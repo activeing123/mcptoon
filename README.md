@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="#installation"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg" /></a>
+  <a href="https://github.com/activeing123/mcptoon/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://pypi.org/project/mcptoon/"><img alt="PyPI" src="https://img.shields.io/pypi/v/mcptoon.svg" /></a>
   <a href="LICENSE"><img alt="Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-green.svg" /></a>
   <a href="#why-mcptoon"><img alt="zero deps" src="https://img.shields.io/badge/dependencies-zero-orange.svg" /></a>

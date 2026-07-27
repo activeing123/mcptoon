@@ -23,7 +23,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install package
-      run: pip install -e . --no-build-isolation
+      run: pip install -e .
 
     - name: Install dev dependencies
       run: pip install pytest pytest-cov
@@ -48,7 +48,7 @@ jobs:
         python-version: "3.12"
 
     - name: Install package
-      run: pip install -e . --no-build-isolation
+      run: pip install -e .
 
     - name: Check imports
       run: |
