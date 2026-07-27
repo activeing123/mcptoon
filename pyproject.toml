@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcptoon"
+version = "0.1.0"
+description = "Token-efficient MCP CLI client — use any MCP tool from the terminal, save 40-60% tokens with TOON encoding."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [{name = "cxh"}]
+requires-python = ">=3.10"
+keywords = ["mcp", "cli", "token-efficient", "model-context-protocol", "agent", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[project.scripts]
+mcptoon = "mcptoon.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

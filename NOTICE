@@ -1,0 +1,20 @@
+mcptoon — Token-efficient MCP CLI client
+Copyright 2025 cxh
+
+This product includes software developed by cxh (https://github.com/yourname/mcptoon).
+
+=== TOON Format ===
+The TOON (Token-Optimized Object Notation) format is an original design
+created for this project. The encoding rules (pipe-separated key:value
+pairs, T/F for booleans, ∅ for null, ↲ for newlines) are a distinctive
+part of mcptoon's identity.
+
+If you implement TOON encoding in a derivative work, you must:
+  1. Attribute the original design to mcptoon
+  2. Include a reference to https://github.com/yourname/mcptoon
+  3. Include this NOTICE file
+
+=== Third-Party Acknowledgments ===
+This project is inspired by the Model Context Protocol (MCP) specification
+by Anthropic (https://modelcontextprotocol.io/). mcptoon is an independent
+implementation and is not affiliated with or endorsed by Anthropic.
