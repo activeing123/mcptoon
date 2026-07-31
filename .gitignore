@@ -30,3 +30,12 @@ Thumbs.db
 
 # Config (local)
 .mcptoon.json
+
+# Build artifacts
+dist/
+*.egg-info/
+
+# Temp scripts
+_*.py
+_*.json
+preview.html
