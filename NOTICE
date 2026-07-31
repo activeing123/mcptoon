@@ -1,7 +1,7 @@
 mcptoon — Token-efficient MCP CLI client
 Copyright 2025 cxh
 
-This product includes software developed by cxh (https://github.com/yourname/mcptoon).
+This product includes software developed by cxh (https://github.com/activeing123/mcptoon).
 
 === TOON Format ===
 The TOON (Token-Optimized Object Notation) format is an original design
@@ -11,7 +11,7 @@ part of mcptoon's identity.
 
 If you implement TOON encoding in a derivative work, you must:
   1. Attribute the original design to mcptoon
-  2. Include a reference to https://github.com/yourname/mcptoon
+  2. Include a reference to https://github.com/activeing123/mcptoon
   3. Include this NOTICE file
 
 === Third-Party Acknowledgments ===

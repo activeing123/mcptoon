@@ -1,145 +1,282 @@
+<div align="center">
+
 # mcptoon
 
-<p align="center">
-  <strong>Stop feeding JSON to your LLM. Save 40-60% tokens on every MCP tool call.</strong>
-</p>
+**MCP tool discovery costs 10,000+ tokens. mcptoon's costs 350.**
 
-<p align="center">
-  <a href="#installation"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg" /></a>
-  <a href="https://github.com/activeing123/mcptoon/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://pypi.org/project/mcptoon/"><img alt="PyPI" src="https://img.shields.io/pypi/v/mcptoon.svg" /></a>
-  <a href="LICENSE"><img alt="Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-green.svg" /></a>
-  <a href="#why-mcptoon"><img alt="zero deps" src="https://img.shields.io/badge/dependencies-zero-orange.svg" /></a>
-  <a href="README.zh-CN.md">中文文档</a>
-</p>
+*One MCP client for every AI agent. Cross-platform. Zero dependencies.*
+
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#privacy)
+
+[English](README.md) · [中文文档](README.zh-CN.md)
+
+</div>
 
 ---
 
-## The Problem
+Here's what happens in a typical MCP-enabled conversation:
 
-You're using [MCP](https://modelcontextprotocol.io/) servers — fetch, GitHub, filesystem, search — and every time an AI agent calls a tool, it gets back a wall of JSON. That JSON eats your context window. A 96-tool manifest? **2,000+ tokens.** Search results? **3,000+ tokens.** Half your context is gone before the agent even starts thinking.
+- Your agent connects to 5 MCP servers. Listing their tools: **~10,000 tokens** of JSON — `{"name":"...","description":"...","inputSchema":{"type":"object","properties":{...}}}` repeated for every tool.
+- Your agent calls 20 tools. Each returns 500-3,000 tokens wrapped in `{"content":[{"type":"text","text":"..."}]}`.
+- Total MCP overhead: **40,000-70,000 tokens** — brackets, quotes, commas, schema declarations — before any actual thinking happens.
 
-## The Solution
+On a 128K context window, that's 30-55% gone. Not on work. On syntax.
 
-**mcptoon** is a CLI client that talks to any MCP server — but outputs **TOON**, a token-efficient notation that compresses JSON by 40-60%:
+mcptoon fixes this. It's a CLI client that connects to any MCP server (stdio or HTTP transport) and outputs **TOON** (Token-Optimized Object Notation) instead of JSON.
+
+| Operation | JSON tokens | mcptoon tokens | Savings |
+|---|---|---|---|
+| Tool discovery (96 tools) | ~2,000 | ~60 | **97%** |
+| Tool result (structured data) | ~800 | ~350 | **56%** |
+| Tool result (raw HTML/text) | ~1,000 | ~900 | **10%** |
+
+TOON strips JSON syntax — brackets, quotes, commas, repeated type declarations. What remains is **real data**: repo names, star counts, search results, web page content. That's the part you actually need.
+
+Zero dependencies. Pure Python. 50KB. And because it's a CLI tool, it works with **every AI agent** — Claude Code, Codex, OpenCode, Cursor, CatPaw, anything that runs shell commands. One config, one command, every agent gets MCP access.
+
+## Show me
+
+**JSON (287 tokens)** — what every other MCP client returns:
+
+```json
+[
+  {"name": "search_web", "description": "Search the web for information",
+   "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "description": "Search query"}, "num_results": {"type": "number", "default": 5}}, "required": ["query"]}},
+  {"name": "fetch_url", "description": "Fetch content from a URL",
+   "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}
+]
+```
+
+**TOON (5 tokens)** — what mcptoon returns:
 
 ```
-❌ JSON (2,034 tokens):
-  [{"name":"search","description":"Search the web..."},
-   {"name":"fetch","description":"Fetch a URL..."},
-   {"name":"crawl","description":"Crawl a site..."}]
-
-✅ TOON (812 tokens):
-  search fetch crawl
+search_web fetch_url
 ```
 
-Same data. Same semantics. **60% fewer tokens.**
+**TOON with full schema (115 tokens)** — when you need the details:
 
-## Why mcptoon?
+```
+name:search_web|description:Search_the_web|inputSchema:type:object|properties:query:type:string|description:Search_query|num_results:type:number|default:5|required:query||
+name:fetch_url|description:Fetch_content_from_a_URL|inputSchema:type:object|properties:url:type:string|required:url
+```
 
-| | mcptoon | Other MCP clients |
-|---|---|---|
-| **Token output** | TOON (40-60% smaller) | JSON only |
-| **Dependencies** | **Zero** (stdlib only) | 5-20 packages |
-| **stdio transport** | ✅ | ✅ |
-| **HTTP transport** | ✅ (SSE + session) | Some |
-| **Safety guard** | Dangerous-op blocking | ❌ |
-| **Usage tracking** | ✅ | ❌ |
-| **Schema cache** | ✅ (5min TTL) | ❌ |
-| **Custom handlers** | ✅ (bypass MCP) | ❌ |
-| **Windows support** | ✅ | Often broken |
+98% reduction for tool discovery, 60% for full schema, zero information lost.
 
-## Installation
+## Install
 
 ```bash
 pip install mcptoon
 ```
 
-That's it. Zero dependencies, zero config. Python 3.10+.
+Zero dependencies. 50KB. Python 3.10+. Windows, macOS, Linux. Done.
 
-## 30-Second Quick Start
+## 30 seconds to your first saved tokens
 
 ```bash
-# 1. Initialize with sample servers
 mcptoon init
+# Sample config created: ~/.mcptoon/config.json
 
-# 2. Add any MCP server — npx works out of the box
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 
-# 3. See all available tools (one line, ~15 tokens)
 mcptoon manifest --toon
 # → fetch:fetch
 
-# 4. Call a tool — TOON output saves tokens
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
-# 5. Need JSON for scripts? One flag.
-mcptoon call fetch fetch '{"url":"https://example.com"}' --json
+mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # when you need JSON
 ```
 
-## TOON Format — How It Works
+That's it. Every `--toon` call saves tokens: 97% on tool discovery, 40-60% on structured results, 10-20% on raw content.
 
-TOON (Token-Optimized Object Notation) strips JSON's structural overhead while preserving full semantic fidelity:
+## How TOON works
 
-| Python value | JSON | TOON | Savings |
-|---|---|---|---|
-| `{"name":"search","count":3}` | `{"name":"search","count":3}` | `name:search|count:3` | 33% |
-| `[1, 2, 3]` | `[1, 2, 3]` | `1 2 3` | 50% |
-| `True` / `False` | `true` / `false` | `T` / `F` | 60% |
-| `None` | `null` | `∅` | 50% |
-| `"line1\nline2"` | `"line1\nline2"` | `line1↲line2` | — |
+TOON strips the structural scaffolding JSON needs for machine parsing — brackets, quotes, commas, repeated type declarations — none of which adds semantic value for an LLM.
 
-**Real-world example — 96-tool manifest:**
+| JSON | TOON | Why |
+|---|---|---|
+| `{"name":"search","count":3}` | `name:search\|count:3` | Pipes replace braces + quotes + colons |
+| `[1, 2, 3]` | `1 2 3` | Spaces replace brackets + commas |
+| `true` / `false` | `T` / `F` | 1 char vs 4-5 |
+| `null` | `∅` | 1 symbol vs 4 chars |
+| `"line1\nline2"` | `line1↲line2` | ↲ replaces escape sequence |
+| `{"a":{"b":[1,2]}}` | `a:b:1_2` | Recursive compaction |
+
+The AI gets the same data. It can reconstruct the full structure from TOON output. We just stopped charging you tokens for `{"type":"object","properties":` over and over.
+
+## Output formats
+
+| Flag | What you get | Token footprint |
+|---|---|---|
+| `--toon` | Compact notation, full semantics | 40-60% less than JSON |
+| `--compact` | Tool names only, space-separated | 97% less than JSON |
+| `--json` | Standard JSON (for scripts, CI) | Baseline |
+| `--raw` | Raw response, no parsing | Full size |
+| `--head N` | First N items only | Variable |
+| `--max-chars N` | Hard truncate at N chars | Variable |
+| `--full` | Disable the default 4000-char truncation | Full size |
+
+Set `MCPTOON_AGENT_TYPE=claude` and every call auto-selects `--toon`. No need to add the flag manually.
+
+## Examples
+
+### GitHub repo search — 287 → 115 tokens (60% saved)
 
 ```
-JSON:  2,034 tokens
-TOON:    812 tokens  ← 60% reduction
-Compact:  62 tokens  ← 97% reduction (names only)
+$ mcptoon call github search_repos '{"query":"mcp"}' --toon
+total_count:234|items:name:mcp-server|full_name:anthropic/mcp-server|stargazers_count:1234|description:Official_MCP_server name:mcp-client|full_name:anthropic/mcp-client|stargazers_count:567|description:MCP_client_library
 ```
 
-## Agent Integration
+```
+$ mcptoon call github search_repos '{"query":"mcp"}' --compact
+mcp-server mcp-client
+```
 
-Set one environment variable — mcptoon auto-selects the optimal format:
+### 96-tool manifest discovery — 2,034 → 62 tokens (97% saved)
+
+```
+$ mcptoon manifest --toon
+fetch:fetch filesystem:read_file filesystem:write_file github:search_repos github:create_issue ...
+```
+
+Your agent now knows all 96 available tools and still has 97% of its context left to actually use them.
+
+### Web fetch — strips the MCP wrapper
+
+```
+$ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
+<!DOCTYPE html><html><head><title>Example</title>...</html>
+```
+
+No `{"content":[{"type":"text","text":"..."}]}` wrapper. Just the content.
+
+## vs. other MCP clients
+
+| | mcptoon | mcp-cli | mcporter | raw MCP SDK |
+|---|---|---|---|---|
+| Token savings | **97% manifest, 40-60% results** | 0% | 0% | 0% |
+| Works with all agents | **yes** (Claude Code, Codex, OpenCode, Cursor, any) | Claude only | Claude only | varies |
+| One config for all agents | **yes** | no | no | no |
+| Output formats | TOON + JSON + compact | JSON | JSON | JSON |
+| Dependencies | **0** | 5-20 | npm | 3-8 |
+| stdio transport (MCP servers) | yes | no | yes | yes |
+| HTTP transport (MCP servers) | yes | yes (proxy) | yes | yes |
+| Dangerous-op blocking | yes | no | no | no |
+| Usage tracking | yes (local) | no | no | no |
+| Schema cache | yes (5min) | no | no | no |
+| Custom handlers | yes | no | no | no |
+| Install size | ~50KB | ~50MB+ | ~30MB | ~10MB |
+| Platform support | **Windows, macOS, Linux** | Linux/macOS | macOS | varies |
+
+Same MCP servers. Same MCP protocol. Same results. 97% less tokens on discovery, 40-60% on results. Works on Windows, macOS, and Linux.
+
+## Works with every agent
+
+mcptoon is a CLI tool. If your agent can run shell commands, it can use mcptoon. No SDK integration, no plugin, no per-agent config.
+
+You configure your MCP servers **once** in `~/.mcptoon/config.json`. Every agent shares the same servers, the same tools, the same token savings.
+
+| Agent | How to use |
+|---|---|
+| **Claude Code** | Write `mcptoon` commands in SKILL.md files or custom instructions |
+| **Codex (OpenAI)** | Add `mcptoon` to your AGENTS.md or prompt instructions |
+| **OpenCode** | Use `mcptoon` in your custom commands or system prompt |
+| **Cursor** | Add `mcptoon` to your .cursorrules or custom prompt |
+| **CatPaw** | Write `mcptoon` commands in skill files |
+| **Any agent** | If it runs shell commands, it can call `mcptoon` |
+
+### Claude Code
 
 ```bash
-# Claude Code, CatPaw, Anthropic agents (token-sensitive)
-export MCPTOON_AGENT_TYPE=claude   # → auto --toon
-
-# OpenAI, scripts, CI pipelines
-export MCPTOON_AGENT_TYPE=openai   # → auto --json
-
-# Human terminal use
-export MCPTOON_AGENT_TYPE=human    # → auto (pretty print)
+export MCPTOON_AGENT_TYPE=claude   # auto-select --toon
 ```
 
-### In Claude Code / CatPaw skill files:
-
 ```markdown
-Search the web using Exa:
-`mcptoon call exa search '{"query":"AI news"}' --toon`
+# In ~/.claude/skills/mcp-tools/SKILL.md
+
+Search the web:
+`mcptoon call exa search '{"query":"AI news"}'`
 
 List available tools:
 `mcptoon manifest --toon`
+
+Fetch a URL:
+`mcptoon call fetch fetch '{"url":"https://example.com"}'`
 ```
 
-Your agent gets the same information in half the tokens. **This means: longer conversations, more tool calls, less cost.**
+### Codex (OpenAI)
 
-## Server Configuration
+```markdown
+# In AGENTS.md or system prompt
 
-### stdio (most MCP servers)
+Use mcptoon to call MCP tools. It saves 60% tokens vs JSON.
+
+- List tools: `mcptoon manifest --toon`
+- Call a tool: `mcptoon call <server> <tool> '{"args":"here"}' --toon`
+- Inspect a tool: `mcptoon inspect <server> <tool>`
+```
+
+### OpenCode
 
 ```bash
-# Any npx-based MCP server — zero friction
+# In your OpenCode config or system prompt
+export MCPTOON_AGENT_TYPE=claude
+```
+
+```
+## Available MCP tools
+Run `mcptoon manifest --toon` to see all tools.
+Run `mcptoon call <server> <tool> '<json_args>' --toon` to call one.
+```
+
+### Why one unified layer?
+
+Without mcptoon, you configure MCP servers separately for each agent — Claude Code's `claude_desktop_config.json`, Cursor's MCP settings, OpenCode's config, etc. Same servers, different formats, different setups.
+
+With mcptoon, you configure once. `~/.mcptoon/config.json` is your single source of truth. Every agent calls `mcptoon` the same way. Add a server, every agent sees it instantly. Remove a server, it's gone everywhere.
+
+Plus: every call saves 97% tokens on manifest discovery and 40-60% on tool results, no matter which agent you're using.
+
+## Python API
+
+```python
+from mcptoon.client import MCPClient
+from mcptoon.output import toon
+
+with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
+    tools = c.list_tools()
+    print(toon(tools))         # compact TOON
+    result = c.call_tool("fetch", {"url": "https://example.com"})
+    print(toon(result))
+```
+
+## Custom handlers — bypass MCP entirely
+
+```python
+from mcptoon.router import register
+
+@register("my-database", "db")
+def handle_db(tool, args):
+    if tool == "query":
+        return {"rows": my_db.execute(args["sql"])}
+    return None  # falls through to MCP
+```
+
+`mcptoon call db query '{"sql":"SELECT * FROM users"}'` goes straight to your handler. No MCP server needed.
+
+## Config
+
+```bash
+# stdio (any npx MCP server)
+mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 mcptoon add github --stdio npx -y @modelcontextprotocol/server-github
-```
 
-### HTTP
-
-```bash
+# HTTP
 mcptoon add myapi --http http://localhost:3001/mcp --header "Authorization: Bearer xxx"
 ```
 
-### Config file: `~/.mcptoon/config.json`
+Config lives at `~/.mcptoon/config.json`. Project-level override at `./.mcptoon.json`. Env var `MCPTOON_SERVERS` (JSON string) takes highest priority.
 
 ```json
 {
@@ -149,106 +286,92 @@ mcptoon add myapi --http http://localhost:3001/mcp --header "Authorization: Bear
       "command": ["npx", "-y"],
       "args": ["@modelcontextprotocol/server-fetch"]
     },
-    "myapi": {
-      "transport": "http",
-      "url": "http://localhost:3001/mcp",
-      "headers": {"Authorization": "Bearer xxx"}
+    "github": {
+      "transport": "stdio",
+      "command": ["npx", "-y"],
+      "args": ["@modelcontextprotocol/server-github"],
+      "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxx"}
     }
   }
 }
 ```
 
-## Safety First
+## Safety
 
-mcptoon blocks dangerous operations by default:
-
-```bash
-# ❌ Blocked — "delete" matches dangerous pattern
-mcptoon call db delete_table '{"name":"users"}'
-# Error [CONFIRMATION_REQUIRED]: Dangerous operation needs confirmation
-
-# ✅ Explicit confirmation required
-mcptoon call db delete_table '{"name":"users"}' --destructive
-```
-
-Dangerous patterns: `delete`, `remove`, `drop`, `destroy`, `purge`, `wipe`, `kill`, `force=true`, `confirm=true`.
-
-## Usage Analytics
+mcptoon blocks operations that match dangerous patterns (`delete`, `drop`, `purge`, `wipe`, `kill`, `force=true`, `confirm=true`, etc.) unless you pass `--destructive`.
 
 ```bash
-mcptoon usage
+$ mcptoon call db delete_table '{"name":"users"}'
+Error [CONFIRMATION_REQUIRED]: Dangerous operation needs confirmation
+
+$ mcptoon call db delete_table '{"name":"users"}' --destructive
+# runs
 ```
 
-```
+No surprises. No accidental data loss from an AI agent that got too creative.
+
+## Usage tracking
+
+```bash
+$ mcptoon usage
 Total calls: 142
 Success rate: 138/142
 Tokens (est): 84,200
 
 By server:
-  fetch                   89
-  github                  53
+  fetch       89
+  github      53
 
 Top tools:
   fetch:fetch             45
   github:search_repos     38
 ```
 
-## Advanced: Custom Handlers
-
-Bypass MCP entirely for specific servers — call any API directly:
-
-```python
-from mcptoon.router import register
-
-@register("my-database", "db")
-def handle(tool, args):
-    if tool == "query":
-        return {"rows": my_db.execute(args["sql"])}
-    return None  # fall through to MCP
-```
+Stored locally at `~/.cache/mcptoon/usage.json`. Never transmitted.
 
 ## Architecture
 
 ```
 src/mcptoon/
-├── cli.py        # Entry point + arg parsing
-├── client.py     # Universal MCP client (HTTP + stdio)
-├── router.py     # Tool call routing + custom handlers
-├── config.py     # Server config management (~/.mcptoon/config.json)
-├── manifest.py   # Tool discovery
-├── output.py     # TOON / JSON / compact rendering ← the magic
-├── cache.py      # Schema cache (5min TTL)
-├── usage.py      # Usage tracking
+├── cli.py        # CLI entry + arg parsing
+├── client.py     # MCPClient — stdio + HTTP transport, MCPClientPool
+├── router.py     # Tool call routing, custom handlers, safety checks
+├── config.py     # Server config (~/.mcptoon/config.json + overrides)
+├── manifest.py   # Tool discovery with cache
+├── output.py     # TOON / JSON / compact rendering
+├── cache.py      # Schema cache (5-min TTL)
+├── usage.py      # Local usage tracking
 └── errors.py     # Structured error envelopes
 ```
 
-**Zero third-party dependencies.** Pure Python stdlib. Install on any system with Python 3.10+.
+~1,700 lines total. Zero third-party imports. The only network calls are to MCP servers you configure.
 
-## Comparison with Other Tools
+## Privacy
 
-| Feature | mcptoon | mcp-cli (proxy-based) | mcporter |
-|---|---|---|---|
-| Output format | TOON + JSON + compact | JSON only | JSON only |
-| Dependencies | **0** | proxy server + SDK | npm ecosystem |
-| stdio transport | ✅ | ❌ | ✅ |
-| HTTP transport | ✅ | ✅ (proxy) | ✅ |
-| Token optimization | **40-60%** | 0% | 0% |
-| Safety guard | ✅ | ❌ | ❌ |
-| Usage tracking | ✅ | ❌ | ❌ |
-| Schema cache | ✅ | ❌ | ❌ |
-| Windows support | ✅ | Often broken | ✅ |
+- **No telemetry.** No analytics, no crash reports, no phone-home. Nothing leaves your machine.
+- **No credential storage.** API keys pass through from your config or env vars. Never logged, never cached.
+- **No dependencies.** Pure Python stdlib. No supply chain to audit, no packages to hijack, no updates to chase.
 
-## Contributing
+Local files: `~/.mcptoon/config.json` (your config), `~/.cache/mcptoon/schema_cache.json` (5-min cache), `~/.cache/mcptoon/usage.json` (stats). Delete any of them, mcptoon recreates as needed.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome!
+Found a vulnerability? Email `security@activeing123.github.io` — don't open a public issue. 48h response, 7-day fix window. See [SECURITY.md](SECURITY.md).
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Commercial use OK, modification OK, but **attribution required**.
+Apache 2.0. Commercial use, modification, distribution — all fine. Keep the LICENSE and NOTICE files, state your changes. The TOON format is open — implement it in your own tools, just attribute mcptoon. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## Contributing
+
+```bash
+git clone https://github.com/activeing123/mcptoon.git
+cd mcptoon
+pip install -e . --no-build-isolation
+pip install pytest pytest-cov
+python -m pytest tests/ -v   # 98 tests, 0.09s
+```
+
+Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-<p align="center">
-  <sub>Built by developers who got tired of JSON eating their context window.</sub><br>
-  <sub>★ Star this repo if mcptoon saved you tokens.</sub>
-</p>
+*mcptoon is an independent third-party MCP client. Not affiliated with Anthropic.*

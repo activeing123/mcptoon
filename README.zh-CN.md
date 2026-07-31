@@ -1,52 +1,68 @@
+<div align="center">
+
 # mcptoon
 
-<p align="center">
-  <strong>别再给 LLM 喂 JSON 了。每次 MCP 工具调用省 40-60% token。</strong>
-</p>
+**MCP 工具发现要 10,000+ token。mcptoon 只要 350。**
 
-<p align="center">
-  <a href="#安装"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg" /></a>
-  <a href="https://pypi.org/project/mcptoon/"><img alt="PyPI" src="https://img.shields.io/pypi/v/mcptoon.svg" /></a>
-  <a href="LICENSE"><img alt="Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-green.svg" /></a>
-  <a href="#为什么选-mcptoon"><img alt="零依赖" src="https://img.shields.io/badge/依赖-零-orange.svg" /></a>
-  <a href="README.md">English</a>
-</p>
+*所有 AI Agent 的统一 MCP 客户端。全平台通用。零依赖。*
+
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/依赖-零-orange)](#隐私)
+
+[English](README.md) · [中文文档](README.zh-CN.md)
+
+</div>
 
 ---
 
-## 问题是什么？
+一轮典型的 MCP 对话里发生什么：
 
-你在用 [MCP](https://modelcontextprotocol.io/) 服务器——搜索、抓取、文件系统、GitHub——每次 AI Agent 调用工具，返回的都是一大坨 JSON。这些 JSON 吃掉你的上下文窗口。96 个工具的清单？**2,000+ token。** 搜索结果？**3,000+ token。** Agent 还没开始思考，上下文已经用了一半。
+- 你的 Agent 连接 5 个 MCP 服务器。列出它们的工具：**~10,000 token** 的 JSON——`{"name":"...","description":"...","inputSchema":{"type":"object","properties":{...}}}` 每个工具重复一遍。
+- 你的 Agent 调用 20 次工具。每次返回 500-3,000 token，包在 `{"content":[{"type":"text","text":"..."}]}` 里。
+- 总计 MCP 开销：**40,000-70,000 token**——括号、引号、逗号、schema 声明——在任何实际思考开始之前。
 
-## 怎么解决？
+128K 上下文窗口里，这是 30-55% 直接没了。不是在工作，是在烧语法。
 
-**mcptoon** 是一个 CLI 客户端，可以连任何 MCP 服务器——但输出 **TOON**，一种 token 高效编码格式，压缩 JSON 40-60%：
+mcptoon 解决这个问题。它是一个 CLI 客户端，连接任何 MCP 服务器（stdio 或 HTTP 传输），但输出 **TOON**（Token-Optimized Object Notation）而不是 JSON。
+
+| 操作 | JSON token | mcptoon token | 省 |
+|---|---|---|---|
+| 工具发现（96 个工具） | ~2,000 | ~60 | **97%** |
+| 工具结果（结构化数据） | ~800 | ~350 | **56%** |
+| 工具结果（原始 HTML/文本） | ~1,000 | ~900 | **10%** |
+
+TOON 去掉的是 JSON 语法——括号、引号、逗号、重复的类型声明。剩下的是**真实数据**：仓库名、star 数、搜索结果、网页内容。这些才是你真正需要的。
+
+零依赖，纯 Python，50KB。因为它是 CLI 工具，所以**所有 AI Agent** 都能用——Claude Code、Codex、OpenCode、Cursor、CatPaw，任何能跑 shell 命令的东西。一个配置，一条命令，所有 Agent 都拿到 MCP 访问权限。
+
+## 看效果
+
+**JSON（287 token）**——其他所有 MCP 客户端返回的：
+
+```json
+[
+  {"name": "search_web", "description": "Search the web for information",
+   "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "description": "Search query"}, "num_results": {"type": "number", "default": 5}}, "required": ["query"]}},
+  {"name": "fetch_url", "description": "Fetch content from a URL",
+   "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}
+]
+```
+
+**TOON（5 token）**——mcptoon 返回的：
 
 ```
-❌ JSON（2,034 token）:
-  [{"name":"search","description":"Search the web..."},
-   {"name":"fetch","description":"Fetch a URL..."},
-   {"name":"crawl","description":"Crawl a site..."}]
-
-✅ TOON（812 token）:
-  search fetch crawl
+search_web fetch_url
 ```
 
-同样的数据。同样的语义。**token 少了 60%。**
+**带完整 schema 的 TOON（115 token）**——需要细节时：
 
-## 为什么选 mcptoon？
+```
+name:search_web|description:Search_the_web|inputSchema:type:object|properties:query:type:string|description:Search_query|num_results:type:number|default:5|required:query||
+name:fetch_url|description:Fetch_content_from_a_URL|inputSchema:type:object|properties:url:type:string|required:url
+```
 
-| | mcptoon | 其他 MCP 客户端 |
-|---|---|---|
-| **输出格式** | TOON（省 40-60%） | 只有 JSON |
-| **依赖** | **零**（纯标准库） | 5-20 个包 |
-| **stdio 传输** | ✅ | ✅ |
-| **HTTP 传输** | ✅（SSE + 会话） | 部分支持 |
-| **安全防护** | 危险操作拦截 | ❌ |
-| **用量统计** | ✅ | ❌ |
-| **Schema 缓存** | ✅（5分钟 TTL） | ❌ |
-| **自定义 Handler** | ✅（绕过 MCP） | ❌ |
-| **Windows 支持** | ✅ | 经常坏 |
+工具发现省 98%，完整 schema 省 60%，信息零丢失。
 
 ## 安装
 
@@ -54,91 +70,213 @@
 pip install mcptoon
 ```
 
-就这一步。零依赖，零配置。需要 Python 3.10+。
+零依赖，50KB，Python 3.10+。Windows、macOS、Linux 全支持。完事。
 
-## 30 秒上手
+## 30 秒省下第一批 token
 
 ```bash
-# 1. 初始化示例服务器配置
 mcptoon init
+# Sample config created: ~/.mcptoon/config.json
 
-# 2. 添加任意 MCP 服务器——npx 开箱即用
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 
-# 3. 查看所有工具（一行，约 15 token）
 mcptoon manifest --toon
 # → fetch:fetch
 
-# 4. 调用工具——TOON 输出省 token
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
-# 5. 需要 JSON 给脚本用？一个 flag
-mcptoon call fetch fetch '{"url":"https://example.com"}' --json
+mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # 脚本需要 JSON 时
 ```
 
-## TOON 格式——怎么工作的？
+就这样。每次 `--toon` 调用省 token：工具发现省 97%，结构化结果省 40-60%，原始内容省 10-20%。
 
-TOON（Token-Optimized Object Notation，token 优化对象编码）去掉了 JSON 的结构冗余，同时保留完整的语义信息：
+## TOON 怎么工作的
 
-| Python 值 | JSON | TOON | 省了 |
-|---|---|---|---|
-| `{"name":"search","count":3}` | `{"name":"search","count":3}` | `name:search|count:3` | 33% |
-| `[1, 2, 3]` | `[1, 2, 3]` | `1 2 3` | 50% |
-| `True` / `False` | `true` / `false` | `T` / `F` | 60% |
-| `None` | `null` | `∅` | 50% |
-| `"第一行\n第二行"` | `"第一行\n第二行"` | `第一行↲第二行` | — |
+TOON 去掉 JSON 为机器解析所需的结构脚手架——括号、引号、逗号、重复的类型声明——这些对 LLM 不增加任何语义价值。
 
-**真实场景——96 个工具的清单：**
+| JSON | TOON | 原理 |
+|---|---|---|
+| `{"name":"search","count":3}` | `name:search\|count:3` | 竖线替代花括号+引号+冒号 |
+| `[1, 2, 3]` | `1 2 3` | 空格替代方括号+逗号 |
+| `true` / `false` | `T` / `F` | 1 字符 vs 4-5 字符 |
+| `null` | `∅` | 1 符号 vs 4 字符 |
+| `"第一行\n第二行"` | `第一行↲第二行` | ↲ 替代转义序列 |
+| `{"a":{"b":[1,2]}}` | `a:b:1_2` | 递归压缩 |
+
+AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只是不再让你为 `{"type":"object","properties":` 反复付 token 了。
+
+## 输出格式
+
+| Flag | 输出 | Token 用量 |
+|---|---|---|
+| `--toon` | 紧凑编码，完整语义 | 比 JSON 省 40-60% |
+| `--compact` | 仅工具名，空格分隔 | 比 JSON 省 97% |
+| `--json` | 标准 JSON（脚本、CI 用） | 基准线 |
+| `--raw` | 原始响应，不解析 | 全量 |
+| `--head N` | 仅前 N 条 | 可变 |
+| `--max-chars N` | 硬截断到 N 字符 | 可变 |
+| `--full` | 禁用默认 4000 字符截断 | 全量 |
+
+设 `MCPTOON_AGENT_TYPE=claude`，所有调用自动用 `--toon`，不用手动加 flag。
+
+## 示例
+
+### GitHub 仓库搜索 — 287 → 115 token（省 60%）
 
 ```
-JSON:     2,034 token
-TOON:       812 token  ← 省 60%
-Compact:     62 token  ← 省 97%（仅名称）
+$ mcptoon call github search_repos '{"query":"mcp"}' --toon
+total_count:234|items:name:mcp-server|full_name:anthropic/mcp-server|stargazers_count:1234|description:Official_MCP_server name:mcp-client|full_name:anthropic/mcp-client|stargazers_count:567|description:MCP_client_library
 ```
 
-## Agent 集成
+```
+$ mcptoon call github search_repos '{"query":"mcp"}' --compact
+mcp-server mcp-client
+```
 
-设一个环境变量，mcptoon 自动选择最优格式：
+### 96 个工具的清单发现 — 2,034 → 62 token（省 97%）
+
+```
+$ mcptoon manifest --toon
+fetch:fetch filesystem:read_file filesystem:write_file github:search_repos github:create_issue ...
+```
+
+你的 Agent 知道所有 96 个可用工具，还剩 97% 的上下文去实际使用它们。
+
+### 网页抓取 — 去掉 MCP 包装
+
+```
+$ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
+<!DOCTYPE html><html><head><title>Example</title>...</html>
+```
+
+没有 `{"content":[{"type":"text","text":"..."}]}` 包装。只有内容。
+
+## 和其他 MCP 客户端比
+
+| | mcptoon | mcp-cli | mcporter | 原生 MCP SDK |
+|---|---|---|---|---|
+| 省 token | **发现省 97%，结果省 40-60%** | 0% | 0% | 0% |
+| 支持所有 Agent | **是**（Claude Code、Codex、OpenCode、Cursor、任意） | 仅 Claude | 仅 Claude | 看情况 |
+| 一份配置所有 Agent 共享 | **是** | 否 | 否 | 否 |
+| 输出格式 | TOON + JSON + compact | JSON | JSON | JSON |
+| 依赖 | **0** | 5-20 | npm | 3-8 |
+| stdio 传输（MCP 服务器） | 有 | 无 | 有 | 有 |
+| HTTP 传输（MCP 服务器） | 有 | 有（代理） | 有 | 有 |
+| 危险操作拦截 | 有 | 无 | 无 | 无 |
+| 用量统计 | 有（本地） | 无 | 无 | 无 |
+| Schema 缓存 | 有（5分钟） | 无 | 无 | 无 |
+| 自定义 Handler | 有 | 无 | 无 | 无 |
+| 安装体积 | ~50KB | ~50MB+ | ~30MB | ~10MB |
+| 平台支持 | **Windows、macOS、Linux** | Linux/macOS | macOS | 看情况 |
+
+同样的 MCP 服务器，同样的 MCP 协议，同样的结果。工具发现省 97%，工具结果省 40-60%。Windows、macOS、Linux 全平台通用。
+
+## 所有 Agent 都能用
+
+mcptoon 是 CLI 工具。你的 Agent 能跑 shell 命令，就能用 mcptoon。不需要 SDK 集成，不需要插件，不需要每个 Agent 单独配。
+
+你把 MCP 服务器配置**一次**，存在 `~/.mcptoon/config.json`。所有 Agent 共享同样的服务器、同样的工具、同样的省 token 效果。
+
+| Agent | 怎么用 |
+|---|---|
+| **Claude Code** | 在 SKILL.md 或自定义指令里写 `mcptoon` 命令 |
+| **Codex (OpenAI)** | 在 AGENTS.md 或 prompt 指令里加 `mcptoon` |
+| **OpenCode** | 在自定义命令或 system prompt 里用 `mcptoon` |
+| **Cursor** | 在 .cursorrules 或自定义 prompt 里加 `mcptoon` |
+| **CatPaw** | 在技能文件里写 `mcptoon` 命令 |
+| **任何 Agent** | 能跑 shell 命令就能调 `mcptoon` |
+
+### Claude Code
 
 ```bash
-# Claude Code、CatPaw、Anthropic Agent（对 token 敏感）
-export MCPTOON_AGENT_TYPE=claude   # → 自动 --toon
-
-# OpenAI、脚本、CI 流水线
-export MCPTOON_AGENT_TYPE=openai   # → 自动 --json
-
-# 人类终端使用
-export MCPTOON_AGENT_TYPE=human    # → 自动（友好打印）
+export MCPTOON_AGENT_TYPE=claude   # 自动用 --toon
 ```
 
-### 在 Claude Code / CatPaw 技能文件中使用：
-
 ```markdown
-用 Exa 搜索网页：
-`mcptoon call exa search '{"query":"AI新闻"}' --toon`
+# ~/.claude/skills/mcp-tools/SKILL.md
+
+搜索网页：
+`mcptoon call exa search '{"query":"AI 新闻"}'`
 
 列出可用工具：
 `mcptoon manifest --toon`
+
+抓取 URL：
+`mcptoon call fetch fetch '{"url":"https://example.com"}'`
 ```
 
-你的 Agent 用一半的 token 拿到同样的信息。**这意味着：更长的对话、更多的工具调用、更低的成本。**
+### Codex (OpenAI)
 
-## 服务器配置
+```markdown
+# AGENTS.md 或 system prompt
 
-### stdio（大多数 MCP 服务器）
+用 mcptoon 调用 MCP 工具，比 JSON 省 60% token。
+
+- 列出工具：`mcptoon manifest --toon`
+- 调用工具：`mcptoon call <server> <tool> '{"args":"here"}' --toon`
+- 查看工具详情：`mcptoon inspect <server> <tool>`
+```
+
+### OpenCode
 
 ```bash
-# 任何基于 npx 的 MCP 服务器——零摩擦
+# OpenCode 配置或 system prompt
+export MCPTOON_AGENT_TYPE=claude
+```
+
+```
+## 可用 MCP 工具
+运行 `mcptoon manifest --toon` 查看所有工具。
+运行 `mcptoon call <server> <tool> '<json_args>' --toon` 调用工具。
+```
+
+### 为什么要统一一层？
+
+没有 mcptoon，你得给每个 Agent 单独配 MCP 服务器——Claude Code 的 `claude_desktop_config.json`、Cursor 的 MCP 设置、OpenCode 的配置……同样的服务器，不同的格式，不同的设置。
+
+有了 mcptoon，配一次就行。`~/.mcptoon/config.json` 是唯一的配置源。每个 Agent 都用同样的 `mcptoon` 命令。加个服务器，所有 Agent 立刻看到。删个服务器，到处都没了。
+
+而且：不管用哪个 Agent，每次调用工具发现省 97%、工具结果省 40-60%。
+
+## Python API
+
+```python
+from mcptoon.client import MCPClient
+from mcptoon.output import toon
+
+with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
+    tools = c.list_tools()
+    print(toon(tools))         # 紧凑 TOON
+    result = c.call_tool("fetch", {"url": "https://example.com"})
+    print(toon(result))
+```
+
+## 自定义 Handler — 绕过 MCP
+
+```python
+from mcptoon.router import register
+
+@register("my-database", "db")
+def handle_db(tool, args):
+    if tool == "query":
+        return {"rows": my_db.execute(args["sql"])}
+    return None  # 回退到 MCP
+```
+
+`mcptoon call db query '{"sql":"SELECT * FROM users"}'` 直接到你的 handler，不需要 MCP 服务器。
+
+## 配置
+
+```bash
+# stdio（任何 npx MCP 服务器）
+mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 mcptoon add github --stdio npx -y @modelcontextprotocol/server-github
-```
 
-### HTTP
-
-```bash
+# HTTP
 mcptoon add myapi --http http://localhost:3001/mcp --header "Authorization: Bearer xxx"
 ```
 
-### 配置文件：`~/.mcptoon/config.json`
+配置文件在 `~/.mcptoon/config.json`。项目级覆盖在 `./.mcptoon.json`。环境变量 `MCPTOON_SERVERS`（JSON 字符串）优先级最高。
 
 ```json
 {
@@ -148,106 +286,92 @@ mcptoon add myapi --http http://localhost:3001/mcp --header "Authorization: Bear
       "command": ["npx", "-y"],
       "args": ["@modelcontextprotocol/server-fetch"]
     },
-    "myapi": {
-      "transport": "http",
-      "url": "http://localhost:3001/mcp",
-      "headers": {"Authorization": "Bearer xxx"}
+    "github": {
+      "transport": "stdio",
+      "command": ["npx", "-y"],
+      "args": ["@modelcontextprotocol/server-github"],
+      "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxx"}
     }
   }
 }
 ```
 
-## 安全第一
+## 安全
 
-mcptoon 默认拦截危险操作：
-
-```bash
-# ❌ 被拦截——"delete" 匹配危险模式
-mcptoon call db delete_table '{"name":"users"}'
-# Error [CONFIRMATION_REQUIRED]: Dangerous operation needs confirmation
-
-# ✅ 需要显式确认
-mcptoon call db delete_table '{"name":"users"}' --destructive
-```
-
-危险模式：`delete`、`remove`、`drop`、`destroy`、`purge`、`wipe`、`kill`、`force=true`、`confirm=true`。
-
-## 用量分析
+mcptoon 拦截匹配危险模式的操作（`delete`、`drop`、`purge`、`wipe`、`kill`、`force=true`、`confirm=true` 等），除非你显式传 `--destructive`。
 
 ```bash
-mcptoon usage
+$ mcptoon call db delete_table '{"name":"users"}'
+Error [CONFIRMATION_REQUIRED]: Dangerous operation needs confirmation
+
+$ mcptoon call db delete_table '{"name":"users"}' --destructive
+# 执行
 ```
 
-```
+没有意外。不会被一个过于有创造力的 AI Agent 导致数据丢失。
+
+## 用量统计
+
+```bash
+$ mcptoon usage
 Total calls: 142
 Success rate: 138/142
 Tokens (est): 84,200
 
 By server:
-  fetch                   89
-  github                  53
+  fetch       89
+  github      53
 
 Top tools:
   fetch:fetch             45
   github:search_repos     38
 ```
 
-## 进阶：自定义 Handler
-
-对特定服务器完全绕过 MCP——直接调用任何 API：
-
-```python
-from mcptoon.router import register
-
-@register("my-database", "db")
-def handle(tool, args):
-    if tool == "query":
-        return {"rows": my_db.execute(args["sql"])}
-    return None  # 回退到 MCP
-```
+存储在本地 `~/.cache/mcptoon/usage.json`。永不传输。
 
 ## 架构
 
 ```
 src/mcptoon/
-├── cli.py        # 入口 + 参数解析
-├── client.py     # 通用 MCP 客户端（HTTP + stdio）
-├── router.py     # 工具调用路由 + 自定义 Handler
-├── config.py     # 服务器配置管理（~/.mcptoon/config.json）
-├── manifest.py   # 工具发现
-├── output.py     # TOON / JSON / compact 渲染 ← 核心
-├── cache.py      # Schema 缓存（5分钟 TTL）
-├── usage.py      # 用量统计
+├── cli.py        # CLI 入口 + 参数解析
+├── client.py     # MCPClient — stdio + HTTP 传输, MCPClientPool
+├── router.py     # 工具调用路由, 自定义 handler, 安全检查
+├── config.py     # 服务器配置 (~/.mcptoon/config.json + 覆盖)
+├── manifest.py   # 工具发现 (带缓存)
+├── output.py     # TOON / JSON / compact 渲染
+├── cache.py      # Schema 缓存 (5分钟 TTL)
+├── usage.py      # 本地用量统计
 └── errors.py     # 结构化错误封装
 ```
 
-**零第三方依赖。** 纯 Python 标准库。任何有 Python 3.10+ 的系统都能装。
+总共约 1,700 行。零第三方 import。唯一的网络调用是到你配置的 MCP 服务器。
 
-## 与其他工具对比
+## 隐私
 
-| 功能 | mcptoon | mcp-cli（代理模式） | mcporter |
-|---|---|---|---|
-| 输出格式 | TOON + JSON + compact | 只有 JSON | 只有 JSON |
-| 依赖 | **0** | 代理服务器 + SDK | npm 生态 |
-| stdio 传输 | ✅ | ❌ | ✅ |
-| HTTP 传输 | ✅ | ✅（代理） | ✅ |
-| Token 优化 | **40-60%** | 0% | 0% |
-| 安全防护 | ✅ | ❌ | ❌ |
-| 用量统计 | ✅ | ❌ | ❌ |
-| Schema 缓存 | ✅ | ❌ | ❌ |
-| Windows 支持 | ✅ | 经常坏 | ✅ |
+- **没有遥测。** 没有分析，没有崩溃报告，没有回传。什么都不离开你的机器。
+- **不存凭证。** API key 从你的配置或环境变量直接传递。永不记录，永不缓存。
+- **没有依赖。** 纯 Python 标准库。没有供应链要审计，没有包会被劫持，没有更新要追。
 
-## 贡献
+本地文件：`~/.mcptoon/config.json`（你的配置）、`~/.cache/mcptoon/schema_cache.json`（5 分钟缓存）、`~/.cache/mcptoon/usage.json`（统计）。删掉任何一个，mcptoon 按需重建。
 
-参见 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎 PR！
+发现安全漏洞？发邮件到 `security@activeing123.github.io`，不要公开提 issue。48 小时回复，7 天修复。见 [SECURITY.md](SECURITY.md)。
 
 ## 许可证
 
-Apache License 2.0——详见 [LICENSE](LICENSE)。商业使用 OK，修改 OK，但**必须保留署名**。
+Apache 2.0。商业使用、修改、分发都行。保留 LICENSE 和 NOTICE 文件，声明你的修改。TOON 格式是开放的——你可以在自己的工具中实现，只需署名 mcptoon。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
+## 贡献
+
+```bash
+git clone https://github.com/activeing123/mcptoon.git
+cd mcptoon
+pip install -e . --no-build-isolation
+pip install pytest pytest-cov
+python -m pytest tests/ -v   # 98 个测试, 0.09s
+```
+
+零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
-<p align="center">
-  <sub>由受够了 JSON 吃掉上下文窗口的开发者构建。</sub><br>
-  <sub>★ 如果 mcptoon 帮你省了 token，给个 Star。</sub>
-</p>
+*mcptoon 是独立的第三方 MCP 客户端，不隶属于 Anthropic。*

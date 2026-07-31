@@ -6,7 +6,7 @@ Thanks for your interest in contributing! This guide will help you get started.
 
 ```bash
 # Clone
-git clone https://github.com/yourname/mcptoon.git
+git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 
 # Install in development mode

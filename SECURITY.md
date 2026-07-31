@@ -11,7 +11,7 @@
 If you discover a security vulnerability in mcptoon:
 
 1. **DO NOT** open a public GitHub issue
-2. Email: security@yourdomain.com (replace with your email)
+2. Email: `security@activeing123.github.io`
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce
@@ -38,3 +38,20 @@ mcptoon does not phone home. Usage tracking is local-only (`~/.cache/mcptoon/usa
 
 ### Zero Dependencies
 The entire codebase uses only Python standard library. No supply chain risk from third-party packages.
+
+### No Background Processes
+mcptoon runs as a one-shot CLI command. It starts, executes, prints output, and exits. No daemon, no background service, no lingering process.
+
+### Network Transparency
+The **only** network connections mcptoon makes are to MCP servers **you** configure. mcptoon itself never connects to any external service, API, or endpoint.
+
+### Local Data Files
+All data stays on your machine:
+
+| File | Purpose | Location |
+|------|---------|----------|
+| `~/.mcptoon/config.json` | Server configuration (you create/edit) | User home dir |
+| `~/.cache/mcptoon/schema_cache.json` | Tool schema cache (5-min TTL) | Cache dir |
+| `~/.cache/mcptoon/usage.json` | Local usage statistics | Cache dir |
+
+You can delete any of these files at any time. mcptoon will recreate them as needed.
