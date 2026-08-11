@@ -366,7 +366,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 98 tests, 0.09s
+python -m pytest tests/ -v   # 160 tests, 0.22s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
