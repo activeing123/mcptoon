@@ -43,4 +43,7 @@ preview.html
 # Internal docs (not for public repo)
 PROJECT_STATUS.md
 TASK_SPEC.md
+INCREMENTAL_PLAN.md
+HANDOFF.md
+.daily_progress.json
 assets/badge_preview.html
