@@ -1,0 +1,38 @@
+{
+  "name": "filesystem",
+  "display_name": "Filesystem",
+  "description": "Read/write files and directories — the most basic MCP server, zero config needed",
+  "package": "@modelcontextprotocol/server-filesystem",
+  "install": "npx -y @modelcontextprotocol/server-filesystem <allowed-dir>",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"],
+    "env": {}
+  },
+  "tools": [
+    "read_file",
+    "read_multiple_files",
+    "write_file",
+    "create_directory",
+    "list_directory",
+    "move_file",
+    "search_files",
+    "get_file_info",
+    "list_allowed_directories"
+  ],
+  "tool_count": 9,
+  "verified": true,
+  "verified_date": "2026-08-11",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Must specify allowed directory as argument — server only accesses paths you explicitly allow",
+    "On Windows, use forward slashes or escaped backslashes in the path argument",
+    "No recursive directory creation with write_file — use create_directory first"
+  ],
+  "notes": "The #1 beginner MCP. Pass your project directory as the argument and your agent can read/write files. Security by design — only paths you list are accessible.",
+  "usage": "mcptoon add filesystem --stdio npx -y @modelcontextprotocol/server-filesystem /your/project/dir",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true
+}

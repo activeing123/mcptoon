@@ -1,0 +1,26 @@
+{
+  "name": "time",
+  "display_name": "Time",
+  "description": "Get current time and convert timezones — simple but surprisingly useful",
+  "package": "@modelcontextprotocol/server-time",
+  "install": "npx -y @modelcontextprotocol/server-time",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-time"],
+    "env": {}
+  },
+  "tools": ["get_current_time", "convert_time"],
+  "tool_count": 2,
+  "verified": true,
+  "verified_date": "2026-08-11",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Uses IANA timezone names (e.g., 'Asia/Shanghai', 'America/New_York') — not abbreviations like 'CST'"
+  ],
+  "notes": "Simple but practical. AI agents often need to know the current time, schedule tasks, or convert between timezones. Zero config.",
+  "usage": "mcptoon add time --stdio npx -y @modelcontextprotocol/server-time",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true
+}

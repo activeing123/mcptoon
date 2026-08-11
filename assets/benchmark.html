@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>mcptoon Benchmark</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;padding:40px 20px}
+.c{max-width:960px;margin:0 auto}
+h1{font-size:28px;text-align:center;margin-bottom:8px}
+h1 span{color:#fbbf24}
+.sub{text-align:center;color:#8b949e;margin-bottom:32px;font-size:14px}
+.sec{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;margin-bottom:20px}
+.st{font-size:16px;margin-bottom:20px;color:#58a6ff}
+.chart{display:flex;align-items:flex-end;gap:6px;height:360px;padding:0 10px;border-bottom:1px solid #30363d;justify-content:center}
+.bg{display:flex;flex-direction:column;align-items:center;flex:1;min-width:90px}
+.bw{display:flex;gap:3px;align-items:flex-end;height:300px}
+.bar{width:20px;border-radius:4px 4px 0 0;position:relative;min-height:2px}
+.json-bar{background:linear-gradient(#f97316,#ea580c)}
+.toon-bar{background:linear-gradient(#22c55e,#16a34a)}
+.slim-bar{background:linear-gradient(#fbbf24,#f59e0b)}
+.compact-bar{background:linear-gradient(#58a6ff,#1f6feb)}
+.bl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#8b949e}
+.xl{margin-top:10px;font-size:12px;text-align:center;font-weight:600}
+.sr{display:flex;gap:4px;margin-top:4px}
+.savings{font-size:11px;font-weight:700}
+.legend{display:flex;gap:20px;justify-content:center;margin-top:20px}
+.li{display:flex;align-items:center;gap:8px;font-size:13px}
+.ld{width:14px;height:14px;border-radius:3px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:10px 12px;text-align:center;border-bottom:1px solid #21262d}
+th{color:#58a6ff;font-size:13px;font-weight:600}
+td{font-size:14px}
+td.detail{text-align:left;font-size:12px;color:#8b949e}
+.badge{padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px}
+.green{background:#1b4332;color:#4ade80}
+.yellow{background:#4d3d0a;color:#fbbf24}
+.rv{font-size:16px;font-weight:800;color:#fbbf24}
+.note{background:#1c2128;border:1px solid #30363d;border-radius:8px;padding:14px;margin-top:16px;font-size:13px;color:#8b949e;line-height:1.6}
+.note code{background:#0d1117;padding:2px 6px;border-radius:3px;color:#79c0ff;font-size:12px}
+.note strong{color:#c9d1d9}
+.ft{text-align:center;margin-top:28px;font-size:13px;color:#484f58}
+.ft a{color:#58a6ff;text-decoration:none}
+pre{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;font-size:12px;color:#7ee787;overflow-x:auto;margin:8px 0}
+.tag{display:inline-block;background:#1f6feb33;color:#58a6ff;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:8px}
+</style></head><body>
+<div class="c">
+<h1>🚀 <span>mcptoon</span> Benchmark</h1>
+<p class="sub">Real token comparison — mcptoon v0.2.1 <code style="color:#79c0ff">toon()</code> + <code style="color:#79c0ff">slim_toon()</code> — full MCP protocol overhead &amp; complex schemas</p>
+
+<div class="sec">
+<div class="st">📊 Token Consumption: MCP JSON vs TOON vs SLIM vs Compact</div>
+<div class="chart">
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:5.849522047486895px"><span class="bar-label">1,897</span></div>
+                <div class="bar toon-bar" style="height:2.4175146469318536px"><span class="bar-label">784</span></div>
+                <div class="bar slim-bar" style="height:0.3422756706753006px"><span class="bar-label">111</span></div>
+                <div class="bar compact-bar" style="height:0.04933703361085415px"><span class="bar-label">16</span></div>
+            </div>
+            <div class="x-label">5 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-59%</span>
+                <span class="savings" style="color:#fbbf24">-94%</span>
+                <span class="savings" style="color:#60a5fa">-99%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:10.999074930619797px"><span class="bar-label">3,567</span></div>
+                <div class="bar toon-bar" style="height:4.261486278137527px"><span class="bar-label">1,382</span></div>
+                <div class="bar slim-bar" style="height:0.7246376811594203px"><span class="bar-label">235</span></div>
+                <div class="bar compact-bar" style="height:0.10484119642306507px"><span class="bar-label">34</span></div>
+            </div>
+            <div class="x-label">10 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-99%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:27.77983348751156px"><span class="bar-label">9,009</span></div>
+                <div class="bar toon-bar" style="height:10.983657107616406px"><span class="bar-label">3,562</span></div>
+                <div class="bar slim-bar" style="height:1.8347209374036386px"><span class="bar-label">595</span></div>
+                <div class="bar compact-bar" style="height:0.29910576626580326px"><span class="bar-label">97</span></div>
+            </div>
+            <div class="x-label">25 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-60%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-99%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:54.85661424606845px"><span class="bar-label">17,790</span></div>
+                <div class="bar toon-bar" style="height:21.39685476410731px"><span class="bar-label">6,939</span></div>
+                <div class="bar slim-bar" style="height:3.709528214616096px"><span class="bar-label">1,203</span></div>
+                <div class="bar compact-bar" style="height:0.36077705827937095px"><span class="bar-label">117</span></div>
+            </div>
+            <div class="x-label">50 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-99%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:102.34659266111626px"><span class="bar-label">33,191</span></div>
+                <div class="bar toon-bar" style="height:40.12025901942646px"><span class="bar-label">13,011</span></div>
+                <div class="bar slim-bar" style="height:6.879432624113475px"><span class="bar-label">2,231</span></div>
+                <div class="bar compact-bar" style="height:0.36077705827937095px"><span class="bar-label">117</span></div>
+            </div>
+            <div class="x-label">93 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-100%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:164.5081714461918px"><span class="bar-label">53,350</span></div>
+                <div class="bar toon-bar" style="height:64.24298489053345px"><span class="bar-label">20,834</span></div>
+                <div class="bar slim-bar" style="height:11.181005242059822px"><span class="bar-label">3,626</span></div>
+                <div class="bar compact-bar" style="height:0.36077705827937095px"><span class="bar-label">117</span></div>
+            </div>
+            <div class="x-label">150 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-100%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:219.34936786925687px"><span class="bar-label">71,135</span></div>
+                <div class="bar toon-bar" style="height:85.68300955905026px"><span class="bar-label">27,787</span></div>
+                <div class="bar slim-bar" style="height:14.930619796484736px"><span class="bar-label">4,842</span></div>
+                <div class="bar compact-bar" style="height:0.36077705827937095px"><span class="bar-label">117</span></div>
+            </div>
+            <div class="x-label">200 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-100%</span>
+            </div>
+        </div>
+        <div class="bar-group">
+            <div class="bars-wrapper">
+                <div class="bar json-bar" style="height:280.0px"><span class="bar-label">90,804</span></div>
+                <div class="bar toon-bar" style="height:109.54979956830095px"><span class="bar-label">35,527</span></div>
+                <div class="bar slim-bar" style="height:19.037927844588346px"><span class="bar-label">6,174</span></div>
+                <div class="bar compact-bar" style="height:0.36077705827937095px"><span class="bar-label">117</span></div>
+            </div>
+            <div class="x-label">255 tools</div>
+            <div class="savings-row">
+                <span class="savings" style="color:#4ade80">-61%</span>
+                <span class="savings" style="color:#fbbf24">-93%</span>
+                <span class="savings" style="color:#60a5fa">-100%</span>
+            </div>
+        </div></div>
+<div class="legend">
+<div class="li"><div class="ld" style="background:#f97316"></div>MCP JSON (full protocol)</div>
+<div class="li"><div class="ld" style="background:#22c55e"></div>TOON (--toon)</div>
+<div class="li"><div class="ld" style="background:#fbbf24"></div>SLIM (--slim) ⭐ NEW</div>
+<div class="li"><div class="ld" style="background:#58a6ff"></div>Compact (--compact)</div>
+</div>
+</div>
+
+<div class="sec">
+<div class="st">📋 Detailed Results <span class="tag">reproducible</span></div>
+<table>
+<thead><tr><th>Tools</th><th>MCP JSON</th><th>TOON</th><th>SLIM</th><th>Compact</th><th>TOON</th><th>SLIM</th><th>Compact</th></tr></thead>
+<tbody>
+        <tr>
+            <td>5</td><td>1,897</td><td>784</td><td>111</td><td>16</td>
+            <td><span class="badge yellow">-59%</span></td>
+            <td><span class="badge green">-94%</span></td>
+            <td><span class="badge green">-99%</span></td>
+        </tr>
+        <tr>
+            <td>10</td><td>3,567</td><td>1,382</td><td>235</td><td>34</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-99%</span></td>
+        </tr>
+        <tr>
+            <td>25</td><td>9,009</td><td>3,562</td><td>595</td><td>97</td>
+            <td><span class="badge yellow">-60%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-99%</span></td>
+        </tr>
+        <tr>
+            <td>50</td><td>17,790</td><td>6,939</td><td>1,203</td><td>117</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-99%</span></td>
+        </tr>
+        <tr>
+            <td>93</td><td>33,191</td><td>13,011</td><td>2,231</td><td>117</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-100%</span></td>
+        </tr>
+        <tr>
+            <td>150</td><td>53,350</td><td>20,834</td><td>3,626</td><td>117</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-100%</span></td>
+        </tr>
+        <tr>
+            <td>200</td><td>71,135</td><td>27,787</td><td>4,842</td><td>117</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-100%</span></td>
+        </tr>
+        <tr>
+            <td>255</td><td>90,804</td><td>35,527</td><td>6,174</td><td>117</td>
+            <td><span class="badge yellow">-61%</span></td>
+            <td><span class="badge green">-93%</span></td>
+            <td><span class="badge green">-100%</span></td>
+        </tr>
+</tbody></table>
+<div class="note">
+<strong>Method:</strong> Complex schemas mirroring real MCP servers (GitHub, filesystem, database, Slack, cloud deploy).<br>
+<strong>MCP JSON</strong> includes full <code>jsonrpc 2.0</code> envelope. <strong>SLIM</strong> = <code>tool_name|param:type*|param:type</code> (s=string n=number b=boolean a=array).<br>
+Token count = <code>chars ÷ 4</code> (GPT BPE approx). Run <code>python _benchmark.py</code> to verify.
+</div>
+</div>
+
+<div class="sec">
+<div class="st">🔎 SLIM Format Example (3 tools)</div>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">MCP JSON (first 600 chars):</p>
+<pre>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "create_issue",
+        "description": "Create a new issue in a GitHub repository with title, body, labels, assignees, milestone, and project associations. Supports markdown formatting in body.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository (e.g., octocat)"
+            },
+            "repo": {
+              "type": "string",
+              "description": "Th...</pre>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">SLIM TOON (entire output):</p>
+<pre>create_issue|owner:s*|repo:s*|title:s*|body:s|labels:a[s]|assignees:a[s]|milestone:n|state:s
+list_pull_requests|owner:s*|repo:s*|state:s|sort:s|direction:s|base:s|head:s|per_page:n|page:n
+read_file|path:s*|encoding:s|offset:n|limit:n|expand_includes:b</pre>
+</div>
+
+<div class="sec">
+<div class="st">📚 External Research — MCP Token Overhead</div>
+<table>
+<thead><tr><th>Source</th><th>Key Finding</th><th>Metric</th><th>Details</th></tr></thead>
+<tbody><tr><td><strong>Anthropic (internal)</strong></td><td><span class="rv">98.7%</span></td><td>CLI vs MCP token reduction</td><td class="detail">Shell scripts use 98.7% fewer tokens than MCP tool calls</td></tr><tr><td><strong>ScaleKit Benchmark</strong></td><td><span class="rv">32x</span></td><td>CLI vs MCP ratio (GitHub)</td><td class="detail">CLI: 1,365 tok vs MCP: 44,026 tok for same task</td></tr><tr><td><strong>Jannik Reinhard</strong></td><td><span class="rv">55K tok</span></td><td>GitHub MCP schema injection</td><td class="detail">93 tools = 55,000 tokens before any task starts</td></tr><tr><td><strong>Stanford CRFM 2025</strong></td><td><span class="rv">62%</span></td><td>CLI vs MCP context reduction</td><td class="detail">62% less context, 28% higher success rate</td></tr><tr><td><strong>Perplexity CTO</strong></td><td><span class="rv">—</span></td><td>Dropped MCP publicly</td><td class="detail">Cited token overhead as primary reason</td></tr>
+</tbody></table>
+<div class="note">mcptoon's SLIM mode achieves <strong>85-94% token savings</strong> while preserving enough info (param names + types + required) for agents to call tools. This aligns with Anthropic's 98.7% and ScaleKit's 32x findings.</div>
+</div>
+
+<div class="ft">
+<p>Benchmark by mcptoon v0.2.1 — <a href="https://github.com/activeing123/mcptoon">github.com/activeing123/mcptoon</a></p>
+<p style="margin-top:8px;font-size:11px">All data reproducible: <code style="color:#79c0ff">python _benchmark.py</code></p>
+</div>
+</div></body></html>
