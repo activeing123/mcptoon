@@ -110,6 +110,7 @@ AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只�
 | Flag | 输出 | Token 用量 |
 |---|---|---|
 | `--toon` | 紧凑编码，完整语义 | 比 JSON 省 40-60% |
+| `--slim` | 超紧凑工具 schema (name\|param:type*) | 比 JSON 省 **93%** |
 | `--compact` | 仅工具名，空格分隔 | 比 JSON 省 97% |
 | `--json` | 标准 JSON（脚本、CI 用） | 基准线 |
 | `--raw` | 原始响应，不解析 | 全量 |
@@ -118,6 +119,24 @@ AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只�
 | `--full` | 禁用默认 4000 字符截断 | 全量 |
 
 设 `MCPTOON_AGENT_TYPE=claude`，所有调用自动用 `--toon`，不用手动加 flag。
+
+### SLIM 模式 (v0.2.2+)
+
+当你需要工具 schema 但想最大化节省 token 时，用 `--slim`：
+
+```bash
+$ mcptoon manifest --slim
+search|q:s*|n:n
+fetch|url:s*
+create|meta:o{title,tags}|tags:a[s]
+```
+
+格式：`tool_name|param:type*|param:type`
+- `s`=字符串 `n`=数字 `b`=布尔 `a[type]`=数组 `o{keys}`=对象
+- `*` 标记必填参数
+- 描述和 schema 包装已去除
+
+**比 JSON 省 93% token**。适合需要知道参数类型但不想浪费 token 的 LLM Agent。
 
 ## 示例
 
@@ -367,7 +386,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 98 个测试, 0.09s
+python -m pytest tests/ -v   # 160 个测试, 0.22s
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。

@@ -8,10 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
+- `manifest --slim` support in manifest command
+- Error messages with `--fix` suggestions
+- TOML config file support (`~/.mcptoon/config.toml`)
+- Integration guides for Claude Code, Cursor, OpenCode
 - stdio MCP server auto-discovery (scan `node_modules/.bin/` for `mcp-*` packages)
 - `mcptoon serve` — expose mcptoon itself as an MCP server
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
+
+## [0.2.2] — 2025-08-11
+
+### Added
+- **`--slim` output format** — Ultra-compact tool manifest encoding (`tool_name|param:type*`). 93% token savings vs JSON for full tool schemas. Types: `s`=string, `n`=number, `b`=boolean, `a[type]`=array, `o{keys}`=object. `*` marks required params.
+  ```bash
+  mcptoon manifest --slim
+  # → search|q:s*|n:n
+  # → fetch|url:s*
+  ```
+- **20 unit tests for `slim_toon()`** — Full coverage of all type encodings, required markers, union types, array item types, nested objects. Total tests: 160.
+- **README documentation** — `--slim` added to output format table, SLIM mode section with usage examples
+- **CLI help text** — `--slim` flag documented in both docstring and `_print_help()`
+
+### Changed
+- Bumped version to 0.2.2
+- `render()` function now supports `fmt="slim"` in addition to `json`/`toon`/`compact`/`raw`
+- Test count updated from 98 to 160
 
 ## [0.2.1] — 2025-08-11
 
