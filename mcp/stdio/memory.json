@@ -1,0 +1,37 @@
+{
+  "name": "memory",
+  "display_name": "Memory",
+  "description": "Persistent knowledge graph — store entities, relations, and observations for your AI agent",
+  "package": "@modelcontextprotocol/server-memory",
+  "install": "npx -y @modelcontextprotocol/server-memory",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-memory"],
+    "env": {}
+  },
+  "tools": [
+    "create_entities",
+    "create_relations",
+    "add_observations",
+    "delete_entities",
+    "delete_observations",
+    "delete_relations",
+    "read_graph",
+    "search_nodes",
+    "open_nodes"
+  ],
+  "tool_count": 9,
+  "verified": true,
+  "verified_date": "2026-08-11",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Data persists in memory during the session — restart loses data unless you save the graph",
+    "No built-in persistence to disk — for long-term storage, use export_graph before closing"
+  ],
+  "notes": "Perfect for AI agents that need to remember context across tool calls. Knowledge graph with entities, relations, and observations.",
+  "usage": "mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true
+}

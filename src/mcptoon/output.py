@@ -106,6 +106,77 @@ def toon(obj):
     return _toon_value(obj)
 
 
+# ─── Slim TOON Encoder (for tool manifests) ───
+
+_TYPE_MAP = {
+    "string": "s", "number": "n", "integer": "n",
+    "boolean": "b", "array": "a", "object": "o", "null": "_",
+}
+
+
+def slim_toon(obj):
+    """Encode tool manifest as ultra-compact TOON.
+
+    Format: tool_name|p1:type*|p2:type|p3:a[item_type]
+    - * marks required params
+    - types: s=string n=number b=boolean a=array o=object
+    - descriptions and schema wrappers stripped
+
+    Example:
+        >>> slim_toon([{"name": "search", "inputSchema": {
+        ...     "properties": {"q": {"type": "string"}, "n": {"type": "number"}},
+        ...     "required": ["q"]}}])
+        'search|q:s*|n:n'
+    """
+    if isinstance(obj, list):
+        lines = []
+        for item in obj:
+            if isinstance(item, dict) and "name" in item:
+                lines.append(_slim_tool(item))
+            else:
+                lines.append(_toon_value(item))
+        return "\n".join(lines)
+    if isinstance(obj, dict) and "name" in obj:
+        return _slim_tool(obj)
+    return _toon_value(obj)
+
+
+def _slim_tool(tool):
+    """Encode a single tool definition as slim TOON."""
+    name = tool.get("name", "?")
+    schema = tool.get("inputSchema", {})
+    props = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    if not props:
+        return name
+
+    params = []
+    for pname, pdef in props.items():
+        ptype = pdef.get("type", "any")
+        # Handle union types (type is a list)
+        if isinstance(ptype, list):
+            ptype = ptype[0] if ptype else "any"
+        short = _TYPE_MAP.get(ptype, ptype[:1] if isinstance(ptype, str) and ptype else "?")
+        # Array with item type
+        if ptype == "array":
+            items = pdef.get("items", {})
+            item_type_raw = items.get("type", "?")
+            if isinstance(item_type_raw, list):
+                item_type_raw = item_type_raw[0] if item_type_raw else "?"
+            item_type = _TYPE_MAP.get(item_type_raw, item_type_raw[:1] if isinstance(item_type_raw, str) and item_type_raw else "?")
+            short = f"a[{item_type}]"
+        # Object with known properties — show nested keys
+        elif ptype == "object" and "properties" in pdef:
+            nested = ",".join(pdef["properties"].keys())
+            short = f"o{{{nested}}}"
+        # Mark required
+        marker = "*" if pname in required else ""
+        params.append(f"{pname}:{short}{marker}")
+
+    return f"{name}|{'|'.join(params)}"
+
+
 # ─── Compact Encoder ───
 
 def compact(obj, max_items=30):
@@ -170,7 +241,7 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
 
     Args:
         obj: Any Python object to render
-        fmt: "json" | "compact" | "toon" | "auto" | "raw"
+        fmt: "json" | "compact" | "toon" | "slim" | "auto" | "raw"
         compact_mode: Use compact JSON (no indent) when fmt=json
         head_n: Take first N items of arrays
         max_chars: Truncate output to N chars (0 = use default 4000)
@@ -196,6 +267,10 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
 
     if fmt == "toon":
         result = toon(obj)
+        return _truncate(result, effective_max) if effective_max else result
+
+    if fmt == "slim":
+        result = slim_toon(obj)
         return _truncate(result, effective_max) if effective_max else result
 
     if fmt == "raw":

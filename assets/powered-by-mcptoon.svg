@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="30" viewBox="0 0 210 30">
+  <defs>
+    <linearGradient id="bun" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="0.5" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="210" height="30" fill="url(#bun)" rx="6"/>
+  <text x="105" y="21" text-anchor="middle" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="800" fill="#1a1a2e">🚀 Powered by mcptoon</text>
+</svg>

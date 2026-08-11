@@ -1,0 +1,28 @@
+{
+  "name": "brave-search",
+  "display_name": "Brave Search",
+  "description": "Web and local business search via Brave Search API",
+  "package": "@modelcontextprotocol/server-brave-search",
+  "install": "npx -y @modelcontextprotocol/server-brave-search",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-brave-search"],
+    "env": {
+      "BRAVE_API_KEY": "<your-brave-api-key>"
+    }
+  },
+  "tools": ["brave_web_search", "brave_local_search"],
+  "tool_count": 2,
+  "verified": true,
+  "verified_date": "2026-08-11",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Requires Brave Search API key — get one at https://brave.com/search/api/",
+    "Free tier: 2000 queries/month"
+  ],
+  "notes": "brave_web_search for general queries, brave_local_search for business/place searches.",
+  "usage": "mcptoon add brave-search --stdio npx -y @modelcontextprotocol/server-brave-search",
+  "our_usage_rank": 4,
+  "our_usage_calls": 89
+}

@@ -81,6 +81,8 @@ def main():
             fmt = "compact"
         elif a == "--toon":
             fmt = "toon"
+        elif a == "--slim":
+            fmt = "slim"
         elif a == "--raw":
             fmt = "raw"
         elif a == "--full":
@@ -544,7 +546,7 @@ _mcptoon_complete() {
         --format)
             COMPREPLY=( $(compgen -W "openai openapi mcp json human" -- $cur) )
             ;;
-        --toon|--json|--compact|--raw|--full|--stdin)
+        --toon|--slim|--json|--compact|--raw|--full|--stdin)
             COMPREPLY=()
             ;;
     esac

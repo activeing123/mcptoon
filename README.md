@@ -17,6 +17,8 @@
 
 **[What's new in v0.2.0](#whats-new-in-v020)** — stdin support, doctor command, tool poisoning guard, fuzzy match, cross-agent format export
 
+![mcptoon demo](assets/demo.gif)
+
 </div>
 
 ---
