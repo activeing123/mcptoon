@@ -31,6 +31,7 @@ Usage:
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
     mcptoon doctor                       Self-diagnose config + connectivity
+    mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags (global):
     --toon         Token-efficient output (default for claude)
@@ -145,6 +146,8 @@ def main():
         _cmd_discover(rest, fmt)
     elif command == "doctor":
         _cmd_doctor(rest)
+    elif command == "completion":
+        _cmd_completion(rest)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -517,6 +520,107 @@ def _cmd_doctor(_rest):
 
 
 # ═══════════════════════════════════════════════════
+# Shell completion
+# ═══════════════════════════════════════════════════
+
+_BASH_COMPLETION = r'''
+_mcptoon_complete() {
+    local cur prev commands
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    commands="init list manifest inspect call add remove usage discover doctor completion help"
+
+    if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$commands" -- $cur) )
+        return 0
+    fi
+
+    case "$prev" in
+        call|inspect)
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "$(mcptoon list 2>/dev/null | sed 's/  //;s/ \[.*//')" -- $cur) )
+            fi
+            ;;
+        --format)
+            COMPREPLY=( $(compgen -W "openai openapi mcp json human" -- $cur) )
+            ;;
+        --toon|--json|--compact|--raw|--full|--stdin)
+            COMPREPLY=()
+            ;;
+    esac
+}
+complete -F _mcptoon_complete mcptoon
+'''
+
+_ZSH_COMPLETION = r'''
+#compdef mcptoon
+
+_mcptoon() {
+    local commands=(init list manifest inspect call add remove usage discover doctor completion help)
+    local formats=(openai openapi mcp json human)
+
+    if (( CURRENT == 1 )); then
+        _describe 'command' commands
+        return
+    fi
+
+    case $words[2] in
+        call|inspect)
+            if (( CURRENT == 2 )); then
+                local servers=($(mcptoon list 2>/dev/null | sed 's/  //;s/ \[.*//'))
+                _describe 'server' servers
+            fi
+            ;;
+        --format)
+            _describe 'format' formats
+            ;;
+    esac
+}
+compdef _mcptoon mcptoon
+'''
+
+_FISH_COMPLETION = r'''
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init list manifest inspect call add remove usage discover doctor completion help'
+complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
+complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
+'''
+
+_PS_COMPLETION = '''
+$scriptBlock = {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $commands = 'init','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help'
+    $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+    }
+}
+Register-ArgumentCompleter -CommandName mcptoon -ScriptBlock $scriptBlock
+'''
+
+
+def _cmd_completion(rest):
+    """Generate shell completion script."""
+    shell = rest[0] if rest else "bash"
+
+    scripts = {
+        "bash": ("Bash", _BASH_COMPLETION),
+        "zsh": ("Zsh", _ZSH_COMPLETION),
+        "fish": ("Fish", _FISH_COMPLETION),
+        "powershell": ("PowerShell", _PS_COMPLETION),
+        "ps": ("PowerShell", _PS_COMPLETION),
+    }
+
+    if shell not in scripts:
+        print(f"Unknown shell: {shell}")
+        print(f"Supported: {', '.join(scripts.keys())}")
+        sys.exit(1)
+
+    name, script = scripts[shell]
+    print(f"# mcptoon completion for {name}")
+    print(f"# Install: eval this script or add to your shell config")
+    print(script)
+
+
+# ═══════════════════════════════════════════════════
 # Natural language fallback
 # ═══════════════════════════════════════════════════
 
@@ -563,6 +667,7 @@ Usage:
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
     mcptoon doctor                       Self-diagnose config + connectivity
+    mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags:
     --toon         Token-efficient output (saves 40-60% tokens)
