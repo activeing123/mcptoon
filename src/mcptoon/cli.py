@@ -35,6 +35,7 @@ Usage:
 
 Output flags (global):
     --toon         Token-efficient output (default for claude)
+    --slim         Ultra-compact tool manifests (93% savings)
     --json         JSON output
     --compact      Names only
     --raw          Raw output
@@ -673,6 +674,7 @@ Usage:
 
 Output flags:
     --toon         Token-efficient output (saves 40-60% tokens)
+    --slim         Ultra-compact tool manifests (saves 93% tokens)
     --json         JSON output
     --compact      Names only
     --stdin        Read JSON args from stdin (for large payloads)
@@ -684,6 +686,7 @@ Output flags:
 Examples:
     mcptoon init
     mcptoon manifest --toon
+    mcptoon manifest --slim              # ultra-compact tool schemas
     mcptoon call fetch fetch '{{"url":"https://example.com"}}' --toon
     echo '{{"huge":"payload"}}' | mcptoon call server tool --stdin --toon
     mcptoon discover

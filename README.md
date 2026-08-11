@@ -15,7 +15,9 @@
 
 [English](README.md) | [中文文档](README.zh-CN.md) | [Report Bug](https://github.com/activeing123/mcptoon/issues) | [Request Feature](https://github.com/activeing123/mcptoon/issues)
 
-**[What's new in v0.2.0](#whats-new-in-v020)** — stdin support, doctor command, tool poisoning guard, fuzzy match, cross-agent format export
+**What's new in v0.2.0** — stdin support, doctor command, tool poisoning guard, fuzzy match, cross-agent format export
+
+**What's new in v0.2.2** — `--slim` mode (93% token savings for tool schemas), unit tests for slim_toon()
 
 ![mcptoon demo](assets/demo.gif)
 
@@ -98,6 +100,7 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # when you nee
 | Flag | What you get | Token footprint |
 |---|---|---|
 | `--toon` | Compact notation, full semantics | 40-60% less than JSON |
+| `--slim` | Ultra-compact tool manifests (name\|param:type*) | **93% less than JSON** |
 | `--compact` | Tool names only, space-separated | 97% less than JSON |
 | `--json` | Standard JSON (for scripts, CI) | Baseline |
 | `--raw` | Raw response, no parsing | Full size |
@@ -106,6 +109,24 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # when you nee
 | `--full` | Disable the default 4000-char truncation | Full size |
 
 Set `MCPTOON_AGENT_TYPE=claude` and every call auto-selects `--toon`.
+
+### SLIM mode (v0.2.2+)
+
+When you need tool schemas but want maximum token savings, use `--slim`:
+
+```bash
+$ mcptoon manifest --slim
+search|q:s*|n:n
+fetch|url:s*
+create|meta:o{title,tags}|tags:a[s]
+```
+
+Format: `tool_name|param:type*|param:type`
+- `s`=string `n`=number `b`=boolean `a[type]`=array `o{keys}`=object
+- `*` marks required parameters
+- Descriptions and schema wrappers stripped
+
+**93% token savings** vs JSON for full tool schemas. Perfect for LLM agents that need to know parameter types without the overhead.
 
 ## What's new in v0.2.0
 
