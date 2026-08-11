@@ -234,7 +234,7 @@ mcptoon is more than a CLI tool — it's a **growing ecosystem** for token-effic
 
 | Component | What it is | Status |
 |-----------|-----------|--------|
-| 📦 **[Profile Registry](mcp/README.md)** | Pre-configured MCP server templates | 10 profiles / 82 tools → 100+ |
+| 📦 **[Server Support Matrix](mcp/README.md)** | 59 MCP servers: 10 ready · 49 planned · community requests | 10 → 100+ |
 | 🔧 **TOON Format** | Token-optimized notation (open spec) | v1 in mcptoon → standalone spec |
 | 📚 **Integration Guides** | Agent-specific setup docs | 10 agents planned |
 | 🏷️ **Powered by Badge** | For MCP servers using mcptoon | Coming soon |
