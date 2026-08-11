@@ -18,7 +18,7 @@ import json
 import os
 import pytest
 
-from mcptoon.output import toon, compact, render, _toon_scalar, _toon_value, head, _truncate
+from mcptoon.output import toon, compact, render, slim_toon, _toon_scalar, _toon_value, head, _truncate
 
 
 class TestToonScalar:
@@ -152,6 +152,112 @@ class TestTruncate:
         assert _truncate(text, 0) == text
 
 
+class TestSlimToon:
+    """Tests for slim_toon() — ultra-compact tool manifest encoding."""
+
+    def test_single_tool_with_required_string(self):
+        tool = {"name": "search", "inputSchema": {
+            "properties": {"q": {"type": "string"}},
+            "required": ["q"]}}
+        assert slim_toon(tool) == "search|q:s*"
+
+    def test_single_tool_with_optional_number(self):
+        tool = {"name": "search", "inputSchema": {
+            "properties": {"q": {"type": "string"}, "n": {"type": "number"}},
+            "required": ["q"]}}
+        assert slim_toon(tool) == "search|q:s*|n:n"
+
+    def test_tool_with_boolean_param(self):
+        tool = {"name": "toggle", "inputSchema": {
+            "properties": {"enabled": {"type": "boolean"}},
+            "required": ["enabled"]}}
+        assert slim_toon(tool) == "toggle|enabled:b*"
+
+    def test_tool_with_integer_param(self):
+        tool = {"name": "paginate", "inputSchema": {
+            "properties": {"page": {"type": "integer"}}}}
+        assert slim_toon(tool) == "paginate|page:n"
+
+    def test_tool_with_no_params(self):
+        tool = {"name": "list_all", "inputSchema": {"properties": {}}}
+        assert slim_toon(tool) == "list_all"
+
+    def test_tool_with_no_schema(self):
+        tool = {"name": "bare_tool"}
+        assert slim_toon(tool) == "bare_tool"
+
+    def test_tool_with_array_param(self):
+        tool = {"name": "batch", "inputSchema": {
+            "properties": {"ids": {"type": "array", "items": {"type": "string"}}},
+            "required": ["ids"]}}
+        assert slim_toon(tool) == "batch|ids:a[s]*"
+
+    def test_tool_with_array_of_numbers(self):
+        tool = {"name": "sum", "inputSchema": {
+            "properties": {"nums": {"type": "array", "items": {"type": "number"}}}}}
+        assert slim_toon(tool) == "sum|nums:a[n]"
+
+    def test_tool_with_object_param(self):
+        tool = {"name": "create", "inputSchema": {
+            "properties": {"meta": {"type": "object", "properties": {"title": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}}}}}}
+        result = slim_toon(tool)
+        assert result == "create|meta:o{title,tags}"
+
+    def test_tool_with_union_type(self):
+        tool = {"name": "flex", "inputSchema": {
+            "properties": {"val": {"type": ["string", "null"]}}}}
+        assert slim_toon(tool) == "flex|val:s"
+
+    def test_tool_with_unknown_type(self):
+        tool = {"name": "weird", "inputSchema": {
+            "properties": {"x": {"type": "custom_type"}}}}
+        result = slim_toon(tool)
+        assert "weird|x:" in result
+
+    def test_multiple_tools_as_list(self):
+        tools = [
+            {"name": "search", "inputSchema": {"properties": {"q": {"type": "string"}}, "required": ["q"]}},
+            {"name": "fetch", "inputSchema": {"properties": {"url": {"type": "string"}}, "required": ["url"]}},
+        ]
+        result = slim_toon(tools)
+        assert "search|q:s*" in result
+        assert "fetch|url:s*" in result
+        assert "\n" in result
+
+    def test_mixed_list_with_non_tool_dicts(self):
+        items = [
+            {"name": "tool1", "inputSchema": {"properties": {"x": {"type": "string"}}}},
+            {"not_a_tool": True},
+        ]
+        result = slim_toon(items)
+        assert "tool1|x:s" in result
+
+    def test_non_dict_passthrough(self):
+        assert slim_toon("hello") == "hello"
+        assert slim_toon(42) == "42"
+
+    def test_empty_list(self):
+        assert slim_toon([]) == ""
+
+    def test_all_required_marked(self):
+        tool = {"name": "multi", "inputSchema": {
+            "properties": {
+                "a": {"type": "string"},
+                "b": {"type": "number"},
+                "c": {"type": "boolean"},
+            },
+            "required": ["a", "b", "c"]}}
+        result = slim_toon(tool)
+        assert "a:s*" in result
+        assert "b:n*" in result
+        assert "c:b*" in result
+
+    def test_no_required_means_no_stars(self):
+        tool = {"name": "optional", "inputSchema": {
+            "properties": {"x": {"type": "string"}}}}
+        assert "*" not in slim_toon(tool)
+
+
 class TestRender:
     def test_json_format(self):
         result = render({"a": 1}, fmt="json")
@@ -184,3 +290,22 @@ class TestRender:
         # Without env var, should work without error
         result = render({"a": 1}, fmt="auto")
         assert "a" in result
+
+    def test_slim_format(self):
+        tool = {"name": "search", "inputSchema": {
+            "properties": {"q": {"type": "string"}}, "required": ["q"]}}
+        result = render([tool], fmt="slim")
+        assert "search|q:s*" in result
+
+    def test_slim_format_truncation(self):
+        tools = []
+        for i in range(100):
+            tools.append({"name": f"tool_{i}", "inputSchema": {
+                "properties": {"param": {"type": "string"}}}})
+        result = render(tools, fmt="slim", max_chars=50)
+        assert "[truncated" in result
+
+    def test_slim_format_full(self):
+        tool = {"name": "x", "inputSchema": {"properties": {"p": {"type": "string"}}}}
+        result = render([tool], fmt="slim", full=True)
+        assert "x|p:s" in result
