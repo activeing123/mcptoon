@@ -13,7 +13,7 @@
 
 **If this saves you tokens, please star the repo — it helps others discover it.**
 
-[English](README.md) | [中文文档](README.zh-CN.md) | [Report Bug](https://github.com/activeing123/mcptoon/issues) | [Request Feature](https://github.com/activeing123/mcptoon/issues)
+[English](README.md) | [中文文档](README.zh-CN.md) | [🌐 Ecosystem](ECOSYSTEM.md) | [📦 Profiles](mcp/README.md) | [Report Bug](https://github.com/activeing123/mcptoon/issues) | [Request Feature](https://github.com/activeing123/mcptoon/issues)
 
 **What's new in v0.2.0** — stdin support, doctor command, tool poisoning guard, fuzzy match, cross-agent format export
 
@@ -227,6 +227,24 @@ mcptoon manifest --format mcp > mcp-tools.json
 | Schema cache | yes (5min) | no | no | no |
 | Install size | ~50KB | ~50MB+ | ~30MB | ~10MB |
 | Platform support | **Windows, macOS, Linux** | Linux/macOS | macOS | varies |
+
+## 🌐 Ecosystem
+
+mcptoon is more than a CLI tool — it's a **growing ecosystem** for token-efficient MCP usage:
+
+| Component | What it is | Status |
+|-----------|-----------|--------|
+| 📦 **[Profile Registry](mcp/README.md)** | Pre-configured MCP server templates | 10 profiles / 82 tools → 100+ |
+| 🔧 **TOON Format** | Token-optimized notation (open spec) | v1 in mcptoon → standalone spec |
+| 📚 **Integration Guides** | Agent-specific setup docs | 10 agents planned |
+| 🏷️ **Powered by Badge** | For MCP servers using mcptoon | Coming soon |
+| 🔌 **Multi-language SDK** | TOON for JS/Go/Rust | Post-v1.0 |
+
+**Contribute:** Add a profile · Write an integration guide · Implement TOON in your language
+
+→ **[Full ecosystem plan](ECOSYSTEM.md)**
+
+---
 
 ## Works with every agent
 
