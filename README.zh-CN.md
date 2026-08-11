@@ -10,7 +10,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/依赖-零-orange)](#隐私)
 
-[English](README.md) · [中文文档](README.zh-CN.md)
+[English](README.md) · [中文文档](README.zh-CN.md) · [🌐 生态](ECOSYSTEM.md) · [📦 Profiles](mcp/README.md)
 
 </div>
 
@@ -283,6 +283,24 @@ def handle_db(tool, args):
 ```
 
 `mcptoon call db query '{"sql":"SELECT * FROM users"}'` 直接到你的 handler，不需要 MCP 服务器。
+
+## 🌐 生态建设
+
+mcptoon 不只是 CLI 工具——它是一个 **token 高效的 MCP 生态系统**：
+
+| 组件 | 是什么 | 状态 |
+|------|--------|------|
+| 📦 **[Profile 库](mcp/README.md)** | 预配置的 MCP 服务器模板 | 10 个 / 82 工具 → 100+ |
+| 🔧 **TOON 格式** | Token 优化标记法（开放规范） | v1 内置于 mcptoon → 独立规范 |
+| 📚 **集成指南** | Agent 专属配置文档 | 10 个 Agent 规划中 |
+| 🏷️ **Powered by 徽章** | MCP 服务器使用 mcptoon 的标识 | 即将推出 |
+| 🔌 **多语言 SDK** | JS/Go/Rust 的 TOON 实现 | v1.0 后 |
+
+**参与贡献：** 添加 Profile · 写集成指南 · 在你的语言中实现 TOON
+
+→ **[完整生态计划](ECOSYSTEM.md)**
+
+---
 
 ## 配置
 
