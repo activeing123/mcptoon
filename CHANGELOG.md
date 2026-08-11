@@ -10,9 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - stdio MCP server auto-discovery (scan `node_modules/.bin/` for `mcp-*` packages)
 - `mcptoon serve` — expose mcptoon itself as an MCP server
-- Tab completion for bash/zsh/fish/powershell
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
+
+## [0.2.1] — 2025-08-11
+
+### Added
+- **`completion` command** — Generate shell auto-completion scripts for bash, zsh, fish, and PowerShell. Auto-completes subcommands, server names (from config), and `--format` values.
+  ```bash
+  mcptoon completion bash >> ~/.bashrc
+  mcptoon completion zsh >> ~/.zshrc
+  mcptoon completion fish > ~/.config/fish/completions/mcptoon.fish
+  mcptoon completion powershell | Out-File -Append $PROFILE
+  ```
 
 ## [0.2.0] — 2025-08-11
 
