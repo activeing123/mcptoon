@@ -18,6 +18,7 @@ mcptoon router — Tool call routing
 
 Routes tool calls to the appropriate MCP server via MCPClientPool.
 Supports custom handlers via decorator pattern.
+Includes tool poisoning detection and fuzzy match suggestions.
 """
 from typing import Any, Callable
 
@@ -75,6 +76,54 @@ def _check_dangerous(server: str, tool: str, args: dict | None = None) -> str | 
     return None
 
 
+# ─── Tool poisoning detection ───
+
+# Patterns that indicate prompt injection in tool results
+_POISONING_INDICATORS = [
+    # Instruction-like content in results
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard the above",
+    "you are now",
+    "new instructions:",
+    "system prompt:",
+    # Hidden instructions
+    "<!-- assistant:",
+    "<!-- ignore",
+    "[INST]",
+    "<<SYS>>",
+    # Data exfiltration attempts
+    "send this to",
+    "post this to",
+    "call this url",
+]
+
+
+def _check_poisoning(result: Any) -> str | None:
+    """Detect prompt injection in tool results.
+
+    Returns reason string if poisoning detected, None otherwise.
+    This is a heuristic check — not a security boundary, but a safety net.
+    """
+    if result is None:
+        return None
+
+    # Convert result to string for scanning
+    try:
+        text = str(result).lower()
+    except Exception:
+        return None
+
+    # Only check first 5000 chars (performance)
+    text = text[:5000]
+
+    for indicator in _POISONING_INDICATORS:
+        if indicator.lower() in text:
+            return f"potential prompt injection detected: contains '{indicator}'"
+
+    return None
+
+
 # ─── Main router ───
 
 def call_tool(
@@ -82,6 +131,7 @@ def call_tool(
     tool: str,
     args: dict | None = None,
     is_destructive: bool = False,
+    skip_poisoning_check: bool = False,
 ) -> Any:
     """Route a tool call to the appropriate handler or MCP server.
 
@@ -90,11 +140,17 @@ def call_tool(
       2. MCPClientPool → call via MCP protocol
       3. Error
 
+    Safety features:
+      - Dangerous operation blocking (unless is_destructive=True)
+      - Tool poisoning detection (unless skip_poisoning_check=True)
+      - Fuzzy match suggestions on unknown tools
+
     Args:
         server: Server name (short name OK, will be resolved)
         tool: Tool name
         args: Tool arguments dict
         is_destructive: Acknowledge dangerous operation
+        skip_poisoning_check: Skip poisoning detection (for trusted sources)
 
     Returns:
         Tool result (dict, list, or scalar)
@@ -118,6 +174,15 @@ def call_tool(
         try:
             result = handler(tool, args)
             if result is not None:
+                # Check for poisoning
+                if not skip_poisoning_check:
+                    poison = _check_poisoning(result)
+                    if poison:
+                        return make_error(
+                            "TOOL_POISONING",
+                            f"Tool result may contain prompt injection: {poison}",
+                            "router", retry=False, server=server, tool=tool,
+                        )
                 usage.track_call(server, tool, ok=not is_error(result))
                 return result
         except Exception as e:
@@ -137,11 +202,33 @@ def call_tool(
         pool = MCPClientPool(servers)
         result = pool.call(server, tool, args)
         pool.close()
+
+        # Check for poisoning in result
+        if not skip_poisoning_check:
+            poison = _check_poisoning(result)
+            if poison:
+                return make_error(
+                    "TOOL_POISONING",
+                    f"Tool result may contain prompt injection: {poison}",
+                    "router", retry=False, server=server, tool=tool,
+                )
+
         usage.track_call(server, tool, ok=not is_error(result))
         return result
     except MCPError as e:
         usage.track_call(server, tool, ok=False)
-        return make_error(e.code, e.message, "mcp", retry=e.retry, server=server, tool=tool)
+        # Provide suggestions for unknown tools
+        suggestions = []
+        if e.code in ("METHOD_NOT_FOUND", "UNKNOWN_TOOL", "TOOL_NOT_FOUND"):
+            try:
+                from . import manifest as manifest_mod
+                suggestions = manifest_mod.fuzzy_match_tool(server, tool)
+            except Exception:
+                pass
+        err = make_error(e.code, e.message, "mcp", retry=e.retry, server=server, tool=tool)
+        if suggestions:
+            err["suggestions"] = suggestions
+        return err
     except Exception as e:
         usage.track_call(server, tool, ok=False)
         return make_error("CALL_ERROR", str(e)[:200], "router", retry=False, server=server, tool=tool)

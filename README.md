@@ -4,13 +4,16 @@
 
 **MCP tool discovery costs 10,000+ tokens. mcptoon's costs 350.**
 
-*One MCP client for every AI agent. Cross-platform. Zero dependencies.*
+*One MCP client for every AI agent. Cross-platform. Zero dependencies. Battle-tested with 255+ tools.*
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#privacy)
+[![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon)
 
 [English](README.md) · [中文文档](README.zh-CN.md)
+
+**[What's new in v0.2.0](#whats-new-in-v020)** — stdin support, doctor command, tool poisoning guard, fuzzy match, cross-agent format export
 
 </div>
 
@@ -151,6 +154,87 @@ $ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
 No `{"content":[{"type":"text","text":"..."}]}` wrapper. Just the content.
 
+## What's new in v0.2.0
+
+Battle-tested features from production use with 255+ MCP tools across 23+ servers:
+
+### `--stdin` for large payloads
+
+OS command-line limits (32,767 chars on Windows, ~128KB on Linux) break MCP calls with large content. Now you can pipe arguments via stdin:
+
+```bash
+# This fails on Windows if content > 32KB:
+mcptoon call fetch put '{"content":"...huge..."}'
+
+# This always works:
+echo '{"content":"...huge..."}' | mcptoon call fetch put --stdin --toon
+mcptoon call fetch put --stdin --toon < payload.json
+```
+
+### `doctor` — one-command self-diagnosis
+
+```bash
+$ mcptoon doctor
+  ✓ Python 3.12.0 (>=3.10 required)
+  ✓ Config: ~/.mcptoon/config.json (5 servers)
+  ✓ Cache dir: ~/.cache/mcptoon
+  ✓ fetch              [stdio]  1 tools
+  ✓ github             [stdio]  12 tools
+  ✗ myapi              [http]   ERROR: Connection refused
+  - MCPTOON_AGENT_TYPE not set (defaulting to auto)
+
+  5 checks, 1 issue(s)
+```
+
+### `discover` — server health check
+
+```bash
+$ mcptoon discover
+Discovered 3 server(s):
+
+  ✓ fetch                [stdio]   1 tools  ok
+  ✓ github               [stdio]  12 tools  ok
+  ✗ myapi                [http]    0 tools  error
+    └─ Connection refused
+```
+
+### Tool poisoning guard
+
+MCP servers return arbitrary content. A compromised server could inject instructions into your agent's context. mcptoon now detects and blocks common prompt injection patterns:
+
+```bash
+$ mcptoon call malicious get_data '{}'
+Error [TOOL_POISONING]: Tool result may contain prompt injection:
+  potential prompt injection detected: contains 'ignore previous instructions'
+```
+
+Patterns detected: instruction overrides, hidden `<!-- assistant:` directives, `[INST]`/`<<SYS>>` tags, data exfiltration attempts.
+
+### Fuzzy match "Did you mean?"
+
+Tool names across MCP servers follow no naming convention. When you mistype:
+
+```bash
+$ mcptoon call exa sarch '{"query":"AI"}'
+Error [METHOD_NOT_FOUND]: Unknown tool: sarch
+Did you mean: search, search_all
+```
+
+### Cross-agent format export
+
+Export your tool manifest for non-CLI agents:
+
+```bash
+# OpenAI function calling
+mcptoon manifest --format openai > functions.json
+
+# OpenAPI 3.0 spec
+mcptoon manifest --format openapi > openapi.json
+
+# MCP tools/list format
+mcptoon manifest --format mcp > mcp-tools.json
+```
+
 ## vs. other MCP clients
 
 | | mcptoon | mcp-cli | mcporter | raw MCP SDK |
@@ -158,11 +242,15 @@ No `{"content":[{"type":"text","text":"..."}]}` wrapper. Just the content.
 | Token savings | **97% manifest, 40-60% results** | 0% | 0% | 0% |
 | Works with all agents | **yes** (Claude Code, Codex, OpenCode, Cursor, any) | Claude only | Claude only | varies |
 | One config for all agents | **yes** | no | no | no |
-| Output formats | TOON + JSON + compact | JSON | JSON | JSON |
+| Output formats | TOON + JSON + compact + **openai + openapi + mcp** | JSON | JSON | JSON |
 | Dependencies | **0** | 5-20 | npm | 3-8 |
 | stdio transport (MCP servers) | yes | no | yes | yes |
 | HTTP transport (MCP servers) | yes | yes (proxy) | yes | yes |
 | Dangerous-op blocking | yes | no | no | no |
+| Tool poisoning guard | **yes** | no | no | no |
+| Fuzzy match suggestions | **yes** | no | no | no |
+| `--stdin` large payloads | **yes** | no | no | no |
+| `doctor` self-diagnosis | **yes** | no | no | no |
 | Usage tracking | yes (local) | no | no | no |
 | Schema cache | yes (5min) | no | no | no |
 | Custom handlers | yes | no | no | no |

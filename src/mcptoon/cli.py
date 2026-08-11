@@ -20,12 +20,17 @@ Usage:
     mcptoon list                         List configured servers
     mcptoon manifest                     List all tools (compact)
     mcptoon manifest --full              List all tools with params
+    mcptoon manifest --format openai    Export as OpenAI function calling
+    mcptoon manifest --format openapi   Export as OpenAPI 3.0 spec
+    mcptoon discover                     Discover servers + health check
     mcptoon inspect <server> <tool>      Show tool schema
     mcptoon call <server> <tool> [ARGS]  Call a tool
+    mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)
     mcptoon init                         Create sample config
     mcptoon add <name> [options]         Add a server
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
+    mcptoon doctor                       Self-diagnose config + connectivity
 
 Output flags (global):
     --toon         Token-efficient output (default for claude)
@@ -35,6 +40,8 @@ Output flags (global):
     --head N       Limit to N items
     --max-chars N  Truncate to N chars
     --full         No truncation
+    --format X     Export format: openai|openapi|mcp|json|human
+    --stdin        Read JSON args from stdin (for large payloads)
 """
 import json
 import sys
@@ -60,6 +67,8 @@ def main():
     head_n = 0
     max_chars = 0
     full = False
+    export_format = ""
+    use_stdin = False
     cmd_args = []
 
     i = 0
@@ -75,6 +84,8 @@ def main():
             fmt = "raw"
         elif a == "--full":
             full = True
+        elif a == "--stdin":
+            use_stdin = True
         elif a == "--head" and i + 1 < len(args):
             try:
                 head_n = int(args[i + 1])
@@ -97,6 +108,11 @@ def main():
                 max_chars = int(a.split("=", 1)[1])
             except ValueError:
                 pass
+        elif a == "--format" and i + 1 < len(args):
+            export_format = args[i + 1]
+            i += 1
+        elif a.startswith("--format="):
+            export_format = a.split("=", 1)[1]
         else:
             cmd_args.append(a)
         i += 1
@@ -112,11 +128,11 @@ def main():
     if command in ("list", "servers"):
         _cmd_list(rest)
     elif command in ("manifest", "tools"):
-        _cmd_manifest(rest, fmt, head_n, max_chars, full)
+        _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format)
     elif command == "inspect":
         _cmd_inspect(rest, fmt, max_chars, full)
     elif command == "call":
-        _cmd_call(rest, fmt, head_n, max_chars, full)
+        _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin)
     elif command == "init":
         _cmd_init(rest)
     elif command == "add":
@@ -125,6 +141,10 @@ def main():
         _cmd_remove(rest)
     elif command == "usage":
         _cmd_usage(rest, fmt)
+    elif command == "discover":
+        _cmd_discover(rest, fmt)
+    elif command == "doctor":
+        _cmd_doctor(rest)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -157,13 +177,19 @@ def _cmd_list(_rest):
             print(f"  {name:20s} [http]   {url}")
 
 
-def _cmd_manifest(rest, fmt, head_n, max_chars, full):
+def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
     """List all tools."""
     full_mode = "--full" in rest or full
 
     manifest = manifest_mod.get_manifest(use_cache=True)
     if not manifest:
         print("No tools found. Run: mcptoon init")
+        return
+
+    # Export format takes priority
+    if export_format:
+        exported = manifest_mod.export_manifest(manifest, export_format)
+        print(exported)
         return
 
     if fmt in ("toon", "compact"):
@@ -189,6 +215,7 @@ def _cmd_inspect(rest, fmt, max_chars, full):
     """Show tool schema."""
     if len(rest) < 2:
         print("Usage: mcptoon inspect <server> <tool>")
+        print("       mcptoon inspect <server>           (list all tools)")
         sys.exit(1)
 
     server = rest[0]
@@ -196,48 +223,70 @@ def _cmd_inspect(rest, fmt, max_chars, full):
 
     info = manifest_mod.inspect_tool(server, tool)
     if not info:
-        print(f"Tool not found: {server}:{tool}")
+        # Fuzzy match: "Did you mean?"
+        suggestions = manifest_mod.fuzzy_match_tool(server, tool)
+        if suggestions:
+            print(f"Tool not found: {server}:{tool}")
+            print(f"Did you mean: {', '.join(suggestions)}")
+        else:
+            print(f"Tool not found: {server}:{tool}")
+            # Show all tools for this server
+            tools = manifest_mod.get_server_tools(server)
+            if tools:
+                print(f"Available tools: {' '.join(t.get('name','?') for t in tools)}")
         sys.exit(1)
 
     print(output.render(info, fmt=fmt if fmt != "auto" else "json", max_chars=max_chars, full=full))
 
 
-def _cmd_call(rest, fmt, head_n, max_chars, full):
+def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False):
     """Call a tool."""
     if len(rest) < 2:
-        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive]")
+        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin]")
         print("")
         print("Examples:")
         print('  mcptoon call fetch fetch \'{"url":"https://example.com"}\' --toon')
         print('  mcptoon call exa search \'{"query":"AI"}\' --json')
+        print('  echo \'{"huge":"payload"}\' | mcptoon call server tool --stdin --toon')
         sys.exit(1)
 
     server = rest[0]
     tool = rest[1]
     is_destructive = "--destructive" in rest
 
-    # Parse args (JSON string or key=value pairs)
+    # Parse args
     args = {}
-    for item in rest[2:]:
-        if item == "--destructive":
-            continue
-        # Try JSON
-        if item.startswith("{"):
+
+    if use_stdin:
+        # Read JSON args from stdin (for large payloads >32767 chars)
+        stdin_data = sys.stdin.read()
+        if stdin_data.strip():
             try:
-                args = json.loads(item)
-                break
+                args = json.loads(stdin_data)
             except json.JSONDecodeError as e:
-                print(f"Error parsing JSON args: {e}")
+                print(f"Error parsing stdin JSON: {e}", file=sys.stderr)
                 sys.exit(1)
-        # key=value
-        if "=" in item:
-            k, v = item.split("=", 1)
-            # Try to parse value as JSON
-            try:
-                v = json.loads(v)
-            except json.JSONDecodeError:
-                pass
-            args[k] = v
+    else:
+        for item in rest[2:]:
+            if item == "--destructive":
+                continue
+            # Try JSON
+            if item.startswith("{"):
+                try:
+                    args = json.loads(item)
+                    break
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing JSON args: {e}")
+                    sys.exit(1)
+            # key=value
+            if "=" in item:
+                k, v = item.split("=", 1)
+                # Try to parse value as JSON
+                try:
+                    v = json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+                args[k] = v
 
     result = call_tool(server, tool, args, is_destructive=is_destructive)
 
@@ -246,6 +295,9 @@ def _cmd_call(rest, fmt, head_n, max_chars, full):
         print(f"Error [{err['code']}]: {err['message']}", file=sys.stderr)
         if err.get("retry"):
             print("  (retryable)", file=sys.stderr)
+        # Fuzzy match suggestions for unknown tools
+        if err["code"] == "UNKNOWN_TOOL" and result.get("suggestions"):
+            print(f"Did you mean: {', '.join(result['suggestions'])}", file=sys.stderr)
         sys.exit(1)
 
     print(output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
@@ -277,13 +329,6 @@ def _cmd_add(rest):
             print("Error: --stdio requires a command")
             sys.exit(1)
         # First part is command, rest are args
-        server_cfg = {
-            "transport": "stdio",
-            "command": cmd_parts[0:1] if isinstance(cmd_parts[0], str) else cmd_parts,
-            "args": cmd_parts[1:] if len(cmd_parts) > 1 else [],
-        }
-        # Actually, command should be a list for npx-style
-        # Support: mcptoon add fetch --stdio npx -y @mcp/server-fetch
         server_cfg = {
             "transport": "stdio",
             "command": [cmd_parts[0]] + (cmd_parts[1:2] if len(cmd_parts) > 1 else []),
@@ -350,6 +395,127 @@ def _cmd_usage(_rest, fmt):
                 print(f"  {t:30s} {c}")
 
 
+def _cmd_discover(rest, fmt):
+    """Discover servers and check health."""
+    servers = cfg.list_servers()
+    if not servers:
+        print("No servers configured. Run: mcptoon init")
+        return
+
+    filter_name = rest[0] if rest else None
+
+    results = []
+    for name in servers:
+        if filter_name and filter_name not in name:
+            continue
+        s_cfg = cfg.get_server_config(name)
+        transport = s_cfg.get("transport", "stdio") if s_cfg else "?"
+        tool_count = 0
+        status = "ok"
+        error_msg = ""
+
+        try:
+            tools = manifest_mod.get_server_tools(name, use_cache=True)
+            tool_count = len(tools)
+            if tool_count == 0:
+                status = "no-tools"
+        except Exception as e:
+            status = "error"
+            error_msg = str(e)[:80]
+
+        results.append({
+            "server": name,
+            "transport": transport,
+            "tools": tool_count,
+            "status": status,
+            "error": error_msg,
+        })
+
+    if fmt in ("toon", "compact"):
+        print(output.render(results, fmt=fmt))
+    elif fmt == "json":
+        print(output.render(results, fmt="json"))
+    else:
+        print(f"Discovered {len(results)} server(s):")
+        print()
+        for r in results:
+            icon = "✓" if r["status"] == "ok" else "✗"
+            print(f"  {icon} {r['server']:20s} [{r['transport']:5s}] {r['tools']:3d} tools  {r['status']}")
+            if r["error"]:
+                print(f"    └─ {r['error']}")
+
+
+def _cmd_doctor(_rest):
+    """Self-diagnose configuration and connectivity."""
+    print("mcptoon doctor — running diagnostics...")
+    print()
+
+    issues = 0
+    checks = 0
+
+    # 1. Python version
+    checks += 1
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    if sys.version_info >= (3, 10):
+        print(f"  ✓ Python {py_ver} (>=3.10 required)")
+    else:
+        print(f"  ✗ Python {py_ver} — needs 3.10+")
+        issues += 1
+
+    # 2. Config file
+    checks += 1
+    if cfg.CONFIG_FILE.exists():
+        servers = cfg.load_config()
+        print(f"  ✓ Config: {cfg.CONFIG_FILE} ({len(servers)} servers)")
+    else:
+        print(f"  ✗ No config found. Run: mcptoon init")
+        issues += 1
+        print()
+        print(f"  {checks} checks, {issues} issue(s)")
+        return
+
+    # 3. Cache directory
+    checks += 1
+    if cfg.CACHE_DIR.exists():
+        print(f"  ✓ Cache dir: {cfg.CACHE_DIR}")
+    else:
+        print(f"  ! Cache dir missing (will be created on first use)")
+        cfg.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 4. Check each server
+    servers = cfg.load_config()
+    for name in sorted(servers.keys()):
+        s_cfg = servers[name]
+        transport = s_cfg.get("transport", "stdio")
+        checks += 1
+
+        try:
+            tools = manifest_mod.get_server_tools(name, use_cache=True)
+            count = len(tools)
+            if count > 0:
+                print(f"  ✓ {name:20s} [{transport:5s}] {count} tools")
+            else:
+                print(f"  ! {name:20s} [{transport:5s}] 0 tools (server may be empty)")
+        except Exception as e:
+            print(f"  ✗ {name:20s} [{transport:5s}] ERROR: {str(e)[:80]}")
+            issues += 1
+
+    # 5. Environment
+    checks += 1
+    agent_type = os.environ.get("MCPTOON_AGENT_TYPE", "")
+    if agent_type:
+        print(f"  ✓ MCPTOON_AGENT_TYPE={agent_type}")
+    else:
+        print(f"  - MCPTOON_AGENT_TYPE not set (defaulting to auto)")
+
+    print()
+    print(f"  {checks} checks, {issues} issue(s)")
+    if issues == 0:
+        print("  All good! ✓")
+    else:
+        print(f"  {issues} issue(s) found. See above for details.")
+
+
 # ═══════════════════════════════════════════════════
 # Natural language fallback
 # ═══════════════════════════════════════════════════
@@ -362,8 +528,12 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
         _cmd_manifest(rest, fmt, head_n, max_chars, full)
         return
 
-    if any(kw in text for kw in ["服务器", "server", "list server"]):
-        _cmd_list(rest)
+    if any(kw in text for kw in ["服务器", "server", "list server", "discover"]):
+        _cmd_discover(rest, fmt)
+        return
+
+    if any(kw in text for kw in ["诊断", "检查", "doctor", "health", "check"]):
+        _cmd_doctor(rest)
         return
 
     print(f"Unknown command: {command}")
@@ -375,32 +545,42 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
 # ═══════════════════════════════════════════════════
 
 def _print_help():
-    print("""mcptoon — Token-efficient MCP CLI client
+    print(f"""mcptoon v{__import__('mcptoon').__version__} — Token-efficient MCP CLI client
 
 Usage:
     mcptoon list                         List configured servers
     mcptoon manifest                     List all tools (compact)
     mcptoon manifest --full              List all tools with params
+    mcptoon manifest --format openai     Export as OpenAI function calling format
+    mcptoon manifest --format openapi    Export as OpenAPI 3.0 spec
+    mcptoon manifest --format mcp        Export as MCP tools/list format
+    mcptoon discover                     Discover servers + health check
     mcptoon inspect <server> <tool>      Show tool schema
     mcptoon call <server> <tool> [ARGS]  Call a tool
+    mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)
     mcptoon init                         Create sample config
     mcptoon add <name> [options]         Add a server
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
+    mcptoon doctor                       Self-diagnose config + connectivity
 
 Output flags:
     --toon         Token-efficient output (saves 40-60% tokens)
     --json         JSON output
     --compact      Names only
+    --stdin        Read JSON args from stdin (for large payloads)
     --head N       Limit to N items
     --max-chars N  Truncate to N chars
     --full         No truncation
+    --format X     Export: openai|openapi|mcp|json|human
 
 Examples:
     mcptoon init
     mcptoon manifest --toon
-    mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
-    mcptoon add myserver --stdio npx -y @mcp/server-fetch
+    mcptoon call fetch fetch '{{"url":"https://example.com"}}' --toon
+    echo '{{"huge":"payload"}}' | mcptoon call server tool --stdin --toon
+    mcptoon discover
+    mcptoon doctor
 
 Environment:
     MCPTOON_AGENT_TYPE=claude    Auto-select --toon
@@ -408,7 +588,3 @@ Environment:
 
 Config: ~/.mcptoon/config.json
 """)
-
-
-if __name__ == "__main__":
-    main()

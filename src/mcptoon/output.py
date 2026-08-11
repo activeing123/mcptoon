@@ -31,6 +31,13 @@ Adaptive format: set MCPTOON_AGENT_TYPE env var
   script  → --json
   human   → auto
 
+Export formats (--format flag):
+  openai  → OpenAI function calling definitions
+  openapi → OpenAPI 3.0 spec
+  mcp     → MCP tools/list format
+  json    → Raw JSON
+  human   → Human-readable
+
 TOON Format Spec:
   dict  → k1:v1|k2:v2           (pipe-separated key:value pairs)
   list  → v1 v2 v3              (space-separated values)
