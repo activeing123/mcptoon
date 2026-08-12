@@ -68,11 +68,11 @@ Claude Code 配了 15 个 MCP 服务器。换 Cursor——配置格式不同、�
 
 → **mcptoon：一份配置文件，所有 Agent 通用。** `~/.mcptoon/config.json`。几秒切换。配置跟着你走。
 
-#### 😤 为 JSON 垃圾付钱 → ✅ TOON，小 56-97%
+#### 😤 为 JSON 垃圾付钱 → ✅ TOON，小 20-97%
 
 每个 MCP 返回长这样：`{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}`——80 个 token 的括号、引号、类型声明，就为传 6 个 token 的真实数据。一个 session 调 200 次工具 = 1.5万 token 纯语法浪费。
 
-→ **mcptoon：返回 `name:react|stars:219000`——同样的数据，少 56% token。** 工具发现：少 97%。工具 schema：少 93%。
+→ **mcptoon：返回 `name:react|stars:219000`——同样的数据，结果少 20-40% token，schema 少 61%。** 工具发现：少 97%。工具 schema：少 93%。[tiktoken 验证](#toon-原理)。
 
 ---
 
@@ -80,7 +80,7 @@ Claude Code 配了 15 个 MCP 服务器。换 Cursor——配置格式不同、�
 
 ### 怎么做到的？CLI 模式。
 
-mcptoon 是个 CLI 工具，不是 MCP 客户端库。你的 Agent 不连接 MCP 服务器——它只跑 `mcptoon` 命令。MCP schema 存在磁盘上的 `~/.mcptoon/config.json` 里，不进你的上下文窗口。只有你主动要的紧凑输出才进上下文——而 TOON 编码让它比 JSON 小 56-97%。
+mcptoon 是个 CLI 工具，不是 MCP 客户端库。你的 Agent 不连接 MCP 服务器——它只跑 `mcptoon` 命令。MCP schema 存在磁盘上的 `~/.mcptoon/config.json` 里，不进你的上下文窗口。只有你主动要的紧凑输出才进上下文——而 TOON 编码让它比 JSON 小 20-97%。
 
 ## 看效果
 
@@ -179,7 +179,7 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # 脚本需要 JSON 时
 ```
 
-就这样。每次 `--toon` 调用省 token：工具发现省 97%，结构化结果省 40-60%，原始内容省 10-20%。
+就这样。每次 `--toon` 调用省 token：工具发现省 97%，结构化结果省 20-40%，原始内容省 10-20%。
 
 ## TOON 怎么工作的
 
@@ -189,9 +189,9 @@ TOON 去掉 JSON 为机器解析所需的结构脚手架——括号、引号、
 |---|---|---|
 | `{"name":"search","count":3}` | `name:search\|count:3` | 竖线替代花括号+引号+冒号 |
 | `[1, 2, 3]` | `1 2 3` | 空格替代方括号+逗号 |
-| `true` / `false` | `T` / `F` | 1 字符 vs 4-5 字符 |
-| `null` | `∅` | 1 符号 vs 4 字符 |
-| `"第一行\n第二行"` | `第一行↲第二行` | ↲ 替代转义序列 |
+| `true` / `false` | `true` / `false` | 保持原样（两者都是 1 token） |
+| `null` | `null` | 保持原样（∅ 花费 2 token，反而更多） |
+| `"a:b"` | `a_b` | 冒号→下划线（避免竖线歧义） |
 | `{"a":{"b":[1,2]}}` | `a:b:1_2` | 递归压缩 |
 
 AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只是不再让你为 `{"type":"object","properties":` 反复付 token 了。
@@ -200,7 +200,7 @@ AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只�
 
 | Flag | 输出 | Token 用量 |
 |---|---|---|
-| `--toon` | 紧凑编码，完整语义 | 比 JSON 省 40-60% |
+| `--toon` | 紧凑编码，完整语义 | 比 JSON 省 20-40%（tiktoken 验证） |
 | `--slim` | 超紧凑工具 schema (name\|param:type*) | 比 JSON 省 **93%** |
 | `--compact` | 仅工具名，空格分隔 | 比 JSON 省 97% |
 | `--json` | 标准 JSON（脚本、CI 用） | 基准线 |
@@ -392,7 +392,7 @@ export MCPTOON_AGENT_TYPE=claude
 
 有了 mcptoon，配一次就行。`~/.mcptoon/config.json` 是唯一的配置源。每个 Agent 都用同样的 `mcptoon` 命令。加个服务器，所有 Agent 立刻看到。删个服务器，到处都没了。
 
-而且：不管用哪个 Agent，每次调用工具发现省 97%、工具结果省 40-60%。
+而且：不管用哪个 Agent，每次调用工具发现省 97%、工具结果省 20-40%。
 
 ## Python API
 

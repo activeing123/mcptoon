@@ -2,7 +2,7 @@
   {
     "tools": 5,
     "json": 1897,
-    "toon": 784,
+    "toon": 785,
     "slim": 111,
     "compact": 16,
     "toon_save": 59,
@@ -14,7 +14,7 @@
   {
     "tools": 10,
     "json": 3567,
-    "toon": 1382,
+    "toon": 1391,
     "slim": 235,
     "compact": 34,
     "toon_save": 61,
@@ -26,7 +26,7 @@
   {
     "tools": 25,
     "json": 9009,
-    "toon": 3562,
+    "toon": 3580,
     "slim": 595,
     "compact": 97,
     "toon_save": 60,
@@ -38,7 +38,7 @@
   {
     "tools": 50,
     "json": 17790,
-    "toon": 6939,
+    "toon": 6981,
     "slim": 1203,
     "compact": 117,
     "toon_save": 61,
@@ -50,7 +50,7 @@
   {
     "tools": 93,
     "json": 33191,
-    "toon": 13011,
+    "toon": 13086,
     "slim": 2231,
     "compact": 117,
     "toon_save": 61,
@@ -62,7 +62,7 @@
   {
     "tools": 150,
     "json": 53350,
-    "toon": 20834,
+    "toon": 20958,
     "slim": 3626,
     "compact": 117,
     "toon_save": 61,
@@ -74,7 +74,7 @@
   {
     "tools": 200,
     "json": 71135,
-    "toon": 27787,
+    "toon": 27952,
     "slim": 4842,
     "compact": 117,
     "toon_save": 61,
@@ -86,7 +86,7 @@
   {
     "tools": 255,
     "json": 90804,
-    "toon": 35527,
+    "toon": 35735,
     "slim": 6174,
     "compact": 117,
     "toon_save": 61,

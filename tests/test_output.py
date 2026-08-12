@@ -23,13 +23,13 @@ from mcptoon.output import toon, compact, render, slim_toon, _toon_scalar, _toon
 
 class TestToonScalar:
     def test_bool_true(self):
-        assert _toon_scalar(True) == "T"
+        assert _toon_scalar(True) == "true"
 
     def test_bool_false(self):
-        assert _toon_scalar(False) == "F"
+        assert _toon_scalar(False) == "false"
 
     def test_none(self):
-        assert _toon_scalar(None) == "∅"
+        assert _toon_scalar(None) == "null"
 
     def test_int(self):
         assert _toon_scalar(42) == "42"
@@ -41,10 +41,11 @@ class TestToonScalar:
         assert _toon_scalar("hello") == "hello"
 
     def test_string_with_colon(self):
-        assert _toon_scalar("a:b") == "a＿b"
+        assert _toon_scalar("a:b") == "a_b"
 
     def test_string_with_newline(self):
-        assert _toon_scalar("line1\nline2") == "line1↲line2"
+        # Newlines kept as-is (↲ costs 2 tokens, worse)
+        assert _toon_scalar("line1\nline2") == "line1\nline2"
 
     def test_long_string_truncated(self):
         long_str = "x" * 300
@@ -63,10 +64,10 @@ class TestToonValue:
         assert "|" in result
 
     def test_dict_with_bool(self):
-        assert _toon_value({"ok": True}) == "ok:T"
+        assert _toon_value({"ok": True}) == "ok:true"
 
     def test_dict_with_none(self):
-        assert _toon_value({"err": None}) == "err:∅"
+        assert _toon_value({"err": None}) == "err:null"
 
     def test_empty_list(self):
         assert _toon_value([]) == "[]"
@@ -98,7 +99,7 @@ class TestToon:
         assert "\n" in result
 
     def test_bool_and_null(self):
-        assert toon({"ok": True, "err": None}) == "ok:T|err:∅"
+        assert toon({"ok": True, "err": None}) == "ok:true|err:null"
 
 
 class TestCompact:
@@ -269,7 +270,7 @@ class TestRender:
 
     def test_toon_format(self):
         result = render({"ok": True}, fmt="toon")
-        assert result == "ok:T"
+        assert result == "ok:true"
 
     def test_raw_format_string(self):
         assert render("raw text", fmt="raw") == "raw text"

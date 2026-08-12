@@ -73,11 +73,11 @@ You set up 15 MCP servers for Claude Code. Now you try Cursor — different conf
 
 → **mcptoon: One config file, every agent.** `~/.mcptoon/config.json`. Switch agents in seconds. Config follows you.
 
-#### 😤 Paying for JSON garbage → ✅ TOON, 56-97% smaller
+#### 😤 Paying for JSON garbage → ✅ TOON, 20-97% smaller
 
 Every MCP result looks like `{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}` — 80 tokens of braces, quotes, and type declarations to deliver 6 tokens of actual data. Over a session with 200 tool calls, that's 15,000 tokens of pure syntax waste.
 
-→ **mcptoon: Returns `name:react|stars:219000` — same data, 56% fewer tokens.** Discovery: 97% fewer. Schemas: 93% fewer.
+→ **mcptoon: Returns `name:react|stars:219000` — same data, 20-40% fewer tokens on results, 61% on schemas.** Discovery: 97% fewer. Schemas: 93% fewer. [tiktoken-verified](#how-toon-works).
 
 ---
 
@@ -85,7 +85,7 @@ Every MCP result looks like `{"content":[{"type":"text","text":"{\"name\":\"reac
 
 ### How? CLI mode.
 
-mcptoon is a CLI tool, not an MCP client library. Your agent doesn't connect to MCP servers — it just runs `mcptoon` commands. MCP schemas live on disk in `~/.mcptoon/config.json`, not in your context window. Only the compact output you request enters context — and TOON encoding makes it 56-97% smaller than JSON.
+mcptoon is a CLI tool, not an MCP client library. Your agent doesn't connect to MCP servers — it just runs `mcptoon` commands. MCP schemas live on disk in `~/.mcptoon/config.json`, not in your context window. Only the compact output you request enters context — and TOON encoding makes it 20-97% smaller than JSON.
 
 ## Show me
 
@@ -127,16 +127,16 @@ search_web fetch_url
 
 | Tools | JSON tokens | TOON tokens | SLIM tokens | Compact tokens | TOON save | SLIM save | Compact save |
 |--------|-----------|------------|------------|---------------|-----------|-----------|-------------|
-| 5 | 1,897 | 784 | 111 | 16 | 59% | 94% | 99% |
-| 10 | 3,567 | 1,382 | 235 | 34 | 61% | 93% | 99% |
-| 25 | 9,009 | 3,562 | 595 | 97 | 60% | 93% | 99% |
-| 50 | 17,790 | 6,939 | 1,203 | 117 | 61% | 93% | 99% |
-| 93 | 33,191 | 13,011 | 2,231 | 117 | 61% | 93% | 100% |
-| 150 | 53,350 | 20,834 | 3,626 | 117 | 61% | 93% | 100% |
-| 200 | 71,135 | 27,787 | 4,842 | 117 | 61% | 93% | 100% |
-| 255 | 90,804 | 35,527 | 6,174 | 117 | 61% | 93% | 100% |
+| 5 | 1,897 | 785 | 111 | 16 | 59% | 94% | 99% |
+| 10 | 3,567 | 1,391 | 235 | 34 | 61% | 93% | 99% |
+| 25 | 9,009 | 3,580 | 595 | 97 | 60% | 93% | 99% |
+| 50 | 17,790 | 6,981 | 1,203 | 117 | 61% | 93% | 99% |
+| 93 | 33,191 | 13,086 | 2,231 | 117 | 61% | 93% | 100% |
+| 150 | 53,350 | 20,958 | 3,626 | 117 | 61% | 93% | 100% |
+| 200 | 71,135 | 27,952 | 4,842 | 117 | 61% | 93% | 100% |
+| 255 | 90,804 | 35,735 | 6,174 | 117 | 61% | 93% | 100% |
 
-Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json` + `assets/benchmark.html`
+Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json` + `assets/benchmark.html`. Token count: `chars ÷ 4` (GPT BPE approximation). tiktoken verification: `python _audit2.py`.
 
 </details>
 
@@ -208,16 +208,24 @@ No JSON config files. No RPC debugging. No server restarts. Just CLI commands.
 
 ## How TOON works
 
-TOON (Token-Optimized Object Notation) is mcptoon's encoding that compresses JSON for LLM consumption:
+TOON (Token-Optimized Object Notation) is mcptoon's encoding that compresses JSON for LLM consumption. Savings come from **structural compression** — removing JSON braces, quotes, brackets, and type wrappers — not from scalar substitution.
 
 | JSON | TOON | Why |
 |---|---|---|
 | `{"name":"search","count":3}` | `name:search\|count:3` | Pipes replace braces + quotes + colon |
 | `[1, 2, 3]` | `1 2 3` | Spaces replace brackets + commas |
-| `true` / `false` | `T` / `F` | 1 char vs 4-5 |
-| `null` | `∅` | 1 symbol vs 4 chars |
-| `"line1\nline2"` | `line1↲line2` | ↲ replaces escape sequence |
+| `true` / `false` | `true` / `false` | Kept as-is (1 token either way) |
+| `null` | `null` | Kept as-is (∅ costs 2 tokens, worse) |
+| `"a:b"` | `a_b` | Colons → underscore (avoids pipe ambiguity) |
 | `{"a":{"b":[1,2]}}` | `a:b:1_2` | Recursive compaction |
+
+**tiktoken verification** (o200k_base / cl100k_base):
+
+```
+{"content":[{"type":"text","text":"hello"}]}  →  hello         (85% savings)
+{"type":"object","properties":{"q":{"type":"string"}}}  →  q:s*        (83% savings)
+{"name":"search","count":3,"cached":true,"error":null}  →  name:search|count:3|cached:true|error:null  (24% savings)
+```
 
 Token optimization at the transport layer is mcptoon's primary focus.
 
@@ -227,7 +235,7 @@ Token optimization at the transport layer is mcptoon's primary focus.
 |---|---|---|
 | `--compact` | Tool names only, space-separated | **97% less than JSON** |
 | `--slim` | Ultra-compact schemas (name\|param:type*) | **93% less than JSON** |
-| `--toon` | Compact notation, full semantics | 40-60% less than JSON |
+| `--toon` | Compact notation, full semantics | 20-40% less than JSON (tiktoken-verified) |
 | `--json` | Standard JSON (for scripts, CI) | Baseline |
 | `--raw` | Raw response, no parsing | Full size |
 | `--head N` | First N items only | Variable |
