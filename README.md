@@ -153,6 +153,24 @@ mcptoon manifest --slim               # → tool schemas, 93% smaller than JSON
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 ```
 
+## Docker
+
+mcptoon is zero-dependency, so the image is small. Build it and run any subcommand. The entrypoint is `mcptoon`, so args pass through exactly as on the host:
+
+```bash
+docker build -t mcptoon .
+docker run --rm mcptoon help
+docker run --rm mcptoon manifest --toon
+```
+
+Server config lives at `~/.mcptoon/config.json` on the host. Mount it so the container shares your servers:
+
+```bash
+docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --toon
+```
+
+`manifest`, `list`, `inspect`, and `doctor` are config-only and work out of the box. `call` and `add --stdio` spawn a server process (for example `npx`), so they need that runtime available inside the image: extend the Dockerfile with the toolchain your servers require.
+
 ## Works with every agent
 
 mcptoon is a CLI tool. **If your agent can run shell commands, it can use mcptoon.** No plugins. No SDK. No per-agent MCP setup. No JSON config editing.
