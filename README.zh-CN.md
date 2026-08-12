@@ -72,7 +72,7 @@ Claude Code 配了 15 个 MCP 服务器。换 Cursor——配置格式不同、�
 
 每个 MCP 返回长这样：`{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}`——80 个 token 的括号、引号、类型声明，就为传 6 个 token 的真实数据。一个 session 调 200 次工具 = 1.5万 token 纯语法浪费。
 
-→ **mcptoon：返回 `name:react|stars:219000`——同样的数据，少 56% token。** 工具发现：少 97%。工具 schema：少 93%。**没有别的 MCP 客户端干这事。只有 mcptoon。**
+→ **mcptoon：返回 `name:react|stars:219000`——同样的数据，少 56% token。** 工具发现：少 97%。工具 schema：少 93%。
 
 ---
 
