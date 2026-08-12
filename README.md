@@ -77,7 +77,7 @@ You set up 15 MCP servers for Claude Code. Now you try Cursor — different conf
 
 Every MCP result looks like `{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}` — 80 tokens of braces, quotes, and type declarations to deliver 6 tokens of actual data. Over a session with 200 tool calls, that's 15,000 tokens of pure syntax waste.
 
-→ **mcptoon: Returns `name:react|stars:219000` — same data, 56% fewer tokens.** Discovery: 97% fewer. Schemas: 93% fewer. **No other MCP client does this. Only mcptoon.**
+→ **mcptoon: Returns `name:react|stars:219000` — same data, 56% fewer tokens.** Discovery: 97% fewer. Schemas: 93% fewer.
 
 ---
 
@@ -219,7 +219,7 @@ TOON (Token-Optimized Object Notation) is mcptoon's encoding that compresses JSO
 | `"line1\nline2"` | `line1↲line2` | ↲ replaces escape sequence |
 | `{"a":{"b":[1,2]}}` | `a:b:1_2` | Recursive compaction |
 
-No other MCP client does token optimization. mcptoon is the only one.
+Token optimization at the transport layer is mcptoon's primary focus.
 
 ## Output formats
 
@@ -320,7 +320,7 @@ Every profile declares its security posture:
 
 ## Features
 
-**Battle-tested** with 255+ MCP tools across 23+ servers, 30K+ real calls.
+**Tested** with 255+ MCP tools across 23+ servers, 30K+ real calls.
 
 - **`--stdin`** — Pipe large payloads bypassing OS command-line limits
 - **`doctor`** — One-command self-diagnosis (Python, config, servers, connectivity)
