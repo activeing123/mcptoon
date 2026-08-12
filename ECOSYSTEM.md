@@ -30,7 +30,7 @@ That's why we're building an ecosystem, not just a tool.
     ┌─────▼─────┐  ┌────▼─────┐  ┌──────▼──────┐  ┌───▼──────────┐
     │  Profiles │  │  TOON    │  │ Integration │  │   Badge      │
     │  Registry │  │  Spec    │  │   Guides    │  │   Program    │
-    │  10 → 100 │  │  v1 → v2 │  │   0 → 10    │  │   0 → 50     │
+    │  23 → 100 │  │  v1 → v2 │  │   0 → 10    │  │   0 → 50     │
     └───────────┘  └──────────┘  └─────────────┘  └──────────────┘
 ```
 
@@ -40,12 +40,13 @@ Pre-configured, battle-tested MCP server templates. Copy, paste, done.
 
 | Stat | Value |
 |------|-------|
-| Profiles now | 10 |
-| Tools covered | 82 |
+| Profiles now | 23 |
+| Tools covered | 186+ |
+| Security-audited | 23 |
 | Target | 100+ profiles |
 | Location | [`mcp/`](mcp/) |
 
-**Categories planned:** developer · data · search · automation · knowledge · communication
+**Categories:** developer · database · search · browser · communication · file · cloud · data · knowledge · utility
 
 Browse profiles: [mcp/README.md](mcp/README.md)
 
@@ -103,7 +104,7 @@ MCP servers that recommend mcptoon for token-efficient access can display a badg
 
 1. Fork the repo
 2. Copy `mcp/_template.json` → `mcp/stdio/<your-server>.json`
-3. Fill in the fields
+3. Fill in the fields — **including the `security` block**
 4. Test: `mcptoon manifest --toon` should work with your profile
 5. Open a PR
 
@@ -139,7 +140,7 @@ mcptoon usage  # shows your token savings
 
 | Quarter | Milestone | Profiles | Guides | TOON SDK |
 |---------|-----------|----------|--------|----------|
-| 2026 Q3 | v0.3.0 — Integration guides | 15 | 3 | — |
+| 2026 Q3 | v0.3.0 — Credential leak detection + integration guides | 23 | 3 | — |
 | 2026 Q4 | v0.5.0 — TOON Spec v1 | 30 | 7 | — |
 | 2027 Q1 | v0.7.0 — Smart format selection | 50 | 7 | JS |
 | 2027 Q2 | **v1.0.0 — Stable ecosystem** | 100 | 10 | JS + Go |
@@ -153,7 +154,7 @@ mcptoon usage  # shows your token savings
 2. **Open format** — TOON is free to implement in any language, no license restrictions
 3. **Community-driven** — Profiles and guides are community-contributed, not vendor-controlled
 4. **Real data** — Every profile is battle-tested with real usage numbers, not theoretical
-5. **Security first** — No credentials in profiles, no telemetry in CLI, no backdoors anywhere
+5. **Security first** — No credentials in profiles, no telemetry in CLI, no backdoors anywhere. Every profile is security-audited with `credential_safe`, `env_vars_required`, and `permissions` fields. Tool results are scanned for credential leaks via 12 regex patterns before reaching your agent's context.
 
 ---
 

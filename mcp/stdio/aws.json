@@ -1,0 +1,46 @@
+{
+  "name": "aws",
+  "display_name": "AWS",
+  "description": "Amazon Web Services — S3, EC2, Lambda, DynamoDB, and more",
+  "package": "@modelcontextprotocol/server-aws",
+  "install": "npx -y @modelcontextprotocol/server-aws",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-aws"],
+    "env": {
+      "AWS_ACCESS_KEY_ID": "<your-aws-access-key>",
+      "AWS_SECRET_ACCESS_KEY": "<your-aws-secret-key>",
+      "AWS_REGION": "us-east-1"
+    }
+  },
+  "tools": ["aws_s3_list_buckets", "aws_s3_get_object", "aws_s3_put_object", "aws_lambda_list", "aws_lambda_invoke", "aws_dynamo_query", "aws_dynamo_scan", "aws_ec2_describe_instances", "aws_ec2_start", "aws_ec2_stop"],
+  "tool_count": 10,
+  "verified": false,
+  "verified_date": "",
+  "platforms": { "windows": "pending", "macos": "pending", "linux": "pending" },
+  "pitfalls": [
+    "Requires AWS credentials with appropriate IAM permissions",
+    "Community server — verify package name before use",
+    "AWS_SECRET_ACCESS_KEY is extremely sensitive — mcptoon's credential leak detection will catch it if it appears in results"
+  ],
+  "notes": "Full AWS service access. Create IAM credentials at https://console.aws.amazon.com/iam/",
+  "usage": "mcptoon add aws --stdio npx -y @modelcontextprotocol/server-aws",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": false,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {"name": "AWS_ACCESS_KEY_ID", "sensitivity": "high", "description": "AWS Access Key ID (AKIA...)"},
+      {"name": "AWS_SECRET_ACCESS_KEY", "sensitivity": "high", "description": "AWS Secret Access Key (40 chars)"},
+      {"name": "AWS_REGION", "sensitivity": "low", "description": "AWS region (e.g. us-east-1)"}
+    ],
+    "permissions": ["read: S3, DynamoDB, EC2, Lambda", "write: S3 objects, Lambda invoke, EC2 start/stop"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~10MB"
+}

@@ -1,0 +1,38 @@
+{
+  "name": "tmux",
+  "display_name": "tmux",
+  "description": "Terminal multiplexer automation — sessions, windows, panes, send keys",
+  "package": "@modelcontextprotocol/server-tmux",
+  "install": "npx -y @modelcontextprotocol/server-tmux",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-tmux"],
+    "env": {}
+  },
+  "tools": ["tmux_list_sessions", "tmux_create_session", "tmux_kill_session", "tmux_list_windows", "tmux_create_window", "tmux_send_keys", "tmux_capture_pane", "tmux_split_window"],
+  "tool_count": 8,
+  "verified": false,
+  "verified_date": "",
+  "platforms": { "windows": "na", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Requires tmux installed on the host (brew install tmux / apt install tmux)",
+    "Not available on Windows (use WSL)",
+    "Community server — verify package name before use"
+  ],
+  "notes": "Automate terminal sessions from your AI agent. Create sessions, send commands, capture output. Perfect for long-running processes and parallel terminal workflows.",
+  "usage": "mcptoon add tmux --stdio npx -y @modelcontextprotocol/server-tmux",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": false,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: session list, pane output", "write: create/kill sessions, send keystrokes, split panes"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~3MB"
+}
