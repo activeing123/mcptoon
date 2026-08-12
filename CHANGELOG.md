@@ -17,7 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
 
-## [0.2.3] — 2025-08-12
+## [0.3.0] — 2026-08-12
+
+### Fixed
+- **TOON scalar substitution honesty** — Removed `∅` (null→∅) and `↲` (newline→↲) substitutions that tiktoken-verified as **worse** than original (2 tokens vs 1). Kept `true`/`false` as-is (1 token either way). Savings now come from structural compression only (removing JSON braces, quotes, brackets). Verified with tiktoken o200k_base + cl100k_base.
+- **README benchmark data** — Updated all TOON savings claims with tiktoken-verified numbers. Added tokenizer version notes. Honest about what saves tokens (structure) vs what doesn't (scalar substitution).
+
+### Changed
+- `_toon_scalar()`: `null` stays `null` (not `∅`), `true`/`false` stay as-is (not `T`/`F`), newlines kept as-is (not `↲`), colons → `_` (not `＿`)
+
+## [0.2.3] — 2026-08-12
 
 ### Added
 - **Credential leak detection** — Scans tool results for 12 credential patterns (AWS Access Keys, AWS Secret Keys, GitHub PATs, GitHub Fine-grained PATs, OpenAI API Keys, Anthropic API Keys, Slack Tokens, Google API Keys, Private Key Blocks, Generic Credentials, Bearer Tokens, JWT Tokens). Blocks results before they reach agent context. Credentials are masked in error messages (`sk-abc...wxyz`).
@@ -40,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Credential leak detection prevents API keys, tokens, and private keys from entering agent context via MCP tool results
 
-## [0.2.2] — 2025-08-11
+## [0.2.2] — 2026-08-11
 
 ### Added
 - **`--slim` output format** — Ultra-compact tool manifest encoding (`tool_name|param:type*`). 93% token savings vs JSON for full tool schemas. Types: `s`=string, `n`=number, `b`=boolean, `a[type]`=array, `o{keys}`=object. `*` marks required params.
@@ -58,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `render()` function now supports `fmt="slim"` in addition to `json`/`toon`/`compact`/`raw`
 - Test count updated from 98 to 160
 
-## [0.2.1] — 2025-08-11
+## [0.2.1] — 2026-08-11
 
 ### Added
 - **`completion` command** — Generate shell auto-completion scripts for bash, zsh, fish, and PowerShell. Auto-completes subcommands, server names (from config), and `--format` values.
@@ -69,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mcptoon completion powershell | Out-File -Append $PROFILE
   ```
 
-## [0.2.0] — 2025-08-11
+## [0.2.0] — 2026-08-11
 
 ### Added — Battle-tested features from production use
 

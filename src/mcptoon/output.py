@@ -19,7 +19,7 @@ mcptoon output — multi-format output rendering
 Modes:
   --json       Machine-readable JSON (default for piped output)
   --compact    Space-separated names only (~20 tokens for 96 tools)
-  --toon       Token-efficient notation for LLMs (40-60% fewer tokens than JSON)
+  --toon       Token-efficient notation for LLMs (20-40% fewer tokens than JSON, tiktoken-verified)
   --head N     Limit array output to first N records
   --raw        Raw response body (no JSON parsing)
   --max-chars N  Truncate output to N chars (default: 4000, use --full for unlimited)
@@ -41,14 +41,18 @@ Export formats (--format flag):
 TOON Format Spec:
   dict  → k1:v1|k2:v2           (pipe-separated key:value pairs)
   list  → v1 v2 v3              (space-separated values)
-  bool  → T / F
-  null  → ∅
-  str   → literal (newlines → ↲, colons → ＿, truncated to 200 chars)
+  bool  → true / false         (kept as-is, 1 token either way)
+  null  → null                 (kept as-is, ∅ costs 2 tokens)
+  str   → literal (colons → _, truncated to 200 chars)
   num   → literal
+
+  Token savings come from STRUCTURAL compression (removing JSON braces,
+  quotes, type wrappers), not scalar substitution.
+  Verified with tiktoken (o200k_base + cl100k_base).
 
   Example:
     JSON:   {"name": "search", "params": {"query": "AI", "num": 5}, "cached": true, "error": null}
-    TOON:   name:search|params:query:AI|num:5|cached:T|error:∅
+    TOON:   name:search|params:query:AI|num:5|cached:true|error:null
 """
 import json
 import os
@@ -77,16 +81,22 @@ def _toon_value(val):
 
 
 def _toon_scalar(val):
-    """Encode a scalar value as TOON."""
+    """Encode a scalar value as TOON.
+
+    Only substitutions that tiktoken-verify as ≤ original token count.
+    - bool: kept as true/false (1 token either way, no benefit to T/F)
+    - null: kept as null (∅ costs 2 tokens, worse)
+    - newlines: kept as-is (↲ costs 2 tokens, worse)
+    """
     if isinstance(val, bool):
-        return "T" if val else "F"
+        return "true" if val else "false"
     elif val is None:
-        return "∅"
+        return "null"
     elif isinstance(val, (int, float)):
         return str(val)
     else:
         s = str(val)[:200]
-        return s.replace(":", "＿").replace("\n", "↲")
+        return s.replace(":", "_")
 
 
 def toon(obj):
@@ -97,7 +107,7 @@ def toon(obj):
     >>> toon([1, 2, 3])
     '1 2 3'
     >>> toon({"ok": True, "err": None})
-    'ok:T|err:∅'
+    'ok:true|err:null'
     """
     if isinstance(obj, str):
         return obj
