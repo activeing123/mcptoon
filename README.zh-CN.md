@@ -381,7 +381,7 @@ mcptoon 不只是 CLI 工具——它是一个 **token 高效的 MCP 生态系�
 
 | 组件 | 是什么 | 状态 |
 |------|--------|------|
-| 📦 **[服务器 Profile](mcp/README.md)** | 20 个现成 MCP 服务器 Profile（160+ 工具） | 20 → 100+ |
+| 📦 **[服务器 Profile](mcp/README.md)** | 23 个现成 MCP 服务器 Profile（186+ 工具） | 23 → 100+ |
 | 🔧 **TOON 格式** | Token 优化标记法（开放规范） | v1 内置于 mcptoon → 独立规范 |
 | 📚 **集成指南** | Agent 专属配置文档 | 10 个 Agent 规划中 |
 | 🏷️ **Powered by 徽章** | MCP 服务器使用 mcptoon 的标识 | 即将推出 |

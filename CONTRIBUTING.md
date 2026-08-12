@@ -57,7 +57,7 @@ chore: update CI to Python 3.12
 src/mcptoon/
 ├── cli.py        # CLI entry point — keep thin, delegate to other modules
 ├── client.py     # MCPClient + MCPClientPool — transport layer
-├── router.py     # Tool call routing + custom handler registry
+├── router.py     # Tool routing + custom handlers + poisoning/credential leak detection
 ├── config.py     # Server config management
 ├── manifest.py   # Tool discovery
 ├── output.py     # TOON / JSON / compact rendering ← the magic
@@ -80,6 +80,28 @@ src/mcptoon/
 2. Add transport detection in `MCPClient.__init__()` and `MCPClientPool._make_client()`
 3. Add config schema support in `config.py`
 4. Add tests in `tests/test_client.py`
+
+## Adding a New Server Profile
+
+1. Copy `mcp/_template.json` → `mcp/stdio/<name>.json`
+2. Fill in all fields — **including the `security` block**:
+   - `security.audited` — set to `true` if you've verified the server
+   - `security.credential_safe` — `true` if the server doesn't expose credentials in results
+   - `security.env_vars_required` — list each env var with `name`, `sensitivity` (high/medium/low), and `description`
+   - `security.permissions` — list read/write scopes (e.g. `["read: repos", "write: issues"]`)
+3. Set `bundled: false` and `install_method: "on-demand"`
+4. **Never store real API keys** — use `<your-key>` placeholders
+5. Test: `mcptoon add <name> --stdio npx -y <package> && mcptoon manifest --toon`
+6. Update `mcp/README.md` tables
+7. Open a PR — we'll verify and merge
+
+### Security audit checklist for profiles
+
+- [ ] All env vars listed with sensitivity level
+- [ ] No real credentials in the JSON (only `<placeholder>`)
+- [ ] `credential_safe` set accurately
+- [ ] `permissions` describes read/write scope
+- [ ] Server doesn't return credentials in tool results (test with `mcptoon call`)
 
 ## Reporting Bugs
 

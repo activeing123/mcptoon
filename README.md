@@ -302,7 +302,7 @@ $ mcptoon call github get_file --toon
 
 | Component | What it is | Status |
 |-----------|-----------|--------|
-| 📦 **[Server Profiles](mcp/README.md)** | 20 ready-to-use MCP server profiles (160+ tools) | 20 → 100+ |
+| 📦 **[Server Profiles](mcp/README.md)** | 23 ready-to-use MCP server profiles (186+ tools) | 23 → 100+ |
 | 🔧 **TOON Format** | Token-optimized notation (open spec) | v1 in mcptoon |
 | 📚 **Integration Guides** | Agent-specific setup docs | Coming soon |
 | 🏷️ **Powered by Badge** | For MCP servers using mcptoon | Available |
@@ -331,7 +331,7 @@ The 20 profiles in `mcp/stdio/` are **JSON templates, not installed software**:
 }
 ```
 
-20 profiles available: fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker. See [`mcp/README.md`](mcp/README.md) for the full list.
+23 profiles available: fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker, aws, cloudflare, tmux. See [`mcp/README.md`](mcp/README.md) for the full list.
 
 → **[Full ecosystem plan](ECOSYSTEM.md)**
 

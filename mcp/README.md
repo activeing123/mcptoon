@@ -2,7 +2,7 @@
 
 > mcptoon works with **any** MCP server (stdio or HTTP). Pre-configured profiles make it even easier — just copy and go.
 
-**20 profiles ready · 30+ planned · growing**
+**23 profiles ready · 30+ planned · growing**
 
 > **Profiles are JSON templates, not bundled software.**
 > mcptoon doesn't ship MCP servers. Each profile is a ~1KB JSON file describing how to connect.
@@ -28,7 +28,7 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
 ---
 
-## ✅ Profile Ready (20 servers, 160+ tools)
+## ✅ Profile Ready (23 servers, 186+ tools)
 
 Battle-tested with real production usage: 255+ tools, 23+ servers, 30K+ calls.
 
@@ -95,6 +95,9 @@ Battle-tested with real production usage: 255+ tools, 23+ servers, 30K+ calls.
 | Name | Package | Tools | Env vars | Security | Profile |
 |------|---------|-------|----------|----------|---------|
 | **docker** | community server | 8 | None | ⚠️ pending audit | [✅](stdio/docker.json) |
+| **aws** | @modelcontextprotocol/server-aws | 10 | `AWS_ACCESS_KEY_ID` | ✅ audited | [✅](stdio/aws.json) |
+| **cloudflare** | @modelcontextprotocol/server-cloudflare | 10 | `CLOUDFLARE_API_TOKEN` | ✅ audited | [✅](stdio/cloudflare.json) |
+| **tmux** | @modelcontextprotocol/server-tmux | 8 | None | ✅ audited | [✅](stdio/tmux.json) |
 
 ### 🔧 Utility
 
@@ -301,11 +304,11 @@ mcptoon manifest --toon    # works immediately
 | 📁 File & Document | 1 | 4 | 5 |
 | 📋 Project Management | 0 | 4 | 4 |
 | 🎨 Creative & Design | 0 | 4 | 4 |
-| ☁️ Cloud & DevOps | 1 | 5 | 6 |
+| ☁️ Cloud & DevOps | 4 | 2 | 6 |
 | 📊 Data & Analytics | 1 | 3 | 4 |
 | 🧠 AI & Knowledge | 2 | 1 | 3 |
 | 🔧 Utility | 1 | 0 | 1 |
-| **Total** | **20** | **39** | **59** |
+| **Total** | **23** | **36** | **59** |
 
 ---
 
@@ -319,4 +322,4 @@ Every server benefits from mcptoon's token optimization:
 | Tool schema (per tool) | ~80-150 | ~5-10 | **93%** |
 | Tool results (structured) | ~500-3000 | ~200-1200 | **56-61%** |
 
-A typical 20-server setup saves **90,000+ tokens** per conversation. See [benchmark data](../assets/benchmark_data.json).
+A typical 23-server setup saves **90,000+ tokens** per conversation. See [benchmark data](../assets/benchmark_data.json).
