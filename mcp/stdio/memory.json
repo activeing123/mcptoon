@@ -6,8 +6,13 @@
   "install": "npx -y @modelcontextprotocol/server-memory",
   "config": {
     "transport": "stdio",
-    "command": ["npx", "-y"],
-    "args": ["@modelcontextprotocol/server-memory"],
+    "command": [
+      "npx",
+      "-y"
+    ],
+    "args": [
+      "@modelcontextprotocol/server-memory"
+    ],
     "env": {}
   },
   "tools": [
@@ -24,7 +29,11 @@
   "tool_count": 9,
   "verified": true,
   "verified_date": "2026-08-11",
-  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "platforms": {
+    "windows": "ok",
+    "macos": "ok",
+    "linux": "ok"
+  },
   "pitfalls": [
     "Data persists in memory during the session — restart loses data unless you save the graph",
     "No built-in persistence to disk — for long-term storage, use export_graph before closing"
@@ -33,5 +42,17 @@
   "usage": "mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory",
   "our_usage_rank": null,
   "our_usage_calls": 0,
-  "beginner_friendly": true
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": [
+      "read: knowledge graph entities, relations",
+      "write: entities, relations, observations"
+    ]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
 }

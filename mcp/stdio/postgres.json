@@ -1,0 +1,38 @@
+{
+  "name": "postgres",
+  "display_name": "PostgreSQL",
+  "description": "Query PostgreSQL databases — schema inspection, read/write queries",
+  "package": "@modelcontextprotocol/server-postgres",
+  "install": "npx -y @modelcontextprotocol/server-postgres <connection-string>",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-postgres", "postgresql://user:pass@localhost:5432/dbname"],
+    "env": {}
+  },
+  "tools": ["query", "list_tables", "describe_table"],
+  "tool_count": 3,
+  "verified": true,
+  "verified_date": "2026-08-12",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Connection string contains password — mcptoon's credential leak detection will warn if it appears in results",
+    "Read-only by default in some implementations — check your server version",
+    "/Pass connection string as first argument, not env var"
+  ],
+  "notes": "Production database queries. The AI can inspect schema and run SQL. Connection string goes in the command args.",
+  "usage": "mcptoon add postgres --stdio npx -y @modelcontextprotocol/server-postgres postgresql://user:pass@localhost:5432/mydb",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": false,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: schema, tables, rows", "write: INSERT/UPDATE/DELETE (if server allows)"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~10MB"
+}

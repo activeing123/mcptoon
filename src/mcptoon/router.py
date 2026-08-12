@@ -18,8 +18,9 @@ mcptoon router — Tool call routing
 
 Routes tool calls to the appropriate MCP server via MCPClientPool.
 Supports custom handlers via decorator pattern.
-Includes tool poisoning detection and fuzzy match suggestions.
+Includes tool poisoning detection, credential leak detection, and fuzzy match suggestions.
 """
+import re
 from typing import Any, Callable
 
 from .client import MCPClientPool, MCPError
@@ -124,6 +125,65 @@ def _check_poisoning(result: Any) -> str | None:
     return None
 
 
+# ─── Credential leak detection ───
+
+# Patterns that indicate exposed API keys, tokens, or private keys
+_CREDENTIAL_PATTERNS = [
+    # AWS
+    (re.compile(r'AKIA[0-9A-Z]{16}'), 'AWS Access Key ID'),
+    (re.compile(r'aws_secret_access_key\s*[=:]\s*[A-Za-z0-9/+=]{40}', re.I), 'AWS Secret Access Key'),
+    # GitHub
+    (re.compile(r'gh[ps]_[A-Za-z0-9]{36}'), 'GitHub PAT'),
+    (re.compile(r'github_pat_[A-Za-z0-9_]{82}'), 'GitHub Fine-grained PAT'),
+    # OpenAI / Anthropic
+    (re.compile(r'sk-[A-Za-z0-9]{48}'), 'OpenAI API Key'),
+    (re.compile(r'sk-ant-[A-Za-z0-9]{93,}'), 'Anthropic API Key'),
+    # Slack
+    (re.compile(r'xox[baprs]-[A-Za-z0-9-]{10,}'), 'Slack Token'),
+    # Google
+    (re.compile(r'AIza[0-9A-Za-z\-_]{35}'), 'Google API Key'),
+    # Private keys
+    (re.compile(r'-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----'), 'Private Key Block'),
+    # Generic credential patterns
+    (re.compile(r'(?i)(api[_-]?key|secret[_-]?key|access[_-]?token|password|passwd|pwd)\s*[=:]\s*["\'][A-Za-z0-9+/=_\-]{16,}["\']'), 'Generic Credential'),
+    # Bearer tokens
+    (re.compile(r'Bearer\s+[A-Za-z0-9\-_\.]{20,}'), 'Bearer Token'),
+    # JWT
+    (re.compile(r'eyJ[A-Za-z0-9\-_]{10,}\.eyJ[A-Za-z0-9\-_]{10,}\.[A-Za-z0-9\-_]{10,}'), 'JWT Token'),
+]
+
+
+def _check_credential_leak(result: Any) -> str | None:
+    """Detect exposed API keys, passwords, and secrets in tool results.
+
+    Returns reason string if credential leak detected, None otherwise.
+    This is a heuristic check — scans for common credential patterns.
+    """
+    if result is None:
+        return None
+
+    try:
+        text = str(result)
+    except Exception:
+        return None
+
+    # Check first 10K chars (performance)
+    text = text[:10000]
+
+    for pattern, cred_type in _CREDENTIAL_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            # Mask the credential: show first 6 + last 4 chars
+            raw = match.group()
+            if len(raw) > 14:
+                masked = raw[:6] + '...' + raw[-4:]
+            else:
+                masked = raw[:4] + '...'
+            return f"potential {cred_type} leak detected: {masked}"
+
+    return None
+
+
 # ─── Main router ───
 
 def call_tool(
@@ -143,6 +203,7 @@ def call_tool(
     Safety features:
       - Dangerous operation blocking (unless is_destructive=True)
       - Tool poisoning detection (unless skip_poisoning_check=True)
+      - Credential leak detection (unless skip_poisoning_check=True)
       - Fuzzy match suggestions on unknown tools
 
     Args:
@@ -174,13 +235,20 @@ def call_tool(
         try:
             result = handler(tool, args)
             if result is not None:
-                # Check for poisoning
+                # Check for poisoning and credential leaks
                 if not skip_poisoning_check:
                     poison = _check_poisoning(result)
                     if poison:
                         return make_error(
                             "TOOL_POISONING",
                             f"Tool result may contain prompt injection: {poison}",
+                            "router", retry=False, server=server, tool=tool,
+                        )
+                    leak = _check_credential_leak(result)
+                    if leak:
+                        return make_error(
+                            "CREDENTIAL_LEAK",
+                            f"Tool result may contain exposed credentials: {leak}",
                             "router", retry=False, server=server, tool=tool,
                         )
                 usage.track_call(server, tool, ok=not is_error(result))
@@ -203,13 +271,20 @@ def call_tool(
         result = pool.call(server, tool, args)
         pool.close()
 
-        # Check for poisoning in result
+        # Check for poisoning and credential leaks in result
         if not skip_poisoning_check:
             poison = _check_poisoning(result)
             if poison:
                 return make_error(
                     "TOOL_POISONING",
                     f"Tool result may contain prompt injection: {poison}",
+                    "router", retry=False, server=server, tool=tool,
+                )
+            leak = _check_credential_leak(result)
+            if leak:
+                return make_error(
+                    "CREDENTIAL_LEAK",
+                    f"Tool result may contain exposed credentials: {leak}",
                     "router", retry=False, server=server, tool=tool,
                 )
 

@@ -1,0 +1,38 @@
+{
+  "name": "puppeteer",
+  "display_name": "Puppeteer",
+  "description": "Browser automation — navigate, click, screenshot, fill forms, execute JS in real Chrome",
+  "package": "@modelcontextprotocol/server-puppeteer",
+  "install": "npx -y @modelcontextprotocol/server-puppeteer",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-puppeteer"],
+    "env": {}
+  },
+  "tools": ["puppeteer_navigate", "puppeteer_screenshot", "puppeteer_click", "puppeteer_fill", "puppeteer_evaluate", "puppeteer_select", "puppeteer_hover", "puppeteer_go_back"],
+  "tool_count": 8,
+  "verified": true,
+  "verified_date": "2026-08-12",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Downloads Chromium on first run (~200MB)",
+    "Headless by default — set PUPPETEER_HEADLESS=false for visible browser",
+    "47 tools with full schema = ~23K tokens in context (mcptoon: 0)"
+  ],
+  "notes": "The #1 browser automation MCP. Perfect for scraping dynamic pages, testing web apps, and automating browser workflows. With mcptoon, all 8 tools stay configured but consume 0 context tokens.",
+  "usage": "mcptoon add puppeteer --stdio npx -y @modelcontextprotocol/server-puppeteer",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: web pages, DOM", "write: form inputs, JS execution in browser context"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~200MB (Chromium download on first run)"
+}

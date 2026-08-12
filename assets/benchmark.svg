@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+  <style>
+    .bg { fill: #0d1117; }
+    .title { fill: #58a6ff; font: bold 20px sans-serif; }
+    .subtitle { fill: #8b949e; font: 13px sans-serif; }
+    .bar-json { fill: #f85149; }
+    .bar-toon { fill: #3fb950; }
+    .bar-slim { fill: #58a6ff; }
+    .bar-compact { fill: #d2a8ff; }
+    .label { fill: #c9d1d9; font: 11px monospace; }
+    .value { fill: #e6edf3; font: bold 11px monospace; }
+    .axis { fill: #484f58; font: 10px sans-serif; }
+    .legend { fill: #c9d1d9; font: 12px sans-serif; }
+  </style>
+
+  <!-- Background -->
+  <rect class="bg" width="800" height="420" rx="12"/>
+
+  <!-- Title -->
+  <text class="title" x="30" y="35">mcptoon Benchmark: 255 tools, 23 servers</text>
+  <text class="subtitle" x="30" y="55">Token consumption comparison (lower = better)</text>
+
+  <!-- Legend -->
+  <rect class="bar-json" x="520" y="30" width="12" height="12" rx="2"/>
+  <text class="legend" x="538" y="40">JSON</text>
+  <rect class="bar-slim" x="580" y="30" width="12" height="12" rx="2"/>
+  <text class="legend" x="598" y="40">SLIM</text>
+  <rect class="bar-compact" x="640" y="30" width="12" height="12" rx="2"/>
+  <text class="legend" x="658" y="40">Compact</text>
+
+  <!-- Chart area: x=60..740, y=80..360 -->
+  <!-- Max value = 90804, so scale: 280px / 90804 ≈ 0.00308 -->
+  <!-- 8 bars: 5,10,25,50,93,150,200,255 -->
+
+  <!-- Bar group positions: 8 groups, each ~85px wide, starting at x=70 -->
+  <!-- Group width: 85px, bar width: 18px, gap: 4px -->
+
+  <!-- 5 tools: JSON=1897, TOON=784, SLIM=111, compact=16 -->
+  <rect class="bar-json" x="75" y="345" width="18" height="15" rx="1"/>
+  <text class="value" x="80" y="340" text-anchor="middle">1.9K</text>
+  <rect class="bar-slim" x="97" y="357" width="18" height="3" rx="1"/>
+  <rect class="bar-compact" x="119" y="359" width="18" height="1" rx="1"/>
+  <text class="label" x="106" y="375" text-anchor="middle">5</text>
+
+  <!-- 10 tools: JSON=3567, SLIM=235, compact=34 -->
+  <rect class="bar-json" x="160" y="329" width="18" height="31" rx="1"/>
+  <text class="value" x="169" y="324" text-anchor="middle">3.6K</text>
+  <rect class="bar-slim" x="182" y="353" width="18" height="7" rx="1"/>
+  <rect class="bar-compact" x="204" y="357" width="18" height="3" rx="1"/>
+  <text class="label" x="191" y="375" text-anchor="middle">10</text>
+
+  <!-- 25 tools: JSON=9009, SLIM=595, compact=97 -->
+  <rect class="bar-json" x="245" y="285" width="18" height="75" rx="1"/>
+  <text class="value" x="254" y="280" text-anchor="middle">9K</text>
+  <rect class="bar-slim" x="267" y="341" width="18" height="19" rx="1"/>
+  <rect class="bar-compact" x="289" y="357" width="18" height="3" rx="1"/>
+  <text class="label" x="276" y="375" text-anchor="middle">25</text>
+
+  <!-- 50 tools: JSON=17790, SLIM=1203, compact=117 -->
+  <rect class="bar-json" x="330" y="206" width="18" height="154" rx="1"/>
+  <text class="value" x="339" y="201" text-anchor="middle">17.8K</text>
+  <rect class="bar-slim" x="352" y="325" width="18" height="35" rx="1"/>
+  <rect class="bar-compact" x="374" y="356" width="18" height="4" rx="1"/>
+  <text class="label" x="361" y="375" text-anchor="middle">50</text>
+
+  <!-- 93 tools: JSON=33191, SLIM=2231, compact=117 -->
+  <rect class="bar-json" x="415" y="98" width="18" height="262" rx="1"/>
+  <text class="value" x="424" y="93" text-anchor="middle">33.2K</text>
+  <rect class="bar-slim" x="437" y="291" width="18" height="69" rx="1"/>
+  <rect class="bar-compact" x="459" y="356" width="18" height="4" rx="1"/>
+  <text class="label" x="446" y="375" text-anchor="middle">93</text>
+
+  <!-- 150 tools: JSON=53350, SLIM=3626, compact=117 -->
+  <rect class="bar-json" x="500" y="196" width="18" height="164" rx="1"/>
+  <text class="value" x="509" y="191" text-anchor="middle" transform="rotate(0, 509, 191)">53.4K</text>
+  <rect class="bar-slim" x="522" y="249" width="18" height="111" rx="1"/>
+  <rect class="bar-compact" x="544" y="356" width="18" height="4" rx="1"/>
+  <text class="label" x="531" y="375" text-anchor="middle">150</text>
+
+  <!-- 200 tools: JSON=71135, SLIM=4842, compact=117 -->
+  <rect class="bar-json" x="585" y="141" width="18" height="219" rx="1"/>
+  <text class="value" x="594" y="136" text-anchor="middle">71.1K</text>
+  <rect class="bar-slim" x="607" y="211" width="18" height="149" rx="1"/>
+  <rect class="bar-compact" x="629" y="356" width="18" height="4" rx="1"/>
+  <text class="label" x="616" y="375" text-anchor="middle">200</text>
+
+  <!-- 255 tools: JSON=90804, SLIM=6174, compact=117 -->
+  <rect class="bar-json" x="670" y="80" width="18" height="280" rx="1"/>
+  <text class="value" x="679" y="75" text-anchor="middle">90.8K</text>
+  <rect class="bar-slim" x="692" y="170" width="18" height="190" rx="1"/>
+  <text class="value" x="701" y="165" text-anchor="middle">6.2K</text>
+  <rect class="bar-compact" x="714" y="356" width="18" height="4" rx="1"/>
+  <text class="label" x="701" y="375" text-anchor="middle">255</text>
+
+  <!-- Baseline -->
+  <line x1="60" y1="360" x2="740" y2="360" stroke="#30363d" stroke-width="1"/>
+
+  <!-- X axis label -->
+  <text class="axis" x="400" y="395" text-anchor="middle">Number of MCP tools</text>
+
+  <!-- Key stat -->
+  <text class="subtitle" x="30" y="412">255 tools: JSON 90,804 tokens → mcptoon compact 117 tokens = 99.87% reduction</text>
+</svg>

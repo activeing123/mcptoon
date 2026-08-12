@@ -6,15 +6,27 @@
   "install": "npx -y @modelcontextprotocol/server-time",
   "config": {
     "transport": "stdio",
-    "command": ["npx", "-y"],
-    "args": ["@modelcontextprotocol/server-time"],
+    "command": [
+      "npx",
+      "-y"
+    ],
+    "args": [
+      "@modelcontextprotocol/server-time"
+    ],
     "env": {}
   },
-  "tools": ["get_current_time", "convert_time"],
+  "tools": [
+    "get_current_time",
+    "convert_time"
+  ],
   "tool_count": 2,
   "verified": true,
   "verified_date": "2026-08-11",
-  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "platforms": {
+    "windows": "ok",
+    "macos": "ok",
+    "linux": "ok"
+  },
   "pitfalls": [
     "Uses IANA timezone names (e.g., 'Asia/Shanghai', 'America/New_York') — not abbreviations like 'CST'"
   ],
@@ -22,5 +34,16 @@
   "usage": "mcptoon add time --stdio npx -y @modelcontextprotocol/server-time",
   "our_usage_rank": null,
   "our_usage_calls": 0,
-  "beginner_friendly": true
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": [
+      "read: current time, timezone conversion"
+    ]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
 }

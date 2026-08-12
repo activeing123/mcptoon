@@ -275,3 +275,23 @@ class TestCLIFlags:
         with contextlib.redirect_stdout(buf):
             _print_help()
         assert "--stdin" in buf.getvalue()
+
+
+class TestManifestSlim:
+    """Test manifest --slim support (v0.2.3)."""
+
+    def test_slim_flag_in_help(self):
+        from mcptoon.cli import _print_help
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            _print_help()
+        assert "--slim" in buf.getvalue()
+
+    def test_slim_format Renders_tools(self):
+        from mcptoon.output import slim_toon
+        tools = [{"name": "search", "inputSchema": {
+            "properties": {"q": {"type": "string"}},
+            "required": ["q"]}}]
+        result = slim_toon(tools)
+        assert "search|q:s*" in result

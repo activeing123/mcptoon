@@ -1,0 +1,42 @@
+{
+  "name": "google-maps",
+  "display_name": "Google Maps",
+  "description": "Geocoding, directions, places search, distance matrix — location intelligence",
+  "package": "@modelcontextprotocol/server-google-maps",
+  "install": "npx -y @modelcontextprotocol/server-google-maps",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-google-maps"],
+    "env": {
+      "GOOGLE_MAPS_API_KEY": "<your-google-maps-api-key>"
+    }
+  },
+  "tools": ["maps_geocode", "maps_reverse_geocode", "maps_search_nearby", "maps_directions", "maps_distance_matrix"],
+  "tool_count": 5,
+  "verified": true,
+  "verified_date": "2026-08-12",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Requires Google Maps API key — enable Geocoding, Directions, and Places APIs",
+    "Free tier: 28K map loads/month, 200 USD credit",
+    "Create key at https://console.cloud.google.com/google/maps-apis"
+  ],
+  "notes": "Location intelligence for AI agents. Geocode addresses, find nearby places, get directions, calculate distances.",
+  "usage": "mcptoon add google-maps --stdio npx -y @modelcontextprotocol/server-google-maps",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {"name": "GOOGLE_MAPS_API_KEY", "sensitivity": "high", "description": "Google Maps API key with Geocoding+Directions+Places enabled"}
+    ],
+    "permissions": ["read: geocoding, directions, places, distances"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~3MB"
+}

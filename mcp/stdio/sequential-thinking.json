@@ -6,15 +6,26 @@
   "install": "npx -y @modelcontextprotocol/server-sequential-thinking",
   "config": {
     "transport": "stdio",
-    "command": ["npx", "-y"],
-    "args": ["@modelcontextprotocol/server-sequential-thinking"],
+    "command": [
+      "npx",
+      "-y"
+    ],
+    "args": [
+      "@modelcontextprotocol/server-sequential-thinking"
+    ],
     "env": {}
   },
-  "tools": ["sequentialthinking"],
+  "tools": [
+    "sequentialthinking"
+  ],
   "tool_count": 1,
   "verified": true,
   "verified_date": "2026-08-11",
-  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "platforms": {
+    "windows": "ok",
+    "macos": "ok",
+    "linux": "ok"
+  },
   "pitfalls": [
     "Single tool — the thinking happens through the thought parameter, not separate tools",
     "Can consume many tokens if the AI over-uses it for simple problems"
@@ -23,5 +34,17 @@
   "usage": "mcptoon add sequential-thinking --stdio npx -y @modelcontextprotocol/server-sequential-thinking",
   "our_usage_rank": null,
   "our_usage_calls": 0,
-  "beginner_friendly": true
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": [
+      "read: none",
+      "write: none (reasoning only)"
+    ]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
 }

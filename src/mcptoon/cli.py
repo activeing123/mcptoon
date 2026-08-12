@@ -198,7 +198,15 @@ def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
         print(exported)
         return
 
-    if fmt in ("toon", "compact"):
+    if fmt == "slim":
+        # For slim, output ultra-compact tool schemas
+        all_tools = []
+        for server, tools in manifest.items():
+            for t in tools:
+                if "error" not in t:
+                    all_tools.append(t)
+        print(output.render(all_tools, fmt="slim", head_n=head_n, max_chars=max_chars, full=full))
+    elif fmt in ("toon", "compact"):
         # For toon/compact, output just the tool names
         result = {}
         for server, tools in manifest.items():
