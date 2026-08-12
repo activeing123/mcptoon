@@ -17,6 +17,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
 
+## [0.2.3] — 2025-08-12
+
+### Added
+- **Credential leak detection** — Scans tool results for 12 credential patterns (AWS Access Keys, AWS Secret Keys, GitHub PATs, GitHub Fine-grained PATs, OpenAI API Keys, Anthropic API Keys, Slack Tokens, Google API Keys, Private Key Blocks, Generic Credentials, Bearer Tokens, JWT Tokens). Blocks results before they reach agent context. Credentials are masked in error messages (`sk-abc...wxyz`).
+  ```bash
+  $ mcptoon call github get_file --toon
+  # Error: CREDENTIAL_LEAK — potential OpenAI API Key leak detected: sk-abc...wxyz
+  ```
+- **23 security-audited MCP server profiles** — Each profile now includes a `security` block declaring `credential_safe`, `env_vars_required` (with sensitivity levels), and `permissions` (read/write scope). 3 new profiles added: `aws`, `cloudflare`, `tmux`.
+- **Benchmark data with SVG chart** — Measured benchmark across 255 tools / 23 servers. 99.87% token reduction on tool discovery. SVG chart and interactive HTML page in `assets/`.
+- **Third-party research citations** — README now references Anthropic, OpenAI, Cursor, Latent Space, and Simon Willison sources validating the token waste problem.
+- **46 credential leak detection tests** — Full coverage of all 12 patterns, masking behavior, false positive edge cases. Total tests: 187.
+
+### Changed
+- Bumped version to 0.2.3
+- `call_tool()` in `router.py` now scans results for credential leaks in both custom handler and MCP protocol paths
+- `pyproject.toml` description updated to reflect credential leak detection feature
+- README test count updated from 160 to 187
+- README line count updated to ~2,500
+
+### Security
+- Credential leak detection prevents API keys, tokens, and private keys from entering agent context via MCP tool results
+
 ## [0.2.2] — 2025-08-11
 
 ### Added

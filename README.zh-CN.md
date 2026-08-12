@@ -261,25 +261,71 @@ $ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
 没有 `{"content":[{"type":"text","text":"..."}]}` 包装。只有内容。
 
-## 和其他 MCP 客户端比
+## 架构 —— 三层解耦
 
-| | mcptoon | mcp-cli | mcporter | 原生 MCP SDK |
-|---|---|---|---|---|
-| 省 token | **发现省 97%，结果省 40-60%** | 0% | 0% | 0% |
-| 支持所有 Agent | **是**（Claude Code、Codex、OpenCode、Cursor、任意） | 仅 Claude | 仅 Claude | 看情况 |
-| 一份配置所有 Agent 共享 | **是** | 否 | 否 | 否 |
-| 输出格式 | TOON + JSON + compact | JSON | JSON | JSON |
-| 依赖 | **0** | 5-20 | npm | 3-8 |
-| stdio 传输（MCP 服务器） | 有 | 无 | 有 | 有 |
-| HTTP 传输（MCP 服务器） | 有 | 有（代理） | 有 | 有 |
-| 危险操作拦截 | 有 | 无 | 无 | 无 |
-| 用量统计 | 有（本地） | 无 | 无 | 无 |
-| Schema 缓存 | 有（5分钟） | 无 | 无 | 无 |
-| 自定义 Handler | 有 | 无 | 无 | 无 |
-| 安装体积 | ~50KB | ~50MB+ | ~30MB | ~10MB |
-| 平台支持 | **Windows、macOS、Linux** | Linux/macOS | macOS | 看情况 |
+mcptoon 基于**三层解耦架构**。每一层独立——换一层不碰其他层。
 
-同样的 MCP 服务器，同样的 MCP 协议，同样的结果。工具发现省 97%，工具结果省 40-60%。Windows、macOS、Linux 全平台通用。
+```
+┌─────────────────────────────────────────────────┐
+│  第 1 层: mcptoon CLI (~50KB, 零依赖)            │
+│  ─────────────────────────────────────────────   │
+│  在 Agent 的 shell 里运行。所有输出做 token      │
+│  优化。schema 永远不进上下文。永远不。            │
+└──────────────────────┬──────────────────────────┘
+                       │ 读 JSON 模板（在磁盘上）
+┌──────────────────────▼──────────────────────────┐
+│  第 2 层: MCP 服务器 Profile (~1KB/个)            │
+│  ─────────────────────────────────────────────   │
+│  23 个 JSON 模板在 mcp/stdio/*.json。             │
+│  不是已安装的软件——只是连接规格。                 │
+│  安全审计: credential_safe、env_vars、             │
+│  permissions 每个 Profile 都声明。                 │
+│  加你自己的——直接用。                             │
+└──────────────────────┬──────────────────────────┘
+                       │ 按需启动 via npx
+┌──────────────────────▼──────────────────────────┐
+│  第 3 层: 实际 MCP 服务器 (npm 包)                │
+│  ─────────────────────────────────────────────   │
+│  真正的 MCP 服务器 (@modelcontextprotocol/       │
+│  server-* 等)。只有你实际调用工具时才启动。        │
+│  配置时不安装。启动时不加载。不用就零开销。        │
+└─────────────────────────────────────────────────┘
+```
+
+**为什么三层？**
+
+- **第 1 层 (CLI)** 保持极小——50KB，零依赖。没有 MCP SDK 臃肿。
+- **第 2 层 (Profile)** 是可编辑 JSON——加、删、fork 不碰代码。每个 ~1KB 文件只描述*怎么连接*，不是服务器本身。
+- **第 3 层 (服务器)** 惰性启动——只有 `mcptoon call` 实际执行时才 spin up。没有空闲进程。没有启动税。
+
+这意味着：
+- 100 个服务器配好 → 0 个在运行，直到你用其中一个
+- 删一个 Profile → 其余照常工作
+- 加一个 Profile → 不改代码，不重新构建
+- mcptoon 不捆绑 MCP 服务器——你装你用的
+
+### 安全审计的 Profile
+
+每个 Profile 声明其安全姿态：
+
+```json
+// mcp/stdio/puppeteer.json
+{
+  "name": "puppeteer",
+  "security": {
+    "audited": true,
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: web pages, DOM", "write: form inputs, JS execution"]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
+}
+```
+
+23 个 Profile：fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker, aws, cloudflare, tmux。详见 [`mcp/README.md`](mcp/README.md)。
+
+→ **[完整生态计划](ECOSYSTEM.md)**
 
 ## 所有 Agent 都能用
 
@@ -387,32 +433,6 @@ mcptoon 不只是 CLI 工具——它是一个 **token 高效的 MCP 生态系�
 | 🏷️ **Powered by 徽章** | MCP 服务器使用 mcptoon 的标识 | 即将推出 |
 | 🔌 **多语言 SDK** | JS/Go/Rust 的 TOON 实现 | v1.0 后 |
 
-### 服务器 Profile —— 不捆绑、按需安装、干净
-
-`mcp/stdio/` 里的 20 个 Profile 是 **JSON 模板，不是已安装的软件**：
-
-- **不捆绑** —— mcptoon 不随包发布 MCP 服务器。每个 Profile 是一个 ~1KB 的 JSON 文件，描述*如何连接*。
-- **按需安装** —— 运行 `mcptoon add <name>` 时通过 `npx` 安装实际 MCP 服务器。你只安装你用的。
-- **安全审计** —— 每个 Profile 声明 `security.credential_safe`、`env_vars_required`（含敏感等级）、`permissions`（读写范围）。
-- **解耦** —— Profile 互相独立。删一个，其他的照常工作。加你自己的，直接用。
-
-```json
-// 示例：mcp/stdio/puppeteer.json（节选）
-{
-  "name": "puppeteer",
-  "security": {
-    "audited": true,
-    "credential_safe": true,
-    "env_vars_required": [],
-    "permissions": ["read: web pages, DOM", "write: form inputs, JS execution"]
-  },
-  "bundled": false,
-  "install_method": "on-demand"
-}
-```
-
-20 个 Profile：fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker。详见 [`mcp/README.md`](mcp/README.md)。
-
 **参与贡献：** 添加 Profile · 写集成指南 · 在你的语言中实现 TOON
 
 → **[完整生态计划](ECOSYSTEM.md)**
@@ -509,7 +529,7 @@ src/mcptoon/
 └── errors.py     # 结构化错误封装
 ```
 
-总共约 1,700 行。零第三方 import。唯一的网络调用是到你配置的 MCP 服务器。
+总共约 2,500 行。187 个测试。零第三方 import。唯一的网络调用是到你配置的 MCP 服务器。
 
 ## 隐私
 
@@ -533,7 +553,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 160 个测试, 0.22s
+python -m pytest tests/ -v   # 187 个测试, 0.2s
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
