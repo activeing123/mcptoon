@@ -251,21 +251,72 @@ Format: `tool_name|param:type*|param:type`
 
 **93% token savings** vs JSON for full tool schemas.
 
-## vs. other MCP clients
+## Architecture — Three-layer decoupling
 
-| | mcptoon | mcp-cli | raw MCP SDK |
-|---|---|---|---|
-| **Context pollution** | **0 tokens** — schemas on disk | All schemas in context | All schemas in context |
-| **Servers stay configured** | **Yes — no load/unload** | Must manage | Must manage |
-| **Add server = CLI command** | **`mcptoon add ...`** | Edit JSON config | Edit JSON config |
-| Token savings | **97% discovery, 93% schema, 56% results** | 0% | 0% |
-| Works with all agents | **yes** (any shell-capable agent) | Claude only | varies |
-| One config for all agents | **yes** | no | no |
-| Dependencies | **0** | 5-20 | 3-8 |
-| Install size | ~50KB | ~50MB+ | ~10MB |
-| Tool poisoning guard | **yes** | no | no |
-| `doctor` self-diagnosis | **yes** | no | no |
-| Platform | **Windows, macOS, Linux** | Linux/macOS | varies |
+mcptoon is built on a **three-layer decoupled architecture**. Each layer is independent — swap one without touching the others.
+
+```
+┌─────────────────────────────────────────────────┐
+│  Layer 1: mcptoon CLI (~50KB, zero deps)         │
+│  ─────────────────────────────────────────────   │
+│  Runs in your agent's shell. Token-optimizes     │
+│  everything. No schemas in context. Ever.        │
+└──────────────────────┬──────────────────────────┘
+                       │ reads JSON templates (on disk)
+┌──────────────────────▼──────────────────────────┐
+│  Layer 2: MCP Server Profiles (~1KB each)         │
+│  ─────────────────────────────────────────────   │
+│  23 JSON templates in mcp/stdio/*.json.           │
+│  Not installed software — just connection specs.  │
+│  Security-audited: credential_safe, env_vars,     │
+│  permissions declared per profile.                │
+│  Add your own — it just works.                    │
+└──────────────────────┬──────────────────────────┘
+                       │ spawns on-demand via npx
+┌──────────────────────▼──────────────────────────┐
+│  Layer 3: Actual MCP Servers (npm packages)       │
+│  ─────────────────────────────────────────────   │
+│  Real MCP servers (@modelcontextprotocol/server-* │
+│  etc). Only launched when you actually call a     │
+│  tool. Not installed at config time.              │
+│  Not loaded at startup. Zero overhead until use.  │
+└─────────────────────────────────────────────────┘
+```
+
+**Why three layers?**
+
+- **Layer 1 (CLI)** stays tiny — 50KB, zero deps. No MCP SDK bloat.
+- **Layer 2 (Profiles)** are editable JSON — add, remove, fork without touching code. Each is a ~1KB file describing *how to connect*, not the server itself.
+- **Layer 3 (Servers)** spin up lazily — only when `mcptoon call` actually runs. No idle processes. No startup tax.
+
+This means:
+- 100 servers configured → 0 running until you use one
+- Remove a profile → the rest work fine
+- Add a profile → no code changes, no rebuild
+- mcptoon never bundles MCP servers — you install what you use
+
+### Security-audited profiles
+
+Every profile declares its security posture:
+
+```json
+// mcp/stdio/puppeteer.json
+{
+  "name": "puppeteer",
+  "security": {
+    "audited": true,
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: web pages, DOM", "write: form inputs, JS execution"]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
+}
+```
+
+23 profiles: fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker, aws, cloudflare, tmux. See [`mcp/README.md`](mcp/README.md).
+
+→ **[Full ecosystem plan](ECOSYSTEM.md)**
 
 ## Features
 
@@ -306,34 +357,6 @@ $ mcptoon call github get_file --toon
 | 🔧 **TOON Format** | Token-optimized notation (open spec) | v1 in mcptoon |
 | 📚 **Integration Guides** | Agent-specific setup docs | Coming soon |
 | 🏷️ **Powered by Badge** | For MCP servers using mcptoon | Available |
-
-### Server profiles — not bundled, on-demand, clean
-
-The 20 profiles in `mcp/stdio/` are **JSON templates, not installed software**:
-
-- **Not bundled** — mcptoon doesn't ship MCP servers. Each profile is a ~1KB JSON file describing *how* to connect.
-- **On-demand** — Running `mcptoon add <name>` installs the actual MCP server via `npx`. You only install what you use.
-- **Security-audited** — Each profile declares `security.credential_safe`, `env_vars_required` (with sensitivity levels), and `permissions` (read/write scope).
-- **Decoupled** — Profiles are independent. Remove one, the rest work fine. Add your own, it just works.
-
-```json
-// Example: mcp/stdio/puppeteer.json (excerpt)
-{
-  "name": "puppeteer",
-  "security": {
-    "audited": true,
-    "credential_safe": true,
-    "env_vars_required": [],
-    "permissions": ["read: web pages, DOM", "write: form inputs, JS execution"]
-  },
-  "bundled": false,
-  "install_method": "on-demand"
-}
-```
-
-23 profiles available: fetch, github, exa, brave-search, firecrawl, filesystem, memory, sequential-thinking, sqlite, time, puppeteer, playwright, postgres, slack, notion, git, gitlab, tavily, google-maps, docker, aws, cloudflare, tmux. See [`mcp/README.md`](mcp/README.md) for the full list.
-
-→ **[Full ecosystem plan](ECOSYSTEM.md)**
 
 ## Python API
 
@@ -383,7 +406,7 @@ src/mcptoon/
 └── errors.py     # Structured error envelopes
 ```
 
-~2,400 lines. 160 tests. Zero third-party imports. 50KB installed.
+~2,500 lines. 187 tests. Zero third-party imports. 50KB installed.
 
 ## Contributing
 
@@ -392,7 +415,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 160 tests, 0.22s
+python -m pytest tests/ -v   # 187 tests, 0.2s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).

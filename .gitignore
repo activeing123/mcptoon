@@ -40,6 +40,10 @@ _*.py
 _*.json
 preview.html
 
+# Old README versions
+readme-v*.md
+readme-preview*.html
+
 # Internal docs (not for public repo)
 PROJECT_STATUS.md
 TASK_SPEC.md
