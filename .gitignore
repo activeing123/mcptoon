@@ -39,6 +39,8 @@ dist/
 _*.py
 _*.json
 preview.html
+# Exception: __main__.py is NOT a temp script
+!src/mcptoon/__main__.py
 
 # Old README versions
 readme-v*.md
@@ -51,6 +53,8 @@ INCREMENTAL_PLAN.md
 HANDOFF.md
 ROADMAP.md
 GROWTH.md
+CONTEXT.md
 .daily_progress.json
 assets/badge_preview.html
 reddit_post.md
+docs/archive/

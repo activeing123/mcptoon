@@ -73,11 +73,11 @@ You set up 15 MCP servers for Claude Code. Now you try Cursor — different conf
 
 → **mcptoon: One config file, every agent.** `~/.mcptoon/config.json`. Switch agents in seconds. Config follows you.
 
-#### 😤 Paying for JSON garbage → ✅ TOON, 20-97% smaller
+#### 😤 Paying for JSON garbage → ✅ TOON, 30-97% smaller
 
 Every MCP result looks like `{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}` — 80 tokens of braces, quotes, and type declarations to deliver 6 tokens of actual data. Over a session with 200 tool calls, that's 15,000 tokens of pure syntax waste.
 
-→ **mcptoon: Returns `name:react|stars:219000` — same data, 20-40% fewer tokens on results, 61% on schemas.** Discovery: 97% fewer. Schemas: 93% fewer. [tiktoken-verified](#how-toon-works).
+→ **mcptoon: Returns `name: react\nstars: 219000` — same data, 30-60% fewer tokens on results (standard TOON), 97% fewer on discovery, 93% fewer on schemas.** [tiktoken-verified](#how-toon-works).
 
 ---
 
@@ -85,7 +85,7 @@ Every MCP result looks like `{"content":[{"type":"text","text":"{\"name\":\"reac
 
 ### How? CLI mode.
 
-mcptoon is a CLI tool, not an MCP client library. Your agent doesn't connect to MCP servers — it just runs `mcptoon` commands. MCP schemas live on disk in `~/.mcptoon/config.json`, not in your context window. Only the compact output you request enters context — and TOON encoding makes it 20-97% smaller than JSON.
+mcptoon is a CLI tool, not an MCP client library. Your agent doesn't connect to MCP servers — it just runs `mcptoon` commands. MCP schemas live on disk in `~/.mcptoon/config.json`, not in your context window. Only the compact output you request enters context — and TOON encoding makes it 30-97% smaller than JSON.
 
 ## Show me
 
@@ -106,39 +106,25 @@ mcptoon is a CLI tool, not an MCP client library. Your agent doesn't connect to 
 search_web fetch_url
 ```
 
-### Measured benchmark (255 tools, 23 servers)
+### Measured benchmark (255 tools, 5 formats)
 
-| Tools | JSON (tokens) | mcptoon compact | Reduction |
-|-------|-------------|----------------|-----------|
-| 5 | 1,897 | 16 | **99.2%** |
-| 10 | 3,567 | 34 | **99.0%** |
-| 25 | 9,009 | 97 | **98.9%** |
-| 50 | 17,790 | 117 | **99.3%** |
-| 93 | 33,191 | 117 | **99.6%** |
-| 150 | 53,350 | 117 | **99.8%** |
-| 200 | 71,135 | 117 | **99.8%** |
-| **255** | **90,804** | **117** | **99.87%** |
+| Tools | JSON | Std TOON | mcptoon | SLIM | Compact |
+|-------|------|----------|---------|------|---------|
+| 5 | 1,897 | 981 (-48%) | 785 (-59%) | 111 (-94%) | 16 (-99%) |
+| 10 | 3,567 | 1,757 (-51%) | 1,391 (-61%) | 235 (-93%) | 34 (-99%) |
+| 25 | 9,009 | 4,491 (-50%) | 3,580 (-60%) | 595 (-93%) | 97 (-99%) |
+| 50 | 17,790 | 8,776 (-51%) | 6,981 (-61%) | 1,203 (-93%) | 117 (-99%) |
+| 93 | 33,191 | 16,426 (-51%) | 13,086 (-61%) | 2,231 (-93%) | 117 (-100%) |
+| 150 | 53,350 | 26,326 (-51%) | 20,958 (-61%) | 3,626 (-93%) | 117 (-100%) |
+| 200 | 71,135 | 35,106 (-51%) | 27,952 (-61%) | 4,842 (-93%) | 117 (-100%) |
+| **255** | **90,804** | **44,863 (-51%)** | **35,735 (-61%)** | **6,174 (-93%)** | **117 (-100%)** |
 
-**TOON format** for tool results: **61% smaller** than JSON.
-**SLIM format** for full schemas: **93% smaller** than JSON.
+**Standard TOON** (`--toon`): **51% smaller** than JSON (round-trip safe).
+**mcptoon format** (`--mcptoon`): **61% smaller** (round-trip safe).
+**SLIM format** (`--slim`): **93% smaller** for full schemas.
+**Compact** (`--compact`): **100% smaller** for tool names only.
 
-<details>
-<summary>📊 Full benchmark data (click to expand)</summary>
-
-| Tools | JSON tokens | TOON tokens | SLIM tokens | Compact tokens | TOON save | SLIM save | Compact save |
-|--------|-----------|------------|------------|---------------|-----------|-----------|-------------|
-| 5 | 1,897 | 785 | 111 | 16 | 59% | 94% | 99% |
-| 10 | 3,567 | 1,391 | 235 | 34 | 61% | 93% | 99% |
-| 25 | 9,009 | 3,580 | 595 | 97 | 60% | 93% | 99% |
-| 50 | 17,790 | 6,981 | 1,203 | 117 | 61% | 93% | 99% |
-| 93 | 33,191 | 13,086 | 2,231 | 117 | 61% | 93% | 100% |
-| 150 | 53,350 | 20,958 | 3,626 | 117 | 61% | 93% | 100% |
-| 200 | 71,135 | 27,952 | 4,842 | 117 | 61% | 93% | 100% |
-| 255 | 90,804 | 35,735 | 6,174 | 117 | 61% | 93% | 100% |
-
-Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json` + `assets/benchmark.html`. Token count: `chars ÷ 4` (GPT BPE approximation). tiktoken verification: `python _audit2.py`.
-
-</details>
+Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json`. Token count: `chars ÷ 4` (GPT BPE approximation).
 
 ### Third-party research & context window economics
 
@@ -208,23 +194,47 @@ No JSON config files. No RPC debugging. No server restarts. Just CLI commands.
 
 ## How TOON works
 
-TOON (Token-Optimized Object Notation) is mcptoon's encoding that compresses JSON for LLM consumption. Savings come from **structural compression** — removing JSON braces, quotes, brackets, and type wrappers — not from scalar substitution.
+mcptoon supports two token-efficient formats:
 
-| JSON | TOON | Why |
+### Standard TOON (`--toon`)
+
+Implements the [TOON (Token-Oriented Object Notation)](https://github.com/toon-format/toon) spec — an open-source format for token-efficient LLM data exchange. Uses YAML-style indentation for objects and CSV-style tabular layout for uniform arrays.
+
+| JSON | Standard TOON | Why |
 |---|---|---|
-| `{"name":"search","count":3}` | `name:search\|count:3` | Pipes replace braces + quotes + colon |
+| `{"name":"search","count":3}` | `name: search\ncount: 3` | Newlines replace braces + quotes |
+| `[{"id":1,"name":"Alice"}]` | `[1]{id,name}:\n  1,Alice` | Field declaration once + CSV rows |
+| `[1, 2, 3]` | `[3]:\n  1\n  2\n  3` | Bracket notation for arrays |
+| `true` / `false` / `null` | `true` / `false` / `null` | Kept as-is (1 token each) |
+
+**Round-trip safe**: `decode(encode(x)) == x`. URLs, timestamps, and special characters are preserved.
+
+### Legacy mcptoon format (`--mcptoon`)
+
+mcptoon's original pipe-separated format. Simpler but less structured than standard TOON.
+
+| JSON | mcptoon | Why |
+|---|---|---|
+| `{"name":"search","count":3}` | `name:search\|count:3` | Pipes replace braces + quotes |
 | `[1, 2, 3]` | `1 2 3` | Spaces replace brackets + commas |
-| `true` / `false` | `true` / `false` | Kept as-is (1 token either way) |
-| `null` | `null` | Kept as-is (∅ costs 2 tokens, worse) |
-| `"a:b"` | `a_b` | Colons → underscore (avoids pipe ambiguity) |
-| `{"a":{"b":[1,2]}}` | `a:b:1_2` | Recursive compaction |
+| `"https://example.com"` | `https\c//example.com` | Colons escaped as `\c` (round-trip safe) |
+
+**Round-trip safe** with `mcptoon_decode()`. Escape sequences: `\c`=colon, `\p`=pipe, `\\`=backslash.
+
+### SLIM format (`--slim`)
+
+mcptoon-specific ultra-compact tool schema encoding. No external equivalent.
+
+```
+search|q:s*|n:n
+fetch|url:s*
+```
 
 **tiktoken verification** (o200k_base / cl100k_base):
 
 ```
 {"content":[{"type":"text","text":"hello"}]}  →  hello         (85% savings)
 {"type":"object","properties":{"q":{"type":"string"}}}  →  q:s*        (83% savings)
-{"name":"search","count":3,"cached":true,"error":null}  →  name:search|count:3|cached:true|error:null  (24% savings)
 ```
 
 Token optimization at the transport layer is mcptoon's primary focus.
@@ -235,7 +245,8 @@ Token optimization at the transport layer is mcptoon's primary focus.
 |---|---|---|
 | `--compact` | Tool names only, space-separated | **97% less than JSON** |
 | `--slim` | Ultra-compact schemas (name\|param:type*) | **93% less than JSON** |
-| `--toon` | Compact notation, full semantics | 20-40% less than JSON (tiktoken-verified) |
+| `--toon` | Standard TOON (toon-format/toon spec) | 30-60% less than JSON (round-trip safe) |
+| `--mcptoon` | Legacy mcptoon pipe format | 20-40% less than JSON (round-trip safe) |
 | `--json` | Standard JSON (for scripts, CI) | Baseline |
 | `--raw` | Raw response, no parsing | Full size |
 | `--head N` | First N items only | Variable |
@@ -362,7 +373,9 @@ $ mcptoon call github get_file --toon
 | Component | What it is | Status |
 |-----------|-----------|--------|
 | 📦 **[Server Profiles](mcp/README.md)** | 23 ready-to-use MCP server profiles (186+ tools) | 23 → 100+ |
-| 🔧 **TOON Format** | Token-optimized notation (open spec) | v1 in mcptoon |
+| 🔧 **Standard TOON** | Token-Oriented Object Notation (toon-format/toon spec) | v2, round-trip safe |
+| 🔧 **mcptoon Format** | Legacy pipe-separated notation | v2, round-trip safe |
+| 🔧 **SLIM Format** | Ultra-compact tool schemas | v1, mcptoon-specific |
 | 📚 **Integration Guides** | Agent-specific setup docs | Coming soon |
 | 🏷️ **Powered by Badge** | For MCP servers using mcptoon | Available |
 
@@ -370,13 +383,16 @@ $ mcptoon call github get_file --toon
 
 ```python
 from mcptoon.client import MCPClient
-from mcptoon.output import toon
+from mcptoon.output import toon_encode, toon_decode, mcptoon_encode
 
 with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
     tools = c.list_tools()
-    print(toon(tools))         # compact TOON
+    print(toon_encode(tools))         # Standard TOON output
     result = c.call_tool("fetch", {"url": "https://example.com"})
-    print(toon(result))
+    print(toon_encode(result))        # Standard TOON output
+    # Round-trip: decode back to Python dict
+    decoded = toon_decode(toon_encode(result))
+    assert decoded == result          # ✅ Round-trip safe
 ```
 
 ## Config
@@ -408,13 +424,13 @@ src/mcptoon/
 ├── router.py     # Tool routing, custom handlers, poisoning + credential leak detection
 ├── config.py     # Server config
 ├── manifest.py   # Tool discovery with cache
-├── output.py     # TOON / JSON / compact / slim rendering
+├── output.py     # Standard TOON + legacy mcptoon + JSON / compact / slim rendering
 ├── cache.py      # Schema cache (5-min TTL)
 ├── usage.py      # Local usage tracking
 └── errors.py     # Structured error envelopes
 ```
 
-~2,500 lines. 187 tests. Zero third-party imports. 50KB installed.
+~3,000 lines. 309 tests. Zero third-party imports. 50KB installed.
 
 ## Contributing
 
@@ -423,7 +439,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 187 tests, 0.2s
+python -m pytest tests/ -v   # 309 tests, 0.5s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).

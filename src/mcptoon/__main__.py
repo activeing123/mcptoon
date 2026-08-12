@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""mcptoon — Token-efficient MCP CLI client."""
+"""Allow `python -m mcptoon` as an alternative to the `mcptoon` command."""
 
-__version__ = "0.4.0"
+from .cli import main
+
+if __name__ == "__main__":
+    main()

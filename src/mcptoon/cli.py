@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2025 cxh
+# Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ Usage:
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags (global):
-    --toon         Token-efficient output (default for claude)
+    --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
+    --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens, round-trip safe)
     --slim         Ultra-compact tool manifests (93% savings)
     --json         JSON output
     --compact      Names only
@@ -82,6 +83,8 @@ def main():
             fmt = "compact"
         elif a == "--toon":
             fmt = "toon"
+        elif a == "--mcptoon":
+            fmt = "mcptoon"
         elif a == "--slim":
             fmt = "slim"
         elif a == "--raw":
@@ -159,6 +162,34 @@ def main():
 
 
 # ═══════════════════════════════════════════════════
+# Error fix suggestions
+# ═══════════════════════════════════════════════════
+
+_FIX_SUGGESTIONS = {
+    "SERVER_NOT_FOUND": "Try: mcptoon list    | mcptoon add <name> --stdio npx -y <package>    | mcptoon doctor",
+    "CONFIG_MISSING": "Try: mcptoon init",
+    "TOOL_NOT_FOUND": "Try: mcptoon manifest    | mcptoon inspect <server>",
+    "UNKNOWN_TOOL": "Try: mcptoon inspect <server>    | mcptoon manifest --slim",
+    "CONNECTION_FAILED": "Try: mcptoon doctor    | check if npx/node is installed and in PATH",
+    "TIMEOUT": "Try: mcptoon doctor    | the server may be slow to start (first npx download)",
+    "DANGEROUS_OP": "Add --destructive flag to confirm: mcptoon call <server> <tool> '{...}' --destructive",
+    "CREDENTIAL_LEAK": "Result blocked for safety. If this is a false positive, use --raw to bypass",
+    "TOOL_POISONING": "Result blocked for safety. If this is a false positive, use --raw to bypass",
+    "PARSE_ERROR": "Try: mcptoon inspect <server> <tool>    | check required parameters and types",
+}
+
+
+def _fix_suggestion(code: str, server: str = "", tool: str = "") -> str:
+    """Return a fix suggestion string for a given error code."""
+    suggestion = _FIX_SUGGESTIONS.get(code, "")
+    if suggestion and server:
+        suggestion = suggestion.replace("<server>", server)
+    if suggestion and tool:
+        suggestion = suggestion.replace("<tool>", tool)
+    return suggestion
+
+
+# ═══════════════════════════════════════════════════
 # Commands
 # ═══════════════════════════════════════════════════
 
@@ -206,8 +237,8 @@ def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
                 if "error" not in t:
                     all_tools.append(t)
         print(output.render(all_tools, fmt="slim", head_n=head_n, max_chars=max_chars, full=full))
-    elif fmt in ("toon", "compact"):
-        # For toon/compact, output just the tool names
+    elif fmt in ("toon", "mcptoon", "compact"):
+        # For toon/mcptoon/compact, output just the tool names
         result = {}
         for server, tools in manifest.items():
             names = [t.get("name", "?") for t in tools if "error" not in t]
@@ -312,6 +343,10 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False):
         # Fuzzy match suggestions for unknown tools
         if err["code"] == "UNKNOWN_TOOL" and result.get("suggestions"):
             print(f"Did you mean: {', '.join(result['suggestions'])}", file=sys.stderr)
+        # Fix suggestions for common errors
+        fix = _fix_suggestion(err["code"], server, tool)
+        if fix:
+            print(f"  Fix: {fix}", file=sys.stderr)
         sys.exit(1)
 
     print(output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
@@ -393,7 +428,7 @@ def _cmd_remove(rest):
 def _cmd_usage(_rest, fmt):
     """Show usage stats."""
     stats = usage_mod.get_usage_stats()
-    if fmt in ("toon", "compact"):
+    if fmt in ("toon", "mcptoon", "compact"):
         print(output.render(stats, fmt=fmt))
     else:
         print(f"Total calls: {stats['total_calls']}")
@@ -445,7 +480,7 @@ def _cmd_discover(rest, fmt):
             "error": error_msg,
         })
 
-    if fmt in ("toon", "compact"):
+    if fmt in ("toon", "mcptoon", "compact"):
         print(output.render(results, fmt=fmt))
     elif fmt == "json":
         print(output.render(results, fmt="json"))
@@ -555,7 +590,7 @@ _mcptoon_complete() {
         --format)
             COMPREPLY=( $(compgen -W "openai openapi mcp json human" -- $cur) )
             ;;
-        --toon|--slim|--json|--compact|--raw|--full|--stdin)
+        --toon|--mcptoon|--slim|--json|--compact|--raw|--full|--stdin)
             COMPREPLY=()
             ;;
     esac
@@ -681,7 +716,8 @@ Usage:
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags:
-    --toon         Token-efficient output (saves 40-60% tokens)
+    --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
+    --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
     --slim         Ultra-compact tool manifests (saves 93% tokens)
     --json         JSON output
     --compact      Names only
@@ -693,7 +729,8 @@ Output flags:
 
 Examples:
     mcptoon init
-    mcptoon manifest --toon
+    mcptoon manifest --toon              # standard TOON format
+    mcptoon manifest --mcptoon           # legacy pipe format
     mcptoon manifest --slim              # ultra-compact tool schemas
     mcptoon call fetch fetch '{{"url":"https://example.com"}}' --toon
     echo '{{"huge":"payload"}}' | mcptoon call server tool --stdin --toon
