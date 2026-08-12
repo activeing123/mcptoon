@@ -1,0 +1,38 @@
+{
+  "name": "git",
+  "display_name": "Git",
+  "description": "Git repository operations — status, diff, log, commit, branch, blame",
+  "package": "@modelcontextprotocol/server-git",
+  "install": "npx -y @modelcontextprotocol/server-git",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-git"],
+    "env": {}
+  },
+  "tools": ["git_status", "git_diff_unstaged", "git_diff_staged", "git_commit", "git_add", "git_reset", "git_log", "git_create_branch", "git_checkout", "git_show", "git_blame"],
+  "tool_count": 11,
+  "verified": true,
+  "verified_date": "2026-08-12",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Operates on the repository in the current working directory",
+    "git_commit and git_add are write operations — mcptoon's dangerous-op guard may flag them",
+    "No remote operations (push/pull) — use the GitHub MCP for remote actions"
+  ],
+  "notes": "Local git operations without needing GitHub API. Perfect for AI agents that need to inspect code changes, create commits, and manage branches.",
+  "usage": "mcptoon add git --stdio npx -y @modelcontextprotocol/server-git",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: status, diff, log, blame, branches", "write: add, commit, reset, checkout, create branch"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~5MB"
+}

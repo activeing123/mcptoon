@@ -1,13 +1,14 @@
-# MCP Server Support Matrix
+# MCP Server Profiles
 
 > mcptoon works with **any** MCP server (stdio or HTTP). Pre-configured profiles make it even easier — just copy and go.
 
-**Three tiers:**
-- ✅ **Profile ready** — pre-configured, battle-tested, copy-paste ready
-- 🔜 **Profile planned** — mcptoon supports it today (just `mcptoon add`), profile coming soon
-- 💬 **Community requested** — users want it, waiting for profile contributor
+**20 profiles ready · 30+ planned · growing**
 
-**Total: 10 profiles ready · 50+ planned · growing**
+> **Profiles are JSON templates, not bundled software.**
+> mcptoon doesn't ship MCP servers. Each profile is a ~1KB JSON file describing how to connect.
+> Running `mcptoon add <name>` installs the actual server via `npx` — you only install what you use.
+> Profiles are **decoupled** — remove one, the rest work fine. Add your own, it just works.
+> Each profile is **security-audited**: declares `credential_safe`, `env_vars_required` (with sensitivity levels), and `permissions` (read/write scope).
 
 ---
 
@@ -27,53 +28,83 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 
 ---
 
-## ✅ Profile Ready (10 servers, 82 tools)
+## ✅ Profile Ready (20 servers, 160+ tools)
 
 Battle-tested with real production usage: 255+ tools, 23+ servers, 30K+ calls.
 
 ### 🛠️ Developer
 
-| Name | Package | Tools | Env vars | Our usage | Profile |
-|------|---------|-------|----------|-----------|---------|
-| **github** | @modelcontextprotocol/server-github | 26 | `GITHUB_PERSONAL_ACCESS_TOKEN` | 714 calls | [✅ Profile](stdio/github.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **github** | @modelcontextprotocol/server-github | 26 | `GITHUB_PERSONAL_ACCESS_TOKEN` | ✅ audited | [✅](stdio/github.json) |
+| **git** | @modelcontextprotocol/server-git | 11 | None | ✅ audited | [✅](stdio/git.json) |
+| **gitlab** | @modelcontextprotocol/server-gitlab | 14 | `GITLAB_PERSONAL_ACCESS_TOKEN` | ✅ audited | [✅](stdio/gitlab.json) |
 
 ### 🔍 Search & Web
 
-| Name | Package | Tools | Env vars | Our usage | Profile |
-|------|---------|-------|----------|-----------|---------|
-| **fetch** | @modelcontextprotocol/server-fetch | 1 | None | 441 calls | [✅ Profile](stdio/fetch.json) |
-| **exa** | exa-mcp-server | 1 | `EXA_API_KEY` | 789 calls | [✅ Profile](stdio/exa.json) |
-| **brave-search** | @modelcontextprotocol/server-brave-search | 2 | `BRAVE_API_KEY` | 89 calls | [✅ Profile](stdio/brave-search.json) |
-| **firecrawl** | firecrawl-mcp | 26 | `FIRECRAWL_API_KEY` | 69 calls | [✅ Profile](stdio/firecrawl.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **fetch** | @modelcontextprotocol/server-fetch | 1 | None | ✅ audited | [✅](stdio/fetch.json) |
+| **exa** | exa-mcp-server | 1 | `EXA_API_KEY` | ✅ audited | [✅](stdio/exa.json) |
+| **brave-search** | @modelcontextprotocol/server-brave-search | 2 | `BRAVE_API_KEY` | ✅ audited | [✅](stdio/brave-search.json) |
+| **firecrawl** | firecrawl-mcp | 26 | `FIRECRAWL_API_KEY` | ✅ audited | [✅](stdio/firecrawl.json) |
+| **tavily** | tavily-mcp | 3 | `TAVILY_API_KEY` | ✅ audited | [✅](stdio/tavily.json) |
 
-### 📁 File & Document
+### 🌐 Browser Automation
 
-| Name | Package | Tools | Env vars | Config | Profile |
-|------|---------|-------|----------|--------|---------|
-| **filesystem** | @modelcontextprotocol/server-filesystem | 9 | None | Pass a directory path | [✅ Profile](stdio/filesystem.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **puppeteer** | @modelcontextprotocol/server-puppeteer | 8 | None | ✅ audited | [✅](stdio/puppeteer.json) |
+| **playwright** | @executeautomation/playwright-mcp-server | 10 | None | ✅ audited | [✅](stdio/playwright.json) |
 
-### 🧠 AI & Knowledge
+### 💬 Communication
 
-| Name | Package | Tools | Env vars | Config | Profile |
-|------|---------|-------|----------|--------|---------|
-| **memory** | @modelcontextprotocol/server-memory | 9 | None | Zero config | [✅ Profile](stdio/memory.json) |
-| **sequential-thinking** | @modelcontextprotocol/server-sequential-thinking | 1 | None | Zero config | [✅ Profile](stdio/sequential-thinking.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **slack** | @modelcontextprotocol/server-slack | 5 | `SLACK_BOT_TOKEN` | ✅ audited | [✅](stdio/slack.json) |
+| **notion** | @modelcontextprotocol/server-notion | 10 | `NOTION_API_KEY` | ✅ audited | [✅](stdio/notion.json) |
 
 ### 🗄️ Database
 
-| Name | Package | Tools | Env vars | Config | Profile |
-|------|---------|-------|----------|--------|---------|
-| **sqlite** | @modelcontextprotocol/server-sqlite | 5 | None | Pass a .db file path | [✅ Profile](stdio/sqlite.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **sqlite** | @modelcontextprotocol/server-sqlite | 5 | None | ✅ audited | [✅](stdio/sqlite.json) |
+| **postgres** | @modelcontextprotocol/server-postgres | 3 | Pass connection string | ✅ audited | [✅](stdio/postgres.json) |
+
+### 📁 File & Document
+
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **filesystem** | @modelcontextprotocol/server-filesystem | 9 | None | ✅ audited | [✅](stdio/filesystem.json) |
+
+### 🧠 AI & Knowledge
+
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **memory** | @modelcontextprotocol/server-memory | 9 | None | ✅ audited | [✅](stdio/memory.json) |
+| **sequential-thinking** | @modelcontextprotocol/server-sequential-thinking | 1 | None | ✅ audited | [✅](stdio/sequential-thinking.json) |
+
+### 📊 Data & Analytics
+
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **google-maps** | @modelcontextprotocol/server-google-maps | 5 | `GOOGLE_MAPS_API_KEY` | ✅ audited | [✅](stdio/google-maps.json) |
+
+### ☁️ Cloud & DevOps
+
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **docker** | community server | 8 | None | ⚠️ pending audit | [✅](stdio/docker.json) |
 
 ### 🔧 Utility
 
-| Name | Package | Tools | Env vars | Config | Profile |
-|------|---------|-------|----------|--------|---------|
-| **time** | @modelcontextprotocol/server-time | 2 | None | Zero config | [✅ Profile](stdio/time.json) |
+| Name | Package | Tools | Env vars | Security | Profile |
+|------|---------|-------|----------|----------|---------|
+| **time** | @modelcontextprotocol/server-time | 2 | None | ✅ audited | [✅](stdio/time.json) |
 
 ---
 
-## 🔜 Profile Planned (50+ servers)
+## 🔜 Profile Planned (30+ servers)
 
 mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <package>`. Pre-configured profiles are coming.
 
@@ -81,11 +112,8 @@ mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <pa
 
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
-| gitlab | @modelcontextprotocol/server-gitlab | ~15 | Code platform | High |
-| git | @modelcontextprotocol/server-git | ~11 | Repository ops | High |
 | sentry | @modelcontextprotocol/server-sentry | ~5 | Error monitoring | Medium |
 | linear | @modelcontextprotocol/server-linear | ~10 | Issue tracking | Medium |
-| docker | community server | ~8 | Container ops | Medium |
 | kubernetes | community server | ~12 | K8s management | Medium |
 | terminal | community server | ~3 | Shell access | Low |
 
@@ -93,7 +121,6 @@ mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <pa
 
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
-| postgres | @modelcontextprotocol/server-postgres | ~3 | SQL database | High |
 | mongodb | community server | ~6 | NoSQL database | Medium |
 | redis | community server | ~4 | Cache/key-value | Low |
 | supabase | community server | ~8 | Backend-as-a-service | Medium |
@@ -106,24 +133,14 @@ mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <pa
 
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
-| tavily | tavily-mcp | ~3 | AI search | High |
 | perplexity | community server | ~2 | AI search | Medium |
 | bing-search | community server | ~2 | Web search | Low |
 | google-custom-search | community server | ~2 | Web search | Low |
-
-### 🌐 Browser Automation
-
-| Name | Package | Tools | Category | Priority |
-|------|---------|-------|----------|----------|
-| puppeteer | @modelcontextprotocol/server-puppeteer | ~8 | Browser automation | High |
-| playwright | community server | ~10 | Browser automation | High |
-| browserbase | community server | ~5 | Cloud browser | Low |
 
 ### 💬 Communication
 
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
-| slack | @modelcontextprotocol/server-slack | ~5 | Team messaging | High |
 | discord | community server | ~4 | Community chat | Medium |
 | email (imap) | community server | ~6 | Email access | Medium |
 | reddit | community server | ~3 | Social media | Low |
@@ -134,7 +151,6 @@ mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <pa
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
 | google-drive | @modelcontextprotocol/server-google-drive | ~8 | Cloud storage | Medium |
-| notion | community server | ~10 | Knowledge base | High |
 | obsidian | community server | ~6 | Note-taking | Medium |
 | dropbox | community server | ~5 | Cloud storage | Low |
 | confluence | community server | ~6 | Enterprise wiki | Low |
@@ -171,7 +187,6 @@ mcptoon supports these **today** — just `mcptoon add <name> --stdio npx -y <pa
 
 | Name | Package | Tools | Category | Priority |
 |------|---------|-------|----------|----------|
-| google-maps | @modelcontextprotocol/server-google-maps | ~4 | Location/maps | Medium |
 | spotify | community server | ~6 | Music data | Low |
 | youtube | community server | ~5 | Video data | Low |
 | alpha-vantage | community server | ~3 | Finance data | Low |
@@ -202,7 +217,7 @@ Servers that users have asked for. Want to help? Pick one and contribute a profi
 ### How to contribute a profile
 
 1. Copy `mcp/_template.json` → `mcp/stdio/<name>.json`
-2. Fill in the fields
+2. Fill in the fields (including the `security` section)
 3. Test: `mcptoon add <name> --stdio npx -y <package> && mcptoon manifest --toon`
 4. Open a PR — we'll verify and merge
 
@@ -230,18 +245,32 @@ Each profile JSON contains:
   "tools": ["tool1", "tool2"],
   "tool_count": 2,
   "verified": true,
-  "verified_date": "2026-08-11",
+  "verified_date": "2026-08-12",
   "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
   "pitfalls": ["Known issues"],
   "notes": "Usage notes",
   "usage": "mcptoon add ...",
   "our_usage_rank": 1,
   "our_usage_calls": 100,
-  "beginner_friendly": false
+  "beginner_friendly": false,
+
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {"name": "API_KEY", "sensitivity": "high", "description": "What this key is for"}
+    ],
+    "permissions": ["read: what it reads", "write: what it writes"]
+  },
+
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~5MB"
 }
 ```
 
-**Security: All API keys, tokens, and credentials are replaced with `<your-key>` placeholders. No secrets are stored in profiles.**
+**Security: All API keys, tokens, and credentials are replaced with `<your-key>` placeholders. No secrets are stored in profiles. Each profile declares its security audit status.**
 
 ---
 
@@ -249,7 +278,7 @@ Each profile JSON contains:
 
 Without a profile, you need to: find the server package → read its docs → figure out env vars → write the config.
 
-With a profile, you just: `mcptoon add <name> --stdio npx -y <package>` — everything is pre-configured.
+With a profile, you just: `mcptoon add <name> --stdio npx -y <package>` — everything is pre-configured, including security metadata.
 
 **But remember: mcptoon works with ANY MCP server, profile or not.** If your server isn't listed here, just add it manually:
 
@@ -264,19 +293,19 @@ mcptoon manifest --toon    # works immediately
 
 | Category | Ready | Planned | Total |
 |----------|-------|---------|-------|
-| 🛠️ Developer Tools | 1 | 6 | 7 |
-| 🗄️ Database | 1 | 8 | 9 |
-| 🔍 Search & Web | 4 | 4 | 8 |
-| 🌐 Browser Automation | 0 | 3 | 3 |
-| 💬 Communication | 0 | 5 | 5 |
-| 📁 File & Document | 1 | 5 | 6 |
+| 🛠️ Developer Tools | 3 | 4 | 7 |
+| 🗄️ Database | 2 | 7 | 9 |
+| 🔍 Search & Web | 5 | 3 | 8 |
+| 🌐 Browser Automation | 2 | 0 | 2 |
+| 💬 Communication | 2 | 4 | 6 |
+| 📁 File & Document | 1 | 4 | 5 |
 | 📋 Project Management | 0 | 4 | 4 |
 | 🎨 Creative & Design | 0 | 4 | 4 |
-| ☁️ Cloud & DevOps | 0 | 5 | 5 |
-| 📊 Data & Analytics | 0 | 4 | 4 |
+| ☁️ Cloud & DevOps | 1 | 5 | 6 |
+| 📊 Data & Analytics | 1 | 3 | 4 |
 | 🧠 AI & Knowledge | 2 | 1 | 3 |
 | 🔧 Utility | 1 | 0 | 1 |
-| **Total** | **10** | **49** | **59** |
+| **Total** | **20** | **39** | **59** |
 
 ---
 
@@ -288,6 +317,6 @@ Every server benefits from mcptoon's token optimization:
 |-----------|-------------|----------------|---------|
 | Tool discovery (per server) | ~200-400 | ~5-15 | **97%** |
 | Tool schema (per tool) | ~80-150 | ~5-10 | **93%** |
-| Tool results (structured) | ~500-3000 | ~200-1200 | **56%** |
+| Tool results (structured) | ~500-3000 | ~200-1200 | **56-61%** |
 
-A typical 5-server setup saves **40,000-70,000 tokens** per conversation.
+A typical 20-server setup saves **90,000+ tokens** per conversation. See [benchmark data](../assets/benchmark_data.json).

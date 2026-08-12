@@ -6,8 +6,13 @@
   "install": "npx -y @modelcontextprotocol/server-github",
   "config": {
     "transport": "stdio",
-    "command": ["npx", "-y"],
-    "args": ["@modelcontextprotocol/server-github"],
+    "command": [
+      "npx",
+      "-y"
+    ],
+    "args": [
+      "@modelcontextprotocol/server-github"
+    ],
     "env": {
       "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-github-pat>"
     }
@@ -42,7 +47,11 @@
   "tool_count": 26,
   "verified": true,
   "verified_date": "2026-08-11",
-  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "platforms": {
+    "windows": "ok",
+    "macos": "ok",
+    "linux": "ok"
+  },
   "pitfalls": [
     "Requires GitHub Personal Access Token (PAT) with repo scope",
     "API rate limit: 5000 requests/hour per token",
@@ -51,5 +60,23 @@
   "notes": "Create your PAT at https://github.com/settings/tokens — fine-grained tokens also work.",
   "usage": "mcptoon add github --stdio npx -y @modelcontextprotocol/server-github",
   "our_usage_rank": 2,
-  "our_usage_calls": 714
+  "our_usage_calls": 714,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {
+        "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "sensitivity": "high",
+        "description": "GitHub PAT with repo scope"
+      }
+    ],
+    "permissions": [
+      "read: repos, issues, PRs, code",
+      "write: issues, PRs, commits, repos"
+    ]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
 }

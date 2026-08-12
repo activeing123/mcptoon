@@ -6,8 +6,13 @@
   "install": "npx -y firecrawl-mcp",
   "config": {
     "transport": "stdio",
-    "command": ["npx", "-y"],
-    "args": ["firecrawl-mcp"],
+    "command": [
+      "npx",
+      "-y"
+    ],
+    "args": [
+      "firecrawl-mcp"
+    ],
     "env": {
       "FIRECRAWL_API_KEY": "<your-firecrawl-api-key>"
     }
@@ -43,7 +48,11 @@
   "tool_count": 26,
   "verified": true,
   "verified_date": "2026-08-11",
-  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "platforms": {
+    "windows": "ok",
+    "macos": "ok",
+    "linux": "ok"
+  },
   "pitfalls": [
     "Requires Firecrawl API key — get one at https://firecrawl.dev",
     "26 tools — the largest MCP server in our profile. Includes research paper search, web monitoring, and autonomous agent mode.",
@@ -52,5 +61,23 @@
   "notes": "Most feature-rich MCP server we use. firecrawl_search for general web search, firecrawl_scrape for single-page extraction, firecrawl_research_search_papers for academic papers.",
   "usage": "mcptoon add firecrawl --stdio npx -y firecrawl-mcp",
   "our_usage_rank": 5,
-  "our_usage_calls": 69
+  "our_usage_calls": 69,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {
+        "name": "FIRECRAWL_API_KEY",
+        "sensitivity": "high",
+        "description": "Firecrawl API key"
+      }
+    ],
+    "permissions": [
+      "read: web pages, crawl results",
+      "write: none"
+    ]
+  },
+  "bundled": false,
+  "install_method": "on-demand"
 }

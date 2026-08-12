@@ -1,0 +1,42 @@
+{
+  "name": "tavily",
+  "display_name": "Tavily AI Search",
+  "description": "AI-optimized web search — returns clean, relevant content for LLMs",
+  "package": "tavily-mcp",
+  "install": "npx -y tavily-mcp",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["tavily-mcp"],
+    "env": {
+      "TAVILY_API_KEY": "<your-tavily-api-key>"
+    }
+  },
+  "tools": ["tavily_search", "tavily_extract", "tavily_crawl"],
+  "tool_count": 3,
+  "verified": true,
+  "verified_date": "2026-08-12",
+  "platforms": { "windows": "ok", "macos": "ok", "linux": "ok" },
+  "pitfalls": [
+    "Requires Tavily API key — get one at https://tavily.com",
+    "Free tier: 1000 searches/month",
+    "Returns AI-optimized content (cleaner than raw HTML)"
+  ],
+  "notes": "AI-native search engine designed for LLMs. Returns clean, relevant content instead of raw HTML. Great alternative to Exa for some use cases.",
+  "usage": "mcptoon add tavily --stdio npx -y tavily-mcp",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": true,
+  "security": {
+    "audited": true,
+    "audited_date": "2026-08-12",
+    "credential_safe": true,
+    "env_vars_required": [
+      {"name": "TAVILY_API_KEY", "sensitivity": "high", "description": "Tavily API key"}
+    ],
+    "permissions": ["read: web search results, page content"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~3MB"
+}

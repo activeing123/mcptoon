@@ -1,0 +1,39 @@
+{
+  "name": "docker",
+  "display_name": "Docker",
+  "description": "Container management — list, run, stop, inspect, build, logs",
+  "package": "@modelcontextprotocol/server-docker",
+  "install": "npx -y @modelcontextprotocol/server-docker",
+  "config": {
+    "transport": "stdio",
+    "command": ["npx", "-y"],
+    "args": ["@modelcontextprotocol/server-docker"],
+    "env": {}
+  },
+  "tools": ["docker_list_containers", "docker_run_container", "docker_stop_container", "docker_remove_container", "docker_inspect", "docker_logs", "docker_build", "docker_exec"],
+  "tool_count": 8,
+  "verified": false,
+  "verified_date": "",
+  "platforms": { "windows": "pending", "macos": "pending", "linux": "ok" },
+  "pitfalls": [
+    "Requires Docker daemon running on the host",
+    "docker_remove_container is a destructive operation — mcptoon's safety guard will block it by default",
+    "Windows/macOS: requires Docker Desktop",
+    "Community server — verify package name before use"
+  ],
+  "notes": "Container operations from your AI agent. Perfect for DevOps automation, debugging, and infrastructure management.",
+  "usage": "mcptoon add docker --stdio npx -y @modelcontextprotocol/server-docker",
+  "our_usage_rank": null,
+  "our_usage_calls": 0,
+  "beginner_friendly": false,
+  "security": {
+    "audited": false,
+    "audited_date": "",
+    "credential_safe": true,
+    "env_vars_required": [],
+    "permissions": ["read: containers, images, logs", "write: run, stop, remove, build, exec commands"]
+  },
+  "bundled": false,
+  "install_method": "on-demand",
+  "install_size": "~5MB"
+}
