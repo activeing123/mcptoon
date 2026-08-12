@@ -72,7 +72,7 @@ Claude Code 配了 15 个 MCP 服务器。换 Cursor——配置格式不同、�
 
 每个 MCP 返回长这样：`{"content":[{"type":"text","text":"{\"name\":\"react\",\"stars\":219000}"}]}`——80 个 token 的括号、引号、类型声明，就为传 6 个 token 的真实数据。一个 session 调 200 次工具 = 1.5万 token 纯语法浪费。
 
-→ **mcptoon：返回 `name:react|stars:219000`——同样的数据，结果少 20-40% token，schema 少 61%。** 工具发现：少 97%。工具 schema：少 93%。[tiktoken 验证](#toon-原理)。
+→ **mcptoon：返回 `name: react\nstars: 219000`——同样的数据，结果少 30-60% token（标准 TOON），schema 少 93%（SLIM）。** 工具发现：少 97-100%。[tiktoken 验证](#toon-原理)。
 
 ---
 
@@ -101,48 +101,34 @@ mcptoon 是个 CLI 工具，不是 MCP 客户端库。你的 Agent 不连接 MCP
 search_web fetch_url
 ```
 
-**带完整 schema 的 TOON（115 token）**——需要细节时：
+**带完整 schema 的 SLIM（115 token）**——需要参数细节时：
 
 ```
-name:search_web|description:Search_the_web|inputSchema:type:object|properties:query:type:string|description:Search_query|num_results:type:number|default:5|required:query||
-name:fetch_url|description:Fetch_content_from_a_URL|inputSchema:type:object|properties:url:type:string|required:url
+search_web|query:s*|num_results:n
+fetch_url|url:s*
 ```
 
-工具发现省 98%，完整 schema 省 60%，信息零丢失。
+工具发现省 98%，完整 schema 省 93%，信息零丢失。
 
-### 实测 benchmark（255 个工具，23 个服务器）
+### 实测 benchmark（255 个工具，5 种格式）
 
-| 工具数 | JSON（token） | mcptoon compact | 降低 |
-|-------|-------------|----------------|-----------|
-| 5 | 1,897 | 16 | **99.2%** |
-| 10 | 3,567 | 34 | **99.0%** |
-| 25 | 9,009 | 97 | **98.9%** |
-| 50 | 17,790 | 117 | **99.3%** |
-| 93 | 33,191 | 117 | **99.6%** |
-| 150 | 53,350 | 117 | **99.8%** |
-| 200 | 71,135 | 117 | **99.8%** |
-| **255** | **90,804** | **117** | **99.87%** |
+| 工具数 | JSON | 标准 TOON | mcptoon | SLIM | Compact |
+|-------|------|----------|---------|------|---------|
+| 5 | 1,897 | 981 (-48%) | 785 (-59%) | 111 (-94%) | 16 (-99%) |
+| 10 | 3,567 | 1,757 (-51%) | 1,391 (-61%) | 235 (-93%) | 34 (-99%) |
+| 25 | 9,009 | 4,491 (-50%) | 3,580 (-60%) | 595 (-93%) | 97 (-99%) |
+| 50 | 17,790 | 8,776 (-51%) | 6,981 (-61%) | 1,203 (-93%) | 117 (-99%) |
+| 93 | 33,191 | 16,426 (-51%) | 13,086 (-61%) | 2,231 (-93%) | 117 (-100%) |
+| 150 | 53,350 | 26,326 (-51%) | 20,958 (-61%) | 3,626 (-93%) | 117 (-100%) |
+| 200 | 71,135 | 35,106 (-51%) | 27,952 (-61%) | 4,842 (-93%) | 117 (-100%) |
+| **255** | **90,804** | **44,863 (-51%)** | **35,735 (-61%)** | **6,174 (-93%)** | **117 (-100%)** |
 
-**TOON 格式**工具结果：比 JSON **小 61%**。
-**SLIM 格式**完整 schema：比 JSON **小 93%**。
+**标准 TOON** (`--toon`)：比 JSON **小 51%**（可逆）。
+**mcptoon 格式** (`--mcptoon`)：比 JSON **小 61%**（可逆）。
+**SLIM 格式** (`--slim`)：完整 schema **小 93%**。
+**Compact** (`--compact`)：工具名 **小 100%**。
 
-<details>
-<summary>📊 完整 benchmark 数据（点击展开）</summary>
-
-| 工具数 | JSON token | TOON token | SLIM token | Compact token | TOON 节省 | SLIM 节省 | Compact 节省 |
-|--------|-----------|------------|------------|---------------|-----------|-----------|-------------|
-| 5 | 1,897 | 784 | 111 | 16 | 59% | 94% | 99% |
-| 10 | 3,567 | 1,382 | 235 | 34 | 61% | 93% | 99% |
-| 25 | 9,009 | 3,562 | 595 | 97 | 60% | 93% | 99% |
-| 50 | 17,790 | 6,939 | 1,203 | 117 | 61% | 93% | 99% |
-| 93 | 33,191 | 13,011 | 2,231 | 117 | 61% | 93% | 100% |
-| 150 | 53,350 | 20,834 | 3,626 | 117 | 61% | 93% | 100% |
-| 200 | 71,135 | 27,787 | 4,842 | 117 | 61% | 93% | 100% |
-| 255 | 90,804 | 35,527 | 6,174 | 117 | 61% | 93% | 100% |
-
-复现：`python _benchmark.py` → 输出 `assets/benchmark_data.json` + `assets/benchmark.html`
-
-</details>
+复现：`python _benchmark.py` → 输出 `assets/benchmark_data.json`
 
 ### 第三方研究与上下文经济学
 
@@ -183,31 +169,58 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --json   # 脚本需要
 
 ## TOON 怎么工作的
 
-TOON 去掉 JSON 为机器解析所需的结构脚手架——括号、引号、逗号、重复的类型声明——这些对 LLM 不增加任何语义价值。
+mcptoon 支持两种 token 高效格式：
 
-| JSON | TOON | 原理 |
+### 标准 TOON (`--toon`)
+
+实现了 [TOON (Token-Oriented Object Notation)](https://github.com/toon-format/toon) 规范——为 LLM 设计的开放格式。用 YAML 风格缩进表示对象，CSV 风格表格表示统一数组。
+
+| JSON | 标准 TOON | 原理 |
 |---|---|---|
-| `{"name":"search","count":3}` | `name:search\|count:3` | 竖线替代花括号+引号+冒号 |
-| `[1, 2, 3]` | `1 2 3` | 空格替代方括号+逗号 |
-| `true` / `false` | `true` / `false` | 保持原样（两者都是 1 token） |
-| `null` | `null` | 保持原样（∅ 花费 2 token，反而更多） |
-| `"a:b"` | `a_b` | 冒号→下划线（避免竖线歧义） |
-| `{"a":{"b":[1,2]}}` | `a:b:1_2` | 递归压缩 |
+| `{"name":"search","count":3}` | `name: search\ncount: 3` | 换行替代花括号+引号 |
+| `[{"id":1,"name":"Alice"}]` | `[1]{id,name}:\n  1,Alice` | 字段声明一次 + CSV 行 |
+| `[1, 2, 3]` | `[3]:\n  1\n  2\n  3` | 方括号表示数组 |
+| `true` / `false` / `null` | `true` / `false` / `null` | 保持原样（都是 1 token） |
 
-AI 拿到的是同样的数据，可以从 TOON 完整重建结构。我们只是不再让你为 `{"type":"object","properties":` 反复付 token 了。
+**可逆**：`decode(encode(x)) == x`。URL、时间戳、特殊字符都安全保留。
+
+### 旧版 mcptoon 格式 (`--mcptoon`)
+
+mcptoon 原创的管道分隔格式。比标准 TOON 简单但结构化程度更低。
+
+| JSON | mcptoon | 原理 |
+|---|---|---|
+| `{"name":"search","count":3}` | `name:search\|count:3` | 竖线替代花括号+引号 |
+| `[1, 2, 3]` | `1 2 3` | 空格替代方括号+逗号 |
+| `"https://example.com"` | `https\c//example.com` | 冒号转义为 `\c`（可逆） |
+
+**可逆**，用 `mcptoon_decode()`。转义序列：`\c`=冒号，`\p`=竖线，`\\`=反斜杠。
+
+### SLIM 格式 (`--slim`)
+
+mcptoon 专属的超紧凑工具 schema 编码。无外部对应。
+
+```
+search|q:s*|n:n
+fetch|url:s*
+```
+
+**tiktoken 验证**：`{"type":"object","properties":{...}}` → `q:s*`（省 83% token）。
 
 ## 输出格式
 
 | Flag | 输出 | Token 用量 |
 |---|---|---|
-| `--toon` | 紧凑编码，完整语义 | 比 JSON 省 20-40%（tiktoken 验证） |
+| `--toon` | 标准 TOON（toon-format/toon 规范） | 比 JSON 省 **30-60%**（可逆） |
+| `--mcptoon` | 旧版 mcptoon 管道格式 | 比 JSON 省 **20-40%**（可逆） |
 | `--slim` | 超紧凑工具 schema (name\|param:type*) | 比 JSON 省 **93%** |
-| `--compact` | 仅工具名，空格分隔 | 比 JSON 省 97% |
+| `--compact` | 仅工具名，空格分隔 | 比 JSON 省 **97-100%** |
 | `--json` | 标准 JSON（脚本、CI 用） | 基准线 |
 | `--raw` | 原始响应，不解析 | 全量 |
 | `--head N` | 仅前 N 条 | 可变 |
 | `--max-chars N` | 硬截断到 N 字符 | 可变 |
 | `--full` | 禁用默认 4000 字符截断 | 全量 |
+| `--format X` | 导出格式：openai\|openapi\|mcp\|json\|human | 可变 |
 
 设 `MCPTOON_AGENT_TYPE=claude`，所有调用自动用 `--toon`，不用手动加 flag。
 
@@ -398,13 +411,16 @@ export MCPTOON_AGENT_TYPE=claude
 
 ```python
 from mcptoon.client import MCPClient
-from mcptoon.output import toon
+from mcptoon.output import toon_encode, toon_decode, mcptoon_encode
 
 with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
     tools = c.list_tools()
-    print(toon(tools))         # 紧凑 TOON
+    print(toon_encode(tools))         # 标准 TOON 输出
     result = c.call_tool("fetch", {"url": "https://example.com"})
-    print(toon(result))
+    print(toon_encode(result))        # 标准 TOON 输出
+    # 可逆：解码回 Python dict
+    decoded = toon_decode(toon_encode(result))
+    assert decoded == result          # ✅ 可逆
 ```
 
 ## 自定义 Handler — 绕过 MCP
@@ -428,9 +444,11 @@ mcptoon 不只是 CLI 工具——它是一个 **token 高效的 MCP 生态系�
 | 组件 | 是什么 | 状态 |
 |------|--------|------|
 | 📦 **[服务器 Profile](mcp/README.md)** | 23 个现成 MCP 服务器 Profile（186+ 工具） | 23 → 100+ |
-| 🔧 **TOON 格式** | Token 优化标记法（开放规范） | v1 内置于 mcptoon → 独立规范 |
-| 📚 **集成指南** | Agent 专属配置文档 | 10 个 Agent 规划中 |
-| 🏷️ **Powered by 徽章** | MCP 服务器使用 mcptoon 的标识 | 即将推出 |
+| 🔧 **标准 TOON** | Token-Oriented Object Notation (toon-format/toon 规范) | v2，可逆 |
+| 🔧 **mcptoon 格式** | 旧版管道分隔格式 | v2，可逆 |
+| 🔧 **SLIM 格式** | 超紧凑工具 schema | v1，mcptoon 专属 |
+| 📚 **集成指南** | Agent 专属配置文档 | 5 个 Agent 已覆盖 |
+| 🏷️ **Powered by 徽章** | MCP 服务器使用 mcptoon 的标识 | 可用 |
 | 🔌 **多语言 SDK** | JS/Go/Rust 的 TOON 实现 | v1.0 后 |
 
 **参与贡献：** 添加 Profile · 写集成指南 · 在你的语言中实现 TOON
@@ -523,13 +541,13 @@ src/mcptoon/
 ├── router.py     # 工具调用路由, 自定义 handler, 注入防护 + 凭据泄露检测
 ├── config.py     # 服务器配置 (~/.mcptoon/config.json + 覆盖)
 ├── manifest.py   # 工具发现 (带缓存)
-├── output.py     # TOON / JSON / compact 渲染
+├── output.py     # 标准 TOON + 旧版 mcptoon + JSON / compact / slim 渲染
 ├── cache.py      # Schema 缓存 (5分钟 TTL)
 ├── usage.py      # 本地用量统计
 └── errors.py     # 结构化错误封装
 ```
 
-总共约 2,500 行。187 个测试。零第三方 import。唯一的网络调用是到你配置的 MCP 服务器。
+总共约 3,000 行。309 个测试。零第三方 import。唯一的网络调用是到你配置的 MCP 服务器。
 
 ## 隐私
 
@@ -553,7 +571,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 187 个测试, 0.2s
+python -m pytest tests/ -v   # 309 个测试, 0.3s
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。

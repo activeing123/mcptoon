@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2025 cxh
+# Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,7 +49,13 @@ from typing import Any, Optional
 # ─── MCP Protocol Constants ───
 
 PROTOCOL_VERSION = "2024-11-05"
-_CLIENT_INFO = {"name": "mcptoon", "version": "0.1.0"}
+
+# Read version dynamically to avoid hardcoding drift
+try:
+    from . import __version__ as _pkg_version
+except ImportError:
+    _pkg_version = "0.0.0"
+_CLIENT_INFO = {"name": "mcptoon", "version": _pkg_version}
 
 # Request ID counter (thread-safe)
 _id_lock = threading.Lock()

@@ -11,11 +11,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `manifest --slim` support in manifest command
 - Error messages with `--fix` suggestions
 - TOML config file support (`~/.mcptoon/config.toml`)
-- Integration guides for Claude Code, Cursor, OpenCode
-- stdio MCP server auto-discovery (scan `node_modules/.bin/` for `mcp-*` packages)
+- awesome-mcp-clients PR submission
+- MCP Profiles expansion (23 → 30+)
 - `mcptoon serve` — expose mcptoon itself as an MCP server
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
+
+## [0.4.0] — 2026-08-12
+
+### Added
+- **Standard TOON adoption** — Implemented `toon_encode()` / `toon_decode()` following the [TOON (Token-Oriented Object Notation)](https://github.com/toon-format/toon) spec. Uses YAML-style indentation for objects and CSV-style tabular layout for uniform arrays. Round-trip safe: `decode(encode(x)) == x`.
+  ```python
+  from mcptoon.output import toon_encode, toon_decode
+  toon_encode({"name": "search", "count": 3})
+  # → "name: search\ncount: 3"
+  toon_encode([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
+  # → "[2]{id,name}:\n  1,Alice\n  2,Bob"
+  ```
+- **TOON decoder** — `toon_decode()` reverses `toon_encode()`. Handles all types: strings (with CSV quoting/escaping), numbers, booleans, null, nested objects, uniform arrays, scalar arrays, mixed arrays.
+- **31 cross-validation tests** — `tests/test_toon_cross_validate.py` validates TOON spec conformance: object encoding, scalar values, string escaping, array CSV-style, round-trip safety, token efficiency. Total tests: 293.
+- **CLI flag separation** — `--toon` and `--mcptoon` are now properly separated in the CLI arg parsing chain (fixed `if` → `elif` bug).
+- **`__main__.py` support** — `python -m mcptoon` now works as an alternative to the `mcptoon` command. Required for some CI/CD environments and Docker containers.
+- **Error fix suggestions** — CLI errors now include actionable fix suggestions. 10 error codes covered: `SERVER_NOT_FOUND`, `CONFIG_MISSING`, `TOOL_NOT_FOUND`, `UNKNOWN_TOOL`, `CONNECTION_FAILED`, `TIMEOUT`, `DANGEROUS_OP`, `CREDENTIAL_LEAK`, `TOOL_POISONING`, `PARSE_ERROR`.
+  ```bash
+  $ mcptoon call nonexistent tool '{}'
+  Error [SERVER_NOT_FOUND]: Server not found: nonexistent
+    Fix: Try: mcptoon list | mcptoon add <name> --stdio npx -y <package> | mcptoon doctor
+  ```
+- **16 new tests** — `tests/test_v04_features.py` covers `__main__.py` and error fix suggestions. Total tests: 309.
+
+### Changed
+- Bumped version to 0.4.0
+- `output.py` now exports `toon_encode` / `toon_decode` as the standard TOON API, alongside legacy `mcptoon_encode` / `mcptoon_decode`
+- `pyproject.toml` classifier updated to `Production/Stable`
+- Benchmark updated to v4: now compares 5 formats (JSON vs Standard TOON vs mcptoon vs SLIM vs Compact)
+- CI lint step updated to use `toon_encode` / `mcptoon_encode` instead of deprecated `toon` alias
+- `errors.py` copyright year updated to 2025-2026
+
+### Fixed
+- **cli.py flag parsing bug** — `--toon` was parsed with `if` instead of `elif`, causing it to be in a separate if-chain from `--json`/`--compact`. Fixed to `elif`.
+- **Legacy mcptoon format data loss** — Strings containing colons, pipes, or newlines were corrupted. Now properly escaped with `\c` (colon), `\p` (pipe), `\\` (backslash), `\n` (newline). Round-trip safe with `mcptoon_decode()`.
+
+### Benchmark Results (v4, 255 tools)
+
+| Tools | JSON | Std TOON | mcptoon | SLIM | Compact |
+|-------|------|----------|---------|------|---------|
+| 5 | 1,897 | 981 (-48%) | 785 (-59%) | 111 (-94%) | 16 (-99%) |
+| 50 | 17,790 | 8,776 (-51%) | 6,981 (-61%) | 1,203 (-93%) | 117 (-99%) |
+| 93 | 33,191 | 16,426 (-51%) | 13,086 (-61%) | 2,231 (-93%) | 117 (-100%) |
+| 255 | 90,804 | 44,863 (-51%) | 35,735 (-61%) | 6,174 (-93%) | 117 (-100%) |
 
 ## [0.3.0] — 2026-08-12
 

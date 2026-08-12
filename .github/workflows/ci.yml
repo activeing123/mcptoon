@@ -54,7 +54,8 @@ jobs:
       run: |
         python -c "import mcptoon; print(f'mcptoon v{mcptoon.__version__} OK')"
         python -c "from mcptoon.client import MCPClient; print('client OK')"
-        python -c "from mcptoon.output import toon; print('toon OK')"
+        python -c "from mcptoon.output import toon_encode, toon_decode; print('toon_encode OK')"
+        python -c "from mcptoon.output import mcptoon_encode, mcptoon_decode; print('mcptoon_encode OK')"
         python -c "from mcptoon.router import call_tool; print('router OK')"
 
     - name: Verify zero dependencies
