@@ -22,11 +22,18 @@ Usage:
     mcptoon manifest --full              List all tools with params
     mcptoon manifest --format openai    Export as OpenAI function calling
     mcptoon manifest --format openapi   Export as OpenAPI 3.0 spec
-    mcptoon discover                     Discover servers + health check
+    mcptoon discover                     Auto-discover MCP servers (scan + probe)
+    mcptoon discover --write             Discover + write to config
+    mcptoon discover --http <url>        Probe a specific HTTP MCP endpoint
     mcptoon inspect <server> <tool>      Show tool schema
+    mcptoon search <query>              Search tools across all servers
     mcptoon call <server> <tool> [ARGS]  Call a tool
-    mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)
+    mcptoon call --auto <tool> [ARGS]    Call a tool (auto-find server)
+    mcptoon call <server> <tool> --stdin   Read args from stdin (large payloads)
     mcptoon init                         Create sample config
+    mcptoon init --auto                  Auto-discover all MCP servers
+    mcptoon init --auto --dry            Discover, print only, don't write
+    mcptoon init --auto --http <url>     Add HTTP MCP endpoint
     mcptoon add <name> [options]         Add a server
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
@@ -72,6 +79,7 @@ def main():
     full = False
     export_format = ""
     use_stdin = False
+    fallback_json = False
     cmd_args = []
 
     i = 0
@@ -93,6 +101,8 @@ def main():
             full = True
         elif a == "--stdin":
             use_stdin = True
+        elif a == "--fallback-json":
+            fallback_json = True
         elif a == "--head" and i + 1 < len(args):
             try:
                 head_n = int(args[i + 1])
@@ -138,10 +148,14 @@ def main():
         _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format)
     elif command == "inspect":
         _cmd_inspect(rest, fmt, max_chars, full)
+    elif command == "search":
+        _cmd_search(rest, fmt, head_n, max_chars, full)
     elif command == "call":
-        _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin)
+        _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin, fallback_json)
+    elif command in ("quickstart", "qs"):
+        _cmd_quickstart(rest, fmt)
     elif command == "init":
-        _cmd_init(rest)
+        _cmd_init(rest, fmt)
     elif command == "add":
         _cmd_add(rest)
     elif command == "remove":
@@ -149,7 +163,12 @@ def main():
     elif command == "usage":
         _cmd_usage(rest, fmt)
     elif command == "discover":
-        _cmd_discover(rest, fmt)
+        if "--health" in rest:
+            # Legacy health-check mode
+            health_args = [a for a in rest if a != "--health"]
+            _cmd_health_check(health_args, fmt)
+        else:
+            _cmd_auto_discover(rest, fmt)
     elif command == "doctor":
         _cmd_doctor(rest)
     elif command == "completion":
@@ -284,14 +303,76 @@ def _cmd_inspect(rest, fmt, max_chars, full):
     print(output.render(info, fmt=fmt if fmt != "auto" else "json", max_chars=max_chars, full=full))
 
 
-def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False):
+def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json=False):
     """Call a tool."""
+    # Check for --auto mode
+    is_auto = "--auto" in rest
+    if is_auto:
+        rest = [a for a in rest if a != "--auto"]
+        if len(rest) < 1:
+            print("Usage: mcptoon call --auto <tool> [JSON_ARGS] [--destructive] [--stdin]")
+            print("")
+            print("Examples:")
+            print('  mcptoon call --auto search \'{"query":"AI"}\' --toon')
+            print('  mcptoon call --auto fetch \'{"url":"https://example.com"}\'')
+            sys.exit(1)
+
+        tool = rest[0]
+        is_destructive = "--destructive" in rest
+
+        # Parse args (same logic as below)
+        args = {}
+        if use_stdin:
+            stdin_data = sys.stdin.read()
+            if stdin_data.strip():
+                try:
+                    args = json.loads(stdin_data)
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing stdin JSON: {e}", file=sys.stderr)
+                    sys.exit(1)
+        else:
+            for item in rest[1:]:
+                if item == "--destructive":
+                    continue
+                if item.startswith("{"):
+                    try:
+                        args = json.loads(item)
+                        break
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing JSON args: {e}")
+                        sys.exit(1)
+                if "=" in item:
+                    k, v = item.split("=", 1)
+                    try:
+                        v = json.loads(v)
+                    except json.JSONDecodeError:
+                        pass
+                    args[k] = v
+
+        from .router import call_tool_auto
+        result = call_tool_auto(tool, args, is_destructive=is_destructive)
+
+        if is_error(result):
+            err = result["_error"]
+            print(f"Error [{err['code']}]: {err['message']}", file=sys.stderr)
+            if result.get("suggestions"):
+                servers_list = ", ".join(result["suggestions"])
+                print(f"  Available on servers: {servers_list}", file=sys.stderr)
+                print(f"  Try: mcptoon call <server> {tool} ...", file=sys.stderr)
+            sys.exit(1)
+
+        # Render with fallback-json if needed
+        _render_result(result, fmt, head_n, max_chars, full, fallback_json)
+        return
+
     if len(rest) < 2:
         print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin]")
+        print("       mcptoon call --auto <tool> [JSON_ARGS] [--destructive] [--stdin]")
         print("")
         print("Examples:")
         print('  mcptoon call fetch fetch \'{"url":"https://example.com"}\' --toon')
         print('  mcptoon call exa search \'{"query":"AI"}\' --json')
+        print('  mcptoon call --auto search \'{"query":"AI"}\'  # auto-find server')
         print('  echo \'{"huge":"payload"}\' | mcptoon call server tool --stdin --toon')
         sys.exit(1)
 
@@ -349,16 +430,345 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False):
             print(f"  Fix: {fix}", file=sys.stderr)
         sys.exit(1)
 
-    print(output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
+    _render_result(result, fmt, head_n, max_chars, full, fallback_json)
 
 
-def _cmd_init(_rest):
-    """Create sample config."""
-    if cfg.init_sample_config():
-        print(f"Sample config created: {cfg.CONFIG_FILE}")
-        print("Edit it to add your MCP servers, then run: mcptoon manifest")
+def _render_result(result, fmt, head_n, max_chars, full, fallback_json=False):
+    """Render tool call result with optional fallback-json.
+
+    If fallback_json is True and the chosen format (toon/mcptoon/slim) fails
+    to encode the result, automatically fall back to JSON output.
+    """
+    if not fallback_json or fmt in ("json", "auto", "raw"):
+        print(output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
+        return
+
+    # Try the requested format, fall back to JSON on error
+    try:
+        rendered = output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full)
+        # Check for encoding issues
+        if rendered and "Error" in rendered[:50] and "encode" in rendered.lower():
+            raise ValueError(f"Encoding failed with {fmt}")
+        print(rendered)
+    except (ValueError, TypeError, KeyError) as e:
+        print(f"# fallback-json: {fmt} encoding failed ({e}), falling back to JSON", file=sys.stderr)
+        print(output.render(result, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
+
+
+# ═══════════════════════════════════════════════════
+# Search command
+# ═══════════════════════════════════════════════════
+
+def _cmd_search(rest, fmt, head_n, max_chars, full):
+    """Search tools across all configured servers.
+
+    Usage:
+        mcptoon search <query>          # search by keyword
+        mcptoon search "git commit"     # multi-word query
+        mcptoon search web --slim       # slim format output
+        mcptoon search fetch --json     # JSON output
+        mcptoon search fetch --head 5   # limit to 5 results
+    """
+    if not rest:
+        print("Usage: mcptoon search <query>")
+        print("")
+        print("Examples:")
+        print('  mcptoon search "search web"')
+        print("  mcptoon search git")
+        print("  mcptoon search fetch --slim")
+        print("  mcptoon search url --json --head 5")
+        sys.exit(1)
+
+    query = " ".join(rest)
+
+    from . import manifest as manifest_mod
+
+    results = manifest_mod.search_tools(query, limit=20)
+
+    if not results:
+        print(f"No tools found matching '{query}'.")
+        print("")
+        print("Tips:")
+        print("  - Check if your servers are configured: mcptoon list")
+        print("  - See all available tools: mcptoon manifest")
+        sys.exit(0)
+
+    if fmt == "slim":
+        # Ultra-compact: server/tool_name|params
+        lines = []
+        for r in results:
+            lines.append(f"{r['server']}/{r['name']}|{r['params']}|score:{r['score']}")
+        print("\n".join(lines))
+    elif fmt == "compact":
+        # Names only
+        names = [f"{r['server']}/{r['name']}" for r in results]
+        print(" ".join(names))
+    elif fmt == "json":
+        print(output.render(results, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
+    elif fmt == "toon":
+        print(output.render(results, fmt="toon", head_n=head_n, max_chars=max_chars, full=full))
     else:
-        print(f"Config already exists: {cfg.CONFIG_FILE}")
+        # Human-readable
+        print(f"Found {len(results)} tool(s) matching '{query}':")
+        print("")
+        for r in results:
+            server = r["server"]
+            name = r["name"]
+            desc = r["description"]
+            params = r["params"]
+            score = r["score"]
+            print(f"  {server}/{name}  (score: {score})")
+            if desc:
+                print(f"    {desc}")
+            if params:
+                print(f"    params: {params}")
+            print("")
+
+
+def _cmd_quickstart(rest, fmt="auto"):
+    """One-command onboarding: discover + configure + show tools.
+
+    This is the "aha moment" command. Designed for first-time users.
+    Replaces the old 4-step flow (init → add → manifest → call) with one command.
+
+    Usage:
+        mcptoon quickstart              # discover + configure + show slim manifest
+        mcptoon qs                      # alias
+        mcptoon quickstart --http URL    # include HTTP MCP endpoint
+        mcptoon quickstart --dry        # don't write config, just show
+    """
+    is_dry = "--dry" in rest
+    http_url = ""
+    for i, a in enumerate(rest):
+        if a == "--http" and i + 1 < len(rest):
+            http_url = rest[i + 1]
+            break
+        elif a.startswith("--http="):
+            http_url = a.split("=", 1)[1]
+            break
+
+    from . import discover as disc
+
+    print("mcptoon quickstart — discovering your MCP servers...")
+    print("")
+
+    # Step 1: Auto-discover
+    result = disc.auto_discover()
+
+    if http_url:
+        probe_info = disc.probe_http_endpoint(http_url, timeout=2.0)
+        if probe_info and probe_info.get("alive"):
+            http_config = disc.make_http_config(http_url)
+            result.servers["http-endpoint"] = http_config
+            result.sources["http-endpoint"] = ["manual"]
+            tool_count = probe_info.get("tools_count", 0)
+            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+
+    if result.count == 0:
+        print("  No MCP servers found on this machine.")
+        print("")
+        print("  Don't worry — here's how to get started:")
+        print("")
+        print("    # Add a zero-config server (no API key needed):")
+        print("    mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch")
+        print("")
+        print("    # Then see your tools:")
+        print("    mcptoon manifest --slim")
+        print("")
+        print("    # Call a tool:")
+        print("    mcptoon call fetch fetch '{\"url\":\"https://example.com\"}'")
+        print("")
+        print("  Or check out MCP server profiles:")
+        print("    https://github.com/modelcontextprotocol/servers")
+        return
+
+    # Step 2: Write config (unless dry)
+    if not is_dry:
+        if cfg.CONFIG_FILE.exists():
+            added, skipped, _ = cfg.merge_servers(result.servers, overwrite=False)
+            if added > 0:
+                print(f"  ✓ {added} new server(s) added to config")
+            if skipped > 0:
+                print(f"  = {skipped} existing server(s) kept (use 'mcptoon init --auto --force' to overwrite)")
+        else:
+            cfg.save_config(result.servers)
+            print(f"  ✓ Config created: {cfg.CONFIG_FILE}")
+    else:
+        print("  (--dry mode: config not written)")
+
+    print("")
+
+    # Step 3: Show summary
+    print(result.summary())
+
+    # Step 4: The "aha moment" — show slim manifest
+    if not is_dry:
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("  Your tools (--slim format, 93% smaller than JSON):")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        try:
+            manifest = manifest_mod.get_manifest(use_cache=False)
+            slim_output = manifest_mod.format_manifest(manifest, full=False)
+            if slim_output.strip():
+                print(slim_output)
+            else:
+                print("  (tools will appear after servers are started)")
+        except Exception as e:
+            print(f"  Could not fetch tools yet: {e}")
+            print("  Run 'mcptoon manifest --slim' after servers are started")
+
+    print("")
+    print("Next steps:")
+    print("  mcptoon manifest --slim     # see all available tools")
+    print("  mcptoon call <server> <tool> '{...}'   # call a tool")
+    print("  mcptoon doctor             # check connectivity")
+    if result.count <= 3:
+        print("")
+        print("  Want more servers?")
+        print("  mcptoon add github --stdio npx -y @modelcontextprotocol/server-github")
+        print("  mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory")
+
+
+def _cmd_health_check(rest, fmt):
+    """Health check for configured servers (legacy discover behavior).
+
+    Usage:
+        mcptoon discover --health           # check all servers
+        mcptoon discover --health exa       # filter by name
+    """
+    servers = cfg.list_servers()
+    if not servers:
+        print("No servers configured. Run: mcptoon init --auto")
+        return
+
+    filter_name = rest[0] if rest else None
+
+    results = []
+    for name in servers:
+        if filter_name and filter_name not in name:
+            continue
+        s_cfg = cfg.get_server_config(name)
+        transport = s_cfg.get("transport", "stdio") if s_cfg else "?"
+        tool_count = 0
+        status = "ok"
+        error_msg = ""
+
+        try:
+            tools = manifest_mod.get_server_tools(name, use_cache=True)
+            tool_count = len(tools)
+            if tool_count == 0:
+                status = "no-tools"
+        except Exception as e:
+            status = "error"
+            error_msg = str(e)[:80]
+
+        results.append({
+            "server": name,
+            "transport": transport,
+            "tools": tool_count,
+            "status": status,
+            "error": error_msg,
+        })
+
+    if fmt in ("toon", "mcptoon", "compact"):
+        print(output.render(results, fmt=fmt))
+    elif fmt == "json":
+        print(output.render(results, fmt="json"))
+    else:
+        print(f"Health check: {len(results)} server(s)")
+        print()
+        for r in results:
+            icon = "+" if r["status"] == "ok" else "x"
+            print(f"  {icon} {r['server']:20s} [{r['transport']:5s}] {r['tools']:3d} tools  {r['status']}")
+            if r["error"]:
+                print(f"    -> {r['error']}")
+
+
+def _cmd_init(rest, fmt="auto"):
+    """Create sample config or auto-discover servers.
+
+    Usage:
+        mcptoon init                  # Create sample config (2 servers)
+        mcptoon init --auto           # Auto-discover all MCP servers
+        mcptoon init --auto --dry     # Discover, print only, don't write
+        mcptoon init --auto --force   # Overwrite existing config with discovered
+        mcptoon init --auto --http http://localhost:8080/mcp  # Add HTTP MCP endpoint
+    """
+    is_auto = "--auto" in rest
+    is_dry = "--dry" in rest or "--dry-run" in rest
+    is_force = "--force" in rest
+
+    # Check for --http URL
+    http_url = ""
+    for i, a in enumerate(rest):
+        if a == "--http" and i + 1 < len(rest):
+            http_url = rest[i + 1]
+            break
+        elif a.startswith("--http="):
+            http_url = a.split("=", 1)[1]
+            break
+
+    if not is_auto:
+        # Legacy: create sample config
+        if cfg.init_sample_config():
+            print(f"Sample config created: {cfg.CONFIG_FILE}")
+            print("Edit it to add your MCP servers, then run: mcptoon manifest")
+            print("")
+            print("Tip: Run 'mcptoon init --auto' to auto-discover all your MCP servers.")
+        else:
+            print(f"Config already exists: {cfg.CONFIG_FILE}")
+            print("Run 'mcptoon init --auto' to discover more servers.")
+        return
+
+    # ─── Auto-discover mode ───
+    from . import discover as disc
+
+    print("Auto-discovering MCP servers...")
+    print("")
+
+    result = disc.auto_discover()
+
+    # Add explicit HTTP endpoint if specified
+    if http_url:
+        probe_info = disc.probe_http_endpoint(http_url, timeout=2.0)
+        if probe_info and probe_info.get("alive"):
+            http_config = disc.make_http_config(http_url)
+            result.servers["http-endpoint"] = http_config
+            result.sources["http-endpoint"] = ["manual"]
+            tool_count = probe_info.get("tools_count", 0)
+            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+            print(f"  [Manual] http-endpoint: {http_url} ({tool_count} tools)")
+        else:
+            print(f"  [Manual] http-endpoint: {http_url} — NOT responding (added anyway)")
+            result.servers["http-endpoint"] = disc.make_http_config(http_url)
+            result.sources["http-endpoint"] = ["manual"]
+            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} (not responding)"
+
+    print("")
+    print(result.summary())
+
+    if is_dry:
+        print("(--dry mode: config not written. Run without --dry to save.)")
+        return
+
+    if result.count == 0:
+        print("No servers discovered. Try: mcptoon init (creates sample config)")
+        return
+
+    # Write config
+    if cfg.CONFIG_FILE.exists() and not is_force:
+        added, skipped, overwritten = cfg.merge_servers(result.servers, overwrite=False)
+        print(f"Config updated: {cfg.CONFIG_FILE}")
+        print(f"  +{added} new servers added")
+        print(f"  ={skipped} existing servers skipped (use --force to overwrite)")
+    else:
+        cfg.save_config(result.servers)
+        print(f"Config written: {cfg.CONFIG_FILE} ({result.count} servers)")
+
+    print("")
+    print("Next steps:")
+    print(f"  mcptoon manifest --slim    # see all available tools")
+    print(f"  mcptoon doctor             # verify connectivity")
 
 
 def _cmd_add(rest):
@@ -444,54 +854,74 @@ def _cmd_usage(_rest, fmt):
                 print(f"  {t:30s} {c}")
 
 
-def _cmd_discover(rest, fmt):
-    """Discover servers and check health."""
-    servers = cfg.list_servers()
-    if not servers:
-        print("No servers configured. Run: mcptoon init")
-        return
+def _cmd_auto_discover(rest, fmt):
+    """Auto-discover MCP servers (network probe + config scan + env detection).
 
-    filter_name = rest[0] if rest else None
+    Usage:
+        mcptoon discover                  # auto-discover, print results
+        mcptoon discover --write          # discover + write to config
+        mcptoon discover --http <url>     # probe a specific HTTP MCP endpoint
+        mcptoon discover --no-network     # skip network probing (faster)
+        mcptoon discover --no-configs     # skip scanning existing configs
+    """
+    do_write = "--write" in rest
+    http_url = ""
+    scan_configs = "--no-configs" not in rest
+    detect_env = "--no-env" not in rest
+    detect_local = "--no-local" not in rest
+    probe_network = "--no-network" not in rest
+    match_profiles_flag = "--no-profiles" not in rest
 
-    results = []
-    for name in servers:
-        if filter_name and filter_name not in name:
-            continue
-        s_cfg = cfg.get_server_config(name)
-        transport = s_cfg.get("transport", "stdio") if s_cfg else "?"
-        tool_count = 0
-        status = "ok"
-        error_msg = ""
+    for i, a in enumerate(rest):
+        if a == "--http" and i + 1 < len(rest):
+            http_url = rest[i + 1]
+            break
+        elif a.startswith("--http="):
+            http_url = a.split("=", 1)[1]
+            break
 
-        try:
-            tools = manifest_mod.get_server_tools(name, use_cache=True)
-            tool_count = len(tools)
-            if tool_count == 0:
-                status = "no-tools"
-        except Exception as e:
-            status = "error"
-            error_msg = str(e)[:80]
+    from . import discover as disc
 
-        results.append({
-            "server": name,
-            "transport": transport,
-            "tools": tool_count,
-            "status": status,
-            "error": error_msg,
-        })
+    print("Auto-discovering MCP servers...")
+    print("")
 
-    if fmt in ("toon", "mcptoon", "compact"):
-        print(output.render(results, fmt=fmt))
+    result = disc.auto_discover(
+        scan_configs=scan_configs,
+        detect_env=detect_env,
+        detect_local=detect_local,
+        probe_network=probe_network,
+        match_profiles=match_profiles_flag,
+    )
+
+    # Add explicit HTTP endpoint if specified
+    if http_url:
+        probe_info = disc.probe_http_endpoint(http_url, timeout=2.0)
+        if probe_info and probe_info.get("alive"):
+            http_config = disc.make_http_config(http_url)
+            result.servers["http-endpoint"] = http_config
+            result.sources["http-endpoint"] = ["manual"]
+            tool_count = probe_info.get("tools_count", 0)
+            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+        else:
+            result.servers["http-endpoint"] = disc.make_http_config(http_url)
+            result.sources["http-endpoint"] = ["manual"]
+            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} (not responding)"
+
+    if fmt in ("toon", "mcptoon", "compact", "slim"):
+        print(output.render(list(result.servers.keys()), fmt=fmt))
     elif fmt == "json":
-        print(output.render(results, fmt="json"))
+        print(output.render(result.servers, fmt="json"))
     else:
-        print(f"Discovered {len(results)} server(s):")
-        print()
-        for r in results:
-            icon = "✓" if r["status"] == "ok" else "✗"
-            print(f"  {icon} {r['server']:20s} [{r['transport']:5s}] {r['tools']:3d} tools  {r['status']}")
-            if r["error"]:
-                print(f"    └─ {r['error']}")
+        print(result.summary())
+
+    if do_write and result.count > 0:
+        added, skipped, overwritten = cfg.merge_servers(result.servers, overwrite=False)
+        print(f"Config updated: {cfg.CONFIG_FILE}")
+        print(f"  +{added} new servers added")
+        if skipped:
+            print(f"  ={skipped} existing servers skipped")
+        print("")
+        print("Run: mcptoon manifest --slim")
 
 
 def _cmd_doctor(_rest):
@@ -564,6 +994,74 @@ def _cmd_doctor(_rest):
     else:
         print(f"  {issues} issue(s) found. See above for details.")
 
+    # ─── Smart tips ───
+    _doctor_smart_tips(servers)
+
+
+def _doctor_smart_tips(servers: dict):
+    """Print smart tips based on current configuration.
+
+    This is the Land & Expand strategy in action:
+    - <3 servers: suggest adding more (zero-config servers)
+    - 3-5 stdio servers: mention HTTP endpoints as an option
+    - >5 stdio servers: strongly recommend HTTP aggregation
+    - HTTP endpoint already configured: confirm it's working
+    """
+    if not servers:
+        return
+
+    stdio_count = sum(1 for s in servers.values() if s.get("transport", "stdio") == "stdio")
+    http_count = sum(1 for s in servers.values() if s.get("transport") == "http")
+    total = len(servers)
+
+    tips = []
+
+    # Tip 1: Too few servers
+    if total <= 2:
+        tips.append(
+            "Tip: Add zero-config servers (no API key needed):\n"
+            "  mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch\n"
+            "  mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory\n"
+            "  Or run: mcptoon init --auto"
+        )
+
+    # Tip 2: Many stdio servers — recommend HTTP aggregation
+    if stdio_count >= 6:
+        tips.append(
+            f"Tip: You have {stdio_count} stdio servers. Each spawns a separate process.\n"
+            "  Consider aggregating them behind one HTTP MCP endpoint:\n"
+            "  mcptoon init --auto --http http://your-server:8080/mcp\n"
+            "  Benefits: faster startup, shared connection, all tools behind one URL"
+        )
+    elif stdio_count >= 3:
+        tips.append(
+            f"Tip: {stdio_count} stdio servers detected. If startup feels slow,\n"
+            "  consider an HTTP MCP endpoint: mcptoon add my-server --http http://localhost:8080/mcp"
+        )
+
+    # Tip 3: HTTP endpoint already configured
+    has_http = any(s.get("transport") == "http" for s in servers.values())
+    if has_http:
+        tips.append(
+            "HTTP MCP endpoint configured. All tools across all servers are accessible\n"
+            "  through one endpoint — no per-server process spawning needed."
+        )
+
+    # Tip 4: No HTTP servers at all
+    if http_count == 0 and stdio_count >= 4:
+        tips.append(
+            "Tip: All your servers use stdio (subprocess). For better performance,\n"
+            "  consider running an HTTP MCP server to serve them over HTTP."
+        )
+
+    if tips:
+        print()
+        print("  ── Smart Tips ──")
+        for tip in tips:
+            print()
+            for line in tip.split("\n"):
+                print(f"  {line}")
+
 
 # ═══════════════════════════════════════════════════
 # Shell completion
@@ -574,7 +1072,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init list manifest inspect call add remove usage discover doctor completion help"
+    commands="init quickstart list manifest inspect call add remove usage discover doctor completion help"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -626,7 +1124,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init list manifest inspect call add remove usage discover doctor completion help'
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor completion help'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -634,7 +1132,7 @@ complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi
 _PS_COMPLETION = '''
 $scriptBlock = {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = 'init','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help'
+    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help'
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
@@ -678,12 +1176,20 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
         _cmd_manifest(rest, fmt, head_n, max_chars, full)
         return
 
-    if any(kw in text for kw in ["服务器", "server", "list server", "discover"]):
-        _cmd_discover(rest, fmt)
+    if any(kw in text for kw in ["服务器", "server", "list server"]):
+        _cmd_list(rest)
         return
 
-    if any(kw in text for kw in ["诊断", "检查", "doctor", "health", "check"]):
-        _cmd_doctor(rest)
+    if any(kw in text for kw in ["搜工具", "找工具", "search tool", "search"]):
+        _cmd_search(rest, fmt, head_n, max_chars, full)
+        return
+
+    if any(kw in text for kw in ["发现", "搜索服务器", "discover", "auto-discover"]):
+        _cmd_auto_discover(rest, fmt)
+        return
+
+    if any(kw in text for kw in ["健康", "health", "check"]):
+        _cmd_health_check(rest, fmt)
         return
 
     print(f"Unknown command: {command}")
@@ -698,22 +1204,30 @@ def _print_help():
     print(f"""mcptoon v{__import__('mcptoon').__version__} — Token-efficient MCP CLI client
 
 Usage:
-    mcptoon list                         List configured servers
-    mcptoon manifest                     List all tools (compact)
-    mcptoon manifest --full              List all tools with params
-    mcptoon manifest --format openai     Export as OpenAI function calling format
-    mcptoon manifest --format openapi    Export as OpenAPI 3.0 spec
-    mcptoon manifest --format mcp        Export as MCP tools/list format
-    mcptoon discover                     Discover servers + health check
-    mcptoon inspect <server> <tool>      Show tool schema
-    mcptoon call <server> <tool> [ARGS]  Call a tool
-    mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)
-    mcptoon init                         Create sample config
-    mcptoon add <name> [options]         Add a server
-    mcptoon remove <name>                Remove a server
-    mcptoon usage                        Show usage stats
-    mcptoon doctor                       Self-diagnose config + connectivity
-    mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
+    mcptoon quickstart                    One-command setup (discover + config + show tools)
+    mcptoon list                          List configured servers
+    mcptoon manifest                      List all tools (compact)
+    mcptoon manifest --full               List all tools with params
+    mcptoon manifest --format openai      Export as OpenAI function calling format
+    mcptoon manifest --format openapi     Export as OpenAPI 3.0 spec
+    mcptoon manifest --format mcp         Export as MCP tools/list format
+    mcptoon discover                      Auto-discover MCP servers (scan + probe)
+    mcptoon discover --write              Discover + write to config
+    mcptoon discover --http <url>         Probe a specific HTTP MCP endpoint
+    mcptoon discover --health             Health check (legacy discover behavior)
+    mcptoon inspect <server> <tool>       Show tool schema
+    mcptoon search <query>              Search tools across all servers
+    mcptoon call <server> <tool> [ARGS]   Call a tool
+    mcptoon call --auto <tool> [ARGS]    Call a tool (auto-find server)
+    mcptoon call <server> <tool> --stdin   Read args from stdin (large payloads)
+    mcptoon init                          Create sample config
+    mcptoon init --auto                   Auto-discover all MCP servers
+    mcptoon init --auto --http <url>      Auto-discover + add HTTP MCP endpoint
+    mcptoon add <name> [options]          Add a server
+    mcptoon remove <name>                 Remove a server
+    mcptoon usage                         Show usage stats
+    mcptoon doctor                        Self-diagnose config + connectivity
+    mcptoon completion <shell>            Generate shell completion (bash|zsh|fish|ps)
 
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
@@ -726,6 +1240,7 @@ Output flags:
     --max-chars N  Truncate to N chars
     --full         No truncation
     --format X     Export: openai|openapi|mcp|json|human
+    --fallback-json  Fall back to JSON if TOON encoding fails
 
 Examples:
     mcptoon init
