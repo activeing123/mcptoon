@@ -307,3 +307,70 @@ def call_tool(
     except Exception as e:
         usage.track_call(server, tool, ok=False)
         return make_error("CALL_ERROR", str(e)[:200], "router", retry=False, server=server, tool=tool)
+
+
+def call_tool_auto(
+    tool: str,
+    args: dict | None = None,
+    is_destructive: bool = False,
+    skip_poisoning_check: bool = False,
+) -> Any:
+    """Auto-route a tool call to the server that has this tool.
+
+    Tries to find the tool across all configured servers, then calls it
+    on the first matching server. If multiple servers have the same tool
+    name, prefers the one most recently used (from usage stats).
+
+    Args:
+        tool: Tool name (without specifying server)
+        args: Tool arguments dict
+        is_destructive: Acknowledge dangerous operation
+        skip_poisoning_check: Skip poisoning detection
+
+    Returns:
+        Tool result, or error dict if tool not found on any server.
+
+    Example:
+        >>> result = call_tool_auto("search", {"query": "AI"})
+        # Automatically calls exa.search, brave-search.search, etc.
+    """
+    from . import manifest as manifest_mod
+
+    servers_with_tool = manifest_mod.find_tool_across_servers(tool)
+
+    if not servers_with_tool:
+        # Try fuzzy match across all servers
+        all_tools = manifest_mod.get_manifest(use_cache=True)
+        suggestions = []
+        for sname, tools in all_tools.items():
+            for t in tools:
+                if "error" not in t and t.get("name", "").lower() == tool.lower():
+                    suggestions.append(sname)
+        if not suggestions:
+            # Broader fuzzy search
+            results = manifest_mod.search_tools(tool, limit=5)
+            suggestions = list({r["server"] for r in results})
+
+        return make_error(
+            "TOOL_NOT_FOUND",
+            f"Tool '{tool}' not found on any configured server.",
+            "router", retry=False, tool=tool,
+            suggestions=suggestions[:5] if suggestions else [],
+        )
+
+    # If multiple servers have this tool, try the one with most recent usage
+    chosen = servers_with_tool[0]
+    if len(servers_with_tool) > 1:
+        # Check usage stats to pick the most-used server
+        try:
+            stats = usage.get_usage_stats()
+            best_count = -1
+            for sname in servers_with_tool:
+                count = stats.get("by_server", {}).get(sname, 0)
+                if count > best_count:
+                    best_count = count
+                    chosen = sname
+        except Exception:
+            chosen = servers_with_tool[0]
+
+    return call_tool(chosen, tool, args, is_destructive, skip_poisoning_check)

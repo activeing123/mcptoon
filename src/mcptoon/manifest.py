@@ -264,3 +264,182 @@ def export_manifest(manifest: dict, fmt: str) -> str:
 
     # Fallback
     return json.dumps(manifest, indent=2, ensure_ascii=False)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Cross-server tool search
+# ═══════════════════════════════════════════════════════════════
+
+def search_tools(query: str, use_cache: bool = True, limit: int = 20) -> list[dict]:
+    """Search tools across all configured servers by keyword.
+
+    Searches tool names and descriptions using a multi-factor scoring
+    algorithm (exact match > prefix > substring > token overlap > fuzzy).
+
+    Args:
+        query: Search query (e.g. "search web", "git commit", "fetch url")
+        use_cache: Use cached tool manifests when available
+        limit: Maximum results to return
+
+    Returns:
+        List of dicts, each with: server, tool, name, description, score
+        Sorted by score (highest first).
+
+    Example:
+        >>> results = search_tools("search web")
+        >>> # [{"server": "exa", "name": "search", "description": "...", "score": 1.0}, ...]
+    """
+    manifest = get_manifest(use_cache=use_cache)
+    query_lower = query.lower().strip()
+    query_tokens = set(_tokenize(query_lower))
+
+    results = []
+
+    for server, tools in sorted(manifest.items()):
+        if not tools:
+            continue
+
+        for t in tools:
+            if "error" in t:
+                continue
+
+            name = t.get("name", "")
+            desc = t.get("description", "")
+            name_lower = name.lower()
+            desc_lower = desc.lower()
+
+            score = _search_score(query_lower, query_tokens, name_lower, desc_lower)
+            if score > 0:
+                # Extract schema summary
+                schema = t.get("inputSchema", {})
+                props = schema.get("properties", {})
+                required = set(schema.get("required", []))
+                params = []
+                for pname, pdef in props.items():
+                    ptype = pdef.get("type", "any")
+                    if isinstance(ptype, list):
+                        ptype = ptype[0] if ptype else "any"
+                    marker = "*" if pname in required else ""
+                    params.append(f"{pname}:{ptype}{marker}")
+
+                results.append({
+                    "server": server,
+                    "name": name,
+                    "description": desc[:120] if desc else "",
+                    "params": ",".join(params) if params else "",
+                    "score": round(score, 2),
+                })
+
+    results.sort(key=lambda x: -x["score"])
+    return results[:limit]
+
+
+def find_tool_across_servers(tool_name: str, use_cache: bool = True) -> list[str]:
+    """Find which servers have a tool with the given name.
+
+    Args:
+        tool_name: Exact tool name to search for
+        use_cache: Use cached manifests when available
+
+    Returns:
+        List of server names that have this tool.
+        Empty list if no server has it.
+
+    Example:
+        >>> find_tool_across_servers("search")
+        ["exa", "brave-search", "tavily"]
+    """
+    manifest = get_manifest(use_cache=use_cache)
+    servers_with_tool = []
+
+    for server, tools in sorted(manifest.items()):
+        if not tools:
+            continue
+        for t in tools:
+            if "error" in t:
+                continue
+            if t.get("name") == tool_name:
+                servers_with_tool.append(server)
+                break  # Found in this server, no need to check more tools
+
+    return servers_with_tool
+
+
+def _tokenize(text: str) -> list[str]:
+    """Split text into search tokens.
+
+    Splits on non-alphanumeric characters, filters short tokens.
+    """
+    tokens = []
+    current = []
+    for c in text:
+        if c.isalnum():
+            current.append(c)
+        else:
+            if current:
+                token = "".join(current)
+                if len(token) >= 2:
+                    tokens.append(token)
+                current = []
+    if current:
+        token = "".join(current)
+        if len(token) >= 2:
+            tokens.append(token)
+    return tokens
+
+
+def _search_score(query: str, query_tokens: set, name: str, desc: str) -> float:
+    """Multi-factor relevance score for tool search.
+
+    Scoring factors:
+      - Exact name match: 1.0
+      - Name starts with query: 0.8
+      - Query substring in name: 0.7
+      - Name token in query tokens: 0.6 each
+      - Query in description: 0.4
+      - Query token overlap with description: 0.2 each
+      - Fuzzy name similarity: 0.3 * similarity
+
+    Returns 0 if no relevance.
+    """
+    if not query or not name:
+        return 0.0
+
+    score = 0.0
+
+    # Factor 1: Exact match
+    if query == name:
+        return 1.0
+
+    # Factor 2: Name starts with query
+    if name.startswith(query):
+        score = max(score, 0.85)
+
+    # Factor 3: Query is substring of name
+    if query in name:
+        score = max(score, 0.75)
+
+    # Factor 4: Name tokens match query tokens
+    name_tokens = set(_tokenize(name))
+    if query_tokens and name_tokens:
+        overlap = len(query_tokens & name_tokens)
+        if overlap > 0:
+            score = max(score, 0.6 + 0.05 * overlap)
+
+    # Factor 5: Query in description
+    if desc and query in desc:
+        score = max(score, 0.45)
+
+    # Factor 6: Query token overlap with description
+    if desc and query_tokens:
+        desc_tokens = set(_tokenize(desc))
+        overlap = len(query_tokens & desc_tokens)
+        if overlap > 0:
+            score = max(score, 0.2 + 0.05 * overlap)
+
+    # Factor 7: Fuzzy similarity (for typos) — always try as a last resort
+    sim = _similarity(query, name)
+    if sim > 0.5:
+        score = max(score, 0.3 * sim)
+
+    return score
