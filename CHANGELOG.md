@@ -17,6 +17,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
 
+## [0.4.1] — 2026-08-14
+
+### Added — Zero-config discovery + cross-server search + auto-routing + fallback-json + TOML
+
+- **`discover.py` module** — Five-layer auto-discovery of MCP servers, zero dependency:
+  1. **Config scanning** — imports from Claude Desktop, Cursor, Cline, Windsurf configs
+  2. **Environment detection** — detects `GITHUB_TOKEN`, `BRAVE_API_KEY`, `EXA_API_KEY`, etc.
+  3. **Local tool detection** — checks `npx`/`uvx`/`docker`/`sqlite3` in PATH, git repo
+  4. **HTTP endpoint detection** — checks `MCP_HTTP_URL` env var for HTTP MCP endpoints
+  5. **Profile matching** — matches bundled profiles against satisfied env vars
+
+- **`mcptoon search <query>`** — Cross-server tool search with multi-factor scoring
+- **`mcptoon call --auto <tool> [args]`** — Cross-server auto-routing
+- **`--fallback-json` flag** — Degradation safety net
+- **TOML config support** — `~/.mcptoon/config.toml`
+- **`quickstart` command** — One-command onboarding
+- **`init --auto` command** — Zero-config setup
+
+### Tests — 97 new tests (309 → 407 total)
+
+### Changed
+- Bumped version to 0.4.1
+- `discover` command now runs full auto-discovery (was: health check only)
+- `init` command now accepts `--auto` flag for zero-config setup
+
 ## [0.4.0] — 2026-08-12
 
 ### Added

@@ -143,7 +143,7 @@ Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json`. Toke
 pip install mcptoon
 ```
 
-Zero dependencies. 50KB. Python 3.10+. Windows, macOS, Linux.
+Zero dependencies. ~65KB. Python 3.10+. Windows, macOS, Linux.
 
 ```bash
 mcptoon init                          # Sample config: ~/.mcptoon/config.json
@@ -294,7 +294,7 @@ mcptoon is built on a **three-layer decoupled architecture**. Each layer is inde
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Layer 1: mcptoon CLI (~50KB, zero deps)         │
+│  Layer 1: mcptoon CLI (~~65KB, zero deps)         │
 │  ─────────────────────────────────────────────   │
 │  Runs in your agent's shell. Token-optimizes     │
 │  everything. No schemas in context. Ever.        │
@@ -322,7 +322,7 @@ mcptoon is built on a **three-layer decoupled architecture**. Each layer is inde
 
 **Why three layers?**
 
-- **Layer 1 (CLI)** stays tiny — 50KB, zero deps. No MCP SDK bloat.
+- **Layer 1 (CLI)** stays tiny — ~65KB, zero deps. No MCP SDK bloat.
 - **Layer 2 (Profiles)** are editable JSON — add, remove, fork without touching code. Each is a ~1KB file describing *how to connect*, not the server itself.
 - **Layer 3 (Servers)** spin up lazily — only when `mcptoon call` actually runs. No idle processes. No startup tax.
 
@@ -448,7 +448,7 @@ src/mcptoon/
 └── errors.py     # Structured error envelopes
 ```
 
-~3,000 lines. 309 tests. Zero third-party imports. 50KB installed.
+~~4,200 lines. 407 tests. Zero third-party imports. ~65KB installed.
 
 ## Contributing
 
@@ -457,7 +457,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 309 tests, 0.5s
+python -m pytest tests/ -v   # 407 tests, 0.5s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
