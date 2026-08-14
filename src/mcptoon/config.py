@@ -289,6 +289,12 @@ def _toml_lite_parse(text: str) -> dict:
             continue
 
         # Table header: [section] or [section.subsection]
+        # Strip inline comments from table headers first
+        if line.startswith("["):
+            # Find the closing bracket, ignore anything after it (inline comment)
+            close = line.find("]")
+            if close >= 0:
+                line = line[:close + 1]
         if line.startswith("[") and line.endswith("]"):
             table_path = line[1:-1].strip()
             parts = [p.strip() for p in table_path.split(".")]
