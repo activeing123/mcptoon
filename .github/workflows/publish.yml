@@ -8,8 +8,6 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: pypi
-    permissions:
-      id-token: write  # for trusted publishing (no token needed)
 
     steps:
     - uses: actions/checkout@v4
@@ -27,5 +25,5 @@ jobs:
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      # Uses OIDC trusted publishing — no PyPI token needed!
-      # Just configure: https://pypi.org/manage/account/publishing/
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
