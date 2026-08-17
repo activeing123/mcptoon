@@ -15,7 +15,6 @@ from mcptoon.discover import (
     _detect_local_tools,
     _probe_http_mcp,
     _probe_endpoint,
-    _match_profiles,
     _normalize_imported_config,
     _which,
     probe_http_endpoint,
@@ -269,28 +268,6 @@ class TestNetworkProbe:
             results = _probe_http_mcp()
             assert isinstance(results, list)
             assert len(results) == 0  # Probe failed → not included
-
-
-# ═══════════════════════════════════════════════════════════════
-# Profile matching tests
-# ═══════════════════════════════════════════════════════════════
-
-class TestProfileMatching:
-    def test_load_profiles(self):
-        """Test that bundled profiles can be loaded."""
-        profiles = _match_profiles()
-        assert isinstance(profiles, list)
-        # Profiles may or may not match depending on env — just check structure
-        for p in profiles:
-            assert "config" in p
-            assert "transport" in p["config"]
-            assert "name" in p
-
-    def test_profile_has_config(self):
-        profiles = _match_profiles()
-        for p in profiles:
-            assert "config" in p
-            assert "transport" in p["config"]
 
 
 # ═══════════════════════════════════════════════════════════════
