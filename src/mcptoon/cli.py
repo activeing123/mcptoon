@@ -584,7 +584,7 @@ def _cmd_quickstart(rest, fmt="auto"):
         print("    # Call a tool:")
         print("    mcptoon call fetch fetch '{\"url\":\"https://example.com\"}'")
         print("")
-        print("  Or check out MCP server profiles:")
+        print("  Or browse MCP servers:")
         print("    https://github.com/modelcontextprotocol/servers")
         return
 
@@ -876,7 +876,6 @@ def _cmd_auto_discover(rest, fmt):
     detect_env = "--no-env" not in rest
     detect_local = "--no-local" not in rest
     probe_network = "--no-network" not in rest
-    match_profiles_flag = "--no-profiles" not in rest
 
     for i, a in enumerate(rest):
         if a == "--http" and i + 1 < len(rest):
@@ -896,7 +895,6 @@ def _cmd_auto_discover(rest, fmt):
         detect_env=detect_env,
         detect_local=detect_local,
         probe_network=probe_network,
-        match_profiles=match_profiles_flag,
     )
 
     # Add explicit HTTP endpoint if specified

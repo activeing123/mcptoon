@@ -14,7 +14,7 @@ mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。�
 [![Zero Dependencies](https://img.shields.io/badge/依赖-零-orange)](#隐私)
 [![Tests](https://img.shields.io/badge/Tests-429%20passed-brightgreen)](#贡献)
 
-**👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [服务器 Profile](mcp/README.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)
+**👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)
 
 ![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
 
@@ -88,9 +88,7 @@ mcptoon install --remove brave-search
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
 
-**23 个连接模板**随包提供（fetch、github、puppeteer、sqlite、slack 等热门服务器）——每个只是一个 ~1KB 的 JSON 文件，**不是内置服务器**。它们只描述怎么连接。你仍然自己安装服务器。把它们当食谱卡片，不是食材。不想要？忽略就行，总共才 23KB。详见 [mcp/README.md](mcp/README.md)。
-
-**支持任何 MCP 服务器**，有没有模板都行：
+**支持任何 MCP 服务器：**
 
 ```bash
 mcptoon add my-server --stdio npx -y @any/mcp-package
@@ -223,23 +221,19 @@ mcptoon completion bash         # Shell 补全（bash/zsh/fish/ps）
 
 mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不连接 MCP 服务器——它跑 `mcptoon` 命令。Schema 存在磁盘上的 `~/.mcptoon/config.json` 里，不进上下文窗口。
 
-**三层解耦：**
+**两层解耦：**
 
 ```
 第 1 层: mcptoon CLI (~200KB, 零依赖)
          在 Agent 的 shell 里运行。schema 永远不进上下文。
                     │
-第 2 层: 服务器 Profile (~1KB/个, 含 23 个)
-         JSON 模板，描述怎么连接。不是已安装的软件。
-         加你自己的——直接用。
-                    │
-第 3 层: 实际 MCP 服务器 (npm 包)
+第 2 层: 实际 MCP 服务器 (npm/pip 包)
          只有调用工具时才启动。不用就零开销。
 ```
 
-- 100 个服务器配好 → 0 个在运行，直到你用其中一个
-- mcptoon 不捆绑 MCP 服务器——你装你用的
-- 每个 Profile 安全审计过：声明 `credential_safe`、`env_vars`、`permissions`
+- 1,000 个服务器配好 → 0 个在运行，直到你用其中一个
+- mcptoon 不搄带任何服务器——你加你想要的，一条命令加一个
+- 删掉 mcptoon？你的 MCP 服务器照常独立运行
 
 ---
 

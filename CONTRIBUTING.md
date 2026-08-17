@@ -81,27 +81,13 @@ src/mcptoon/
 3. Add config schema support in `config.py`
 4. Add tests in `tests/test_client.py`
 
-## Adding a New Server Profile
+## Testing a New MCP Server Integration
 
-1. Copy `mcp/_template.json` → `mcp/stdio/<name>.json`
-2. Fill in all fields — **including the `security` block**:
-   - `security.audited` — set to `true` if you've verified the server
-   - `security.credential_safe` — `true` if the server doesn't expose credentials in results
-   - `security.env_vars_required` — list each env var with `name`, `sensitivity` (high/medium/low), and `description`
-   - `security.permissions` — list read/write scopes (e.g. `["read: repos", "write: issues"]`)
-3. Set `bundled: false` and `install_method: "on-demand"`
-4. **Never store real API keys** — use `<your-key>` placeholders
-5. Test: `mcptoon add <name> --stdio npx -y <package> && mcptoon manifest --toon`
-6. Update `mcp/README.md` tables
-7. Open a PR — we'll verify and merge
-
-### Security audit checklist for profiles
-
-- [ ] All env vars listed with sensitivity level
-- [ ] No real credentials in the JSON (only `<placeholder>`)
-- [ ] `credential_safe` set accurately
-- [ ] `permissions` describes read/write scope
-- [ ] Server doesn't return credentials in tool results (test with `mcptoon call`)
+1. Add the server: `mcptoon add <name> --stdio npx -y <package>`
+2. Verify tools: `mcptoon manifest --toon`
+3. Call a tool: `mcptoon call <name> <tool> '{"args":"here"}' --toon`
+4. Check for credential leaks: `mcptoon call <name> <tool> '{}' --toon` (should be blocked if keys present)
+5. Open a PR with an integration note in `docs/integrations/`
 
 ## Reporting Bugs
 

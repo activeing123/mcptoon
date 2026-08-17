@@ -14,7 +14,7 @@ mcptoon is a CLI tool that sits between your AI agent and MCP servers. Add unlim
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#privacy)
 [![Tests](https://img.shields.io/badge/Tests-429%20passed-brightgreen)](#contributing)
 
-**👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Server Profiles](mcp/README.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
+**👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
 
 ![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
 
@@ -88,9 +88,7 @@ mcptoon install --remove brave-search
 
 mcptoon auto-connects, discovers tools, generates a handler, and registers it. No restart needed.
 
-**23 connection templates** are included for popular servers (fetch, github, puppeteer, sqlite, slack, etc.) — each is a ~1KB JSON file, *not* a bundled server. They just describe how to connect. You still install servers yourself. Think of them as recipe cards, not ingredients. Don't want them? Ignore them. They take 23KB total. See [mcp/README.md](mcp/README.md).
-
-**Works with any MCP server**, template or not:
+**Works with any MCP server:**
 
 ```bash
 mcptoon add my-server --stdio npx -y @any/mcp-package
@@ -223,23 +221,19 @@ mcptoon completion bash         # shell completion (bash/zsh/fish/ps)
 
 mcptoon is a **CLI tool**, not an MCP client library. Your agent doesn't connect to MCP servers — it runs `mcptoon` commands. Schemas live on disk in `~/.mcptoon/config.json`, not in your context window.
 
-**Three layers, fully decoupled:**
+**Two layers, fully decoupled:**
 
 ```
 Layer 1: mcptoon CLI (~200KB, zero deps)
          Runs in your agent's shell. No schemas in context. Ever.
                     │
-Layer 2: Server Profiles (~1KB each, 23 included)
-         JSON templates describing how to connect. Not installed software.
-         Add your own — it just works.
-                    │
-Layer 3: Actual MCP Servers (npm packages)
+Layer 2: Actual MCP Servers (npm/pip packages)
          Launched on-demand only when you call a tool. Zero overhead until use.
 ```
 
-- 100 servers configured → 0 running until you use one
-- mcptoon never bundles MCP servers — you install what you use
-- Each profile is security-audited: declares `credential_safe`, `env_vars_required`, `permissions`
+- 1,000 servers configured → 0 running until you use one
+- mcptoon ships zero bundled servers — you add what you want, one command each
+- Delete mcptoon? Your MCP servers keep working independently
 
 ---
 

@@ -15,13 +15,12 @@
 """
 mcptoon discover — Auto-discovery of MCP servers
 
-Five-layer discovery strategy (all zero-dependency, pure stdlib):
+Four-layer discovery strategy (all zero-dependency, pure stdlib):
 
   1. Scan existing MCP client configs (Claude Desktop, Cursor, Cline, Windsurf, etc.)
   2. Detect from environment variables (GITHUB_TOKEN → github server, etc.)
   3. Detect local tools (npx in PATH → zero-config servers, docker, sqlite, git repo)
   4. Check env vars for HTTP MCP endpoints (MCP_HTTP_URL, etc.)
-  5. Match against bundled profiles (mcp/stdio/*.json) — check env vars satisfied
 
 Usage:
     from mcptoon.discover import auto_discover
@@ -81,11 +80,10 @@ class DiscoveryResult:
             "env": "Environment variables",
             "local": "Local tools",
             "network": "HTTP endpoint (env var)",
-            "profile": "Bundled profiles",
             "manual": "Manual (--http)",
         }
 
-        for src_key in ["claude-desktop", "cursor", "cline", "windsurf", "env", "local", "network", "profile", "manual"]:
+        for src_key in ["claude-desktop", "cursor", "cline", "windsurf", "env", "local", "network", "manual"]:
             names = by_source.get(src_key, [])
             if not names:
                 continue
@@ -558,79 +556,6 @@ def _probe_endpoint(url: str, timeout: float = 0.5) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Layer 5: Match against bundled profiles
-# ═══════════════════════════════════════════════════════════════
-
-def _get_profiles_dir() -> Path:
-    """Get the mcp/stdio/ profiles directory."""
-    # From src/mcptoon/discover.py → ../../mcp/stdio/
-    return Path(__file__).parent.parent.parent.parent / "mcp" / "stdio"
-
-
-def _load_profiles() -> list[dict]:
-    """Load all profile JSON files from mcp/stdio/."""
-    profiles = []
-    profiles_dir = _get_profiles_dir()
-
-    if not profiles_dir.exists():
-        return profiles
-
-    for path in sorted(profiles_dir.glob("*.json")):
-        if path.name.startswith("_"):
-            continue
-        try:
-            profile = json.loads(path.read_text(encoding="utf-8"))
-            profile["_path"] = str(path)
-            profiles.append(profile)
-        except (json.JSONDecodeError, OSError):
-            continue
-
-    return profiles
-
-
-def _match_profiles() -> list[dict]:
-    """Match bundled profiles against current environment."""
-    found = []
-    profiles = _load_profiles()
-
-    for profile in profiles:
-        name = profile.get("name", "")
-        if not name:
-            continue
-
-        config = profile.get("config", {})
-        security = profile.get("security", {})
-        env_vars_required = security.get("env_vars_required", [])
-
-        # Check if all required env vars are present
-        missing = []
-        for env_spec in env_vars_required:
-            if isinstance(env_spec, dict):
-                env_name = env_spec.get("name", "")
-            else:
-                env_name = str(env_spec)
-            if env_name and not os.environ.get(env_name):
-                missing.append(env_name)
-
-        if missing:
-            # Profile not satisfied — skip but don't add to skipped list
-            # (it would be too noisy with all API-key-required profiles)
-            continue
-
-        # Profile is satisfied (all env vars present, or no env vars needed)
-        env_reason = "no env vars needed" if not env_vars_required else f"env vars satisfied: {[e if isinstance(e, str) else e.get('name','') for e in env_vars_required]}"
-
-        found.append({
-            "name": name,
-            "config": config,
-            "source": "profile",
-            "reason": f"Profile matched ({env_reason})",
-        })
-
-    return found
-
-
-# ═══════════════════════════════════════════════════════════════
 # Main: auto_discover
 # ═══════════════════════════════════════════════════════════════
 
@@ -639,7 +564,6 @@ def auto_discover(
     detect_env: bool = True,
     detect_local: bool = True,
     probe_network: bool = True,
-    match_profiles: bool = True,
     network_timeout: float = 0.5,
 ) -> DiscoveryResult:
     """Run all discovery layers and return merged result.
@@ -649,8 +573,6 @@ def auto_discover(
         detect_env: Detect from environment variables
         detect_local: Detect local tools (npx, docker, sqlite)
         probe_network: Check env vars for HTTP MCP endpoints
-        match_profiles: Match against bundled profiles
-
     Returns:
         DiscoveryResult with merged, deduplicated servers.
     """
@@ -670,14 +592,11 @@ def auto_discover(
     if detect_local:
         all_findings.extend(_detect_local_tools())
 
-    if match_profiles:
-        all_findings.extend(_match_profiles())
-
     if probe_network:
         all_findings.extend(_probe_http_mcp())
 
     # Merge and deduplicate
-    # Priority: existing config > claude-desktop > cursor > cline > windsurf > env > local > network > profile
+    # Priority: existing config > claude-desktop > cursor > cline > windsurf > env > local > network > manual
     source_priority = {
         "claude-desktop": 0,
         "cursor": 1,
@@ -686,7 +605,6 @@ def auto_discover(
         "env": 4,
         "local": 5,
         "network": 6,
-        "profile": 7,
         "manual": 8,
     }
 

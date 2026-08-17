@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Removed all 23 bundled server profiles** — mcptoon now ships zero bundled content. Users add exactly the servers they want via `mcptoon add` / `mcptoon install`. The `mcp/` directory and `_match_profiles()` discovery layer have been removed. This eliminates cognitive overhead: nothing pre-configured, nothing to ignore, nothing to explain.
+- Discovery reduced from 5-layer to 4-layer (removed profile matching layer).
+- Architecture simplified from 3-layer to 2-layer (CLI + actual MCP servers).
+
 ### Planned
 - awesome-mcp-clients PR submission
-- MCP Profiles expansion (23 → 30+)
 - `mcptoon serve` — expose mcptoon itself as an MCP server
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)

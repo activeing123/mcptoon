@@ -100,15 +100,12 @@ MCP servers that recommend mcptoon for token-efficient access can display a badg
 
 ## How to participate
 
-### Contribute a Profile
+### Add a Server Integration
 
-1. Fork the repo
-2. Copy `mcp/_template.json` → `mcp/stdio/<your-server>.json`
-3. Fill in the fields — **including the `security` block**
-4. Test: `mcptoon manifest --toon` should work with your profile
-5. Open a PR
-
-See [mcp/README.md](mcp/README.md) for the profile format.
+1. Pick an MCP server (from [npm](https://www.npmjs.com/search?q=mcp) or [pip](https://pypi.org/search?q=mcp))
+2. Test it: `mcptoon add my-server --stdio npx -y <package>` then `mcptoon manifest --toon`
+3. Write a short integration note (server name, install command, example tool call)
+4. Open a PR to `docs/integrations/`
 
 ### Write an Integration Guide
 

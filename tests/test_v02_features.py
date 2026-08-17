@@ -311,7 +311,7 @@ class TestManifestSlim:
             _print_help()
         assert "--slim" in buf.getvalue()
 
-    def test_slim_format Renders_tools(self):
+    def test_slim_format_Renders_tools(self):
         from mcptoon.output import slim_toon
         tools = [{"name": "search", "inputSchema": {
             "properties": {"q": {"type": "string"}},
