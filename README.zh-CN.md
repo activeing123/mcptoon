@@ -107,17 +107,24 @@ mcptoon manifest --toon    # 直接就能用
 
 ---
 
-## 所有 AI Agent 都能用
+## 兼容 Shell 型 AI Agent
 
-mcptoon 是 CLI 工具。**你的 Agent 能跑 shell 命令，就能用 mcptoon。** 不需要插件、SDK、每个 Agent 单独配。
+mcptoon 是 **CLI 工具，不是 MCP Server**。它不能填入 `mcpServers` JSON 配置。你的 Agent 通过 shell 命令调用 `mcptoon`——schema 不进上下文。
+
+**兼容（能跑 shell 的 Agent）：**
 
 | Agent | 怎么用 |
 |---|---|
 | **Claude Code** | 在 SKILL.md 里写 `mcptoon` 命令 |
 | **Codex (OpenAI)** | 在 AGENTS.md 里加 `mcptoon` |
-| **Cursor** | 在 .cursorrules 里加 `mcptoon` |
+| **Cursor** | 在 .cursorrules 里加 `mcptoon`（Agent 生成 shell 命令） |
 | **OpenCode** | 在自定义命令里用 `mcptoon` |
 | **任何 Agent** | 能跑 shell 命令就能调 `mcptoon` |
+
+**不能替代原生 MCP 配置：**
+- Cursor 的 `mcpServers` 设置 → 不受影响（mcptoon 是独立的，不是 server 条目）
+- Claude Desktop 的 `claude_desktop_config.json` → 不受影响
+- mcptoon 不输出 MCP JSON-RPC 协议流——它是客户端，不是服务端
 
 在 `~/.mcptoon/config.json` 配置一次，所有 Agent 共享同样的服务器和工具。换 Agent？配置跟着你走。
 
@@ -215,8 +222,8 @@ mcptoon completion bash         # Shell 补全（bash/zsh/fish/ps）
 
 | Flag | 输出 | 节省 |
 |---|---|---|
-| `--compact` | 仅工具名 | 比 JSON **省 97-100%** |
-| `--slim` | 工具 schema (`name\|param:type*`) | 比 JSON **省 93%** |
+| `--compact` | 仅工具名 | 比 JSON **省 98.5%** (tiktoken) |
+| `--slim` | 工具 schema (`name\|param:type*`) | 比 JSON **省 91%** (tiktoken) |
 | `--toon` | 标准 TOON (toon-format/toon 规范) | 比 JSON **省 30-60%**，可逆 |
 | `--json` | 标准 JSON | 基准线 |
 | `--raw` | 原始响应 | 全量 |
@@ -224,12 +231,21 @@ mcptoon completion bash         # Shell 补全（bash/zsh/fish/ps）
 | `--max-chars N` | 截断到 N 字符 | 可变 |
 | `--full` | 禁用默认 4000 字符截断 | 全量 |
 | `--stdin` | 从 stdin 读参数（大 payload） | — |
+| `--fallback-json` | TOON 编码出错时回退到 JSON | 安全网 |
+
+> **`--fallback-json` 说明：** 只捕获编码层面的错误（如不支持的数据类型）。不检测 LLM 是否成功解析了输出——这是调用者的责任。
 
 ---
 
 ## 原理
 
-mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不连接 MCP 服务器——它跑 `mcptoon` 命令。Schema 存在磁盘上的 `~/.mcptoon/config.json` 里，不进上下文窗口。
+mcptoon 是 **CLI 工具**，不是 MCP 客户端库，也不是 MCP Server。你的 Agent 不连接 MCP 服务器——它跑 `mcptoon` 命令。Schema 存在磁盘上的 `~/.mcptoon/config.json` 里，不进上下文窗口。
+
+**架构边界：**
+- mcptoon 是 **MCP Client**——内部通过 stdio/HTTP 连接 MCP 服务器
+- mcptoon **不**对外暴露 MCP JSON-RPC 端点
+- `--json` 输出是工具列表片段，不是完整的 MCP 协议消息（没有 `initialize`、`id`、`method` 字段）
+- 要在 Cursor/Claude Desktop 原生 MCP 里用：单独配它们的 `mcpServers`。mcptoon 只适用于能跑 shell 的 Agent。
 
 **两层解耦：**
 

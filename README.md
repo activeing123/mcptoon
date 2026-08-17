@@ -16,7 +16,7 @@ mcptoon sits between your AI agent and MCP servers. Install 1,000 tools — your
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
 
-![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
+![Benchmark: 255 tools, 39,964 → 581 tokens (tiktoken-verified)](assets/benchmark.svg)
 
 ![Demo: mcptoon in action](assets/demo.gif)
 
@@ -71,8 +71,9 @@ So you unload servers when not needed. Reload when needed. Repeat. Forever. And 
 **mcptoon fixes this.** All your MCP servers stay configured, but their schemas **never enter your agent's context**. Your agent just runs `mcptoon` commands. Only the compact result you request enters context — and TOON encoding makes it 30-97% smaller than JSON.
 
 ```
-Without mcptoon:  255 tools → 90,804 tokens of schemas in your context
-With mcptoon:      255 tools → 117 tokens. That's 99.87% savings.
+Without mcptoon:  255 tools → 39,964 tokens of schemas in your context (tiktoken-verified)
+With mcptoon:      255 tools → 3,511 tokens (SLIM format). 91% savings.
+                   255 tools → 581 tokens (compact, names only). 98.5% savings.
 ```
 
 ---
@@ -107,17 +108,24 @@ mcptoon manifest --toon    # works immediately
 
 ---
 
-## Works with every AI agent
+## Works with shell-capable AI agents
 
-mcptoon is a CLI tool. **If your agent can run shell commands, it can use mcptoon.** No plugins, no SDK, no per-agent setup.
+mcptoon is a **CLI tool, not an MCP Server**. It does not plug into `mcpServers` JSON config. Instead, your agent calls `mcptoon` via shell commands — schemas stay out of context.
+
+**Works with (shell-capable agents):**
 
 | Agent | How to use |
 |---|---|
 | **Claude Code** | Write `mcptoon` commands in SKILL.md files |
 | **Codex (OpenAI)** | Add `mcptoon` to AGENTS.md |
-| **Cursor** | Add `mcptoon` to .cursorrules |
+| **Cursor** | Add `mcptoon` to .cursorrules (agent generates shell commands) |
 | **OpenCode** | Use `mcptoon` in custom commands |
 | **Any agent** | If it runs shell commands, it can call `mcptoon` |
+
+**Does NOT replace native MCP config:**
+- Cursor's `mcpServers` setting → unaffected (mcptoon is separate, not a server entry)
+- Claude Desktop's `claude_desktop_config.json` → unaffected
+- mcptoon does not output MCP JSON-RPC protocol stream — it is a client, not a server
 
 Configure once in `~/.mcptoon/config.json`. Every agent shares the same servers and tools. Switch agents — config follows you.
 
@@ -138,16 +146,18 @@ mcptoon call github search_repos '{"query":"mcp"}' --toon
 
 ## The numbers
 
-### Token savings (255 tools, 5 formats)
+### Token savings (255 tools, tiktoken-verified)
+
+All numbers from `tiktoken.get_encoding("cl100k_base")` — OpenAI's official BPE tokenizer.
 
 | Tools | JSON | TOON | SLIM | Compact |
 |-------|------|------|------|---------|
-| 5 | 1,897 | 981 (-48%) | 111 (-94%) | 16 (-99%) |
-| 50 | 17,790 | 8,776 (-51%) | 1,203 (-93%) | 117 (-99%) |
-| 255 | **90,804** | **44,863 (-51%)** | **6,174 (-93%)** | **117 (-100%)** |
+| 5 | 785 | 410 (-48%) | 69 (-91%) | 12 (-98%) |
+| 50 | 7,832 | 3,940 (-50%) | 688 (-91%) | 117 (-99%) |
+| 255 | **39,964** | **19,980 (-50%)** | **3,511 (-91%)** | **581 (-98.5%)** |
 
-- `--compact` → tool names only: **97-100% savings**
-- `--slim` → tool schemas with params: **93% savings**
+- `--compact` → tool names only: **98.5% savings** (tiktoken cl100k_base)
+- `--slim` → tool schemas with params: **91% savings** (tiktoken cl100k_base)
 - `--toon` → structured results (round-trip safe): **30-60% savings**
 
 Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json`
@@ -215,8 +225,8 @@ mcptoon completion bash         # shell completion (bash/zsh/fish/ps)
 
 | Flag | What you get | Token savings |
 |---|---|---|
-| `--compact` | Tool names only | **97-100%** vs JSON |
-| `--slim` | Tool schemas (`name\|param:type*`) | **93%** vs JSON |
+| `--compact` | Tool names only | **98.5%** vs JSON (tiktoken) |
+| `--slim` | Tool schemas (`name\|param:type*`) | **91%** vs JSON (tiktoken) |
 | `--toon` | Standard TOON (toon-format/toon spec) | **30-60%**, round-trip safe |
 | `--json` | Standard JSON | Baseline |
 | `--raw` | Raw response | Full size |
@@ -224,12 +234,21 @@ mcptoon completion bash         # shell completion (bash/zsh/fish/ps)
 | `--max-chars N` | Truncate at N chars | Variable |
 | `--full` | Disable default 4000-char truncation | Full size |
 | `--stdin` | Read args from stdin (large payloads) | — |
+| `--fallback-json` | Fall back to JSON if TOON encoding errors | Safety net |
+
+> **Note on `--fallback-json`:** Only catches encoding-level errors (e.g., unsupported data types). It does not detect whether the LLM successfully parsed the output — that's the caller's responsibility.
 
 ---
 
 ## How it works
 
-mcptoon is a **CLI tool**, not an MCP client library. Your agent doesn't connect to MCP servers — it runs `mcptoon` commands. Schemas live on disk in `~/.mcptoon/config.json`, not in your context window.
+mcptoon is a **CLI tool**, not an MCP client library or MCP Server. Your agent doesn't connect to MCP servers — it runs `mcptoon` commands. Schemas live on disk in `~/.mcptoon/config.json`, not in your context window.
+
+**Architecture boundary:**
+- mcptoon is an **MCP Client** — it connects to MCP servers internally via stdio/HTTP
+- mcptoon does **not** expose an MCP JSON-RPC endpoint for native MCP hosts
+- `--json` output is a tool list fragment, not a full MCP protocol message (no `initialize`, `id`, `method` fields)
+- To use with Cursor/Claude Desktop native MCP: configure their `mcpServers` separately. mcptoon is for shell-capable agents only.
 
 **Two layers, fully decoupled:**
 
