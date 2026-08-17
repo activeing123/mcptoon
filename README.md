@@ -18,6 +18,8 @@ mcptoon sits between your AI agent and MCP servers. Install 1,000 tools — your
 
 ![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
 
+![Demo: mcptoon in action](assets/demo.gif)
+
 </div>
 
 ---
@@ -44,6 +46,14 @@ mcptoon quickstart     # auto-discover + configure + show tools — all in one c
 ```
 
 That's it. No JSON config editing. No MCP protocol debugging. No context window pollution.
+
+---
+
+## Used by
+
+<!-- Add your project here — PR welcome! -->
+
+*Building something with mcptoon? [Open an issue](https://github.com/activeing123/mcptoon/issues) to be listed here.*
 
 ---
 

@@ -18,6 +18,8 @@ mcptoon 站在你的 AI Agent 和 MCP 服务器之间。装 1,000 个工具—�
 
 ![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
 
+![Demo: mcptoon in action](assets/demo.gif)
+
 </div>
 
 ---
@@ -44,6 +46,14 @@ mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令�
 ```
 
 就这些。不用编辑 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。
+
+---
+
+## 谁在用
+
+<!-- 在这里添加你的项目 — 欢迎 PR！ -->
+
+*正在用 mcptoon 构建项目？[开个 issue](https://github.com/activeing123/mcptoon/issues) 登记在这里。*
 
 ---
 
