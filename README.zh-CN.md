@@ -2,11 +2,11 @@
 
 # mcptoon
 
-**连接 100 个 MCP 服务器到你的 AI Agent。上下文窗口始终保持干净。**
+**连 1,000 个 MCP 服务器。零 token 浪费。零配置地狱。零锁定。**
 
-mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。加多少服务器都行——Agent 的上下文窗口永远不会被填满。工具 schema 存在磁盘上，不进上下文。只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。
+mcptoon 站在你的 AI Agent 和 MCP 服务器之间。加 1,000 个服务器——上下文窗口还是空的。工具 schema 永远不进上下文，只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。一个配置文件通吃所有 Agent。换 Agent，配置跟着走。删掉 mcptoon，服务器照常运行。
 
-**工具是你自己的。** mcptoon 不搄带任何服务器——只是一个 200KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。删掉 mcptoon？你的 MCP 服务器照常独立运行。
+**工具是你自己的。** mcptoon 不搄带任何服务器——只是一个 200KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
