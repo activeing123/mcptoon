@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """Tests for v0.2.1: shell completion."""
 import pytest
-from mcptoon.cli import _cmd_completion, _BASH_COMPLETION, _ZSH_COMPLETION, _FISH_COMPLETION, _PS_COMPLETION
+from mcptoon.cli import _cmd_completion
 import io
 import contextlib
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +20,6 @@ Data stored in ~/.cache/mcptoon/usage.json
 """
 import json
 import time
-from pathlib import Path
 
 from .config import CACHE_DIR
 

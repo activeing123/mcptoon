@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """Tests for mcptoon discover — auto-discovery module."""
 import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from mcptoon.discover import (
     DiscoveryResult,

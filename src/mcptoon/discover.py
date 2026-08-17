@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +38,6 @@ CLI:
 import json
 import os
 import shutil
-import socket
 import sys
 import urllib.request
 import urllib.error
@@ -207,7 +205,7 @@ def _scan_cline() -> list[dict]:
                         "name": name,
                         "config": server_cfg,
                         "source": "cline",
-                        "reason": f"Imported from Cline config",
+                        "reason": "Imported from Cline config",
                     })
         except (json.JSONDecodeError, OSError, KeyError):
             continue
@@ -235,7 +233,7 @@ def _scan_windsurf() -> list[dict]:
                         "name": name,
                         "config": server_cfg,
                         "source": "windsurf",
-                        "reason": f"Imported from Windsurf config",
+                        "reason": "Imported from Windsurf config",
                     })
         except (json.JSONDecodeError, OSError, KeyError):
             continue
@@ -553,7 +551,7 @@ def _probe_endpoint(url: str, timeout: float = 0.5) -> bool:
         # Some endpoints return 200 with non-JSON for non-MCP requests
         return False
 
-    except (urllib.error.HTTPError, urllib.error.URLError, socket.timeout, ConnectionError, OSError):
+    except (TimeoutError, urllib.error.HTTPError, urllib.error.URLError, ConnectionError, OSError):
         return False
     except Exception:
         return False

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,6 @@
 # limitations under the License.
 
 """Tests for v0.4.0 features: __main__.py, error fix suggestions."""
-import pytest
 import subprocess
 import sys
 

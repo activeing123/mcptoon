@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,7 @@
 # limitations under the License.
 
 """Tests for mcptoon router module."""
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mcptoon.router import (
     call_tool, register, _check_dangerous,

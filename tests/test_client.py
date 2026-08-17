@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +13,8 @@
 # limitations under the License.
 
 """Tests for mcptoon client module — MCPClient and MCPClientPool."""
-import json
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock
 
 from mcptoon.client import MCPClient, MCPClientPool, MCPError, _next_id
 

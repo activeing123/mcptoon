@@ -1,10 +1,5 @@
-# -*- coding: utf-8 -*-
 """Tests for cross-server tool search and auto-routing."""
-import json
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -217,7 +212,7 @@ class TestCallToolAuto:
         """call_tool_auto should find the server that has the tool."""
         with patch("mcptoon.router.call_tool") as mock_call:
             mock_call.return_value = {"result": "ok"}
-            result = call_tool_auto("fetch", {"url": "http://example.com"})
+            call_tool_auto("fetch", {"url": "http://example.com"})
             # Should have called call_tool with server="fetch"
             assert mock_call.called
             args = mock_call.call_args
@@ -242,7 +237,7 @@ class TestCallToolAuto:
             with patch("mcptoon.router.call_tool") as mock_call:
                 mock_call.return_value = {"result": "ok"}
                 with patch("mcptoon.router.usage.get_usage_stats", return_value={"by_server": {}}):
-                    result = call_tool_auto("search", {"query": "AI"})
+                    call_tool_auto("search", {"query": "AI"})
                     assert mock_call.called
                     # Should have called with one of the servers
                     server_used = mock_call.call_args[0][0]

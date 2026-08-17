@@ -1,13 +1,9 @@
-# -*- coding: utf-8 -*-
 """Tests for --fallback-json flag behavior."""
 import json
-import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from mcptoon.cli import _render_result
-from mcptoon.output import render
 
 
 class TestRenderResult:

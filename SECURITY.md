@@ -11,7 +11,7 @@
 If you discover a security vulnerability in mcptoon:
 
 1. **DO NOT** open a public GitHub issue
-2. Email: `security@activeing123.github.io`
+2. Use GitHub's private vulnerability reporting: go to the **Security** tab → **Report a vulnerability**
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

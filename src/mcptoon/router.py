@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +20,8 @@ Supports custom handlers via decorator pattern.
 Includes tool poisoning detection, credential leak detection, and fuzzy match suggestions.
 """
 import re
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from .client import MCPClientPool, MCPError
 from .config import load_config, resolve_server_name
@@ -253,7 +253,7 @@ def call_tool(
                         )
                 usage.track_call(server, tool, ok=not is_error(result))
                 return result
-        except Exception as e:
+        except Exception:
             # Fall through to MCP
             pass
 
@@ -334,6 +334,22 @@ def call_tool_auto(
         >>> result = call_tool_auto("search", {"query": "AI"})
         # Automatically calls exa.search, brave-search.search, etc.
     """
+    # 1. 先查本地 handlers（注册的私有 handler）
+    for server_name, handler_func in _HANDLERS.items():
+        try:
+            module = getattr(handler_func, "__module__", "")
+            if not module:
+                continue
+            import sys as _sys
+            mod = _sys.modules.get(module)
+            if mod and hasattr(mod, "SCHEMA"):
+                for td in mod.SCHEMA:
+                    if td.get("name", "").lower() == tool.lower():
+                        return call_tool(server_name, tool, args, is_destructive, skip_poisoning_check)
+        except Exception:
+            continue
+
+    # 2. 再查 MCP 服务器配置
     from . import manifest as manifest_mod
 
     servers_with_tool = manifest_mod.find_tool_across_servers(tool)
@@ -346,6 +362,17 @@ def call_tool_auto(
             for t in tools:
                 if "error" not in t and t.get("name", "").lower() == tool.lower():
                     suggestions.append(sname)
+        # Also check handlers for fuzzy match
+        for server_name, handler_func in _HANDLERS.items():
+            module = getattr(handler_func, "__module__", "")
+            if not module:
+                continue
+            import sys as _sys
+            mod = _sys.modules.get(module)
+            if mod and hasattr(mod, "SCHEMA"):
+                for td in mod.SCHEMA:
+                    if tool.lower() in td.get("name", "").lower():
+                        suggestions.append(server_name)
         if not suggestions:
             # Broader fuzzy search
             results = manifest_mod.search_tools(tool, limit=5)

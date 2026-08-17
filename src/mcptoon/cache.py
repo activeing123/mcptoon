@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +21,6 @@ TTL: 5 minutes (configurable via MCPTOON_CACHE_TTL env var)
 import json
 import os
 import time
-from pathlib import Path
 
 from .config import CACHE_DIR
 

@@ -8,14 +8,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- `manifest --slim` support in manifest command
-- Error messages with `--fix` suggestions
-- TOML config file support (`~/.mcptoon/config.toml`)
 - awesome-mcp-clients PR submission
 - MCP Profiles expansion (23 → 30+)
 - `mcptoon serve` — expose mcptoon itself as an MCP server
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
+
+## [0.5.0] — 2026-08-17
+
+### Added — Install command + local handler architecture + forwarding layer
+
+- **`mcptoon install` command** — One-command MCP server installation with auto-handler generation. Connects to the server, discovers tools, generates a Python handler, and registers it. No restart needed.
+  ```bash
+  mcptoon install brave-search --npm @anthropic/mcp-server-brave-search
+  mcptoon install my-tool --pip mcp-my-tool
+  mcptoon install remote-api --url https://example.com/mcp
+  mcptoon install --list
+  mcptoon install --remove brave-search
+  ```
+
+- **Local handler architecture** — Public core (`src/mcptoon/`) + private layer (`local/`) separation. The `local/` directory contains:
+  - `cli_pro.py` — Enhanced CLI entry point with handler injection
+  - `handlers/` — 30+ auto-generated handlers for MCP servers
+  - `router.py` — Bridge router that checks local handlers before falling back to MCP
+  - `daemon.py` — Background daemon for connection pooling
+  - `core.py` — Remote execution core for SSH-based MCP calls
+
+- **Forwarding layer** — `universal_call.py` forwards old CLI commands to the new `cli_pro.py` entry point, ensuring zero-disruption migration for existing skills and scripts.
+
+- **`call --auto` now searches local handlers first** — Router prioritizes local handlers before MCP servers, ensuring faster response for registered tools.
+
+- **Daemon fallback** — If daemon fails to start, `call` automatically falls back to single-shot mode for maximum reliability.
+
+- **Skill Direct-Invoke mode** — Skills can directly call CLI commands without loading MCP schemas into context, achieving 0-token MCP usage.
+
+- **ADR documentation** — Architecture Decision Records added in `docs/adr/`:
+  - `0001-cli-mode-over-mcp-protocol.md` — Why CLI mode beats MCP protocol injection
+  - `0002-public-core-private-layer-separation.md` — Dual-track architecture decision
+  - `0003-toon-format-as-primary-output.md` — TOON as the default output format
+  - `0004-forwarding-layer-for-backward-compatibility.md` — Forwarding layer for seamless transition
+
+- **E2E test suite** — 10/10 tests passing, covering: echo, gbrain search, gbrain list_pages, servers, doctor, manifest, inspect (×2), call --auto, forwarding layer, install --list.
+
+### Changed
+- Bumped version to 0.5.0
+- `router.py` now checks local handlers before MCP servers in `call_tool_auto`
+- `daemon.py` startup path fixed for Windows, wait time reduced
+- `installer.py` moved from `local/` to `src/mcptoon/` (public core)
+- `installer.py` adapted to use `MCPClient` from public core
+
+### Fixed
+- Daemon startup path error on Windows
+- `call --auto` not searching local handlers
+- `UNKNOWN_SERVER` errors for gbrain, exa, tinyfish, github
+- Double `try/except` nesting in handler bridge
+- SSH remote script path for Windows targets
 
 ## [0.4.1] — 2026-08-14
 

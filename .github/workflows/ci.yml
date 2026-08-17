@@ -7,6 +7,43 @@ on:
     branches: [main, master]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install ruff
+      run: pip install ruff
+
+    - name: Ruff check (zero F821/F841/B904 policy)
+      run: ruff check src/mcptoon/ tests/ --select F821,F841,B904
+
+    - name: Ruff check (full)
+      run: ruff check src/mcptoon/ tests/
+
+    - name: Install package
+      run: pip install -e .
+
+    - name: Check imports
+      run: |
+        python -c "import mcptoon; print(f'mcptoon v{mcptoon.__version__} OK')"
+        python -c "from mcptoon.client import MCPClient; print('client OK')"
+        python -c "from mcptoon.output import toon_encode, toon_decode; print('toon_encode OK')"
+        python -c "from mcptoon.output import mcptoon_encode, mcptoon_decode; print('mcptoon_encode OK')"
+        python -c "from mcptoon.router import call_tool; print('router OK')"
+        python -c "from mcptoon.installer import install_npm; print('installer OK')"
+
+    - name: Verify zero dependencies
+      run: |
+        # Ensure no third-party imports in source
+        ! grep -r "^import " src/mcptoon/ --include="*.py" | grep -v -E "(import json|import os|import sys|import time|import threading|import subprocess|import urllib|import pathlib|import shutil|import functools|import typing|import re)"
+        echo "Zero third-party dependencies confirmed"
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -36,30 +73,3 @@ jobs:
         mcptoon help
         mcptoon init
         mcptoon list
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
-
-    - name: Install package
-      run: pip install -e .
-
-    - name: Check imports
-      run: |
-        python -c "import mcptoon; print(f'mcptoon v{mcptoon.__version__} OK')"
-        python -c "from mcptoon.client import MCPClient; print('client OK')"
-        python -c "from mcptoon.output import toon_encode, toon_decode; print('toon_encode OK')"
-        python -c "from mcptoon.output import mcptoon_encode, mcptoon_decode; print('mcptoon_encode OK')"
-        python -c "from mcptoon.router import call_tool; print('router OK')"
-
-    - name: Verify zero dependencies
-      run: |
-        # Ensure no third-party imports in source
-        ! grep -r "^import " src/mcptoon/ --include="*.py" | grep -v -E "(import json|import os|import sys|import time|import threading|import subprocess|import urllib|import pathlib|import shutil|import functools|import typing)"
-        echo "Zero third-party dependencies confirmed"

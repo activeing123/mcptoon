@@ -1,24 +1,16 @@
-# -*- coding: utf-8 -*-
 """Tests for TOML config support."""
 import json
-import os
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from mcptoon.config import (
     _parse_toml,
-    _toml_lite_parse,
     _dump_toml,
     _toml_array,
     _toml_parse_value,
     _split_array_items,
     load_config,
     save_config,
-    CONFIG_FILE_TOML,
-    CONFIG_FILE,
 )
 
 

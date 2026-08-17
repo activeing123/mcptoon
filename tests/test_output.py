@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,6 @@
 
 """Tests for mcptoon output module — Standard TOON, legacy mcptoon, and rendering."""
 import json
-import os
 import pytest
 
 from mcptoon.output import (
@@ -24,9 +22,7 @@ from mcptoon.output import (
     # Legacy mcptoon
     mcptoon_encode, mcptoon_decode,
     _mcptoon_escape, _mcptoon_unescape, _mcptoon_value, _mcptoon_scalar,
-    _split_unescaped, _find_unescaped, _mcptoon_parse_value,
-    # Deprecated aliases
-    toon, _toon_value, _toon_scalar,
+    _split_unescaped, _find_unescaped, toon, _toon_value, _toon_scalar,
     # Slim
     slim_toon,
     # Compact

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +36,11 @@ Usage:
     mcptoon add <name> [options]         Add a server
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
+    mcptoon install <name> --npm <pkg>    Install MCP server from npm
+    mcptoon install <name> --pip <pkg>    Install MCP server from pip
+    mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
+    mcptoon install --list               List installed servers
+    mcptoon install --remove <name>      Remove an installed server
     mcptoon doctor                       Self-diagnose config + connectivity
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
@@ -62,7 +66,7 @@ from . import manifest as manifest_mod
 from . import output
 from . import usage as usage_mod
 from .router import call_tool
-from .errors import is_error, get_error_message
+from .errors import is_error
 
 
 def main():
@@ -171,6 +175,8 @@ def main():
             _cmd_auto_discover(rest, fmt)
     elif command == "doctor":
         _cmd_doctor(rest)
+    elif command == "install":
+        _cmd_install(rest, fmt)
     elif command == "completion":
         _cmd_completion(rest)
     elif command in ("help", "-h", "--help"):
@@ -767,8 +773,8 @@ def _cmd_init(rest, fmt="auto"):
 
     print("")
     print("Next steps:")
-    print(f"  mcptoon manifest --slim    # see all available tools")
-    print(f"  mcptoon doctor             # verify connectivity")
+    print("  mcptoon manifest --slim    # see all available tools")
+    print("  mcptoon doctor             # verify connectivity")
 
 
 def _cmd_add(rest):
@@ -947,7 +953,7 @@ def _cmd_doctor(_rest):
         servers = cfg.load_config()
         print(f"  ✓ Config: {cfg.CONFIG_FILE} ({len(servers)} servers)")
     else:
-        print(f"  ✗ No config found. Run: mcptoon init")
+        print("  ✗ No config found. Run: mcptoon init")
         issues += 1
         print()
         print(f"  {checks} checks, {issues} issue(s)")
@@ -958,7 +964,7 @@ def _cmd_doctor(_rest):
     if cfg.CACHE_DIR.exists():
         print(f"  ✓ Cache dir: {cfg.CACHE_DIR}")
     else:
-        print(f"  ! Cache dir missing (will be created on first use)")
+        print("  ! Cache dir missing (will be created on first use)")
         cfg.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     # 4. Check each server
@@ -985,7 +991,7 @@ def _cmd_doctor(_rest):
     if agent_type:
         print(f"  ✓ MCPTOON_AGENT_TYPE={agent_type}")
     else:
-        print(f"  - MCPTOON_AGENT_TYPE not set (defaulting to auto)")
+        print("  - MCPTOON_AGENT_TYPE not set (defaulting to auto)")
 
     print()
     print(f"  {checks} checks, {issues} issue(s)")
@@ -1061,6 +1067,85 @@ def _doctor_smart_tips(servers: dict):
             print()
             for line in tip.split("\n"):
                 print(f"  {line}")
+
+
+# ═══════════════════════════════════════════════════
+# Install — one-command MCP server installation
+# ═══════════════════════════════════════════════════
+
+def _cmd_install(rest, fmt):
+    """Install/list/remove MCP servers with auto-handler generation.
+
+    Usage:
+        mcptoon install <name> --npm <package>   Install from npm (npx)
+        mcptoon install <name> --pip <package>   Install from pip
+        mcptoon install <name> --url <url>       Install HTTP/SSE MCP
+        mcptoon install --list                   List installed servers
+        mcptoon install --remove <name>           Remove an installed server
+    """
+    npm_pkg = None
+    pip_pkg = None
+    http_url = None
+    server_name = None
+    do_list = False
+    do_remove = False
+
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a == "--npm" and i + 1 < len(rest):
+            npm_pkg = rest[i + 1]
+            i += 2
+        elif a == "--pip" and i + 1 < len(rest):
+            pip_pkg = rest[i + 1]
+            i += 2
+        elif a == "--url" and i + 1 < len(rest):
+            http_url = rest[i + 1]
+            i += 2
+        elif a == "--list":
+            do_list = True
+            i += 1
+        elif a == "--remove" and i + 1 < len(rest):
+            server_name = rest[i + 1]
+            do_remove = True
+            i += 2
+        elif not a.startswith("--"):
+            server_name = a
+            i += 1
+        else:
+            i += 1
+
+    if do_list:
+        from .installer import list_installed
+        result = list_installed()
+        print(output.render(result, fmt=fmt))
+        return
+
+    if do_remove:
+        from .installer import remove_installed
+        result = remove_installed(server_name)
+        print(output.render(result, fmt=fmt))
+        return
+
+    if http_url:
+        from .installer import install_http
+        result = install_http(http_url, server_name)
+        print(output.render(result, fmt=fmt))
+        return
+
+    if npm_pkg:
+        from .installer import install_npm
+        result = install_npm(npm_pkg, server_name)
+        print(output.render(result, fmt=fmt))
+        return
+
+    if pip_pkg:
+        from .installer import install_pip
+        result = install_pip(pip_pkg, server_name)
+        print(output.render(result, fmt=fmt))
+        return
+
+    print("Usage: mcptoon install <name> [--npm <pkg>] [--pip <pkg>] [--url <url>] [--list] [--remove <name>]")
 
 
 # ═══════════════════════════════════════════════════
@@ -1160,7 +1245,7 @@ def _cmd_completion(rest):
 
     name, script = scripts[shell]
     print(f"# mcptoon completion for {name}")
-    print(f"# Install: eval this script or add to your shell config")
+    print("# Install: eval this script or add to your shell config")
     print(script)
 
 
@@ -1228,6 +1313,11 @@ Usage:
     mcptoon usage                         Show usage stats
     mcptoon doctor                        Self-diagnose config + connectivity
     mcptoon completion <shell>            Generate shell completion (bash|zsh|fish|ps)
+    mcptoon install <name> --npm <pkg>    Install MCP server from npm
+    mcptoon install <name> --pip <pkg>    Install MCP server from pip
+    mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
+    mcptoon install --list               List installed servers
+    mcptoon install --remove <name>      Remove an installed server
 
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)

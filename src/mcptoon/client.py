@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,7 +39,6 @@ import json
 import os
 import subprocess
 import threading
-import time
 import urllib.request
 import urllib.error
 from typing import Any, Optional
@@ -274,9 +272,9 @@ class MCPClient:
             resp = opener.open(req, timeout=timeout or self._timeout)
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
-            raise MCPError("HTTP_ERROR", f"HTTP {e.code}: {body[:300]}", retry=e.code >= 500)
+            raise MCPError("HTTP_ERROR", f"HTTP {e.code}: {body[:300]}", retry=e.code >= 500) from e
         except urllib.error.URLError as e:
-            raise MCPError("CONNECTION_ERROR", str(e.reason)[:200], retry=True)
+            raise MCPError("CONNECTION_ERROR", str(e.reason)[:200], retry=True) from e
 
         # Save session ID from response headers
         new_sid = resp.headers.get("Mcp-Session-Id", "")
@@ -361,7 +359,7 @@ class MCPClient:
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            raise MCPError("PARSE_ERROR", f"Invalid JSON: {e}. Raw: {text[:200]}")
+            raise MCPError("PARSE_ERROR", f"Invalid JSON: {e}. Raw: {text[:200]}") from e
 
     @staticmethod
     def _parse_http_body(body: str) -> dict:
@@ -380,8 +378,8 @@ class MCPClient:
         # Plain JSON
         try:
             return json.loads(body)
-        except json.JSONDecodeError:
-            raise MCPError("PARSE_ERROR", f"Cannot parse response: {body[:200]}")
+        except json.JSONDecodeError as e:
+            raise MCPError("PARSE_ERROR", f"Cannot parse response: {body[:200]}") from e
 
     @staticmethod
     def _extract_content(result: Any) -> Any:

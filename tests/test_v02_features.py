@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,7 @@
 """Tests for v0.2.0 features: poisoning guard, fuzzy match, export formats."""
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mcptoon.router import _check_poisoning, call_tool
 from mcptoon.manifest import fuzzy_match_tool, export_manifest, _similarity, _levenshtein
@@ -282,13 +281,37 @@ class TestManifestSlim:
 
     def test_slim_flag_in_help(self):
         from mcptoon.cli import _print_help
-        import io, contextlib
+        import io
+        import contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             _print_help()
         assert "--slim" in buf.getvalue()
 
     def test_slim_format_renders_tools(self):
+        from mcptoon.output import slim_toon
+        tools = [{"name": "search", "inputSchema": {
+            "properties": {"q": {"type": "string"}},
+            "required": ["q"]}}]
+        result = slim_toon(tools)
+        assert "search|q:s*" in result
+
+
+
+
+
+class TestManifestSlim:
+    """Test manifest --slim support (v0.2.3)."""
+
+    def test_slim_flag_in_help(self):
+        from mcptoon.cli import _print_help
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            _print_help()
+        assert "--slim" in buf.getvalue()
+
+    def test_slim_format Renders_tools(self):
         from mcptoon.output import slim_toon
         tools = [{"name": "search", "inputSchema": {
             "properties": {"q": {"type": "string"}},

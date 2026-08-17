@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,12 +19,10 @@ Lists all tools from all configured servers, with optional caching.
 Also provides cross-agent format export and fuzzy matching.
 """
 import json
-from typing import Any
 
 from . import cache as cache_mod
 from .config import load_config
 from .client import MCPClientPool, MCPError
-from .errors import is_error
 
 
 def get_manifest(use_cache: bool = True) -> dict[str, list[dict]]:

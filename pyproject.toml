@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcptoon"
-version = "0.4.1"
+version = "0.2.3"
 description = "Token-efficient MCP CLI client. 99.87% token savings on tool discovery. Standard TOON (toon-format/toon) + legacy mcptoon format with round-trip safety. Credential leak detection. Zero deps. Works with every AI agent."
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -32,7 +32,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov"]
+dev = ["pytest>=7.0", "pytest-cov", "ruff>=0.6"]
 
 [project.scripts]
 mcptoon = "mcptoon.cli:main"
@@ -42,3 +42,35 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# F821 = undefined-name (BUG: must be zero)
+# F841 = unused-variable (BUG)
+# B904 = raise-without-from (BUG)
+# F401 = unused-import (cleanliness)
+# UP = pyupgrade (modernize)
+# E = pycodestyle errors
+# W = pycodestyle warnings
+# SIM = simplification
+select = ["F821", "F841", "B904", "F401", "E", "W", "UP", "SIM"]
+ignore = [
+    "E501",    # line-too-long (not enforced)
+    "E741",    # ambiguous-variable-name (l, I, O)
+    "E402",    # module-import-not-at-top (test files need sys.path setup)
+    "SIM105",  # suppressible-exception (contextlib.suppress less readable)
+    "SIM117",  # multiple-with-statements (readability)
+    "SIM108",  # if-else-block-instead-of-if-exp (readability)
+    "SIM116",  # if-else-block-instead-of-dict-lookup (readability)
+    "SIM102",  # collapsible-if (readability)
+    "SIM103",  # needless-bool (readability)
+    "UP045",   # non-pep604-annotation-optional (Optional[X] still valid)
+    "UP036",   # outdated-version-block
+    "W293",    # blank-line-with-whitespace
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Cross-validation tests for standard TOON implementation.
 
 Validates mcptoon's toon_encode/toon_decode against the documented TOON spec
@@ -20,7 +19,6 @@ References:
   - 博客园/xueweihan: "官方开源的TypeScript实现在GitHub上一周便斩获了3.5k Star"
   - 博客园/token-ai: "TOON同时做到更省Token、更稳的解析/检索、更易于写提示词"
 """
-import pytest
 from mcptoon.output import toon_encode, toon_decode
 
 

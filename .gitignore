@@ -47,6 +47,7 @@ readme-v*.md
 readme-preview*.html
 
 # Internal docs (not for public repo)
+docs/new-docs-overview.html
 PROJECT_STATUS.md
 TASK_SPEC.md
 INCREMENTAL_PLAN.md
@@ -63,3 +64,8 @@ RELEASE_PLAN.md
 VERSION_STRATEGY.md
 _handle_result.txt
 _*.txt
+PROJECT_MAP.json
+PROJECT_MAP.md
+
+# Private layer (local handlers, not for public release)
+local/
