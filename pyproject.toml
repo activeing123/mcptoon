@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcptoon"
 version = "0.5.0"
-description = "Token-efficient MCP CLI client. 99.87% token savings on tool discovery. Standard TOON (toon-format/toon) + legacy mcptoon format with round-trip safety. Credential leak detection. Zero deps. Works with every AI agent."
+description = "Token-efficient MCP CLI. 1,000 tools on your machine. Zero token waste, zero config hell, zero agent lock-in. Standard TOON + SLIM + compact. Credential leak detection. Zero deps."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [{name = "cxh"}]

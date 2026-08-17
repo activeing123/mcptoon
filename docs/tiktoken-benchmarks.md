@@ -4,7 +4,7 @@ When you connect 5 MCP servers to your agent, something invisible happens before
 
 This isn't hypothetical. Anthropic says [context window is a scarce resource](https://docs.anthropic.com/en/docs/build-with-claude/context-windows). Cursor says [the difference between good and bad agents is context management](https://cursor.com/blog/context-engineering). Latent Space's MCP analysis identifies "a scaling cliff around 20-30 tools."
 
-I built [mcptoon](https://github.com/activeing123/mcptoon) — a 50KB CLI that keeps MCP servers configured but their schemas out of your context. This post shows real tiktoken data (OpenAI's official tokenizer) on how much it actually saves.
+I built [mcptoon](https://github.com/activeing123/mcptoon) — a 200KB CLI that keeps MCP servers configured but their schemas out of your context. This post shows real tiktoken data (OpenAI's official tokenizer) on how much it actually saves.
 
 ## The 5 problems
 
@@ -96,38 +96,34 @@ mcptoon is a CLI tool, not an MCP client library. **If your agent can run shell 
 | Cursor | Same, one config works |
 | OpenCode | Same |
 | Codex | Same |
-| CatPaw | Same |
 | Any shell-capable agent | Same |
 
 One config file `~/.mcptoon/config.json`, shared across all agents. Switch agents without reconfiguring.
 
 ## Architecture
 
-Three-layer decoupled design:
+Two-layer decoupled design:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 1: mcptoon CLI (~50KB, zero deps)│
+│  Layer 1: mcptoon CLI (~200KB, zero deps)│
 │  Runs in agent's shell, optimizes tokens │
 ├─────────────────────────────────────────┤
 │  Layer 2: MCP Servers (your existing)    │
 │  Untouched, stdio/SSE as usual           │
-├─────────────────────────────────────────┤
-│  Layer 3: Config (~/.mcptoon/config.json)│
-│  Shared by all agents, one file for all  │
 └─────────────────────────────────────────┘
 ```
 
-Each layer is independent. Swap agents without touching servers. Swap servers without touching agents. mcptoon is the glue — 50KB, zero dependencies, pure Python stdlib.
+Each layer is independent. Swap agents without touching servers. Swap servers without touching agents. mcptoon is the glue — 200KB, zero dependencies, pure Python stdlib.
 
 ## Community
 
-The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 309 tests, fully open source.
+The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 429 tests, fully open source.
 
 ## Try it
 
 ```bash
-pip install mcptoon          # 50KB, zero deps
+pip install mcptoon          # 200KB, zero deps
 mcptoon init                 # Sample config
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 mcptoon manifest --slim      # Compact schemas for LLM discovery
@@ -144,7 +140,6 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --slim
 
 ## Roadmap
 
-- **More MCP profiles** — 20+ pre-configured server templates
 - **Token budget monitoring** — `mcptoon usage` shows real-time token consumption per server
 - **Adaptive schema trimming** — Dynamically choose --slim / --compact based on remaining context
 
@@ -158,4 +153,4 @@ That's it.
 
 ---
 
-*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 309 tests · Zero dependencies*
+*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 429 tests · Zero dependencies*

@@ -4,12 +4,12 @@ Copyright 2025 cxh
 This product includes software developed by cxh (https://github.com/activeing123/mcptoon).
 
 === TOON Format ===
-The TOON (Token-Optimized Object Notation) format is an original design
-created for this project. The encoding rules (pipe-separated key:value
-pairs, T/F for booleans, ∅ for null, ↲ for newlines) are a distinctive
-part of mcptoon's identity.
+mcptoon supports standard TOON (Token-Oriented Object Notation) as defined
+by the toon-format/toon open spec (https://github.com/toon-format/toon).
+The SLIM format (name|param:type*) is an mcptoon-specific innovation.
 
-If you implement TOON encoding in a derivative work, you must:
+If you implement TOON encoding in a derivative work, please reference
+the standard TOON spec. If you implement SLIM format, please:
   1. Attribute the original design to mcptoon
   2. Include a reference to https://github.com/activeing123/mcptoon
   3. Include this NOTICE file

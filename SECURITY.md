@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.1.x   | ✅ Active support  |
+| 0.5.x   | ✅ Active support  |
+| < 0.5   | ❌ Not supported   |
 
 ## Reporting a Vulnerability
 

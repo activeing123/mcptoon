@@ -1,4 +1,4 @@
-# ADR-0001: Adopt standard TOON as primary format, rename legacy to MCPTOON-SLIM
+# ADR-0005: Adopt standard TOON as primary format, rename legacy to MCPTOON-SLIM
 
 Date: 2026-08-12
 

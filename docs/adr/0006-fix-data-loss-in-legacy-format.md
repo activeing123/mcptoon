@@ -1,4 +1,4 @@
-# ADR-0002: Fix data loss in legacy mcptoon format
+# ADR-0006: Fix data loss in legacy mcptoon format
 
 Date: 2026-08-12
 

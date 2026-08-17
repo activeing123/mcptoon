@@ -57,13 +57,15 @@ chore: update CI to Python 3.12
 src/mcptoon/
 ├── cli.py        # CLI entry point — keep thin, delegate to other modules
 ├── client.py     # MCPClient + MCPClientPool — transport layer
-├── router.py     # Tool routing + custom handlers + poisoning/credential leak detection
-├── config.py     # Server config management
-├── manifest.py   # Tool discovery
-├── output.py     # TOON / JSON / compact rendering ← the magic
-├── cache.py      # Schema cache
-├── usage.py      # Usage tracking
-└── errors.py     # Error envelopes
+├── installer.py  # One-command MCP server installation + auto-handler
+├── router.py     # Tool routing + poisoning/credential leak detection
+├── config.py     # Server config management (JSON + TOML)
+├── manifest.py   # Tool discovery with cache + cross-server search
+├── discover.py   # Zero-config auto-discovery (4-layer)
+├── output.py     # TOON / JSON / compact rendering — the magic
+├── cache.py      # Schema cache (5-min TTL)
+├── usage.py      # Local usage tracking
+└── errors.py     # Error envelopes + fix suggestions
 ```
 
 ## Adding a New Output Format
