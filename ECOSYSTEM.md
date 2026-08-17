@@ -8,10 +8,9 @@ MCP (Model Context Protocol) is growing fast: 10,000+ servers, 1M+ monthly reque
 
 mcptoon solves this with TOON (Token-Optimized Object Notation). But token optimization alone isn't enough. Developers need:
 
-- **Ready-to-use server configs** (not everyone wants to read MCP docs)
-- **Format specs** (so other tools can adopt TOON)
 - **Integration guides** (every agent is different)
-- **Community profiles** (the long tail of MCP servers)
+- **Format specs** (so other tools can adopt TOON)
+- **Community configs** (the long tail of MCP servers)
 
 That's why we're building an ecosystem, not just a tool.
 
@@ -25,32 +24,16 @@ That's why we're building an ecosystem, not just a tool.
                     │   (token optimization)  │
                     └────────────┬────────────┘
                                  │
-          ┌──────────────┬───────┴───────┬──────────────┐
-          │              │               │              │
-    ┌─────▼─────┐  ┌────▼─────┐  ┌──────▼──────┐  ┌───▼──────────┐
-    │  Profiles │  │  TOON    │  │ Integration │  │   Badge      │
-    │  Registry │  │  Spec    │  │   Guides    │  │   Program    │
-    │  23 → 100 │  │  v1 → v2 │  │   0 → 10    │  │   0 → 50     │
-    └───────────┘  └──────────┘  └─────────────┘  └──────────────┘
+          ┌──────────────┬───────┴───────┐
+          │              │               │
+    ┌─────▼─────┐  ┌────▼─────┐  ┌──────▼──────┐
+    │  TOON     │  │ Integration │  │   Badge     │
+    │  Spec     │  │   Guides    │  │   Program   │
+    │  v1 → v2  │  │   0 → 10    │  │   0 → 50    │
+    └───────────┘  └─────────────┘  └─────────────┘
 ```
 
-### 1. MCP Profiles Registry
-
-Pre-configured, battle-tested MCP server templates. Copy, paste, done.
-
-| Stat | Value |
-|------|-------|
-| Profiles now | 23 |
-| Tools covered | 186+ |
-| Security-audited | 23 |
-| Target | 100+ profiles |
-| Location | [`mcp/`](mcp/) |
-
-**Categories:** developer · database · search · browser · communication · file · cloud · data · knowledge · utility
-
-Browse profiles: [mcp/README.md](mcp/README.md)
-
-### 2. TOON Format Specification
+### 1. TOON Format Specification
 
 TOON (Token-Optimized Object Notation) is the encoding that saves 40-97% tokens vs JSON.
 
@@ -67,17 +50,16 @@ TOON (Token-Optimized Object Notation) is the encoding that saves 40-97% tokens 
 - `toon-rust` — Rust SDK
 - Cross-language consistency test suite
 
-### 3. Integration Guides
+### 2. Integration Guides
 
 Every major AI agent gets a step-by-step mcptoon integration guide.
 
 | Agent | Type | Status |
 |-------|------|--------|
-| Claude Code | CLI | 📝 Planned |
-| Cursor | IDE | 📝 Planned |
-| CatPaw | IDE | 📝 Planned |
-| Codex (OpenAI) | CLI | 📝 Planned |
-| OpenCode | CLI | 📝 Planned |
+| Claude Code | CLI | ✅ Ready |
+| Cursor | IDE | ✅ Ready |
+| Codex (OpenAI) | CLI | ✅ Ready |
+| OpenCode | CLI | ✅ Ready |
 | Continue | IDE | 📝 Planned |
 | Aider | CLI | 📝 Planned |
 | Cline | IDE | 📝 Planned |
@@ -86,7 +68,7 @@ Every major AI agent gets a step-by-step mcptoon integration guide.
 
 Each guide: 30-second quick start → full config → token savings comparison → FAQ.
 
-### 4. "Powered by mcptoon" Badge
+### 3. "Powered by mcptoon" Badge
 
 MCP servers that recommend mcptoon for token-efficient access can display a badge:
 
@@ -135,23 +117,23 @@ mcptoon usage  # shows your token savings
 
 ## Roadmap
 
-| Quarter | Milestone | Profiles | Guides | TOON SDK |
-|---------|-----------|----------|--------|----------|
-| 2026 Q3 | v0.3.0 — Credential leak detection + integration guides | 23 | 3 | — |
-| 2026 Q4 | v0.5.0 — TOON Spec v1 | 30 | 7 | — |
-| 2027 Q1 | v0.7.0 — Smart format selection | 50 | 7 | JS |
-| 2027 Q2 | **v1.0.0 — Stable ecosystem** | 100 | 10 | JS + Go |
-| 2027 H2 | Post-v1.0 — Multi-language + marketplace | 150+ | 15 | JS + Go + Rust |
+| Quarter | Milestone | Guides | TOON SDK |
+|---------|-----------|--------|----------|
+| 2026 Q3 | v0.5.0 — Install command + zero bundled content | 4 | — |
+| 2026 Q4 | v0.6.0 — TOON Spec v1 draft | 7 | — |
+| 2027 Q1 | v0.8.0 — Smart format selection | 7 | JS |
+| 2027 Q2 | **v1.0.0 — Stable ecosystem** | 10 | JS + Go |
+| 2027 H2 | Post-v1.0 — Multi-language + marketplace | 15 | JS + Go + Rust |
 
 ---
 
 ## Design principles
 
-1. **Zero dependencies** — Every ecosystem component works without npm/pip installs beyond mcptoon itself
+1. **Zero dependencies** — Every component works without npm/pip installs beyond mcptoon itself
 2. **Open format** — TOON is free to implement in any language, no license restrictions
-3. **Community-driven** — Profiles and guides are community-contributed, not vendor-controlled
-4. **Real data** — Every profile is battle-tested with real usage numbers, not theoretical
-5. **Security first** — No credentials in profiles, no telemetry in CLI, no backdoors anywhere. Every profile is security-audited with `credential_safe`, `env_vars_required`, and `permissions` fields. Tool results are scanned for credential leaks via 12 regex patterns before reaching your agent's context.
+3. **Community-driven** — Guides and configs are community-contributed, not vendor-controlled
+4. **Real data** — Every claim is backed by benchmark numbers, not theoretical
+5. **Security first** — No credentials in configs, no telemetry in CLI, no backdoors anywhere. Tool results are scanned for credential leaks via 12 regex patterns before reaching your agent's context.
 
 ---
 
@@ -159,7 +141,7 @@ mcptoon usage  # shows your token savings
 
 Are you an MCP server author? Let's collaborate:
 
-- We write and verify a profile for your server
+- We test your server with mcptoon and verify token savings
 - You add a "Powered by mcptoon" badge to your README
 - Both projects benefit from cross-promotion
 
@@ -169,6 +151,6 @@ Are you an MCP server author? Let's collaborate:
 
 ## License
 
-All ecosystem materials (profiles, specs, guides) are Apache 2.0, same as mcptoon itself.
+All ecosystem materials (specs, guides) are Apache 2.0, same as mcptoon itself.
 
 TOON format is free to implement — no patent claims, no license restrictions.

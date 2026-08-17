@@ -2,9 +2,9 @@
 
 # mcptoon
 
-**Add 1,000 MCP tools to your local environment. Worry zero about token context.**
+**Connect 100 MCP servers to your AI agent. Your context window stays empty.**
 
-mcptoon is a CLI tool that sits between your AI agent and MCP servers. Add unlimited servers — your agent's context window stays clean. Schemas never enter it. Only the compact result you request does, and it's 30-97% smaller than JSON.
+mcptoon is a CLI that sits between your AI agent and MCP servers. Add as many servers as you want — your agent's context window never fills up. Tool schemas stay on disk, not in context. Only the compact result you request enters context — and it's 30-97% smaller than JSON.
 
 **You own your tools.** mcptoon ships zero bundled servers — just a 200KB CLI. You add the servers you want, one command each, from npm/pip/HTTP. Delete mcptoon? Your MCP servers keep working independently.
 
@@ -264,7 +264,7 @@ src/mcptoon/
 ├── router.py     # Tool routing + poisoning/credential leak detection
 ├── config.py     # Server config (JSON + TOML)
 ├── manifest.py   # Tool discovery with cache + cross-server search
-├── discover.py   # Zero-config auto-discovery (5-layer)
+├── discover.py   # Zero-config auto-discovery (4-layer)
 ├── output.py     # Standard TOON + legacy mcptoon + compact/slim rendering
 ├── cache.py      # Schema cache (5-min TTL)
 ├── usage.py      # Local usage tracking

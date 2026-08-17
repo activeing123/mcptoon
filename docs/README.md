@@ -7,7 +7,6 @@ mcptoon works with any agent that can run shell commands.
 | Claude Code | [claude-code.md](integrations/claude-code.md) |
 | Cursor | [cursor.md](integrations/cursor.md) |
 | OpenCode | [opencode.md](integrations/opencode.md) |
-| CatPaw | [catpaw.md](integrations/catpaw.md) |
 | Codex (OpenAI) | [codex.md](integrations/codex.md) |
 
 ## Quick start for any agent

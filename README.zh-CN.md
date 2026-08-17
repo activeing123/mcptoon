@@ -2,9 +2,9 @@
 
 # mcptoon
 
-**本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
+**连接 100 个 MCP 服务器到你的 AI Agent。上下文窗口始终保持干净。**
 
-mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。加多少服务器都行——Agent 的上下文窗口始终保持干净。Schema 永远不进上下文，只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。
+mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。加多少服务器都行——Agent 的上下文窗口永远不会被填满。工具 schema 存在磁盘上，不进上下文。只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。
 
 **工具是你自己的。** mcptoon 不搄带任何服务器——只是一个 200KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。删掉 mcptoon？你的 MCP 服务器照常独立运行。
 
@@ -264,7 +264,7 @@ src/mcptoon/
 ├── router.py     # 工具路由 + 注入/凭据泄露检测
 ├── config.py     # 服务器配置 (JSON + TOML)
 ├── manifest.py   # 工具发现 + 跨服务器搜索
-├── discover.py   # 零配置自动发现 (5 层)
+├── discover.py   # 零配置自动发现 (4 层)
 ├── output.py     # 标准 TOON + compact/slim 渲染
 ├── cache.py      # Schema 缓存 (5分钟 TTL)
 ├── usage.py      # 本地用量统计
