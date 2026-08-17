@@ -2,9 +2,11 @@
 
 # mcptoon
 
-**100 个 MCP 服务器。0 token 浪费。**
+**本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
 
-*你的 AI Agent 拥有所有 MCP 工具——但它们的 schema 永远不进上下文窗口。*
+mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。加多少服务器都行——Agent 的上下文窗口始终保持干净。Schema 永远不进上下文，只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。
+
+**工具是你自己的。** mcptoon 不搄带任何服务器——只是一个 200KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。删掉 mcptoon？你的 MCP 服务器照常独立运行。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
@@ -86,9 +88,9 @@ mcptoon install --remove brave-search
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
 
-**23 个预置服务器 Profile** 已包含（fetch、github、puppeteer、sqlite、slack 等）——每个是约 1KB 的 JSON 文件，描述*怎么连接*，不是服务器本身。你仍然通过 `npx` 自己安装服务器。详见 [mcp/README.md](mcp/README.md)。
+**23 个连接模板**随包提供（fetch、github、puppeteer、sqlite、slack 等热门服务器）——每个只是一个 ~1KB 的 JSON 文件，**不是内置服务器**。它们只描述怎么连接。你仍然自己安装服务器。把它们当食谱卡片，不是食材。不想要？忽略就行，总共才 23KB。详见 [mcp/README.md](mcp/README.md)。
 
-**支持任何 MCP 服务器**，有没有 Profile 都行：
+**支持任何 MCP 服务器**，有没有模板都行：
 
 ```bash
 mcptoon add my-server --stdio npx -y @any/mcp-package

@@ -2,9 +2,11 @@
 
 # mcptoon
 
-**100+ MCP servers. 0 tokens wasted.**
+**Add 1,000 MCP tools to your local environment. Worry zero about token context.**
 
-*Your AI agent keeps all MCP tools available — but their schemas never enter its context window.*
+mcptoon is a CLI tool that sits between your AI agent and MCP servers. Add unlimited servers — your agent's context window stays clean. Schemas never enter it. Only the compact result you request does, and it's 30-97% smaller than JSON.
+
+**You own your tools.** mcptoon ships zero bundled servers — just a 200KB CLI. You add the servers you want, one command each, from npm/pip/HTTP. Delete mcptoon? Your MCP servers keep working independently.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
@@ -86,9 +88,9 @@ mcptoon install --remove brave-search
 
 mcptoon auto-connects, discovers tools, generates a handler, and registers it. No restart needed.
 
-**23 pre-configured server profiles** come included (fetch, github, puppeteer, sqlite, slack, etc.) — each is a ~1KB JSON file describing *how to connect*, not the server itself. You still install servers yourself via `npx`. See [mcp/README.md](mcp/README.md).
+**23 connection templates** are included for popular servers (fetch, github, puppeteer, sqlite, slack, etc.) — each is a ~1KB JSON file, *not* a bundled server. They just describe how to connect. You still install servers yourself. Think of them as recipe cards, not ingredients. Don't want them? Ignore them. They take 23KB total. See [mcp/README.md](mcp/README.md).
 
-**Works with any MCP server**, profile or not:
+**Works with any MCP server**, template or not:
 
 ```bash
 mcptoon add my-server --stdio npx -y @any/mcp-package
