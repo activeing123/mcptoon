@@ -6,13 +6,13 @@
 
 mcptoon sits between your AI agent and MCP servers. Install 1,000 tools — your context window stays empty. Tool schemas never enter it. Only the compact result you request does, and it's 30-97% smaller than JSON. One config file for all agents. Switch agents, your servers follow. Delete mcptoon, your servers keep running.
 
-**You own your tools.** mcptoon ships zero bundled servers — just a 200KB CLI. You add the servers you want, one command each, from npm/pip/HTTP.
+**You own your tools.** mcptoon ships zero bundled servers — just a ~250KB CLI. You add the servers you want, one command each, from npm/pip/HTTP.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#privacy)
-[![Tests](https://img.shields.io/badge/Tests-429%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-427%20passed-brightgreen)](#contributing)
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
 
@@ -27,7 +27,7 @@ mcptoon sits between your AI agent and MCP servers. Install 1,000 tools — your
 ## 30-second quick start
 
 ```bash
-pip install mcptoon                          # zero deps, 200KB
+pip install mcptoon                          # zero deps, ~250KB
 
 # Add any MCP server — one command:
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
@@ -159,6 +159,60 @@ All numbers from `tiktoken.get_encoding("cl100k_base")` — OpenAI's official BP
 - `--compact` → tool names only: **98.5% savings** (tiktoken cl100k_base)
 - `--slim` → tool schemas with params: **91% savings** (tiktoken cl100k_base)
 - `--toon` → structured results (round-trip safe): **30-60% savings**
+
+<details>
+<summary><b>What is TOON? Why does mcptoon use it?</b></summary>
+
+**TOON (Token-Oriented Object Notation)** is an open data format specification by [Johann Schopplich](https://github.com/johannschopplich) ([toon-format/toon](https://github.com/toon-format/toon), 25K+ stars). It's designed specifically to reduce token consumption when feeding structured data to LLMs.
+
+**Why TOON instead of JSON/YAML/CSV?**
+
+| Format | Problem for LLMs |
+|--------|-----------------|
+| JSON | Braces `{}`, brackets `[]`, quotes `""`, commas — each is a separate BPE token. 255 tool schemas = ~40K tokens. |
+| YAML | Indentation-sensitive, hard for LLMs to generate correctly, no array length hints. |
+| CSV | No nesting, no key-value pairs, no type information. |
+| TOON | YAML-style keys + CSV-style arrays + length hints `[N]` + type literals. 30-60% fewer tokens than JSON. |
+
+**What mcptoon uses from TOON spec v4.1:**
+
+| Feature | Used? | Example |
+|---------|-------|---------|
+| YAML-style objects (`key: value`) | ✅ | `name: search` |
+| Tabular arrays (`[N,]{fields}: rows`) | ✅ | `[2,]{id,name}:\n  1,Alice\n  2,Bob` |
+| Inline scalar arrays (`key[N]: v1,v2,v3`) | ✅ | `tags[3]: ai,ml,nlp` |
+| Nested objects (indentation) | ✅ | `config:\n  host: localhost` |
+| Type literals (`true`/`false`/`null`) | ✅ | `active: true` |
+| String quoting (only when needed) | ✅ | `desc: "hello, world"` |
+| Backslash escaping in quoted strings | ✅ | `desc: "say \"hi\""` |
+| Length markers (`#` prefix) | ❌ Not needed | — |
+| Pipe/tab delimiters | ❌ Not needed | Comma delimiter only |
+| Root scalar values | ❌ Not needed | MCP data is always objects/arrays |
+
+**Compatibility:**
+
+- Encoder/decoder: **vendored from [python-toon](https://github.com/xaviviro/python-toon) v0.1.1** (MIT License, by Xavi Vinaixa) — spec-compliant implementation
+- Official TypeScript reference: [toon-format/toon](https://github.com/toon-format/toon) (25K+ stars)
+- Round-trip safe: `decode(encode(x)) == x` for all JSON-serializable data
+- Non-strict decode mode (lenient parsing for real-world MCP outputs)
+- **Known minor differences:** empty containers output `{}`/`[]` (instead of spec's empty string); 3 edge-case decode patterns (keyed tabular form, nested field groups) — all non-blocking for MCP use cases
+- 47/52 compatibility tests pass against official spec
+
+**Why not use the official `toon-format` PyPI package directly?**
+
+The official Python implementation ([toon-format/toon-python](https://github.com/toon-format/toon-python)) is currently in beta — its encoder raises `NotImplementedError`. We vendor the community implementation (`python-toon` by Xavi Vinaixa) instead, which is functional and spec-compliant. When the official Python encoder is stable, we'll switch.
+
+**TOON vs SLIM vs Compact — what's the difference?**
+
+| Format | Origin | Use case | Savings |
+|--------|--------|----------|---------|
+| `--toon` | Open spec (toon-format/toon v4.1) | General structured output, round-trip safe | 30-60% vs JSON |
+| `--slim` | mcptoon-specific | Tool schemas only (`name\|param:type*`) | 91% vs JSON |
+| `--compact` | mcptoon-specific | Tool names only | 98.5% vs JSON |
+
+SLIM and Compact are **not** part of the TOON spec. They are mcptoon-specific optimizations for tool discovery. TOON is the general-purpose format for tool call results.
+
+</details>
 
 Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json`
 
@@ -301,7 +355,7 @@ src/mcptoon/
 └── errors.py     # Structured error envelopes + fix suggestions
 ```
 
-~4,500 lines. 429 tests. Zero third-party imports. ~200KB source.
+~5,300 lines. 427 tests. Zero third-party imports. ~250KB source.
 
 ## Docker
 
@@ -320,7 +374,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 429 tests, 0.5s
+python -m pytest tests/ -v   # 427 tests, 0.5s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).

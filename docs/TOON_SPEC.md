@@ -1,6 +1,6 @@
 # TOON Format Specification
 
-**Version:** 1.0 (aligned with [toon-format/toon](https://github.com/toon-format/toon) community spec v4.1)
+**Version:** 1.1 (aligned with [toon-format/toon](https://github.com/toon-format/toon) community spec v4.1, vendored python-toon v0.1.1 encoder/decoder)
 
 **Full name:** Token-Oriented Object Notation
 
@@ -84,12 +84,12 @@ JSON:
 
 TOON:
 ```
-[2]{id,name}:
+[2,]{id,name}:
   1,Alice
   2,Bob
 ```
 
-Format: `[count]{field1,field2,...}:` followed by indented rows, one per item, values comma-separated.
+Format: `[count,]{field1,field2,...}:` followed by indented rows, one per item, values comma-separated. The comma inside `[2,]` is the delimiter indicator (spec v4.1).
 
 ### Scalar array
 
@@ -98,23 +98,27 @@ JSON:
 {"tags": ["python", "rust", "go"]}
 ```
 
-TOON:
+TOON (spec v4.1 — inline format):
 ```
-tags[3]:
-  python
-  rust
-  go
+tags[3]: python,rust,go
 ```
+
+For arrays of primitives, TOON emits values inline after the header, comma-separated.
 
 ### Mixed-type array
 
-When array items have different types or non-uniform keys:
-
+When array items are all primitives but of different types:
 ```
-items[3]:
-  value: hello
-  value: 42
-  value: true
+items[3]: 1,hello,true
+```
+
+When array items are objects with non-uniform keys, TOON uses list format with `-` markers:
+```
+items[2]:
+  - name: Alice
+    age: 30
+  - name: Bob
+    age: 25
 ```
 
 ### Empty array
@@ -127,16 +131,16 @@ items[3]:
 
 ## 5. Escaping Rules
 
-Values containing commas, newlines, or double quotes are wrapped in double quotes (CSV-style):
+Strings containing structural characters (comma, colon, brackets, quotes, newline) are wrapped in double quotes with backslash escaping (TOON spec v4.1):
 
 | Value | TOON encoding |
 |-------|--------------|
 | `hello` | `hello` |
 | `hello, world` | `"hello, world"` |
-| `say "hi"` | `"say ""hi"""` |
+| `say "hi"` | `"say \"hi\""` |
 | `line1\nline2` | `"line1\nline2"` |
 
-Internal double quotes are escaped by doubling (`"` → `""`), matching RFC 4180 CSV escaping.
+Strings that don't contain structural characters are emitted unquoted — this is the common case for MCP data.
 
 ---
 
