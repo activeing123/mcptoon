@@ -314,8 +314,19 @@ def _toml_lite_parse(text: str) -> dict:
 
         # Strip inline comments (but not inside strings)
         if value_str.startswith('"'):
-            # String value — find closing quote
-            pass  # Don't strip comments inside strings
+            # String value — find closing quote, then strip comment after it
+            i = 1
+            while i < len(value_str):
+                if value_str[i] == '\\':
+                    i += 2  # Skip escaped char
+                    continue
+                if value_str[i] == '"':
+                    break
+                i += 1
+            if i < len(value_str):
+                # Found closing quote at position i
+                # Keep the quoted string, strip everything after (inline comment)
+                value_str = value_str[:i + 1]
         elif "#" in value_str:
             value_str = value_str[:value_str.index("#")].strip()
 
