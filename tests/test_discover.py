@@ -304,7 +304,6 @@ class TestAutoDiscover:
             detect_env=False,
             detect_local=False,
             probe_network=False,
-            match_profiles=False,
         )
         assert result.count == 0
 
@@ -316,7 +315,6 @@ class TestAutoDiscover:
                 detect_env=True,
                 detect_local=False,
                 probe_network=False,
-                match_profiles=False,
             )
             assert "github" in result.servers
 
