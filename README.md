@@ -2,9 +2,9 @@
 
 # mcptoon
 
-**Any agent. Zero config. 1,000 MCP tools ready in seconds.**
+**Install 1,000 MCP tools locally. Schemas consume 0 tokens. Any agent, zero MCP config.**
 
-A brand-new agent — no MCP config, no JSON editing, no server setup — just runs `mcptoon` commands. Your 1,000 tools are already there. Schemas never enter the context window. Results are 30-97% smaller than JSON. One config file follows you across every agent.
+Download a brand-new agent today — it can immediately call all 1,000 MCP tools. No `mcpServers` JSON to edit. No MCP protocol to configure. Tools are lazy-loaded (0 servers running until you call one). Schemas never enter your context window. Switch to any other agent tomorrow — same 1,000 tools, zero reconfiguration.
 
 **You own your tools.** mcptoon ships zero bundled servers — just a ~250KB CLI. You add the servers you want, one command each, from npm/pip/HTTP. Switch agents? Your tools follow. Delete mcptoon? Servers keep running.
 
