@@ -2,11 +2,11 @@
 
 # mcptoon
 
-**1,000 MCP tools on your machine. Zero token waste. Zero config hell. Zero agent lock-in.**
+**Any agent. Zero config. 1,000 MCP tools ready in seconds.**
 
-mcptoon sits between your AI agent and MCP servers. Install 1,000 tools — your context window stays empty. Tool schemas never enter it. Only the compact result you request does, and it's 30-97% smaller than JSON. One config file for all agents. Switch agents, your servers follow. Delete mcptoon, your servers keep running.
+A brand-new agent — no MCP config, no JSON editing, no server setup — just runs `mcptoon` commands. Your 1,000 tools are already there. Schemas never enter the context window. Results are 30-97% smaller than JSON. One config file follows you across every agent.
 
-**You own your tools.** mcptoon ships zero bundled servers — just a ~250KB CLI. You add the servers you want, one command each, from npm/pip/HTTP.
+**You own your tools.** mcptoon ships zero bundled servers — just a ~250KB CLI. You add the servers you want, one command each, from npm/pip/HTTP. Switch agents? Your tools follow. Delete mcptoon? Servers keep running.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
