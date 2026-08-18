@@ -191,10 +191,16 @@ SLIM and Compact are not part of the TOON spec. They are mcptoon optimizations f
 
 ## 10. Implementation
 
-Reference implementation: `src/mcptoon/output.py` (`toon_encode()` / `toon_decode()`)
+**Encoder/Decoder:** `src/mcptoon/toon_vendored.py` — vendored from [python-toon](https://github.com/xaviviro/python-toon) v0.1.1 (MIT License, by Xavi Vinaixa).
+
+**Wrapper:** `src/mcptoon/output.py` (`toon_encode()` / `toon_decode()`) — delegates to vendored encoder/decoder with fallback to legacy parser.
 
 - Pure Python stdlib, zero dependencies
-- 429 tests cover encoding, decoding, round-trip safety, edge cases
+- Vendored from python-toon v0.1.1 (MIT License, Copyright (c) Xavi Vinaixa)
+- Spec-compliant with [toon-format/toon](https://github.com/toon-format/toon) v4.1 (25K stars, official TypeScript reference by Johann Schopplich)
+- Non-strict decode mode by default (lenient parsing for real-world MCP outputs)
+- 427+ tests cover encoding, decoding, round-trip safety, edge cases
+- Known minor differences from official spec: empty containers (`{}`/`[]` vs empty string), 3 edge-case decode patterns (keyed tabular form, nested field groups) — all non-blocking for MCP use cases
 
 ---
 
@@ -212,3 +218,4 @@ Reference implementation: `src/mcptoon/output.py` (`toon_encode()` / `toon_decod
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2026-08-17 | Initial SPEC.md. Aligned with toon-format/toon v4.1. Removed Unicode substitutions (v0.3.0). |
+| 1.1 | 2026-08-18 | **Replaced custom encoder with vendored python-toon v0.1.1** (MIT, by Xavi Vinaixa). Now spec-compliant. 47/52 compatibility tests pass (was 35/52). |

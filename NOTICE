@@ -8,6 +8,11 @@ mcptoon supports standard TOON (Token-Oriented Object Notation) as defined
 by the toon-format/toon open spec (https://github.com/toon-format/toon).
 The SLIM format (name|param:type*) is an mcptoon-specific innovation.
 
+TOON encoder/decoder is vendored from python-toon v0.1.1
+(https://github.com/xaviviro/python-toon), Copyright (c) Xavi Vinaixa,
+licensed under the MIT License. See src/mcptoon/toon_vendored.py for
+the full copyright notice and license terms.
+
 If you implement TOON encoding in a derivative work, please reference
 the standard TOON spec. If you implement SLIM format, please:
   1. Attribute the original design to mcptoon

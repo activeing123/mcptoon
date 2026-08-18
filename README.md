@@ -227,7 +227,7 @@ mcptoon completion bash         # shell completion (bash/zsh/fish/ps)
 |---|---|---|
 | `--compact` | Tool names only | **98.5%** vs JSON (tiktoken) |
 | `--slim` | Tool schemas (`name\|param:type*`) | **91%** vs JSON (tiktoken) |
-| `--toon` | Standard TOON (toon-format/toon spec) | **30-60%**, round-trip safe |
+| `--toon` | Spec-compliant TOON (vendored python-toon v0.1.1, toon-format v4.1) | **30-60%**, round-trip safe |
 | `--json` | Standard JSON | Baseline |
 | `--raw` | Raw response | Full size |
 | `--head N` | First N items only | Variable |
@@ -294,7 +294,8 @@ src/mcptoon/
 ├── config.py     # Server config (JSON + TOML)
 ├── manifest.py   # Tool discovery with cache + cross-server search
 ├── discover.py   # Zero-config auto-discovery (4-layer)
-├── output.py     # Standard TOON + legacy mcptoon + compact/slim rendering
+├── output.py     # TOON (vendored python-toon) + legacy mcptoon + compact/slim rendering
+├── toon_vendored.py  # Vendored spec-compliant TOON encoder/decoder (MIT, python-toon v0.1.1)
 ├── cache.py      # Schema cache (5-min TTL)
 ├── usage.py      # Local usage tracking
 └── errors.py     # Structured error envelopes + fix suggestions

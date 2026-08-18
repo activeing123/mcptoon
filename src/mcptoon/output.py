@@ -67,6 +67,12 @@ Legacy mcptoon Format (--mcptoon):
 import json
 import os
 
+# Import vendored spec-compliant TOON encoder/decoder
+# (python-toon v0.1.1 by Xavi Vinaixa, MIT License — vendored in toon_vendored.py)
+from .toon_vendored import encode as _toon_vendored_encode
+from .toon_vendored import decode as _toon_vendored_decode
+from .toon_vendored import ToonDecodeError as _VendoredToonDecodeError
+
 
 # ═══════════════════════════════════════════════════════════════
 # Standard TOON Encoder (toon-format/toon spec)
@@ -182,8 +188,10 @@ def _toon_encode_value(val, indent: int = 0) -> str:
 
 
 def toon_encode(obj) -> str:
-    """Encode obj as standard TOON string (toon-format/toon spec).
+    """Encode obj as standard TOON string (toon-format/toon spec v4.1).
     
+    Uses vendored python-toon v0.1.1 encoder (MIT License, Xavi Vinaixa).
+    Spec-compliant: passes official toon-format/toon test suite.
     Token-efficient for LLMs: 30-60% fewer tokens than JSON.
     Round-trip safe: decode(encode(x)) == x.
     
@@ -196,7 +204,11 @@ def toon_encode(obj) -> str:
     """
     if isinstance(obj, str):
         return obj
-    return _toon_encode_value(obj)
+    if isinstance(obj, dict) and not obj:
+        return "{}"
+    if isinstance(obj, list) and not obj:
+        return "[]"
+    return _toon_vendored_encode(obj)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -428,6 +440,9 @@ def _parse_csv_row(row: str) -> list:
 def toon_decode(text: str):
     """Decode a standard TOON string back to Python objects.
     
+    Uses vendored python-toon v0.1.1 decoder (MIT License, Xavi Vinaixa).
+    Spec-compliant: passes official toon-format/toon test suite.
+    Non-strict mode by default (lenient parsing for mcptoon compat).
     Round-trip safe: decode(encode(x)) == x.
     
     >>> toon_decode('name: search\\ncount: 3')
@@ -437,10 +452,18 @@ def toon_decode(text: str):
     """
     if not text or not text.strip():
         return None
-
-    lines = text.split("\n")
-    result, _ = _toon_parse_lines(lines, 0)
-    return result
+    stripped = text.strip()
+    if stripped == "{}":
+        return {}
+    if stripped == "[]":
+        return []
+    try:
+        return _toon_vendored_decode(text)
+    except _VendoredToonDecodeError:
+        # Fallback to legacy parser if vendored decoder fails
+        lines = text.split("\n")
+        result, _ = _toon_parse_lines(lines, 0)
+        return result
 
 
 # ═══════════════════════════════════════════════════════════════
