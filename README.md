@@ -78,6 +78,30 @@ With mcptoon:      255 tools → 3,511 tokens (SLIM format). 91% savings.
 
 ---
 
+## mcptoon vs your current MCP manager
+
+| | Your current MCP manager | mcptoon |
+|---|---|---|
+| **Agent setup** | Edit `mcpServers` JSON in agent config. One typo breaks everything. | Run `mcptoon` shell commands. No agent config to touch. |
+| **Schema tokens** | All schemas loaded into context on launch. 10 servers = 50K-100K tokens gone. | Zero. Schemas never enter context. Only the compact result you request. |
+| **New agent** | Download agent. Find its config file. Edit JSON. Add servers. Restart. Repeat per agent. | Download agent. Run `mcptoon call`. 1,000 tools ready. That's it. |
+| **Switch agents** | Each agent has its own MCP config format. Migration is manual and painful. | Zero config. Any new agent calls 1,000 tools out of the box. |
+| **Server lifecycle** | All configured servers start on agent launch. Running even when unused. Eating RAM. | Lazy-load. Servers start only when you call a tool. 0 running until needed. |
+| **Add a server** | Find package. Edit JSON. Check syntax. Restart agent. | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
+| **Result size** | Full JSON response enters your context window. | TOON/SLIM encoding. 30-97% smaller than JSON. |
+| **100 servers** | 200K+ tokens of schemas. Context window dead before you start. | 0 token schemas. Context window clean. Tools wait on disk. |
+| **Security** | Depends on the agent. Most have no built-in guards. | Prompt injection guard + credential leak detection + dangerous-op blocker. |
+
+| | |
+|---|---|
+| **39,964** tokens | 255 tool schemas in context (current MCP manager) |
+| **581** tokens | 255 tools via mcptoon `--compact` (98.5% less) |
+| **0** tokens | schemas in context with mcptoon (always) |
+
+**Bottom line:** Your current MCP manager taxes your context window with schemas you might never use. mcptoon keeps tools outside the agent, calls them on demand, and compresses results. Your context window stays yours.
+
+---
+
 ## Install MCP servers — one command each
 
 ```bash

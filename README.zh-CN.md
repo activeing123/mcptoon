@@ -77,6 +77,30 @@ mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令�
 
 ---
 
+## mcptoon 对比你现在的 MCP 管理器
+
+| | 你现在的 MCP 管理器 | mcptoon |
+|---|---|---|
+| **agent 配置** | 在 agent 配置文件里编辑 `mcpServers` JSON。一个拼写错误全挂。 | 跑 `mcptoon` shell 命令。不用碰 agent 配置。 |
+| **schema token** | 启动时所有 schema 加载进上下文。10 个服务器 = 5万-10万 token 没了。 | 零。schema 不进上下文。只有你请求的压缩结果才进。 |
+| **全新 agent** | 下载 agent。找配置文件。编辑 JSON。加服务器。重启。每个 agent 来一遍。 | 下载 agent。跑 `mcptoon call`。1000 个工具秒就绪。完事。 |
+| **切换 agent** | 每个 agent 有自己的 MCP 配置格式。迁移靠手动，疼。 | 无需配置，默认任意全新 agent 直接调用。 |
+| **服务器生命周期** | agent 启动时所有配置的服务器都启动。不用也在跑。吃内存。 | 懒加载。只有调用工具时才启动。调用前 0 个在跑。 |
+| **添加服务器** | 找包名。编辑 JSON。检查语法。重启 agent。 | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
+| **返回结果大小** | 完整 JSON 响应直接进你的上下文窗口。 | TOON/SLIM 编码。比 JSON 小 30-97%。 |
+| **100 个服务器** | 20万+ token 的 schema。还没开始干活上下文就满了。 | 0 token schema。上下文干干净净。工具在磁盘上等着。 |
+| **安全防护** | 看 agent 实现。大多数没有内置防护。 | 提示词注入拦截 + 凭证泄露检测 + 危险操作阻断。 |
+
+| | |
+|---|---|
+| **39,964** token | 255 个工具 schema 进上下文（你现在的 MCP 管理器） |
+| **581** token | 255 个工具用 mcptoon `--compact`（少 98.5%） |
+| **0** token | mcptoon 模式下 schema 占用（永远是 0） |
+
+**一句话：** 你现在的 MCP 管理器拿上下文窗口交 schema 税，不管用不用都得扣。mcptoon 把工具放在 agent 外面，按需调用，压缩结果。你的上下文窗口是你自己的。
+
+---
+
 ## 安装 MCP 服务器——每条一个命令
 
 ```bash
