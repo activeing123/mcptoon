@@ -22,6 +22,8 @@ Implements the TOON spec v4.1 (toon-format/toon).
 Source: python-toon v0.1.1 by Xavi Vinaixa (MIT License)
 """
 
+from __future__ import annotations
+
 import re
 import math
 from datetime import date, datetime
