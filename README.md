@@ -16,7 +16,33 @@ Download a brand-new agent today — it can immediately call all 1,000 MCP tools
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
 
-![Benchmark: 255 tools, 39,964 → 581 tokens (tiktoken-verified)](assets/benchmark.svg)
+</div>
+
+## mcptoon vs your current MCP manager
+
+| | Your current MCP manager | mcptoon |
+|---|---|---|
+| **Agent setup** | Edit `mcpServers` JSON in agent config. One typo breaks everything. | Run `mcptoon` shell commands. No agent config to touch. |
+| **Schema tokens** | All schemas loaded into context on launch. 10 servers = 50K-100K tokens gone. | Zero. Schemas never enter context. Only the compact result you request. |
+| **New agent** | Download agent. Find its config file. Edit JSON. Add servers. Restart. Repeat per agent. | Download agent. Run `mcptoon call`. 1,000 tools ready. That's it. |
+| **Switch agents** | Each agent has its own MCP config format. Migration is manual and painful. | Zero config. Any new agent calls 1,000 tools out of the box. |
+| **Server lifecycle** | All configured servers start on agent launch. Running even when unused. Eating RAM. | Lazy-load. Servers start only when you call a tool. 0 running until needed. |
+| **Add a server** | Find package. Edit JSON. Check syntax. Restart agent. | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
+| **Result size** | Full JSON response enters your context window. | TOON/SLIM encoding. 30-93% smaller than JSON. |
+| **100 servers** | 350K+ tokens of schemas. Context window dead before you start. | 0 token schemas. Context window clean. Tools wait on disk. |
+| **Security** | Depends on the agent. Most have no built-in guards. | Prompt injection guard + credential leak detection + dangerous-op blocker. |
+
+| | |
+|---|---|
+| **90,804** tokens | 255 tool schemas in context (current MCP manager) |
+| **117** tokens | 255 tools via mcptoon `--compact` (99.9% less) |
+| **0** tokens | schemas in context with mcptoon (always) |
+
+**Bottom line:** Your current MCP manager taxes your context window with schemas you might never use. mcptoon keeps tools outside the agent, calls them on demand, and compresses results. Your context window stays yours.
+
+<div align="center">
+
+![Benchmark: 255 tools, 90,804 → 117 tokens (tiktoken cl100k_base)](assets/benchmark.svg)
 
 ![Demo: mcptoon in action](assets/demo.gif)
 
@@ -35,7 +61,7 @@ mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 # See all available tools (117 tokens for 255 tools):
 mcptoon manifest --compact
 
-# Call a tool — output is 30-97% smaller than JSON:
+# Call a tool — output is 30-93% smaller than JSON:
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 ```
 
@@ -63,42 +89,18 @@ Every MCP-enabled agent (Claude Code, Cursor, Codex, etc.) loads **all tool sche
 
 ```
 10 MCP servers → 50,000-100,000+ tokens of JSON schemas → 128K context: 40-80% gone
-100 servers → 200,000+ tokens → context window is dead
+100 servers → 350,000+ tokens → context window is dead
 ```
 
 So you unload servers when not needed. Reload when needed. Repeat. Forever. And adding a new server means hand-editing JSON config files — one syntax error and nothing works.
 
-**mcptoon fixes this.** All your MCP servers stay configured, but their schemas **never enter your agent's context**. Your agent just runs `mcptoon` commands. Only the compact result you request enters context — and TOON encoding makes it 30-97% smaller than JSON.
+**mcptoon fixes this.** All your MCP servers stay configured, but their schemas **never enter your agent's context**. Your agent just runs `mcptoon` commands. Only the compact result you request enters context — and TOON encoding makes it 30-93% smaller than JSON.
 
 ```
-Without mcptoon:  255 tools → 39,964 tokens of schemas in your context (tiktoken-verified)
-With mcptoon:      255 tools → 3,511 tokens (SLIM format). 91% savings.
-                   255 tools → 581 tokens (compact, names only). 98.5% savings.
+Without mcptoon:  255 tools → 90,804 tokens of schemas in your context (tiktoken cl100k_base)
+With mcptoon:      255 tools → 6,174 tokens (SLIM format). 93% savings.
+                   255 tools → 117 tokens (compact, names only). 99.9% savings.
 ```
-
----
-
-## mcptoon vs your current MCP manager
-
-| | Your current MCP manager | mcptoon |
-|---|---|---|
-| **Agent setup** | Edit `mcpServers` JSON in agent config. One typo breaks everything. | Run `mcptoon` shell commands. No agent config to touch. |
-| **Schema tokens** | All schemas loaded into context on launch. 10 servers = 50K-100K tokens gone. | Zero. Schemas never enter context. Only the compact result you request. |
-| **New agent** | Download agent. Find its config file. Edit JSON. Add servers. Restart. Repeat per agent. | Download agent. Run `mcptoon call`. 1,000 tools ready. That's it. |
-| **Switch agents** | Each agent has its own MCP config format. Migration is manual and painful. | Zero config. Any new agent calls 1,000 tools out of the box. |
-| **Server lifecycle** | All configured servers start on agent launch. Running even when unused. Eating RAM. | Lazy-load. Servers start only when you call a tool. 0 running until needed. |
-| **Add a server** | Find package. Edit JSON. Check syntax. Restart agent. | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
-| **Result size** | Full JSON response enters your context window. | TOON/SLIM encoding. 30-97% smaller than JSON. |
-| **100 servers** | 200K+ tokens of schemas. Context window dead before you start. | 0 token schemas. Context window clean. Tools wait on disk. |
-| **Security** | Depends on the agent. Most have no built-in guards. | Prompt injection guard + credential leak detection + dangerous-op blocker. |
-
-| | |
-|---|---|
-| **39,964** tokens | 255 tool schemas in context (current MCP manager) |
-| **581** tokens | 255 tools via mcptoon `--compact` (98.5% less) |
-| **0** tokens | schemas in context with mcptoon (always) |
-
-**Bottom line:** Your current MCP manager taxes your context window with schemas you might never use. mcptoon keeps tools outside the agent, calls them on demand, and compresses results. Your context window stays yours.
 
 ---
 
@@ -170,19 +172,19 @@ mcptoon call github search_repos '{"query":"mcp"}' --toon
 
 ## The numbers
 
-### Token savings (255 tools, tiktoken-verified)
+### Token savings (255 tools, tiktoken cl100k_base)
 
 All numbers from `tiktoken.get_encoding("cl100k_base")` — OpenAI's official BPE tokenizer.
 
 | Tools | JSON | TOON | SLIM | Compact |
 |-------|------|------|------|---------|
-| 5 | 785 | 410 (-48%) | 69 (-91%) | 12 (-98%) |
-| 50 | 7,832 | 3,940 (-50%) | 688 (-91%) | 117 (-99%) |
-| 255 | **39,964** | **19,980 (-50%)** | **3,511 (-91%)** | **581 (-98.5%)** |
+| 5 | 1,897 | 1,167 (-39%) | 111 (-94%) | 16 (-99%) |
+| 50 | 17,790 | 10,688 (-40%) | 1,203 (-93%) | 117 (-99%) |
+| 255 | **90,804** | **54,649 (-40%)** | **6,174 (-93%)** | **117 (-99.9%)** |
 
-- `--compact` → tool names only: **98.5% savings** (tiktoken cl100k_base)
-- `--slim` → tool schemas with params: **91% savings** (tiktoken cl100k_base)
-- `--toon` → structured results (round-trip safe): **30-60% savings**
+- `--compact` → tool names only: **99.9% savings** (tiktoken cl100k_base)
+- `--slim` → tool schemas with params: **93% savings** (tiktoken cl100k_base)
+- `--toon` → structured results (round-trip safe): **30-40% savings**
 
 <details>
 <summary><b>What is TOON? Why does mcptoon use it?</b></summary>
@@ -193,10 +195,10 @@ All numbers from `tiktoken.get_encoding("cl100k_base")` — OpenAI's official BP
 
 | Format | Problem for LLMs |
 |--------|-----------------|
-| JSON | Braces `{}`, brackets `[]`, quotes `""`, commas — each is a separate BPE token. 255 tool schemas = ~40K tokens. |
+| JSON | Braces `{}`, brackets `[]`, quotes `""`, commas — each is a separate BPE token. 255 tool schemas = ~91K tokens. |
 | YAML | Indentation-sensitive, hard for LLMs to generate correctly, no array length hints. |
 | CSV | No nesting, no key-value pairs, no type information. |
-| TOON | YAML-style keys + CSV-style arrays + length hints `[N]` + type literals. 30-60% fewer tokens than JSON. |
+| TOON | YAML-style keys + CSV-style arrays + length hints `[N]` + type literals. 30-40% fewer tokens than JSON. |
 
 **What mcptoon uses from TOON spec v4.1:**
 
@@ -230,15 +232,15 @@ The official Python implementation ([toon-format/toon-python](https://github.com
 
 | Format | Origin | Use case | Savings |
 |--------|--------|----------|---------|
-| `--toon` | Open spec (toon-format/toon v4.1) | General structured output, round-trip safe | 30-60% vs JSON |
-| `--slim` | mcptoon-specific | Tool schemas only (`name\|param:type*`) | 91% vs JSON |
-| `--compact` | mcptoon-specific | Tool names only | 98.5% vs JSON |
+| `--toon` | Open spec (toon-format/toon v4.1) | General structured output, round-trip safe | 30-40% vs JSON |
+| `--slim` | mcptoon-specific | Tool schemas only (`name\|param:type*`) | 93% vs JSON |
+| `--compact` | mcptoon-specific | Tool names only | 99.9% vs JSON |
 
 SLIM and Compact are **not** part of the TOON spec. They are mcptoon-specific optimizations for tool discovery. TOON is the general-purpose format for tool call results.
 
 </details>
 
-Reproduce: `python _benchmark.py` → outputs `assets/benchmark_data.json`
+Reproduce: `pip install tiktoken && python _benchmark.py` → outputs `assets/benchmark_data.json`
 
 ### Before vs after — concrete example
 
@@ -303,9 +305,9 @@ mcptoon completion bash         # shell completion (bash/zsh/fish/ps)
 
 | Flag | What you get | Token savings |
 |---|---|---|
-| `--compact` | Tool names only | **98.5%** vs JSON (tiktoken) |
-| `--slim` | Tool schemas (`name\|param:type*`) | **91%** vs JSON (tiktoken) |
-| `--toon` | Spec-compliant TOON (vendored python-toon v0.1.1, toon-format v4.1) | **30-60%**, round-trip safe |
+| `--compact` | Tool names only | **99.9%** vs JSON (tiktoken) |
+| `--slim` | Tool schemas (`name\|param:type*`) | **93%** vs JSON (tiktoken) |
+| `--toon` | Spec-compliant TOON (vendored python-toon v0.1.1, toon-format v4.1) | **30-40%**, round-trip safe |
 | `--json` | Standard JSON | Baseline |
 | `--raw` | Raw response | Full size |
 | `--head N` | First N items only | Variable |
@@ -379,7 +381,7 @@ src/mcptoon/
 └── errors.py     # Structured error envelopes + fix suggestions
 ```
 
-~5,300 lines. 427 tests. Zero third-party imports. ~250KB source.
+~6,400 lines. 427 tests. Zero third-party imports. ~250KB source.
 
 ## Docker
 

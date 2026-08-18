@@ -4,19 +4,45 @@
 
 **本地装 1,000 个 MCP 工具。token 不浪费，配置不用管，换 Agent 不用重来。**
 
-mcptoon 站在你的 AI Agent 和 MCP 服务器之间。装 1,000 个工具——上下文窗口还是空的。工具 schema 永远不进上下文，只有你要的紧凑结果会进去，而且比 JSON 小 30-97%。一个配置文件通吃所有 Agent。换 Agent，配置跟着走。删掉 mcptoon，服务器照常运行。
+mcptoon 站在你的 AI Agent 和 MCP 服务器之间。装 1,000 个工具——上下文窗口还是空的。工具 schema 永远不进上下文，只有你要的紧凑结果会进去，而且比 JSON 小 30-93%。一个配置文件通吃所有 Agent。换 Agent，配置跟着走。删掉 mcptoon，服务器照常运行。
 
-**工具是你自己的。** mcptoon 不搄带任何服务器——只是一个 200KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。
+**工具是你自己的。** mcptoon 不携带任何服务器——只是一个 ~250KB 的 CLI。你按需从 npm/pip/HTTP 添加想要的服务器，一条命令加一个。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/mcptoon/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/依赖-零-orange)](#隐私)
-[![Tests](https://img.shields.io/badge/Tests-429%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-427%20passed-brightgreen)](#贡献)
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)
 
-![Benchmark: 255 tools, 90,804 → 117 tokens](assets/benchmark.svg)
+</div>
+
+## mcptoon 对比你现在的 MCP 管理器
+
+| | 你现在的 MCP 管理器 | mcptoon |
+|---|---|---|
+| **agent 配置** | 在 agent 配置文件里编辑 `mcpServers` JSON。一个拼写错误全挂。 | 跑 `mcptoon` shell 命令。不用碰 agent 配置。 |
+| **schema token** | 启动时所有 schema 加载进上下文。10 个服务器 = 5万-10万 token 没了。 | 零。schema 不进上下文。只有你请求的压缩结果才进。 |
+| **全新 agent** | 下载 agent。找配置文件。编辑 JSON。加服务器。重启。每个 agent 来一遍。 | 下载 agent。跑 `mcptoon call`。1000 个工具秒就绪。完事。 |
+| **切换 agent** | 每个 agent 有自己的 MCP 配置格式。迁移靠手动，疼。 | 无需配置，默认任意全新 agent 直接调用。 |
+| **服务器生命周期** | agent 启动时所有配置的服务器都启动。不用也在跑。吃内存。 | 懒加载。只有调用工具时才启动。调用前 0 个在跑。 |
+| **添加服务器** | 找包名。编辑 JSON。检查语法。重启 agent。 | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
+| **返回结果大小** | 完整 JSON 响应直接进你的上下文窗口。 | TOON/SLIM 编码。比 JSON 小 30-93%。 |
+| **100 个服务器** | 35万+ token 的 schema。还没开始干活上下文就满了。 | 0 token schema。上下文干干净净。工具在磁盘上等着。 |
+| **安全防护** | 看 agent 实现。大多数没有内置防护。 | 提示词注入拦截 + 凭证泄露检测 + 危险操作阻断。 |
+
+| | |
+|---|---|
+| **90,804** token | 255 个工具 schema 进上下文（你现在的 MCP 管理器） |
+| **117** token | 255 个工具用 mcptoon `--compact`（少 99.9%） |
+| **0** token | mcptoon 模式下 schema 占用（永远是 0） |
+
+**一句话：** 你现在的 MCP 管理器拿上下文窗口交 schema 税，不管用不用都得扣。mcptoon 把工具放在 agent 外面，按需调用，压缩结果。你的上下文窗口是你自己的。
+
+<div align="center">
+
+![Benchmark: 255 tools, 90,804 → 117 tokens (tiktoken cl100k_base)](assets/benchmark.svg)
 
 ![Demo: mcptoon in action](assets/demo.gif)
 
@@ -27,7 +53,7 @@ mcptoon 站在你的 AI Agent 和 MCP 服务器之间。装 1,000 个工具—�
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 零依赖，200KB
+pip install mcptoon                          # 零依赖，~250KB
 
 # 添加任意 MCP 服务器——一条命令：
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
@@ -35,7 +61,7 @@ mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
 # 查看所有可用工具（255 个工具只需 117 token）：
 mcptoon manifest --compact
 
-# 调用工具——输出比 JSON 小 30-97%：
+# 调用工具——输出比 JSON 小 30-93%：
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 ```
 
@@ -63,41 +89,18 @@ mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令�
 
 ```
 10 个 MCP 服务器 → 50,000-100,000+ token 的 JSON schema → 128K 上下文：40-80% 没了
-100 个服务器 → 200,000+ token → 上下文窗口死了
+100 个服务器 → 350,000+ token → 上下文窗口死了
 ```
 
 于是你不用的时候卸载服务器，用的时候再加载。来回折腾。想加个新服务器还得手写 JSON 配置——少个逗号就全崩了。
 
-**mcptoon 解决这个问题。** 你的 MCP 服务器都配着，但它们的 schema **永远不进 Agent 的上下文**。Agent 只跑 `mcptoon` 命令，只有你要的紧凑结果进上下文——TOON 编码让它比 JSON 小 30-97%。
+**mcptoon 解决这个问题。** 你的 MCP 服务器都配着，但它们的 schema **永远不进 Agent 的上下文**。Agent 只跑 `mcptoon` 命令，只有你要的紧凑结果进上下文——TOON 编码让它比 JSON 小 30-93%。
 
 ```
-不用 mcptoon：255 个工具 → 90,804 token 的 schema 占满上下文
-用 mcptoon：  255 个工具 → 117 token。省了 99.87%。
+不用 mcptoon：255 个工具 → 90,804 token 的 schema 占满上下文（tiktoken cl100k_base）
+用 mcptoon：  255 个工具 → 6,174 token（SLIM 格式）。省了 93%。
+             255 个工具 → 117 token（compact，仅工具名）。省了 99.9%。
 ```
-
----
-
-## mcptoon 对比你现在的 MCP 管理器
-
-| | 你现在的 MCP 管理器 | mcptoon |
-|---|---|---|
-| **agent 配置** | 在 agent 配置文件里编辑 `mcpServers` JSON。一个拼写错误全挂。 | 跑 `mcptoon` shell 命令。不用碰 agent 配置。 |
-| **schema token** | 启动时所有 schema 加载进上下文。10 个服务器 = 5万-10万 token 没了。 | 零。schema 不进上下文。只有你请求的压缩结果才进。 |
-| **全新 agent** | 下载 agent。找配置文件。编辑 JSON。加服务器。重启。每个 agent 来一遍。 | 下载 agent。跑 `mcptoon call`。1000 个工具秒就绪。完事。 |
-| **切换 agent** | 每个 agent 有自己的 MCP 配置格式。迁移靠手动，疼。 | 无需配置，默认任意全新 agent 直接调用。 |
-| **服务器生命周期** | agent 启动时所有配置的服务器都启动。不用也在跑。吃内存。 | 懒加载。只有调用工具时才启动。调用前 0 个在跑。 |
-| **添加服务器** | 找包名。编辑 JSON。检查语法。重启 agent。 | `mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch` |
-| **返回结果大小** | 完整 JSON 响应直接进你的上下文窗口。 | TOON/SLIM 编码。比 JSON 小 30-97%。 |
-| **100 个服务器** | 20万+ token 的 schema。还没开始干活上下文就满了。 | 0 token schema。上下文干干净净。工具在磁盘上等着。 |
-| **安全防护** | 看 agent 实现。大多数没有内置防护。 | 提示词注入拦截 + 凭证泄露检测 + 危险操作阻断。 |
-
-| | |
-|---|---|
-| **39,964** token | 255 个工具 schema 进上下文（你现在的 MCP 管理器） |
-| **581** token | 255 个工具用 mcptoon `--compact`（少 98.5%） |
-| **0** token | mcptoon 模式下 schema 占用（永远是 0） |
-
-**一句话：** 你现在的 MCP 管理器拿上下文窗口交 schema 税，不管用不用都得扣。mcptoon 把工具放在 agent 外面，按需调用，压缩结果。你的上下文窗口是你自己的。
 
 ---
 
@@ -169,19 +172,75 @@ mcptoon call github search_repos '{"query":"mcp"}' --toon
 
 ## 数据
 
-### Token 节省（255 个工具，5 种格式）
+### Token 节省（255 个工具，tiktoken cl100k_base）
+
+所有数据来自 `tiktoken.get_encoding("cl100k_base")`——OpenAI 官方 BPE 分词器。
 
 | 工具数 | JSON | TOON | SLIM | Compact |
 |-------|------|------|------|---------|
-| 5 | 1,897 | 981 (-48%) | 111 (-94%) | 16 (-99%) |
-| 50 | 17,790 | 8,776 (-51%) | 1,203 (-93%) | 117 (-99%) |
-| 255 | **90,804** | **44,863 (-51%)** | **6,174 (-93%)** | **117 (-100%)** |
+| 5 | 1,897 | 1,167 (-39%) | 111 (-94%) | 16 (-99%) |
+| 50 | 17,790 | 10,688 (-40%) | 1,203 (-93%) | 117 (-99%) |
+| 255 | **90,804** | **54,649 (-40%)** | **6,174 (-93%)** | **117 (-99.9%)** |
 
-- `--compact` → 工具名：**省 97-100%**
+- `--compact` → 工具名：**省 99.9%**
 - `--slim` → 工具 schema 带参数：**省 93%**
-- `--toon` → 结构化结果（可逆）：**省 30-60%**
+- `--toon` → 结构化结果（可逆）：**省 30-40%**
 
-复现：`python _benchmark.py` → 输出 `assets/benchmark_data.json`
+<details>
+<summary><b>什么是 TOON？mcptoon 为什么用 TOON？</b></summary>
+
+**TOON (Token-Oriented Object Notation)** 是一个开放数据格式规范，由 [Johann Schopplich](https://github.com/johannschopplich) 创建（[toon-format/toon](https://github.com/toon-format/toon)，25K+ stars）。专为减少结构化数据喂给 LLM 时的 token 消耗而设计。
+
+**为什么用 TOON 而不是 JSON/YAML/CSV？**
+
+| 格式 | 对 LLM 的问题 |
+|--------|-----------------|
+| JSON | 花括号 `{}`、方括号 `[]`、引号 `""`、逗号——每个都是独立的 BPE token。255 个工具 schema = ~91K token。 |
+| YAML | 缩进敏感，LLM 难以正确生成，没有数组长度提示。 |
+| CSV | 不能嵌套，没有键值对，没有类型信息。 |
+| TOON | YAML 风格键 + CSV 风格数组 + 长度提示 `[N]` + 类型字面量。比 JSON 少 30-40% token。 |
+
+**mcptoon 使用了 TOON spec v4.1 的哪些部分：**
+
+| 特性 | 用了？ | 示例 |
+|---------|-------|---------|
+| YAML 风格对象 (`key: value`) | ✅ | `name: search` |
+| 表格数组 (`[N,]{fields}: rows`) | ✅ | `[2,]{id,name}:\n  1,Alice\n  2,Bob` |
+| 内联标量数组 (`key[N]: v1,v2,v3`) | ✅ | `tags[3]: ai,ml,nlp` |
+| 嵌套对象（缩进） | ✅ | `config:\n  host: localhost` |
+| 类型字面量 (`true`/`false`/`null`) | ✅ | `active: true` |
+| 字符串引号（仅在需要时） | ✅ | `desc: "hello, world"` |
+| 反斜杠转义（引号字符串内） | ✅ | `desc: "say \\"hi\\""` |
+| 长度标记（`#` 前缀） | ❌ 不需要 | — |
+| 管道/制表符分隔符 | ❌ 不需要 | 只用逗号分隔符 |
+| 根标量值 | ❌ 不需要 | MCP 数据总是对象/数组 |
+
+**兼容性：**
+
+- 编码器/解码器：**从 [python-toon](https://github.com/xaviviro/python-toon) v0.1.1 vendor**（MIT 许可证，作者 Xavi Vinaixa）——规范兼容实现
+- 官方 TypeScript 参考实现：[toon-format/toon](https://github.com/toon-format/toon)（25K+ stars）
+- 可逆：`decode(encode(x)) == x`，对所有 JSON 可序列化数据成立
+- 非严格解码模式（对真实 MCP 输出的宽松解析）
+- **已知细微差异：** 空容器输出 `{}`/`[]`（而规范输出空字符串）；3 个边界解码模式（键表格形式、嵌套字段组）——对 MCP 使用场景无影响
+- 47/52 兼容性测试通过官方规范
+
+**为什么不直接用官方 `toon-format` PyPI 包？**
+
+官方 Python 实现（[toon-format/toon-python](https://github.com/toon-format/toon-python)）目前处于 beta 阶段——编码器会抛出 `NotImplementedError`。我们 vendor 了社区实现（`python-toon`，作者 Xavi Vinaixa），它是可用的且规范兼容的。等官方 Python 编码器稳定后我们会切换。
+
+**TOON vs SLIM vs Compact——有什么区别？**
+
+| 格式 | 来源 | 用途 | 节省 |
+|--------|--------|----------|---------|
+| `--toon` | 开放规范 (toon-format/toon v4.1) | 通用结构化输出，可逆 | 比 JSON 少 30-40% |
+| `--slim` | mcptoon 专用 | 仅工具 schema (`name\|param:type*`) | 比 JSON 少 93% |
+| `--compact` | mcptoon 专用 | 仅工具名 | 比 JSON 少 99.9% |
+
+SLIM 和 Compact **不是** TOON 规范的一部分。它们是 mcptoon 专用的工具发现优化。TOON 是工具调用结果的通用格式。
+
+</details>
+
+复现：`pip install tiktoken && python _benchmark.py` → 输出 `assets/benchmark_data.json`
 
 ### 对比实例
 
@@ -246,9 +305,9 @@ mcptoon completion bash         # Shell 补全（bash/zsh/fish/ps）
 
 | Flag | 输出 | 节省 |
 |---|---|---|
-| `--compact` | 仅工具名 | 比 JSON **省 98.5%** (tiktoken) |
-| `--slim` | 工具 schema (`name\|param:type*`) | 比 JSON **省 91%** (tiktoken) |
-| `--toon` | 标准 TOON (toon-format/toon 规范) | 比 JSON **省 30-60%**，可逆 |
+| `--compact` | 仅工具名 | 比 JSON **省 99.9%** (tiktoken) |
+| `--slim` | 工具 schema (`name\|param:type*`) | 比 JSON **省 93%** (tiktoken) |
+| `--toon` | 标准 TOON (vendored python-toon v0.1.1, toon-format v4.1) | 比 JSON **省 30-40%**，可逆 |
 | `--json` | 标准 JSON | 基准线 |
 | `--raw` | 原始响应 | 全量 |
 | `--head N` | 仅前 N 条 | 可变 |
@@ -274,7 +333,7 @@ mcptoon 是 **CLI 工具**，不是 MCP 客户端库，也不是 MCP Server。�
 **两层解耦：**
 
 ```
-第 1 层: mcptoon CLI (~200KB, 零依赖)
+第 1 层: mcptoon CLI (~250KB, 零依赖)
          在 Agent 的 shell 里运行。schema 永远不进上下文。
                     │
 第 2 层: 实际 MCP 服务器 (npm/pip 包)
@@ -282,7 +341,7 @@ mcptoon 是 **CLI 工具**，不是 MCP 客户端库，也不是 MCP Server。�
 ```
 
 - 1,000 个服务器配好 → 0 个在运行，直到你用其中一个
-- mcptoon 不搄带任何服务器——你加你想要的，一条命令加一个
+- mcptoon 不携带任何服务器——你加你想要的，一条命令加一个
 - 删掉 mcptoon？你的 MCP 服务器照常独立运行
 
 ---
@@ -315,13 +374,14 @@ src/mcptoon/
 ├── config.py     # 服务器配置 (JSON + TOML)
 ├── manifest.py   # 工具发现 + 跨服务器搜索
 ├── discover.py   # 零配置自动发现 (4 层)
-├── output.py     # 标准 TOON + compact/slim 渲染
+├── output.py     # 标准 TOON (vendored python-toon) + compact/slim 渲染
+├── toon_vendored.py  # Vendored 规范兼容 TOON 编码器/解码器 (MIT, python-toon v0.1.1)
 ├── cache.py      # Schema 缓存 (5分钟 TTL)
 ├── usage.py      # 本地用量统计
 └── errors.py     # 结构化错误 + 修复建议
 ```
 
-约 4500 行。429 个测试。零第三方 import。约 200KB 源码。
+约 6,400 行。427 个测试。零第三方 import。约 250KB 源码。
 
 ## Docker
 
@@ -340,7 +400,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 429 个测试, 0.5s
+python -m pytest tests/ -v   # 427 个测试, 0.5s
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
