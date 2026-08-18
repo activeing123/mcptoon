@@ -26,7 +26,7 @@ import re
 import math
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 # ═══════════════════════════════════════════════════════════════
 # Constants
@@ -62,10 +62,10 @@ DEFAULT_DELIMITER = DELIMITERS["comma"]
 # Types
 # ═══════════════════════════════════════════════════════════════
 
-JsonPrimitive = Union[str, int, float, bool, None]
-JsonObject = Dict[str, Any]
-JsonArray = List[Any]
-JsonValue = Union[JsonPrimitive, JsonArray, JsonObject]
+JsonPrimitive = str | int | float | bool | None
+JsonObject = dict[str, Any]
+JsonArray = list[Any]
+JsonValue = JsonPrimitive | JsonArray | JsonObject
 
 Delimiter = str
 Depth = int
@@ -219,9 +219,7 @@ def format_header(key, length, fields, delimiter, length_marker):
     fields_str = ""
     if fields:
         fields_str = f"{OPEN_BRACE}{delimiter.join(fields)}{CLOSE_BRACE}"
-    if fields:
-        length_str = f"{OPEN_BRACKET}{marker_prefix}{length}{delimiter}{CLOSE_BRACKET}"
-    elif delimiter != COMMA:
+    if fields or delimiter != COMMA:
         length_str = f"{OPEN_BRACKET}{marker_prefix}{length}{delimiter}{CLOSE_BRACKET}"
     else:
         length_str = f"{OPEN_BRACKET}{marker_prefix}{length}{CLOSE_BRACKET}"
