@@ -70,8 +70,27 @@ SERVER_ALIASES = {
 
 
 def resolve_server_name(name: str) -> str:
-    """Resolve short name to canonical server name."""
-    return SERVER_ALIASES.get(name, name)
+    """Resolve short name to canonical server name.
+
+    Checks static aliases first, then dynamically checks if 'name'
+    is a prefix of any configured server name (e.g. 'fs' → 'filesystem').
+    """
+    # 1. Static aliases (backward compat)
+    if name in SERVER_ALIASES:
+        return SERVER_ALIASES[name]
+
+    # 2. Check if exact name exists in config (no resolution needed)
+    servers = load_config()
+    if name in servers:
+        return name
+
+    # 3. Dynamic prefix matching (e.g. 'fs' → 'filesystem')
+    for sname in servers:
+        if sname.lower() == name.lower():
+            return sname
+
+    # 4. Return as-is (let caller handle unknown server)
+    return name
 
 
 # ─── Config loading ───

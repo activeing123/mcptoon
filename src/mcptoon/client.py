@@ -175,10 +175,32 @@ class MCPClient:
             except Exception:
                 try:
                     self._proc.kill()
+                    self._proc.wait(timeout=1)
                 except Exception:
                     pass
-            self._proc = None
+            finally:
+                self._proc = None
         self._initialized = False
+
+    def _reconnect_if_dead(self):
+        """Check if stdio process is dead and try to reconnect.
+
+        Called before each request. If process has exited, restarts it.
+        """
+        if self._transport != "stdio":
+            return
+        if self._proc is None:
+            # Not started yet — spawn
+            self._spawn_stdio()
+            self._initialized = False
+            return
+        if self._proc.poll() is not None:
+            # Process has exited — restart
+            _log_fn = lambda msg: None  # no-op logger
+            self._proc = None
+            self._initialized = False
+            self._tools_cache = []  # Clear cache on reconnect
+            self._spawn_stdio()
 
     def __enter__(self):
         self.initialize()
@@ -223,7 +245,10 @@ class MCPClient:
         )
 
     def _stdio_request(self, payload: bytes) -> dict:
-        """Send JSON-RPC request over stdin, read response from stdout."""
+        """Send JSON-RPC request over stdin, read response from stdout.
+
+        Handles multi-line responses and skips notification lines.
+        """
         with self._stdout_lock:
             assert self._proc is not None
             assert self._proc.stdin is not None
@@ -232,16 +257,34 @@ class MCPClient:
             self._proc.stdin.write(payload + b"\n")
             self._proc.stdin.flush()
 
-            # Read one line (one JSON-RPC response)
-            line = self._proc.stdout.readline()
-            if not line:
-                # Process may have died — check stderr
-                stderr = ""
-                if self._proc.stderr:
-                    stderr = self._proc.stderr.read().decode("utf-8", errors="replace")[:500]
-                raise MCPError("PROCESS_DIED", f"MCP server process exited. stderr: {stderr}")
+            # Read lines until we get a valid JSON-RPC response (has "id")
+            # Skip notifications (lines without "id" field)
+            while True:
+                line = self._proc.stdout.readline()
+                if not line:
+                    # Process may have died — check stderr
+                    stderr = ""
+                    if self._proc.stderr:
+                        stderr = self._proc.stderr.read().decode("utf-8", errors="replace")[:500]
+                    raise MCPError("PROCESS_DIED", f"MCP server process exited. stderr: {stderr}")
 
-            return self._parse_json_line(line)
+                text = line.decode("utf-8", errors="replace").strip()
+                if not text:
+                    continue
+
+                try:
+                    msg = json.loads(text)
+                except json.JSONDecodeError:
+                    # Could be a partial line or debug output — skip
+                    continue
+
+                # Skip notifications (no "id" field)
+                if isinstance(msg, dict) and "id" not in msg:
+                    continue
+
+                return msg
+
+            raise MCPError("EMPTY_RESPONSE", "No response received")
 
     def _stdio_notify(self, payload: bytes):
         """Send notification (no response expected) over stdio."""
@@ -255,7 +298,13 @@ class MCPClient:
     # ═══════════════════════════════════════════════════
 
     def _http_request(self, payload: bytes, timeout: float | None = None) -> dict:
-        """POST JSON-RPC to HTTP endpoint, handle SSE or JSON response."""
+        """POST JSON-RPC to HTTP endpoint, handle SSE/Streamable HTTP/JSON response.
+
+        Supports:
+          - Plain JSON response (Content-Type: application/json)
+          - SSE stream (Content-Type: text/event-stream) — both old and Streamable HTTP
+          - Streamable HTTP with Mcp-Session-Id header
+        """
         req = urllib.request.Request(self._http_url, data=payload, method="POST")
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "application/json, text/event-stream")
@@ -272,17 +321,33 @@ class MCPClient:
             resp = opener.open(req, timeout=timeout or self._timeout)
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
+            # Try to parse as JSON error
+            try:
+                err_data = json.loads(body)
+                if isinstance(err_data, dict) and "error" in err_data:
+                    return err_data
+            except (json.JSONDecodeError, ValueError):
+                pass
             raise MCPError("HTTP_ERROR", f"HTTP {e.code}: {body[:300]}", retry=e.code >= 500) from e
         except urllib.error.URLError as e:
             raise MCPError("CONNECTION_ERROR", str(e.reason)[:200], retry=True) from e
 
-        # Save session ID from response headers
+        # Save session ID from response headers (Streamable HTTP)
         new_sid = resp.headers.get("Mcp-Session-Id", "")
         if new_sid:
             self._session_id = new_sid
 
-        body = resp.read().decode("utf-8", errors="replace")
-        return self._parse_http_body(body)
+        # Check content type for SSE vs JSON
+        content_type = resp.headers.get("Content-Type", "")
+
+        if "text/event-stream" in content_type:
+            # SSE stream — read all events and find the response
+            body = resp.read().decode("utf-8", errors="replace")
+            return self._parse_http_body(body)
+        else:
+            # Plain JSON response
+            body = resp.read().decode("utf-8", errors="replace")
+            return self._parse_http_body(body)
 
     def _http_notify(self, payload: bytes):
         """Send notification over HTTP (fire-and-forget)."""
@@ -305,6 +370,10 @@ class MCPClient:
 
     def _request(self, method: str, params: dict, timeout: float | None = None) -> dict:
         """Send a JSON-RPC request and return the result."""
+        # Auto-reconnect if stdio process died
+        if self._transport == "stdio":
+            self._reconnect_if_dead()
+
         msg = {
             "jsonrpc": "2.0",
             "id": _next_id(),
@@ -363,7 +432,14 @@ class MCPClient:
 
     @staticmethod
     def _parse_http_body(body: str) -> dict:
-        """Parse HTTP response — handles SSE (data: lines) and plain JSON."""
+        """Parse HTTP response — handles SSE (data: lines) and plain JSON.
+
+        Also handles Streamable HTTP where response may include
+        multiple SSE events (notifications + final response).
+        Returns the last valid JSON-RPC response found.
+        """
+        last_result = None
+
         # SSE format: lines starting with "data: "
         for line in body.split("\n"):
             s = line.strip()
@@ -371,9 +447,17 @@ class MCPClient:
                 try:
                     d = json.loads(s[6:])
                     if isinstance(d, dict):
-                        return d
+                        # Keep the last response with a result or error
+                        if "result" in d or "error" in d:
+                            last_result = d
+                        # Also accept if it has an id (could be a response)
+                        elif "id" in d and "method" not in d:
+                            last_result = d
                 except json.JSONDecodeError:
                     continue
+
+        if last_result is not None:
+            return last_result
 
         # Plain JSON
         try:
@@ -444,20 +528,38 @@ class MCPClientPool:
         self._lock = threading.Lock()
 
     def _get_client(self, name: str) -> MCPClient:
-        """Get or create a client for server name."""
-        if name in self._clients:
-            return self._clients[name]
+        """Get or create a client for server name.
 
+        Thread-safe: uses lock only for dict access, NOT for initialize().
+        This allows parallel server initialization across different servers.
+        Resource-safe: if two threads create clients for the same server,
+        the losing client is properly closed.
+        """
+        # Fast path: already connected
+        cached = self._clients.get(name)
+        if cached is not None:
+            return cached
+
+        # Check config
+        cfg = self._servers.get(name)
+        if not cfg:
+            raise MCPError("UNKNOWN_SERVER", f"Server '{name}' not in config")
+
+        # Create client (no lock needed — each thread creates its own)
+        client = self._make_client(cfg)
+        client.initialize()
+
+        # Store in pool (lock only for dict write)
         with self._lock:
+            # Double-check: another thread may have connected in parallel
             if name in self._clients:
+                # Another thread won; close ours properly
+                try:
+                    client.close()
+                except Exception:
+                    # Best-effort cleanup — don't let close() failure leak resources
+                    pass
                 return self._clients[name]
-
-            cfg = self._servers.get(name)
-            if not cfg:
-                raise MCPError("UNKNOWN_SERVER", f"Server '{name}' not in config")
-
-            client = self._make_client(cfg)
-            client.initialize()
             self._clients[name] = client
             return client
 

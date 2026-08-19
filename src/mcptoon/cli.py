@@ -179,6 +179,10 @@ def main():
         _cmd_install(rest, fmt)
     elif command == "completion":
         _cmd_completion(rest)
+    elif command == "serve":
+        _cmd_serve(rest)
+    elif command == "demo":
+        _cmd_demo(rest)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -1143,7 +1147,44 @@ def _cmd_install(rest, fmt):
         print(output.render(result, fmt=fmt))
         return
 
-    print("Usage: mcptoon install <name> [--npm <pkg>] [--pip <pkg>] [--url <url>] [--list] [--remove <name>]")
+    # mcptoon install --search <keyword>  → search registry
+    if server_name and server_name == "--search":
+        # This shouldn't happen (handled above), but just in case
+        pass
+
+    # mcptoon install <name>  (no --npm/--pip/--url) → auto-search & install
+    if server_name and not server_name.startswith("--"):
+        from .installer import install_by_name, search_registry
+        # First: show search results
+        results = search_registry(server_name)
+        if not results:
+            print(f"  ❌ No MCP server found matching '{server_name}'.")
+            print(f"  Try: mcptoon install {server_name} --npm <package>")
+            print(f"  Or:  mcptoon install {server_name} --pip <package>")
+            return
+        # If multiple results, show them
+        if len(results) > 1:
+            print(f"  Found {len(results)} servers matching '{server_name}':")
+            for i, r in enumerate(results[:10]):
+                name = r.get("name", "")
+                desc = r.get("description", "")[:60]
+                src = r.get("source", "")
+                print(f"    {i+1}. {name} ({src}) — {desc}")
+            print(f"\n  Installing best match: {results[0].get('name', server_name)}")
+        else:
+            print(f"  Found: {results[0].get('name', server_name)} — {results[0].get('description', '')[:80]}")
+
+        result = install_by_name(server_name)
+        print(output.render(result, fmt=fmt))
+        return
+
+    print("Usage:")
+    print("  mcptoon install <name>              # Auto-search & install from registry")
+    print("  mcptoon install <name> --npm <pkg>  # Install from npm")
+    print("  mcptoon install <name> --pip <pkg>  # Install from pip")
+    print("  mcptoon install <name> --url <url>  # Install HTTP/SSE MCP")
+    print("  mcptoon install --list              # List installed servers")
+    print("  mcptoon install --remove <name>      # Remove an installed server")
 
 
 # ═══════════════════════════════════════════════════
@@ -1317,6 +1358,9 @@ Usage:
     mcptoon install --list               List installed servers
     mcptoon install --remove <name>      Remove an installed server
 
+    mcptoon serve                        Run as MCP server (stdio bridge for agents)
+    mcptoon demo                         Zero-config one-command demo
+
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
@@ -1346,3 +1390,19 @@ Environment:
 
 Config: ~/.mcptoon/config.json
 """)
+
+
+# ═══════════════════════════════════════════════════
+# New commands (v0.6+)
+# ═══════════════════════════════════════════════════
+
+def _cmd_serve(rest):
+    """Run as MCP server (stdio bridge for agents)."""
+    from .serve import run_serve
+    run_serve(rest)
+
+
+def _cmd_demo(rest):
+    """Zero-config one-command demo."""
+    from .demo import run_demo
+    run_demo(rest)

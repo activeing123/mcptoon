@@ -210,7 +210,9 @@ class TestSearchRegistry(unittest.TestCase):
     def test_search_network_error(self, mock_urlopen):
         mock_urlopen.side_effect = Exception("Network error")
         result = search_registry("test")
-        self.assertTrue("_error" in result or "error" in result)
+        # Network errors now return empty list (graceful degradation)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 0)
 
 
 class TestCLiInstallCommand(unittest.TestCase):

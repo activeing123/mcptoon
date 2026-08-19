@@ -184,6 +184,30 @@ def _check_credential_leak(result: Any) -> str | None:
     return None
 
 
+# ─── Global pool reuse (avoids re-spawning subprocesses on every call) ───
+_global_pool: MCPClientPool | None = None
+_global_pool_config: dict | None = None
+
+
+def _get_pool() -> MCPClientPool:
+    """Get or create a global MCPClientPool.
+
+    Reuses the pool across calls in the same process.
+    In serve mode, the bridge has its own pool; this is for CLI mode.
+    """
+    global _global_pool, _global_pool_config
+    servers = load_config()
+    if _global_pool is None or _global_pool_config != servers:
+        if _global_pool is not None:
+            try:
+                _global_pool.close()
+            except Exception:
+                pass
+        _global_pool = MCPClientPool(servers)
+        _global_pool_config = servers
+    return _global_pool
+
+
 # ─── Main router ───
 
 def call_tool(
@@ -197,7 +221,7 @@ def call_tool(
 
     Routing chain:
       1. Custom handler (if registered) → return if non-None
-      2. MCPClientPool → call via MCP protocol
+      2. MCPClientPool → call via MCP protocol (reuses global pool)
       3. Error
 
     Safety features:
@@ -257,7 +281,7 @@ def call_tool(
             # Fall through to MCP
             pass
 
-    # 2. MCP protocol
+    # 2. MCP protocol — reuse global pool
     servers = load_config()
     if server not in servers:
         return make_error(
@@ -267,9 +291,8 @@ def call_tool(
         )
 
     try:
-        pool = MCPClientPool(servers)
+        pool = _get_pool()
         result = pool.call(server, tool, args)
-        pool.close()
 
         # Check for poisoning and credential leaks in result
         if not skip_poisoning_check:

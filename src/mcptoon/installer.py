@@ -28,8 +28,10 @@ except ImportError:
     from errors import make_error
     from client import MCPClient, MCPError
 
-# MCP Registry URL (community-maintained)
+# MCP Registry URLs — multiple sources for resilience
 MCP_REGISTRY_URL = "https://registry.modelcontextprotocol.org"
+SMITHERY_API_URL = "https://smithery.ai/api"
+MCP_SO_URL = "https://mcp.so/api"
 
 # Default npx command
 _NPX_CMD = "npx"
@@ -71,11 +73,62 @@ def _save_installed(data):
 
 
 def search_registry(keyword):
-    """Search MCP registry for available servers.
+    """Search MCP registries for available servers.
+
+    Tries Smithery API first (largest registry, 3000+ servers),
+    falls back to MCP official registry.
 
     Returns:
         list: [{name, description, command, args, env}, ...]
     """
+    # Try Smithery first (largest registry)
+    results = _search_smithery(keyword)
+    if results:
+        return results
+
+    # Fall back to MCP official registry
+    results = _search_mcp_registry(keyword)
+    if results:
+        return results
+
+    # Last resort: return empty (no error for "no results")
+    return []
+
+
+def _search_smithery(keyword):
+    """Search Smithery registry."""
+    try:
+        import urllib.request
+        import urllib.parse
+        params = urllib.parse.urlencode({"q": keyword})
+        url = f"{SMITHERY_API_URL}/servers?{params}"
+        req = urllib.request.Request(url, headers={
+            "Accept": "application/json",
+            "User-Agent": "mcptoon-installer/1.0",
+        })
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read().decode("utf-8"))
+
+        # Smithery returns {servers: [{name, description, command, ...}]}
+        servers = data if isinstance(data, list) else data.get("servers", data.get("data", []))
+        if not isinstance(servers, list):
+            servers = []
+
+        return [{
+            "name": s.get("name", s.get("id", "")),
+            "description": (s.get("description", "") or "")[:200],
+            "command": s.get("command", "npx"),
+            "args": s.get("args", ["-y", s.get("name", "")]),
+            "env": s.get("env", {}),
+            "source": "smithery",
+            "url": s.get("url", ""),
+        } for s in servers if s.get("name") or s.get("id")]
+    except Exception:
+        return []
+
+
+def _search_mcp_registry(keyword):
+    """Search MCP official registry."""
     try:
         import urllib.request
         url = f"{MCP_REGISTRY_URL}/servers?q={keyword}"
@@ -83,14 +136,67 @@ def search_registry(keyword):
         resp = urllib.request.urlopen(req, timeout=10)
         data = json.loads(resp.read().decode("utf-8"))
         servers = data.get("servers", [])
-        return [{"name": s.get("name", ""),
-                 "description": s.get("description", "")[:200],
-                 "command": s.get("command", ""),
-                 "args": s.get("args", []),
-                 "env": s.get("env", {})}
-                for s in servers]
-    except Exception as e:
-        return make_error("REGISTRY_ERROR", f"Registry search failed: {str(e)[:200]}", "installer")
+        return [{
+            "name": s.get("name", ""),
+            "description": s.get("description", "")[:200],
+            "command": s.get("command", ""),
+            "args": s.get("args", []),
+            "env": s.get("env", {}),
+            "source": "registry",
+        } for s in servers if s.get("name")]
+    except Exception:
+        return []
+
+
+def install_by_name(name, server_name=None):
+    """Install a server by name from registry (auto-discover source).
+
+    Usage:
+        install_by_name("fetch")      # searches registry, installs best match
+        install_by_name("filesystem")  # same pattern
+
+    Returns:
+        dict: Installation result
+    """
+    # 1. Search for the server
+    results = search_registry(name)
+    if not results:
+        return make_error("NOT_FOUND",
+            f"No MCP server found matching '{name}'. "
+            f"Try: mcptoon install --npm <package> or --pip <package>",
+            "installer")
+
+    # 2. Find best match (exact name or first result)
+    match = None
+    for r in results:
+        if r.get("name", "").lower() == name.lower():
+            match = r
+            break
+    if not match:
+        match = results[0]
+
+    # 3. Determine install method
+    source = match.get("source", "")
+    command = match.get("command", "npx")
+    args = match.get("args", ["-y", match.get("name", name)])
+
+    if command == "npx" or (args and "-y" in args):
+        # npm-based server
+        package = name
+        if args and len(args) > 1:
+            # Extract package name from args
+            for a in args:
+                if a.startswith("@") or (a != "-y" and not a.startswith("-")):
+                    package = a
+                    break
+        return install_npm(package, server_name or name)
+    elif command in (sys.executable, "python", "python3"):
+        return install_pip(match.get("name", name), server_name or name)
+    else:
+        # Custom command
+        if not server_name:
+            server_name = name
+        return install_custom(server_name, command, args, match.get("env", {}))
 
 
 def install_npm(package, server_name=None):
@@ -187,7 +293,7 @@ def install_http(url, server_name=None, transport="auto"):
         server_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
 
     # Verify connection
-    client = MCPClient(http=url, name=server_name)
+    client = MCPClient(http=url)
     init_result = client.initialize()
 
     if isinstance(init_result, Exception):
@@ -268,7 +374,10 @@ for p in [_SRC_DIR, _PARENT_DIR]:
 try:
     from router import register
 except ImportError:
-    from ..router import register
+    try:
+        from ..router import register
+    except ImportError:
+        from mcptoon.router import register
 
 SERVER_NAME = "{server_name}"
 ALIASES = ()
@@ -286,19 +395,21 @@ MCP_TRANSPORT = "{transport}"
 def handle(tool, args):
     """Call HTTP/SSE MCP tool."""
     try:
-        from mcp_client import MCPHttpClient
+        from mcptoon.client import MCPClient
     except ImportError:
-        from ..mcp_client import MCPHttpClient
+        from client import MCPClient
 
-    client = MCPHttpClient(MCP_URL, name=SERVER_NAME, transport=MCP_TRANSPORT)
-    init_result = client.initialize()
-    if init_result.get("_error"):
-        return init_result
-
+    client = MCPClient(http=MCP_URL)
+    client.initialize()
     result = client.call_tool(tool, args or {{}})
     client.close()
     return result
 '''
+
+    with open(handler_file, "w", encoding="utf-8") as f:
+        f.write(handler_code)
+
+    log.info("installer", f"Generated HTTP handler: {handler_file}")
 
     with open(handler_file, "w", encoding="utf-8") as f:
         f.write(handler_code)
@@ -315,7 +426,7 @@ def _verify_and_generate(server_name, command, args_list, env, source):
     4. Record to installed.json
     """
     # 1. Try to connect
-    client = MCPClient(stdio=[command] + (args_list or []), name=server_name)
+    client = MCPClient(stdio=[command] + (args_list or []))
     try:
         client.initialize()
     except MCPError as e:
@@ -402,7 +513,10 @@ for p in [_SRC_DIR, _PARENT_DIR]:
 try:
     from router import register
 except ImportError:
-    from ..router import register
+    try:
+        from ..router import register
+    except ImportError:
+        from mcptoon.router import register
 
 SERVER_NAME = "{server_name}"
 ALIASES = ()
@@ -419,11 +533,11 @@ MCP_ENV = {{{env_str}}}
 
 @register(SERVER_NAME, *ALIASES)
 def handle(tool, args):
-    """Call MCP stdio tool (via daemon or single-shot mode)."""
+    """Call MCP stdio tool."""
     try:
-        from daemon import call_mcp_tool
+        from mcptoon.client import MCPClient
     except ImportError:
-        from ..daemon import call_mcp_tool
+        from client import MCPClient
 
     env = {{}}
     for key in MCP_ENV:
@@ -431,14 +545,10 @@ def handle(tool, args):
         if val:
             env[key] = val
 
-    result = call_mcp_tool(
-        server=SERVER_NAME,
-        tool=tool,
-        args=args or {{}},
-        command=MCP_COMMAND,
-        args_list=MCP_ARGS,
-        env=env,
-    )
+    client = MCPClient(stdio=[MCP_COMMAND] + MCP_ARGS, env=env)
+    client.initialize()
+    result = client.call_tool(tool, args or {{}})
+    client.close()
     return result
 '''
 

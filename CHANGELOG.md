@@ -7,14 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — serve HTTP mode + demo command
+
+- **`mcptoon serve --listen` HTTP mode** — mcptoon serve now supports HTTP mode for remote/multi-agent access. Agents can connect via HTTP POST to `/mcp` endpoint. Health check at `/health`.
+  ```bash
+  mcptoon serve --listen :8080          # HTTP mode on port 8080
+  mcptoon serve --http                   # Shorthand for --listen :8080
+  mcptoon serve --listen 0.0.0.0:9090   # Bind to all interfaces
+  ```
+  - Multiple agents can connect simultaneously (unlike stdio which is single-connection)
+  - JSON-RPC over HTTP, compatible with MCP HTTP transport
+  - Health check: `GET /health` returns `{"status":"ok","servers":N,"tools":N}`
+
+- **`mcptoon demo` command** — Zero-config one-command demo for the "aha moment":
+  1. Starts a demo MCP server (fetch, no API key needed)
+  2. Calls a tool and shows JSON vs TOON vs SLIM token comparison
+  3. Shows the 255 tools benchmark (90,804 → 117 tokens)
+  ```bash
+  mcptoon demo                # Full demo, step by step
+  mcptoon demo --quick        # Fast: skip step-by-step
+  mcptoon demo --keep         # Keep demo server in config
+  ```
+
+- **Parallel manifest loading** — `MCPServerBridge` now uses `ThreadPoolExecutor` with 20 concurrent workers for manifest loading. 100 servers load in ~5s instead of 500s serial.
+- **Per-call timeout** — Each tool call has a 30s timeout (configurable via `MCPTOON_CALL_TIMEOUT`), preventing hung servers from blocking the bridge.
+- **Remote MCP support** — HTTP/SSE MCP servers are now handled transparently by the bridge.
+- **18 new tests** for demo command — Total: 425 tests.
+
 ### Changed
 - **Removed all 23 bundled server profiles** — mcptoon now ships zero bundled content. Users add exactly the servers they want via `mcptoon add` / `mcptoon install`. The `mcp/` directory and `_match_profiles()` discovery layer have been removed. This eliminates cognitive overhead: nothing pre-configured, nothing to ignore, nothing to explain.
 - Discovery reduced from 5-layer to 4-layer (removed profile matching layer).
 - Architecture simplified from 3-layer to 2-layer (CLI + actual MCP servers).
+- `MCPClientPool._get_client` refactored to move `client.initialize()` outside the lock, allowing parallel server initializations.
+
+### Fixed — 20 critical bug fixes
+
+- **`installer.py` TypeError** — Removed invalid `name=` argument passed to `MCPClient()` constructor (2 call sites).
+- **Version mismatch** — `pyproject.toml` was stuck at `0.2.3` while `__init__.py` had `0.5.0`. Synced to `0.5.0`.
+- **HTTP serve stdout race condition** — Replaced global `sys.stdout` swap with thread-local `_response_capture` buffer. Concurrent HTTP requests no longer clobber each other's responses.
+- **Streamable HTTP support** — `_parse_http_body()` now handles multi-event SSE streams (picks last response with `result`/`error`). `_http_request()` checks `Content-Type` header and handles both `text/event-stream` and `application/json`.
+- **HTTP error handling** — `HTTPError` responses now parsed as JSON error objects before raising, allowing structured error propagation.
+- **`resources/read` and `prompts/get`** — Bridge now responds to these MCP methods (previously returned `method not found`).
+- **`logging/setLevel`** — Bridge acknowledges client logging level changes.
+- **JSON-RPC batch support** — HTTP handler now accepts arrays of requests and returns array of responses.
+- **`notifications/cancelled`** — Bridge now handles cancellation notifications gracefully.
+- **HTTP authentication** — Added `--auth <token>` flag and `MCPTOON_AUTH_TOKEN` env var. When set, requests must include `Authorization: Bearer <token>` header.
+- **Connection pool resource leak** — When two threads race to create the same client, the losing client is now properly closed (was: silently leaked subprocess).
+- **`router.py` pool reuse** — Router now reuses a global `MCPClientPool` instead of creating a new pool (spawning all subprocesses) on every `call_tool()` invocation.
+- **Cache file locking** — `cache.py` rewritten with in-process `threading.Lock` + atomic file writes (`os.replace`). Prevents data corruption from concurrent writes.
+- **stdio multi-line response** — `_stdio_request()` now reads lines in a loop until it finds a JSON-RPC response with an `id` field, skipping notification lines and debug output. Previously only read one line, breaking on multi-line responses.
+- **Auto-reconnect for stdio** — `_reconnect_if_dead()` checks if process has exited before each request and restarts it automatically. Clears tools cache on reconnect.
+- **`close()` robustness** — Added `proc.wait(timeout=1)` after `kill()` and `finally: self._proc = None` to ensure cleanup even on exception.
+- **Timeout subprocess kill** — When a tool call times out, the underlying subprocess is now killed (was: thread abandoned but subprocess kept running).
+- **Demo token counting** — `_show_token_comparison()` now uses `tiktoken` if available for accurate token counts, with `len//4` fallback. Previously used only `len//4`.
+- **Health endpoint honesty** — `_handle_health()` now returns `"starting"` when not initialized, `"degraded"` when some servers failed, `"error"` when all failed. Previously always returned `"ok"`.
+- **Handler template imports** — Generated handler files now import from `mcptoon.client.MCPClient` instead of non-existent `daemon.py`/`mcp_client.py` modules.
+- **Server alias resolution** — `resolve_server_name()` now checks config dynamically for prefix matches (e.g. `fs` → `filesystem`), not just static aliases.
+- **`.gitignore`** — Added `local/`, `__pycache__/`, `_*.py`, `_*.txt` to prevent temp files and private layer from being committed.
+- **Cleaned 40+ temporary scripts** — Removed `_1000stars.py`, `_benchmark.py`, `_check_shadowban.py`, etc. from project root.
+- **`test_v02_features.py` syntax error** — Fixed method name with space (`test_slim_format Renders_tools` → `test_slim_format_renders_tools`).
+- **`test_serve.py` health test** — Updated to accept `"starting"` status for uninitialized bridges.
 
 ### Planned
 - awesome-mcp-clients PR submission
-- `mcptoon serve` — expose mcptoon itself as an MCP server
 - `--watch` mode for long-running tool calls
 - Connection pool reuse (keep stdio processes alive across calls)
 
