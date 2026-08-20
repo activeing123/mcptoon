@@ -215,7 +215,7 @@ class TestRemoteMCP:
         config = {
             "remote": {
                 "transport": "http",
-                "url": "http://192.168.1.100:3001/mcp",
+                "url": "http://10.0.0.1:3001/mcp",
                 "headers": {"Authorization": "Bearer test-token"},
             }
         }
@@ -233,7 +233,7 @@ class TestRemoteMCP:
             },
             "remote": {
                 "transport": "http",
-                "url": "http://192.168.1.100:3001/mcp",
+                "url": "http://10.0.0.1:3001/mcp",
             },
         }
         pool = MCPClientPool(config)
