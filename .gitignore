@@ -38,6 +38,9 @@ dist/
 # Temp scripts
 _*.py
 _*.json
+_*.ps1
+_*.sh
+_*.bat
 preview.html
 # Exception: __main__.py is NOT a temp script
 !src/mcptoon/__main__.py
