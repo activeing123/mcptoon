@@ -91,11 +91,11 @@ It's a 200KB Python CLI, zero dependencies, works with any agent that runs shell
 
 ### Current state
 
-- 167 stars, 429 tests, v0.5.0 on PyPI
+- 177 stars, 486 tests, v0.5.1 on PyPI
 - TOON encoding now matches official spec v4.1 (no Unicode hacks)
 - Benchmark data is tiktoken-verified, reproducible
 - README no longer claims 99.87% — uses the real 91% (SLIM) and 98.5% (compact) figures
-- Apache 2.0, zero dependencies, pure Python stdlib
+- Apache 2.0, zero dependencies, pure Python stdlib, 250KB
 
 If you want to try it: `pip install mcptoon`
 
