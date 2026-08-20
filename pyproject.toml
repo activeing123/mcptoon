@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcptoon"
 version = "0.5.1"
-description = "Token-efficient MCP CLI. 1,000 tools on your machine. Zero token waste, zero config hell, zero agent lock-in. Vendored spec-compliant TOON (toon-format v4.1) + SLIM + compact. Credential leak detection. Zero deps."
+description = "Token-efficient MCP CLI. 99.87% less tokens on tool discovery. Zero deps. Cross-platform. Works with every AI agent."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [{name = "cxh"}]
@@ -30,6 +30,14 @@ classifiers = [
     "Topic :: System :: Shells",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/activeing123/mcptoon"
+Repository = "https://github.com/activeing123/mcptoon"
+Documentation = "https://github.com/activeing123/mcptoon#readme"
+Changelog = "https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md"
+Issues = "https://github.com/activeing123/mcptoon/issues"
+PyPI = "https://pypi.org/project/mcptoon/"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov", "ruff>=0.6"]

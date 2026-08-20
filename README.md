@@ -12,7 +12,7 @@ Download a brand-new agent today — it can immediately call all 1,000 MCP tools
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#privacy)
-[![Tests](https://img.shields.io/badge/Tests-427%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-486%20passed-brightgreen)](#contributing)
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [Report Bug](https://github.com/activeing123/mcptoon/issues)
 
@@ -240,7 +240,7 @@ SLIM and Compact are **not** part of the TOON spec. They are mcptoon-specific op
 
 </details>
 
-Reproduce: `pip install tiktoken && python _benchmark.py` → outputs `assets/benchmark_data.json`
+Reproduce: `pip install tiktoken && python -c "import mcptoon; mcptoon._benchmark()"` → outputs `assets/benchmark_data.json`
 
 ### Before vs after — concrete example
 
@@ -381,7 +381,7 @@ src/mcptoon/
 └── errors.py     # Structured error envelopes + fix suggestions
 ```
 
-~6,400 lines. 427 tests. Zero third-party imports. ~250KB source.
+~6,400 lines. 486 tests. Zero third-party imports. ~250KB source.
 
 ## Docker
 
@@ -400,7 +400,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 427 tests, 0.5s
+python -m pytest tests/ -v   # 486 tests, 0.5s
 ```
 
 Zero dependencies is a hard rule. New features need tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
