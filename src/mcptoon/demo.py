@@ -31,17 +31,11 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import shutil
-import subprocess
-import sys
-import tempfile
 import time
 
-from . import __version__
 from . import config as cfg
-from . import manifest as manifest_mod
-from .client import MCPClient, MCPClientPool
+from .client import MCPClient
 from . import output as output_mod
 
 

@@ -176,7 +176,6 @@ def install_by_name(name, server_name=None):
         match = results[0]
 
     # 3. Determine install method
-    source = match.get("source", "")
     command = match.get("command", "npx")
     args = match.get("args", ["-y", match.get("name", name)])
 

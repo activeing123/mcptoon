@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,8 +24,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import threading
-import time
 from pathlib import Path
 
 import pytest
@@ -373,7 +370,8 @@ class TestServeHttpMode:
         from mcptoon.serve import run_serve
         # Just verify it doesn't crash on --help (returns early)
         # We can't actually start HTTP in a unit test
-        import io, contextlib
+        import io
+        import contextlib
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
             run_serve(["--help"])

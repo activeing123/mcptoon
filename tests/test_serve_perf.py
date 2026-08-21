@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,22 +19,18 @@ Tests concurrent access, timeout behavior, parallel manifest loading,
 and remote MCP (HTTP) server support.
 """
 
-import json
 import os
 import subprocess
 import sys
-import tempfile
 import threading
-import time
 from pathlib import Path
 
-import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from mcptoon.serve import MCPServerBridge, _get_call_timeout
-from mcptoon.client import MCPClient, MCPClientPool, MCPError
+from mcptoon.client import MCPClientPool
 
 
 # ═══════════════════════════════════════════════════

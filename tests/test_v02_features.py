@@ -347,7 +347,8 @@ class TestManifestSlim:
 
     def test_slim_flag_in_help(self):
         from mcptoon.cli import _print_help
-        import io, contextlib
+        import io
+        import contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             _print_help()

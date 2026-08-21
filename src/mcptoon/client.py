@@ -196,7 +196,8 @@ class MCPClient:
             return
         if self._proc.poll() is not None:
             # Process has exited — restart
-            _log_fn = lambda msg: None  # no-op logger
+            def _log_fn(msg):
+                pass  # no-op logger
             self._proc = None
             self._initialized = False
             self._tools_cache = []  # Clear cache on reconnect
@@ -448,10 +449,7 @@ class MCPClient:
                     d = json.loads(s[6:])
                     if isinstance(d, dict):
                         # Keep the last response with a result or error
-                        if "result" in d or "error" in d:
-                            last_result = d
-                        # Also accept if it has an id (could be a response)
-                        elif "id" in d and "method" not in d:
+                        if "result" in d or "error" in d or "id" in d and "method" not in d:
                             last_result = d
                 except json.JSONDecodeError:
                     continue

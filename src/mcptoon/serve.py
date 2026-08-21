@@ -67,7 +67,6 @@ from .schema_simplifier import (
     namespaced_tool_name,
     split_namespaced,
 )
-from .errors import make_error, is_error
 
 # MCP protocol version we speak as a server
 PROTOCOL_VERSION = "2024-11-05"
@@ -705,7 +704,6 @@ def _run_http(bridge: MCPServerBridge, listen_addr: str, auth_token: str | None 
     `Authorization: Bearer <token>` header.
     """
     from http.server import HTTPServer, BaseHTTPRequestHandler
-    import threading
 
     # Parse listen address
     if ":" not in listen_addr:
