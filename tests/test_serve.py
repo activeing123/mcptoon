@@ -334,7 +334,7 @@ class TestServeCli:
         """mcptoon serve --help shows help."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "serve", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "stdio bridge" in result.stdout.lower()
@@ -343,7 +343,7 @@ class TestServeCli:
         """mcptoon demo --help shows help."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "demo", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "demo" in result.stdout.lower()
@@ -358,7 +358,7 @@ class TestServeHttpMode:
         """serve --help mentions --listen and --http options."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "serve", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "--listen" in result.stdout

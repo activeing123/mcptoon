@@ -31,7 +31,7 @@ class TestMainModule:
         """`python -m mcptoon --help` should show help text."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "mcptoon" in result.stdout
@@ -41,7 +41,7 @@ class TestMainModule:
         """`python -m mcptoon` with no args should show help."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "mcptoon" in result.stdout

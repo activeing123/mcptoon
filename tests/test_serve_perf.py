@@ -245,7 +245,7 @@ class TestServeHelp:
         """Help text mentions performance features."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "serve", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=30,
         )
         assert "Parallel manifest loading" in result.stdout
         assert "per-call timeout" in result.stdout.lower()

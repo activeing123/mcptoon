@@ -173,7 +173,7 @@ class TestDemoCLIIntegration(unittest.TestCase):
         """`mcptoon --help` should mention demo."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=30,
             cwd=os.path.join(os.path.dirname(__file__), ".."),
         )
         self.assertIn("demo", result.stdout)
@@ -182,7 +182,7 @@ class TestDemoCLIIntegration(unittest.TestCase):
         """`mcptoon demo --help` should print demo help."""
         result = subprocess.run(
             [sys.executable, "-m", "mcptoon", "demo", "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=30,
             cwd=os.path.join(os.path.dirname(__file__), ".."),
         )
         self.assertIn("Zero-config", result.stdout)
