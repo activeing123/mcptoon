@@ -64,6 +64,16 @@ jobs:
     - name: Install package
       run: pip install .
 
+    - name: Debug CLI on Windows
+      if: runner.os == 'Windows'
+      run: |
+        python -m mcptoon serve --help 2>&1 || true
+        python -m mcptoon help 2>&1 || true
+        echo "---PYTHONPATH---"
+        echo %PYTHONPATH%
+        echo "---PIP SHOW---"
+        pip show mcptoon
+
     - name: Install dev dependencies
       run: pip install pytest pytest-cov
 
