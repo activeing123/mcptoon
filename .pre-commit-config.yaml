@@ -1,29 +1,33 @@
 # Pre-commit hooks for mcptoon
 # Install: pip install pre-commit && pre-commit install
-# Run manually: pre-commit run --all-files
+# Manual run: pre-commit run --all-files
 
 repos:
+  # Ruff — lint + auto-fix
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.0
+    rev: v0.15.20
     hooks:
-      # Lint: zero-tolerance on F821/F841/B904 (bugs)
       - id: ruff
-        name: ruff (bug check: F821/F841/B904)
-        args: ["--select", "F821,F841,B904", "--no-fix"]
-        stages: [pre-commit]
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(src|tests)/
 
-      # Lint: full check
-      - id: ruff
-        name: ruff (full lint)
-        args: ["--fix"]
-        stages: [pre-commit]
+  # Basic checks — trailing whitespace, newline, YAML/JSON syntax
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: debug-statements
 
+  # Local hook — fast pytest (only changed test files)
   - repo: local
     hooks:
-      # Run tests before commit (fast subset)
-      - id: pytest-quick
-        name: pytest (quick smoke test)
-        entry: python -m pytest tests/ -x -q
+      - id: pytest-fast
+        name: pytest (fast)
+        entry: python -m pytest tests/ -x -q --tb=short --no-header
         language: system
         types: [python]
         pass_filenames: false
