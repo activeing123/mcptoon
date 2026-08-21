@@ -81,6 +81,7 @@ jobs:
       run: python -m pytest tests/ -v --tb=long --cov=mcptoon --cov-report=term-missing
       env:
         PYTHONPATH: src
+        PYTHONUTF8: "1"
 
     - name: Verify CLI works
       run: |

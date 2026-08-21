@@ -677,7 +677,14 @@ def run_serve(args: list[str]):
             auth_token = a.split("=", 1)[1]
             i += 1
         elif a in ("-h", "--help"):
-            print(_serve_help())
+            _help_text = _serve_help()
+            try:
+                print(_help_text)
+            except UnicodeEncodeError:
+                # Windows cp1252 can't encode Unicode — fallback to UTF-8
+                sys.stdout.buffer.write(_help_text.encode("utf-8"))
+                sys.stdout.buffer.write(b"\n")
+                sys.stdout.buffer.flush()
             return
         i += 1
 
