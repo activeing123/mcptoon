@@ -27,7 +27,7 @@ jobs:
       run: ruff check src/mcptoon/ tests/
 
     - name: Install package
-      run: pip install -e .
+      run: pip install .
 
     - name: Check imports
       run: |
@@ -62,13 +62,15 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install package
-      run: pip install -e .
+      run: pip install .
 
     - name: Install dev dependencies
       run: pip install pytest pytest-cov
 
     - name: Run tests
       run: python -m pytest tests/ -v --tb=long --cov=mcptoon --cov-report=term-missing
+      env:
+        PYTHONPATH: src
 
     - name: Verify CLI works
       run: |
