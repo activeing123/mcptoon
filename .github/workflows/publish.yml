@@ -18,12 +18,27 @@ jobs:
         python-version: "3.12"
 
     - name: Install build tools
-      run: pip install build
+      run: pip install build twine
 
     - name: Build package
       run: python -m build
 
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        # Strip any BOM from token (workaround for GitHub Secrets BOM injection)
+        python -c "
+        import os, sys
+        token = os.environ.get('TWINE_PASSWORD', '')
+        if token.startswith('\ufeff'):
+            token = token[1:]
+            print('WARNING: BOM detected and stripped from PyPI token', file=sys.stderr)
+        # Write clean token to a file for twine
+        with open('/tmp/.pypirc_token', 'w') as f:
+            f.write(token)
+        print(f'Token length: {len(token)}', file=sys.stderr)
+        print(f'Token starts with pypi-: {token.startswith(\"pypi-\")}', file=sys.stderr)
+        "
+        TWINE_PASSWORD=$(cat /tmp/.pypirc_token) twine upload dist/* --verbose
