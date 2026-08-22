@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2025-2026 cxh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,4 +14,4 @@
 
 """mcptoon — Token-efficient MCP CLI client."""
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"

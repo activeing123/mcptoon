@@ -73,9 +73,9 @@ Python's stdlib `argparse` is... fine. But `click` is so much nicer. Decorators,
 def main():
     parser = argparse.ArgumentParser(prog="mcptoon")
     sub = parser.add_subparsers(dest="command")
-    
+
     # ... 15 subcommands, each with its own args ...
-    
+
     add_cmd = sub.add_parser("add")
     add_cmd.add_argument("name")
     add_cmd.add_argument("--stdio", nargs="+")

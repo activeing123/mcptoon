@@ -92,7 +92,7 @@ class TestToonSpecConformance:
 
     def test_uniform_object_array_csv_style(self):
         """Spec v4.1: Uniform object arrays use key[N,]{f1,f2}: + CSV rows.
-        
+
         Note: spec v4.1 includes the delimiter (comma) in the bracket: [2,]
         """
         data = [

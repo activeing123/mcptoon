@@ -80,7 +80,7 @@ from .toon_vendored import ToonDecodeError as _VendoredToonDecodeError
 
 def _toon_escape_csv(value: str) -> str:
     """Escape a value for CSV-style TOON array rows.
-    
+
     If value contains comma, newline, or quote → wrap in double quotes
     and escape internal quotes.
     """
@@ -103,7 +103,7 @@ def _toon_scalar_str(val) -> str:
 
 def _is_uniform_object_array(lst: list) -> bool:
     """Check if list is an array of dicts with the same keys.
-    
+
     Standard TOON optimises uniform object arrays into CSV-style rows.
     """
     if not lst or not all(isinstance(item, dict) for item in lst):
@@ -189,12 +189,12 @@ def _toon_encode_value(val, indent: int = 0) -> str:
 
 def toon_encode(obj) -> str:
     """Encode obj as standard TOON string (toon-format/toon spec v4.1).
-    
+
     Uses vendored python-toon v0.1.1 encoder (MIT License, Xavi Vinaixa).
     Spec-compliant: passes official toon-format/toon test suite.
     Token-efficient for LLMs: 30-60% fewer tokens than JSON.
     Round-trip safe: decode(encode(x)) == x.
-    
+
     >>> toon_encode({"name": "search", "count": 3})
     'name: search\\ncount: 3'
     >>> toon_encode([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
@@ -248,7 +248,7 @@ def _toon_parse_scalar(value: str):
 
 def _toon_parse_lines(lines: list, indent: int = 0) -> tuple:
     """Parse TOON lines at given indent level.
-    
+
     Returns (parsed_value, next_line_index).
     """
     if not lines:
@@ -439,12 +439,12 @@ def _parse_csv_row(row: str) -> list:
 
 def toon_decode(text: str):
     """Decode a standard TOON string back to Python objects.
-    
+
     Uses vendored python-toon v0.1.1 decoder (MIT License, Xavi Vinaixa).
     Spec-compliant: passes official toon-format/toon test suite.
     Non-strict mode by default (lenient parsing for mcptoon compat).
     Round-trip safe: decode(encode(x)) == x.
-    
+
     >>> toon_decode('name: search\\ncount: 3')
     {'name': 'search', 'count': 3}
     >>> toon_decode('[2]{id,name}:\\n  1,Alice\\n  2,Bob')
@@ -478,7 +478,7 @@ def toon_decode(text: str):
 
 def _mcptoon_escape(value: str) -> str:
     """Escape special characters in a string value for legacy mcptoon format.
-    
+
     Escape sequences:
     \\ → \\\\  (backslash, must be first)
     :  → \\c   (colon, avoids key-value separator collision)
@@ -496,7 +496,7 @@ def _mcptoon_escape(value: str) -> str:
 
 def _mcptoon_unescape(value: str) -> str:
     """Unescape special characters in a legacy mcptoon string.
-    
+
     Reverses: \\c→:, \\p→|, \\n→newline, \\\\→backslash.
     """
     result = []
@@ -564,7 +564,7 @@ def _mcptoon_scalar(val):
 
 def mcptoon_encode(obj) -> str:
     """Encode obj as legacy mcptoon pipe format (round-trip safe).
-    
+
     >>> mcptoon_encode({"name": "search", "count": 3})
     'name:search|count:3'
     >>> mcptoon_encode({"url": "https://example.com"})
@@ -583,9 +583,9 @@ def mcptoon_encode(obj) -> str:
 
 def mcptoon_decode(text: str):
     """Decode a legacy mcptoon pipe format string back to Python objects.
-    
+
     Round-trip safe: decode(encode(x)) == x.
-    
+
     >>> mcptoon_decode('name:search|count:3')
     {'name': 'search', 'count': 3}
     >>> mcptoon_decode('url:https\\\\c//example.com')
@@ -664,7 +664,7 @@ def _find_unescaped(text: str, char: str) -> int:
 
 def _mcptoon_parse_value(value_str: str):
     """Parse a value from legacy mcptoon string.
-    
+
     Handles:
     - Scalars (true, false, null, int, float, string)
     - Empty containers ({} and [])
@@ -707,7 +707,7 @@ def _mcptoon_parse_value(value_str: str):
 
 def toon(obj):
     """DEPRECATED: Use toon_encode() for standard TOON or mcptoon_encode() for legacy.
-    
+
     This function now delegates to mcptoon_encode() for backward compatibility.
     """
     return mcptoon_encode(obj)
