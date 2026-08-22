@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: pypi-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -23,7 +27,19 @@ jobs:
     - name: Build package
       run: python -m build
 
+    - name: Check if version already exists on PyPI
+      run: |
+        VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+        echo "Checking if mcptoon==${VERSION} already exists on PyPI..."
+        if pip index versions mcptoon 2>/dev/null | grep -q "${VERSION}"; then
+          echo "Version ${VERSION} already exists on PyPI. Skipping upload."
+          echo "SKIP_UPLOAD=1" >> $GITHUB_ENV
+        else
+          echo "Version ${VERSION} not found on PyPI. Proceeding with upload."
+        fi
+
     - name: Publish to PyPI
+      if: env.SKIP_UPLOAD != '1'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}

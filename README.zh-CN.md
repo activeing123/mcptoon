@@ -12,7 +12,7 @@ mcptoon 站在你的 AI Agent 和 MCP 服务器之间。装 1,000 个工具—�
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/依赖-零-orange)](#隐私)
-[![Tests](https://img.shields.io/badge/Tests-427%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-486%20passed-brightgreen)](#贡献)
 
 **👉 `pip install mcptoon`** · [English](README.md) · [中文文档](README.zh-CN.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)
 
@@ -381,7 +381,7 @@ src/mcptoon/
 └── errors.py     # 结构化错误 + 修复建议
 ```
 
-约 6,400 行。427 个测试。零第三方 import。约 250KB 源码。
+约 6,400 行。486 个测试。零第三方 import。约 250KB 源码。
 
 ## Docker
 
@@ -400,7 +400,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 427 个测试, 0.5s
+python -m pytest tests/ -v   # 486 个测试, 0.5s
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)。

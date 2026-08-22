@@ -69,6 +69,13 @@ _handle_result.txt
 _*.txt
 PROJECT_MAP.json
 PROJECT_MAP.md
+ECOSYSTEM.md
+docs/adr/
+docs/hn-post-draft.md
+docs/hn-post-preview.html
+docs/product-hunt-launch.md
+docs/devto-zero-deps.md
+docs/global-community-strategy.md
 
 # Private layer (local handlers, not for public release)
 local/
