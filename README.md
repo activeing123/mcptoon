@@ -116,12 +116,18 @@ mcptoon install my-tool --pip mcp-my-tool
 # HTTP/SSE server:
 mcptoon install remote-api --url https://example.com/mcp
 
+# Parallel Search (optional; no account or API key required):
+mcptoon install parallel-search --url https://search.parallel.ai/mcp
+
 # List what you have:
 mcptoon install --list
 
 # Remove:
 mcptoon install --remove brave-search
 ```
+
+When you explicitly use Parallel Search, user-provided search objectives, search queries, and
+requested URLs are sent to Parallel.
 
 mcptoon auto-connects, discovers tools, generates a handler, and registers it. No restart needed.
 
