@@ -26,11 +26,11 @@ Output modes:
   --max-chars N  Truncate output to N chars (default: 4000, use --full for unlimited)
   --full       Disable truncation
 
-Adaptive format: set MCPTOON_AGENT_TYPE env var
-  claude  → --toon (standard TOON,省 token)
-  openai  → --json
-  script  → --json
-  human   → auto
+Adaptive format: MCPTOON_AGENT_TYPE env var (optional, defaults to JSON)
+claude  → --toon (optional, only if env var set)
+openai  → --json (default)
+script  → --json (default)
+human   → --json (default)
 
 Export formats (--format flag):
   openai  → OpenAI function calling definitions
@@ -837,15 +837,16 @@ _DEFAULT_MAX_CHARS = 4000  # default truncation threshold
 
 
 def _auto_format():
-    """Auto-select format based on MCPTOON_AGENT_TYPE env var."""
+    """Auto-select format based on MCPTOON_AGENT_TYPE env var.
+    
+    Default is JSON. TOON is only auto-selected when MCPTOON_AGENT_TYPE=claude
+    is explicitly set. This makes JSON the universal default.
+    """
     agent_type = os.environ.get("MCPTOON_AGENT_TYPE", "").lower()
     if agent_type == "claude":
         return "toon"
-    elif agent_type in ("openai", "script", "mcp"):
-        return "json"
-    elif agent_type == "human":
-        return "auto"
-    return "auto"
+    # All other cases: default to JSON
+    return "json"
 
 
 def _truncate(text, max_chars):

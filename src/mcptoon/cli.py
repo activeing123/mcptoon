@@ -41,6 +41,14 @@ Usage:
     mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
     mcptoon install --list               List installed servers
     mcptoon install --remove <name>      Remove an installed server
+    mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
+    mcptoon sync --dry                   Preview without writing
+    mcptoon sync --agent <id>            Sync to one agent only
+    mcptoon health                       Health check all MCP servers (catches zombies)
+    mcptoon health --json                JSON output for CI/CD (exit 1 if any dead)
+    mcptoon health --timeout <sec>       Set per-server timeout
+    mcptoon serve                        Run as stdio MCP server (1 Agent → 100 servers)
+    mcptoon serve --listen :8080         HTTP mode for remote/multi-agent
     mcptoon doctor                       Self-diagnose config + connectivity
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
@@ -183,6 +191,10 @@ def main():
         _cmd_serve(rest)
     elif command == "demo":
         _cmd_demo(rest)
+    elif command == "sync":
+        _cmd_sync(rest, fmt)
+    elif command == "health":
+        _cmd_health(rest, fmt)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -1196,7 +1208,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init quickstart list manifest inspect call add remove usage discover doctor completion help"
+    commands="init quickstart list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -1224,7 +1236,7 @@ _ZSH_COMPLETION = r'''
 #compdef mcptoon
 
 _mcptoon() {
-    local commands=(init list manifest inspect call add remove usage discover doctor completion help)
+    local commands=(init list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search)
     local formats=(openai openapi mcp json human)
 
     if (( CURRENT == 1 )); then
@@ -1248,7 +1260,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor completion help'
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -1256,7 +1268,7 @@ complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi
 _PS_COMPLETION = '''
 $scriptBlock = {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help'
+    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help','sync','health','serve','demo','install','search'
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
@@ -1360,6 +1372,11 @@ Usage:
 
     mcptoon serve                        Run as MCP server (stdio bridge for agents)
     mcptoon demo                         Zero-config one-command demo
+    mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
+    mcptoon sync --dry                   Preview without writing
+    mcptoon sync --agent <id>            Sync to one agent only
+    mcptoon health                       Health check all MCP servers
+    mcptoon health --json                JSON output for CI/CD (exit 1 if dead)
 
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
@@ -1385,8 +1402,8 @@ Examples:
     mcptoon doctor
 
 Environment:
-    MCPTOON_AGENT_TYPE=claude    Auto-select --toon
-    MCPTOON_AGENT_TYPE=openai    Auto-select --json
+MCPTOON_AGENT_TYPE=claude    Auto-select --toon (optional)
+MCPTOON_AGENT_TYPE=openai    Auto-select --json (default)
 
 Config: ~/.mcptoon/config.json
 """)
@@ -1406,3 +1423,70 @@ def _cmd_demo(rest):
     """Zero-config one-command demo."""
     from .demo import run_demo
     run_demo(rest)
+
+
+def _cmd_sync(rest, fmt):
+    """Sync mcptoon config to AI agent config files.
+
+    Usage:
+        mcptoon sync                 # sync to all detected agents
+        mcptoon sync --dry           # preview without writing
+        mcptoon sync --agent cursor  # sync to specific agent only
+        mcptoon sync --agent claude-desktop
+        mcptoon sync --agent windsurf
+    """
+    from .sync import sync_to_all, sync_to_agent, format_sync_report, detect_installed_agents
+
+    dry_run = "--dry" in rest or "--dry-run" in rest
+
+    # Parse --agent
+    agent_id = None
+    for i, a in enumerate(rest):
+        if a == "--agent" and i + 1 < len(rest):
+            agent_id = rest[i + 1]
+            break
+        elif a.startswith("--agent="):
+            agent_id = a.split("=", 1)[1]
+            break
+
+    if agent_id:
+        result = sync_to_agent(agent_id, dry_run=dry_run)
+        report = format_sync_report([result], dry_run=dry_run)
+    else:
+        results = sync_to_all(dry_run=dry_run)
+        report = format_sync_report(results, dry_run=dry_run)
+
+    print(report)
+
+
+def _cmd_health(rest, fmt):
+    """Health check all configured MCP servers.
+
+    Usage:
+        mcptoon health                # check all servers
+        mcptoon health --timeout 5    # 5 second timeout per server
+        mcptoon health --json         # JSON output (for CI/CD)
+    """
+    from .health import check_all, format_health_report
+
+    timeout = 10.0
+    for i, a in enumerate(rest):
+        if a == "--timeout" and i + 1 < len(rest):
+            try:
+                timeout = float(rest[i + 1])
+            except ValueError:
+                pass
+            break
+
+    # JSON output for CI/CD
+    if fmt == "json" or "--json" in rest:
+        import json as _json
+        results = check_all(timeout=timeout)
+        print(_json.dumps(results, ensure_ascii=False, indent=2))
+        # Exit code 1 if any server is dead (for CI/CD)
+        dead = sum(1 for r in results if r["status"] in ("error", "timeout"))
+        if dead > 0:
+            sys.exit(1)
+    else:
+        results = check_all(timeout=timeout)
+        print(format_health_report(results))

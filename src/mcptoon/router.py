@@ -80,23 +80,63 @@ def _check_dangerous(server: str, tool: str, args: dict | None = None) -> str | 
 # ─── Tool poisoning detection ───
 
 # Patterns that indicate prompt injection in tool results
+# Based on OWASP LLM Top 10, Invariant Labs Tool Poisoning research,
+# and MCP-ITP (arXiv:2601.07395) attack patterns
 _POISONING_INDICATORS = [
-    # Instruction-like content in results
+    # ── Direct instruction override ──
     "ignore previous instructions",
     "ignore all previous",
+    "ignore the above",
+    "ignore prior instructions",
     "disregard the above",
+    "disregard previous",
+    "forget your instructions",
+    "forget all previous",
+    # ── Role hijacking ──
     "you are now",
+    "you are a ",  # "you are a DAN" etc
+    "act as ",
+    "pretend you are",
+    "new role:",
     "new instructions:",
     "system prompt:",
-    # Hidden instructions
+    "you have been",
+    # ── Hidden instructions (HTML comments, tags) ──
     "<!-- assistant:",
     "<!-- ignore",
+    "<!-- system",
+    "<!-- important",
+    "<!-- do ",
     "[INST]",
     "<<SYS>>",
-    # Data exfiltration attempts
+    "<|im_start|",
+    "<|system|",
+    # ── Data exfiltration attempts ──
     "send this to",
     "post this to",
     "call this url",
+    "fetch this url",
+    "upload to ",
+    "exfiltrate",
+    "curl http",
+    "wget http",
+    # ── Credential harvesting ──
+    "read your env",
+    "cat ~/.ssh",
+    "print your api key",
+    "show your token",
+    "read /etc/passwd",
+    "cat /etc/shadow",
+    # ── Privilege escalation ──
+    "sudo ",
+    "chmod 777",
+    "rm -rf",
+    "format c:",
+    # ── MCP-specific tool poisoning patterns ──
+    "tool result:",  # fake tool result injection
+    "mcp server:",  # fake server directive
+    "register tool",
+    "add this tool",
 ]
 
 
