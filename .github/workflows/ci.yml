@@ -17,8 +17,8 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install ruff
-      run: pip install ruff
+    - name: Install ruff (pinned — unpinned latest introduced new rules mid-stream)
+      run: pip install "ruff==0.15.20"
 
     - name: Ruff check (zero F821/F841/B904 policy)
       run: ruff check src/mcptoon/ tests/ --select F821,F841,B904
@@ -40,10 +40,8 @@ jobs:
 
     - name: Verify zero dependencies
       run: |
-        # Ensure no third-party imports in source
-        ! grep -r "^import " src/mcptoon/ --include="*.py" | grep -v -E "(import json|import os|import sys|import time|import threading|import subprocess|import urllib|import pathlib|import shutil|import functools|import typing|import re|import math)"
-        ! grep -r "^from " src/mcptoon/ --include="*.py" | grep -v -E "(from __future__|from typing|from pathlib|from urllib|from functools|from datetime|from decimal|from \.toon_vendored|from \.cli|from \.client|from \.config|from \.output|from \.router|from \.manifest|from \.discover|from \.cache|from \.installer|from \.usage|from \.errors)"
-        echo "Zero third-party dependencies confirmed"
+        # AST-based gate (grep allowlists silently missed `from . import x` styles)
+        python scripts/check_zero_deps.py src/mcptoon
 
   test:
     runs-on: ${{ matrix.os }}

@@ -25,10 +25,9 @@ Usage:
 """
 import concurrent.futures
 import time
-from typing import Any
 
 from .config import load_config, list_servers, get_server_config
-from .client import MCPClient, MCPClientPool, MCPError
+from .client import MCPClient, MCPError
 
 
 # ─── Single server check ───

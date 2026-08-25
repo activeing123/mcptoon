@@ -38,7 +38,7 @@ import os
 import sys
 from pathlib import Path
 
-from .config import load_config, CONFIG_DIR
+from .config import load_config
 
 
 # ─── Path helpers (mirrors discover.py) ───

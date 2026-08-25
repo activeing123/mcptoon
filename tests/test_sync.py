@@ -1,18 +1,13 @@
 # Tests for mcptoon sync — config sync to AI agent formats
 import json
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from mcptoon.sync import (
     _mcptoon_to_agent_format,
     _build_mcp_servers_dict,
     sync_to_agent,
     sync_to_all,
-    detect_installed_agents,
     format_sync_report,
 )
 

@@ -96,19 +96,21 @@ class TestWatchLoop:
         assert code == 0
         assert calls == []
 
-    def test_canonical_change_triggers_sync(self, tmp_path):
+    def test_canonical_change_triggers_sync(self, tmp_path, monkeypatch):
+        import mcptoon.watch as w
+        monkeypatch.setattr(w, "DEBOUNCE", 0.02)   # fast but still absorbs bursts
         cfg = tmp_path / "config.json"
         _touch(cfg)
         calls = []
         out = []
 
         def mutate_after_baseline():
-            time.sleep(0.05)
+            time.sleep(0.12)
             _touch(cfg, '{"servers": {"fetch": {}}}')
 
         t = threading.Thread(target=mutate_after_baseline)
         t.start()
-        code = watch(paths=[cfg], max_cycles=8, interval=0.01,
+        code = watch(paths=[cfg], max_cycles=80, interval=0.005,
                      sync_fn=lambda: calls.append(1) or _ok_results(),
                      _out=out.append)
         t.join()
@@ -117,7 +119,9 @@ class TestWatchLoop:
         joined = "\n".join(out)
         assert "synced:" in joined
 
-    def test_quiet_suppresses_info_but_not_errors(self, tmp_path):
+    def test_quiet_suppresses_info_but_not_errors(self, tmp_path, monkeypatch):
+        import mcptoon.watch as w
+        monkeypatch.setattr(w, "DEBOUNCE", 0.02)
         cfg = tmp_path / "config.json"
         _touch(cfg)
 
@@ -128,19 +132,21 @@ class TestWatchLoop:
         out = []
 
         def mutate():
-            time.sleep(0.05)
+            time.sleep(0.12)
             _touch(cfg, "{}")
 
         t = threading.Thread(target=mutate)
         t.start()
-        watch(paths=[cfg], max_cycles=8, interval=0.01, quiet=True,
+        watch(paths=[cfg], max_cycles=80, interval=0.005, quiet=True,
               sync_fn=bad_results, _out=out.append)
         t.join()
         joined = "\n".join(out)
         assert "synced:" not in joined
         assert "error" in joined.lower()
 
-    def test_merge_mode_resyncs_on_agent_drift(self, tmp_path):
+    def test_merge_mode_resyncs_on_agent_drift(self, tmp_path, monkeypatch):
+        import mcptoon.watch as w
+        monkeypatch.setattr(w, "DEBOUNCE", 0.02)
         cfg = tmp_path / "config.json"
         agent = tmp_path / "cursor.json"
         _touch(cfg)
@@ -149,12 +155,12 @@ class TestWatchLoop:
         out = []
 
         def drift():
-            time.sleep(0.05)
+            time.sleep(0.12)
             _touch(agent, '{"mcpServers": {}}')
 
         t = threading.Thread(target=drift)
         t.start()
-        watch(paths=[cfg, agent], max_cycles=8, interval=0.01, mode="merge",
+        watch(paths=[cfg, agent], max_cycles=80, interval=0.005, mode="merge",
               sync_fn=lambda: calls.append(1) or _ok_results(), _out=out.append)
         t.join()
         assert len(calls) >= 1
@@ -169,12 +175,12 @@ class TestWatchLoop:
         out = []
 
         def drift():
-            time.sleep(0.05)
+            time.sleep(0.12)
             _touch(agent, '{"mcpServers": {}}')
 
         t = threading.Thread(target=drift)
         t.start()
-        watch(paths=[cfg, agent], max_cycles=8, interval=0.01, mode="strict",
+        watch(paths=[cfg, agent], max_cycles=80, interval=0.005, mode="strict",
               sync_fn=lambda: calls.append(1) or _ok_results(), _out=out.append)
         t.join()
         assert calls == []
@@ -188,12 +194,12 @@ class TestWatchLoop:
         out = []
 
         def appear():
-            time.sleep(0.05)
+            time.sleep(0.12)
             _touch(late)
 
         t = threading.Thread(target=appear)
         t.start()
-        watch(paths=[cfg, late], max_cycles=10, interval=0.01,
+        watch(paths=[cfg, late], max_cycles=80, interval=0.005,
               sync_fn=lambda: calls.append(1) or _ok_results(), _out=out.append)
         t.join()
         assert len(calls) >= 1  # None -> fingerprint counts as change

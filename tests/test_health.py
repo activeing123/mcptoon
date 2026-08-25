@@ -1,9 +1,6 @@
 # Tests for mcptoon health — batch health check
-import json
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 
-import pytest
 
 from mcptoon.health import check_server, check_all, format_health_report
 

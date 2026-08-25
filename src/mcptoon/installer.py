@@ -21,12 +21,8 @@ import sys
 import subprocess
 import re
 
-try:
-    from .errors import make_error
-    from .client import MCPClient, MCPError
-except ImportError:
-    from errors import make_error
-    from client import MCPClient, MCPError
+from .errors import make_error
+from .client import MCPClient, MCPError
 
 # MCP Registry URLs — multiple sources for resilience
 MCP_REGISTRY_URL = "https://registry.modelcontextprotocol.org"
