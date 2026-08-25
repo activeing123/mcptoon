@@ -1434,10 +1434,17 @@ def _cmd_sync(rest, fmt):
         mcptoon sync --agent cursor  # sync to specific agent only
         mcptoon sync --agent claude-desktop
         mcptoon sync --agent windsurf
+        mcptoon sync --watch         # keep syncing as configs change
+        mcptoon sync --watch --interval 5 --quiet --watch-mode strict
     """
-    from .sync import sync_to_all, sync_to_agent, format_sync_report, detect_installed_agents
+    from .sync import sync_to_all, sync_to_agent, format_sync_report
 
     dry_run = "--dry" in rest or "--dry-run" in rest
+
+    # --watch: continuous sync loop (see watch.py)
+    if "--watch" in rest:
+        from .watch import main as watch_main
+        sys.exit(watch_main(rest))
 
     # Parse --agent
     agent_id = None

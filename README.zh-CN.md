@@ -14,13 +14,13 @@
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-513%20passed-brightgreen)](#开发者指南)
+[![Tests](https://img.shields.io/badge/Tests-531%20passed-brightgreen)](#开发者指南)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#坦诚的局限)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [English](README.md) · [中文文档](README.zh-CN.md) · [更新日志](CHANGELOG.md) · [提 Issue](https://github.com/activeing123/mcptoon/issues)
 
-<!-- TODO 推送前：用 v0.5.x 重录 assets/demo.gif（现有 GIF 录于 2026-08-11 的 v0.2.x，数字已过期），然后恢复引用 assets/demo.gif 的首屏 img 标签（width 720） -->
+<p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon 演示：安装、加一个服务器、同步到所有 Agent、看 token 节省"></p>
 
 </div>
 
@@ -263,7 +263,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 513 个测试，预期全绿
+python -m pytest tests/ -v          # 531 个测试，预期全绿
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

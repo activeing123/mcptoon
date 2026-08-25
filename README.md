@@ -15,13 +15,13 @@ Model Context Protocol server — whether or not the agent supports MCP.
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-513%20passed-brightgreen)](#for-developers)
+[![Tests](https://img.shields.io/badge/Tests-531%20passed-brightgreen)](#for-developers)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [English](README.md) · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
 
-<!-- TODO before pushing: re-record assets/demo.gif against v0.5.x (current GIF was recorded 2026-08-11 on v0.2.x with stale numbers), then restore the hero img tag referencing assets/demo.gif (width 720) -->
+<p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
 
 </div>
 
@@ -272,7 +272,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 513 tests, green expected
+python -m pytest tests/ -v          # 531 tests, green expected
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

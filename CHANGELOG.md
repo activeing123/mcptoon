@@ -5,6 +5,38 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] — 2026-08-25
+
+### Added — Continuous sync (`mcptoon sync --watch`)
+
+- **`--watch` flag**: `mcptoon sync --watch` keeps every detected agent's MCP
+  config aligned with `~/.mcptoon/config.json`. Pure-stdlib polling
+  (os.stat fingerprinting) — no watchdog dependency, identical behavior on
+  Windows, macOS and Linux.
+- **Drift detection**: external edits to agent config files are detected.
+  Merge mode (default) re-syncs while preserving manually-added servers;
+  `--watch-mode strict` warns instead of touching the file.
+- **Debounced writes**: burst saves from editors collapse into one sync round.
+- **Failure guard**: aborts with exit code 1 after 5 consecutive failed rounds.
+- **Flags**: `--interval N`, `--quiet`, `--watch-mode merge|strict`.
+- 18 new tests (total 531).
+- New docs page: `docs/comparison.md` — setup, token and safety numbers for
+  every approach to cross-agent MCP management, category by category.
+- README rewritten in English and Chinese: zero-setup positioning,
+  tiktoken-verified benchmarks, illustrated how-it-works diagram.
+- PyPI/repo description aligned to the measured 99.8% figure (was 99.9%).
+
+## [0.5.4] — 2026-08-24
+
+### Added
+
+- **`sync` command**: write mcptoon's unified config to each detected agent's
+  native format (Claude Desktop, Cursor, Cline, Windsurf, VS Code Copilot,
+  Codex), merging without clobbering manual entries.
+- **`health` command**: check all configured servers with per-server timeout;
+  JSON output plus non-zero exit code for CI/CD pipelines.
+- Shell completion fixes.
+
 ## [0.5.3] — 2026-08-22
 
 ### Fixed — PyPI publish workflow
