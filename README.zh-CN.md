@@ -92,6 +92,8 @@ mcptoon sync               # 把配置写进每一个检测到的 Agent
 ```
 
 sync 是合并不是覆盖——你手动配好的服务器原样保留。
+一条命令就是**跨 Agent 工具管理**：MCP 服务器的一份配置作为唯一事实来源，
+机器上所有 Agent 共享，不用再在 Cursor、Claude 之间来回复制粘贴 JSON。
 
 ```bash
 mcptoon sync --dry           # 预览会写什么，不动真格

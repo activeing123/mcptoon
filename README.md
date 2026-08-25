@@ -95,6 +95,9 @@ mcptoon sync               # writes native config to every detected agent
 ```
 
 mcptoon merges instead of overwriting — servers you configured manually stay put.
+One command gives you **cross-agent tool management**: a single source of truth for
+MCP servers across every agent on the machine, no copy-pasting JSON between Cursor,
+Claude and friends.
 
 ```bash
 mcptoon sync --dry           # preview the writes
