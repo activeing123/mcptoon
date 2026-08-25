@@ -4,6 +4,8 @@
 
 **Install once — and every AI on your computer can use all of your AI tools.**
 
+**Real cross-agent MCP management: one config for every agent, `--watch` keeps them aligned.**
+
 It works like a power strip for AI tools: plug each tool in once, and Claude Code,
 Cursor, Codex — or any program that runs commands — can use them all. No config files,
 no plugins, no restarts. As a bonus, when an AI reads the tool list, it pays
@@ -100,9 +102,14 @@ MCP servers across every agent on the machine, no copy-pasting JSON between Curs
 Claude and friends.
 
 ```bash
+mcptoon sync --watch         # keep every agent aligned automatically
 mcptoon sync --dry           # preview the writes
 mcptoon sync --agent cursor  # target one agent
 ```
+
+`--watch` polls your config files and re-syncs on any change — MCP config sync
+across agents, continuously. Drift detection catches external edits; merge mode
+preserves manually-added servers.
 
 ### 2 · Pay for names, not schemas — `manifest`
 
@@ -119,6 +126,9 @@ fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: qu
 | Raw JSON schemas, 255 tools         | 71,929 | — |
 | `--slim` (names + parameter types)  |  8,282 | −88.5% |
 | `--compact` (names only)            |    123 | **−99.8%** |
+
+<sub>Measured with tiktoken cl100k_base over a real-world 255-tool config (50 MCP servers).
+Your mix will differ. Reproduce: `mcptoon manifest --compact --tokens`.</sub>
 
 In human terms: 71,929 tokens is roughly a 300-page book. 123 tokens is a sticky note.
 
@@ -148,6 +158,7 @@ and a 30s timeout per call so one hung server cannot stall your session.
 
 | Command | What it does |
 |---------|--------------|
+| `mcptoon sync --watch` | Poll configs, re-sync MCP servers across agents continuously |
 | `mcptoon call <server> <tool> '{…}'` | Call any tool on any server |
 | `mcptoon call --auto <tool> '{…}'` | Route by tool name, server found for you |
 | `mcptoon health` | Which servers are alive, dead, and how fast — exits 1 in CI if anything is dead |
@@ -170,6 +181,8 @@ Configured ≠ alive.
 - **Errors that agents can act on** — every failure returns a structured envelope with a
   fix suggestion ("server `fetchh` not found — did you mean `fetch`?"), so your agent
   self-corrects instead of stalling until you rescue it.
+- **Continuous sync (`--watch`)** — polls config files and re-syncs MCP servers across
+  agents on any change. Drift detection with merge/strict modes.
 - **Cross-server fuzzy search** — `mcptoon search star` finds the right tool across
   every configured server, with relevance scoring.
 - **`call --auto`** — give just the tool name; mcptoon finds the server that provides it.

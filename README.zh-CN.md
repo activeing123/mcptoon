@@ -4,6 +4,8 @@
 
 **装一次，你电脑上的每个 AI 就能用你所有的 AI 工具。**
 
+**真正的跨 Agent MCP 管理工具：一份配置管所有，`--watch` 持续同步不断档。**
+
 它像一根给 AI 工具用的万能插排：工具插一次，Claude Code、Cursor、Codex，
 乃至任何能执行命令的程序，全都能用。不改配置文件、不装插件、不用重启。
 附带的好处：AI 读一遍工具清单的开销，比原始 JSON **省 99.8%**。
@@ -96,9 +98,13 @@ sync 是合并不是覆盖——你手动配好的服务器原样保留。
 机器上所有 Agent 共享，不用再在 Cursor、Claude 之间来回复制粘贴 JSON。
 
 ```bash
+mcptoon sync --watch         # 持续同步，配置一变所有 Agent 自动跟上
 mcptoon sync --dry           # 预览会写什么，不动真格
 mcptoon sync --agent cursor  # 只同步 Cursor
 ```
+
+`--watch` 轮询配置文件，MCP 配置变更自动同步到所有 Agent。
+漂移检测能发现外部编辑，合并模式保留你手动添加的服务器。
 
 ### 第 2 步 · 只为名字付钱，不为 schema 付钱 —— `manifest`
 
@@ -115,6 +121,9 @@ fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: qu
 | 完整 JSON schema，255 个工具          | 71,929 | — |
 | `--slim`（名字 + 参数类型）           |  8,282 | −88.5% |
 | `--compact`（仅名字）                 |    123 | **−99.8%** |
+
+<sub>用 tiktoken cl100k_base 在一份真实配置上测得：255 个工具，50 个 MCP 服务器。
+你的组合不同数字也会不同。复现命令：`mcptoon manifest --compact --tokens`。</sub>
 
 说人话就是：71,929 个 token 大约是一本三百页的书；123 个，是一张便利贴。
 
@@ -144,6 +153,7 @@ mcptoon serve --listen :8080   # HTTP 模式 —— 多 Agent / 远程机器
 
 | 命令 | 干什么 |
 |------|--------|
+| `mcptoon sync --watch` | 持续同步 MCP 配置，跨 Agent 自动对齐 |
 | `mcptoon call <server> <tool> '{…}'` | 调任意服务器的任意工具 |
 | `mcptoon call --auto <tool> '{…}'` | 只给工具名，自动找到对应服务器 |
 | `mcptoon health` | 哪些服务器活着、死了、多快——CI 里全死光退出码为 1 |
@@ -166,6 +176,8 @@ mcptoon serve --listen :8080   # HTTP 模式 —— 多 Agent / 远程机器
 - **Agent 能自己消化的报错** —— 每个失败都返回结构化错误信封并附修复建议
   （"找不到服务器 `fetchh` —— 你是不是想要 `fetch`？"），Agent 读一遍就能自我纠正，
   不用卡在那等你救场。
+- **持续同步（`--watch`）** —— 轮询配置文件，MCP 配置变更自动同步到所有 Agent。
+  漂移检测 + 合并/严格双模式。
 - **跨服务器模糊搜索** —— `mcptoon search star` 带相关性评分，在所有已配置的
   服务器里找出对的那个工具，人和 Agent 都用得上。
 - **`call --auto`** —— 只给工具名，mcptoon 自动找到提供它的服务器。
