@@ -118,6 +118,9 @@ fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: qu
 
 说人话就是：71,929 个 token 大约是一本三百页的书；123 个，是一张便利贴。
 
+在几种方案之间纠结？[docs/comparison.md](docs/comparison.md) 按类目逐项对比了
+配置成本、token 成本和安全能力。
+
 这是一个旋钮，不是开关：想要零歧义随时切回 `--json`；
 `call` 的返回结果默认纯文本输出，且经过安全检查。
 

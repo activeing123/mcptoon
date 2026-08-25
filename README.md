@@ -122,6 +122,9 @@ fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: qu
 
 In human terms: 71,929 tokens is roughly a 300-page book. 123 tokens is a sticky note.
 
+Choosing between approaches? [docs/comparison.md](docs/comparison.md) breaks down
+setup cost, token cost and safety, category by category.
+
 It is a dial, not a switch: `--json` is always available when you want zero ambiguity,
 and `call` results default to plain text, security-checked.
 
