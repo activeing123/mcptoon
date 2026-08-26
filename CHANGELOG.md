@@ -5,6 +5,22 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] — 2026-08-26
+
+### Changed — Error envelope & usage-tracking hardening
+
+- **Richer error envelope**: `make_error()` now records which component
+  raised the error (`component`, legacy `source=` accepted as alias) and
+  groups extra keyword context under `_error.detail` instead of spreading
+  it at the top level of the result dict.
+- **New helpers**: `error_code(obj)` / `error_message(obj)` for reading
+  the envelope without touching its internals (`error_message` aliases
+  `get_error_message`).
+- **Concurrent-safe usage tracking**: `track_call()` is now guarded by a
+  thread lock and writes atomically (unique tmp file + `os.replace`), so
+  concurrent agent processes can never corrupt `usage.json`; tracking
+  failures are swallowed so they never break a live tool call.
+
 ## [0.5.5] — 2026-08-25
 
 ### Added — Continuous sync (`mcptoon sync --watch`)

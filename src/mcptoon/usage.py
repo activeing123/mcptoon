@@ -19,11 +19,17 @@ Tracks tool calls per server for cost analysis.
 Data stored in ~/.cache/mcptoon/usage.json
 """
 import json
+import os
+import threading
 import time
 
 from .config import CACHE_DIR
 
 _USAGE_FILE = CACHE_DIR / "usage.json"
+
+# Concurrency guard: multiple agent processes/servers may record calls
+# simultaneously (backported from the private layer, v0.5.6).
+_usage_lock = threading.Lock()
 
 
 def _load_usage() -> dict:
@@ -36,30 +42,48 @@ def _load_usage() -> dict:
 
 
 def _save_usage(data: dict):
+    """Atomic write: unique tmp file + os.replace — readers never see a
+    torn/partial usage.json even under concurrent writers."""
+    tmp = None
     try:
-        _USAGE_FILE.write_text(
+        _USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _USAGE_FILE.with_name(f"usage.json.tmp.{os.getpid()}.{id(data)}")
+        tmp.write_text(
             json.dumps(data, ensure_ascii=False),
             encoding="utf-8",
         )
+        os.replace(tmp, _USAGE_FILE)
     except OSError:
-        pass
+        if tmp is not None:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def track_call(server: str, tool: str, ok: bool = True, tokens_est: int = 0):
-    """Record a tool call."""
-    data = _load_usage()
-    data["calls"].append({
-        "server": server,
-        "tool": tool,
-        "ok": ok,
-        "tokens": tokens_est,
-        "ts": time.time(),
-    })
-    # Keep last 1000 calls
-    if len(data["calls"]) > 1000:
-        data["calls"] = data["calls"][-1000:]
-    data["total"] = data.get("total", 0) + 1
-    _save_usage(data)
+    """Record a tool call.
+
+    Crash-safe by contract: usage tracking must never break the actual
+    tool call it is recording.
+    """
+    try:
+        with _usage_lock:
+            data = _load_usage()
+            data["calls"].append({
+                "server": server,
+                "tool": tool,
+                "ok": ok,
+                "tokens": tokens_est,
+                "ts": time.time(),
+            })
+            # Keep last 1000 calls
+            if len(data["calls"]) > 1000:
+                data["calls"] = data["calls"][-1000:]
+            data["total"] = data.get("total", 0) + 1
+            _save_usage(data)
+    except Exception:
+        pass
 
 
 def get_usage_stats() -> dict:
