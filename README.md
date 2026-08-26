@@ -208,6 +208,20 @@ mcptoon inspects every result before it gets there:
 No telemetry. No analytics. No phone-home. API keys pass through from your config or
 environment and are never stored by mcptoon.
 
+## Academic & Industry Validation
+
+These independent sources validate the problem mcptoon solves.
+
+| Citation | Source | What it says |
+|----------|--------|--------------|
+| SEP-1576 | [modelcontextprotocol issue #1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | Official MCP proposal for schema redundancy reduction + smarter tool selection — validates mcptoon's zero-token direction |
+| Firecrawl Benchmark (2026) | [firecrawl.dev/blog/mcp-vs-cli](https://firecrawl.dev/blog/mcp-vs-cli) | Same tasks cost ~200 tokens via CLI vs ~44K via MCP — 4–32× more expensive |
+| Anthropic code-execution-with-MCP | [anthropic.com/engineering/code-execution-with-mcp](https://www.anthropic.com/engineering/code-execution-with-mcp) | Code-execution pattern cuts context overhead up to 98.7% (150K→~2K tokens) |
+| MCP-Zero (Xiamen University + USTC) | [Academic paper · arXiv:2506.01056](https://arxiv.org/abs/2506.01056) | On-demand tool retrieval achieves constant cost regardless of tool count |
+| ProMCP (ACL ARR 2026) | arXiv | Profiling token flows and latency of MCP agents |
+| Microsoft dynamic-tool-discovery | [Microsoft Learn: dynamic tool discovery](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery) | Dynamic tool discovery as the token-efficiency pattern for MCP clients |
+| Scalekit (2026) | [scalekit.com/blog/mcp-vs-cli-use](https://scalekit.com/blog/mcp-vs-cli-use) | Confirms 32× token cost difference between MCP and CLI |
+
 ## Works with
 
 **Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex · Gemini CLI · OpenCode** — plus aider, shell scripts, CI jobs and anything else that executes commands, including environments with no MCP support at all. That is what being a CLI first means.

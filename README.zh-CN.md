@@ -201,6 +201,20 @@ mcptoon 在结果进入上下文之前逐条检查：
 
 无遥测。无统计上报。无外呼。API Key 只从你的配置或环境变量透传，mcptoon 不存储。
 
+## 学术与业界验证
+
+这些独立来源验证了 mcptoon 所解决的问题。
+
+| 引用 | 来源 | 核心结论 |
+|------|------|----------|
+| SEP-1576 | [modelcontextprotocol issue #1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | 官方 MCP 提案：减少 schema 冗余、更聪明的工具选择——印证 mcptoon 的零 token 方向 |
+| Firecrawl 基准测试（2026） | [firecrawl.dev/blog/mcp-vs-cli](https://firecrawl.dev/blog/mcp-vs-cli) | 同样的任务，经 CLI 约 200 tokens，经 MCP 约 44K——贵 4–32× |
+| Anthropic code-execution-with-MCP | [anthropic.com/engineering/code-execution-with-mcp](https://www.anthropic.com/engineering/code-execution-with-mcp) | 代码执行模式最多削减 98.7% 的上下文开销（150K→约 2K tokens） |
+| MCP-Zero（厦门大学 + 中科大） | [学术论文 · arXiv:2506.01056](https://arxiv.org/abs/2506.01056) | 按需工具检索实现与工具总数无关的恒定成本 |
+| ProMCP（ACL ARR 2026） | arXiv | 剖析 MCP Agent 的 token 流量与延迟 |
+| Microsoft 动态工具发现 | [Microsoft Learn：动态工具发现](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery) | 动态工具发现是 MCP 客户端的 token 效率模式 |
+| Scalekit（2026） | [scalekit.com/blog/mcp-vs-cli-use](https://scalekit.com/blog/mcp-vs-cli-use) | 再次确认 MCP 与 CLI 之间 32× 的 token 成本差 |
+
 ## 兼容范围
 
 **Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex · Gemini CLI · OpenCode**
