@@ -79,3 +79,6 @@ docs/global-community-strategy.md
 
 # Private layer (local handlers, not for public release)
 local/
+
+# Preview artifacts
+readme_preview.html
