@@ -50,6 +50,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 CONFIG_FILE_TOML = CONFIG_DIR / "config.toml"
 CACHE_DIR = HOME_DIR / ".cache" / "mcptoon"
 LOG_DIR = CONFIG_DIR / "logs"
+TOGGLE_FILE = CONFIG_DIR / "toggles.json"
 
 # Ensure dirs exist
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -233,6 +234,50 @@ def list_servers() -> list[str]:
 def get_server_config(name: str) -> dict | None:
     """Get config for a specific server."""
     return load_config().get(name)
+
+
+# ─── Toggle management (per-tool enable/disable) ───
+
+def load_toggles() -> dict:
+    """Load tool toggle state. Format: {"server:tool": true/false}."""
+    if not TOGGLE_FILE.exists():
+        return {}
+    try:
+        return json.loads(TOGGLE_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_toggles(toggles: dict):
+    """Save tool toggle state."""
+    TOGGLE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TOGGLE_FILE.write_text(
+        json.dumps(toggles, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def is_tool_enabled(server: str, tool: str) -> bool:
+    """Check if a tool is enabled (default: True)."""
+    toggles = load_toggles()
+    key = f"{server}:{tool}"
+    return toggles.get(key, True)
+
+
+def toggle_tool(server: str, tool: str) -> bool:
+    """Toggle a tool on/off. Returns new state (True=enabled, False=disabled)."""
+    toggles = load_toggles()
+    key = f"{server}:{tool}"
+    current = toggles.get(key, True)
+    toggles[key] = not current
+    save_toggles(toggles)
+    return not current
+
+
+def list_disabled_tools() -> list[str]:
+    """List all disabled tool keys."""
+    toggles = load_toggles()
+    return [k for k, v in toggles.items() if not v]
 
 
 # ─── Sample config for first-time users ───

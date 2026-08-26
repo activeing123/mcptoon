@@ -36,6 +36,9 @@ Usage:
     mcptoon add <name> [options]         Add a server
     mcptoon remove <name>                Remove a server
     mcptoon usage                        Show usage stats
+    mcptoon stats                        Token savings dashboard (detailed)
+    mcptoon toggle <server> <tool>       Toggle a tool on/off
+    mcptoon toggle --list                List all toggled tools
     mcptoon install <name> --npm <pkg>    Install MCP server from npm
     mcptoon install <name> --pip <pkg>    Install MCP server from pip
     mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
@@ -174,6 +177,10 @@ def main():
         _cmd_remove(rest)
     elif command == "usage":
         _cmd_usage(rest, fmt)
+    elif command == "stats":
+        _cmd_stats(rest, fmt)
+    elif command == "toggle":
+        _cmd_toggle(rest, fmt)
     elif command == "discover":
         if "--health" in rest:
             # Legacy health-check mode
@@ -874,6 +881,136 @@ def _cmd_usage(_rest, fmt):
             print("\nTop tools:")
             for t, c in stats["top_tools"].items():
                 print(f"  {t:30s} {c}")
+
+
+def _cmd_stats(_rest, fmt):
+    """Token savings dashboard — shows how much mcptoon saves vs raw JSON.
+
+    Usage:
+        mcptoon stats              Human-readable dashboard
+        mcptoon stats --json       JSON output
+    """
+    from . import schema_simplifier
+
+    manifest = manifest_mod.get_manifest(use_cache=True)
+    usage = usage_mod.get_usage_stats()
+
+    # Count tools & compute token savings
+    total_tools = 0
+    total_full_tokens = 0
+    total_slim_tokens = 0
+    by_server_full = {}
+    by_server_slim = {}
+
+    for server, tools in manifest.items():
+        if not tools:
+            continue
+        server_full = 0
+        server_slim = 0
+        for t in tools:
+            if "error" in t:
+                continue
+            total_tools += 1
+            full_json = json.dumps(t, ensure_ascii=False)
+            slim = schema_simplifier.simplify_tool_def(t)
+            slim_json = json.dumps(slim, ensure_ascii=False)
+            full_tok = len(full_json) // 4  # rough token estimate
+            slim_tok = len(slim_json) // 4
+            total_full_tokens += full_tok
+            total_slim_tokens += slim_tok
+            server_full += full_tok
+            server_slim += slim_tok
+        by_server_full[server] = server_full
+        by_server_slim[server] = server_slim
+
+    saved = total_full_tokens - total_slim_tokens
+    pct = (saved / total_full_tokens * 100) if total_full_tokens > 0 else 0
+    disabled = cfg.list_disabled_tools()
+
+    if fmt == "json":
+        data = {
+            "total_tools": total_tools,
+            "full_tokens_est": total_full_tokens,
+            "slim_tokens_est": total_slim_tokens,
+            "tokens_saved": saved,
+            "savings_pct": round(pct, 1),
+            "total_calls": usage["total_calls"],
+            "success_rate": usage["success_rate"],
+            "disabled_tools": len(disabled),
+            "by_server": {s: {"full": by_server_full.get(s, 0), "slim": by_server_slim.get(s, 0)} for s in by_server_full},
+        }
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print("╔══════════════════════════════════════════╗")
+        print("║      mcptoon — Token Savings Dashboard   ║")
+        print("╚══════════════════════════════════════════╝")
+        print()
+        print(f"  Tools discovered:     {total_tools}")
+        print(f"  Full JSON tokens:     {total_full_tokens:,}")
+        print(f"  Slim manifest tokens: {total_slim_tokens:,}")
+        print(f"  ─────────────────────────────────")
+        print(f"  Tokens SAVED:         {saved:,} ({pct:.1f}%)")
+        print(f"  Disabled tools:       {len(disabled)}")
+        print()
+        if usage["total_calls"] > 0:
+            print(f"  Usage: {usage['total_calls']} calls, {usage['success_rate']} success")
+            if usage["by_server"]:
+                print("  Top servers by usage:")
+                for s, c in list(usage["by_server"].items())[:5]:
+                    print(f"    {s:20s} {c} calls")
+        print()
+        if by_server_full:
+            print("  Per-server token savings:")
+            for s in sorted(by_server_full):
+                sf = by_server_full[s]
+                ss = by_server_slim.get(s, 0)
+                sp = ((sf - ss) / sf * 100) if sf > 0 else 0
+                print(f"    {s:20s} {sf:>6,} → {ss:>6,}  (-{sp:.0f}%)")
+
+
+def _cmd_toggle(rest, fmt):
+    """Toggle a tool on/off (persisted in ~/.mcptoon/toggles.json).
+
+    Usage:
+        mcptoon toggle <server> <tool>     Toggle a specific tool
+        mcptoon toggle --list              List all toggled tools
+    """
+    if "--list" in rest or not rest:
+        disabled = cfg.list_disabled_tools()
+        if not disabled:
+            print("No tools are disabled. All tools are active.")
+            print("")
+            print("Usage: mcptoon toggle <server> <tool>   # toggle a tool off/on")
+            return
+        print(f"Disabled tools ({len(disabled)}):")
+        for key in sorted(disabled):
+            print(f"  ✗ {key}")
+        print("")
+        print("Re-enable: mcptoon toggle <server> <tool>  (toggle again)")
+        return
+
+    if len(rest) < 2:
+        print("Usage: mcptoon toggle <server> <tool>")
+        print("")
+        print("Examples:")
+        print("  mcptoon toggle exa search        # disable exa's search tool")
+        print("  mcptoon toggle exa search        # re-enable it")
+        print("  mcptoon toggle --list            # show all disabled tools")
+        sys.exit(1)
+
+    server = rest[0]
+    tool = rest[1]
+
+    # Verify server and tool exist
+    servers = cfg.load_config()
+    if server not in servers:
+        print(f"Server '{server}' not found.")
+        print(f"Available: {', '.join(sorted(servers.keys()))}")
+        sys.exit(1)
+
+    new_state = cfg.toggle_tool(server, tool)
+    status = "ENABLED ✓" if new_state else "DISABLED ✗"
+    print(f"{server}:{tool} → {status}")
 
 
 def _cmd_auto_discover(rest, fmt):
