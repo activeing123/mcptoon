@@ -1,18 +1,16 @@
 """Tests for stats command and toggle command."""
-import json
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 _src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
 from mcptoon import config as cfg
-from mcptoon import usage as usage_mod
 
 
 class TestToggleConfig(unittest.TestCase):
