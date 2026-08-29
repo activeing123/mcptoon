@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 400" font-family="-apple-system,'Segoe UI','Noto Sans SC',sans-serif">
+  <rect x="0.5" y="0.5" width="979" height="399" rx="16" fill="#ffffff" stroke="#d0d7de"/>
+
+  <text x="490" y="52" text-anchor="middle" font-size="22" font-weight="700" fill="#1f2328">问一句「有哪些工具」，要花多少 token？</text>
+  <text x="490" y="78" text-anchor="middle" font-size="14" fill="#57606a">同样 255 个工具 · tiktoken cl100k_base 实测 · 可用 mcptoon manifest --compact --tokens 复现</text>
+
+  <!-- Row 1: raw JSON -->
+  <text x="280" y="140" text-anchor="end" font-size="15" font-weight="600" fill="#1f2328">原始 JSON schema</text>
+  <rect x="296" y="122" width="560" height="30" rx="6" fill="#ffebe9" stroke="#cf222e" stroke-opacity="0.4"/>
+  <text x="866" y="143" font-size="16" font-weight="700" fill="#cf222e" font-family="ui-monospace,Consolas,monospace">71,929</text>
+
+  <!-- Row 2: slim -->
+  <text x="280" y="196" text-anchor="end" font-size="15" font-weight="600" fill="#1f2328">--slim 名字+参数</text>
+  <rect x="296" y="178" width="65" height="30" rx="6" fill="#d1f4d9" stroke="#1a7f37" stroke-opacity="0.4"/>
+  <text x="371" y="199" font-size="16" font-weight="700" fill="#1a7f37" font-family="ui-monospace,Consolas,monospace">8,282（−88.5%）</text>
+
+  <!-- Row 3: compact -->
+  <text x="280" y="252" text-anchor="end" font-size="15" font-weight="600" fill="#1f2328">mcptoon --compact</text>
+  <rect x="296" y="234" width="7" height="30" rx="3" fill="#1a7f37"/>
+  <rect x="293" y="231" width="13" height="36" rx="6" fill="#1a7f37" opacity="0.25"/>
+  <text x="316" y="255" font-size="16" font-weight="700" fill="#1a7f37" font-family="ui-monospace,Consolas,monospace">123（−99.8%）</text>
+
+  <!-- annotation -->
+  <path d="M310,234 C330,210 350,196 372,190" fill="none" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+
+  <!-- footer -->
+  <text x="490" y="330" text-anchor="middle" font-size="15" fill="#57606a">71,929 ≈ 一本 300 页的书 · 123 ≈ 一张便利贴</text>
+  <text x="490" y="360" text-anchor="middle" font-size="15" font-weight="600" fill="#1a7f37">关键不是压缩：schema 根本不进上下文</text>
+  <text x="490" y="386" text-anchor="middle" font-size="12" fill="#8c959f">mcptoon · 跨 Agent MCP 管理工具</text>
+</svg>
