@@ -33,7 +33,7 @@
 
   <!-- P3 Plug in -->
   <rect x="512" y="24" width="212" height="340" rx="14" fill="#f6f8fa" stroke="#e1e4e8"/>
-  <text x="618" y="60" text-anchor="middle" font-size="17" font-weight="700" fill="#1f2328">Plug in</text>
+  <text x="618" y="60" text-anchor="middle" font-size="17" font-weight="700" fill="#1f2328">Auto-discover</text>
   <text x="566" y="132" text-anchor="middle" font-size="38">🌐</text>
   <text x="618" y="132" text-anchor="middle" font-size="38">🐙</text>
   <text x="670" y="132" text-anchor="middle" font-size="38">🗄️</text>
