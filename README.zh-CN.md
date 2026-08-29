@@ -25,7 +25,7 @@
 <p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon 演示：安装，添加服务器，同步到所有 Agent，看 token 节省"></p>
 
 <p align="center">
-  <a href="assets/promo.mp4"><img src="assets/promo.gif" width="640" alt="39 秒动画看懂 mcptoon：一个改变你使用 Agent 工具习惯的神奇工具"></a>
+  <a href="assets/promo-zh.mp4"><img src="assets/promo-zh.gif" width="640" alt="39 秒动画看懂 mcptoon：一个改变你使用 Agent 工具习惯的神奇工具"></a>
   <br>
   <sub>🎬 <b>39 秒动画看懂 mcptoon</b> —— 开局一句话，痛点、装一次、自动发现、token 对比、安全把关全讲透 · 点击画面看高清版</sub>
 </p>
