@@ -24,7 +24,11 @@ Already compatible with native MCP JSON! TOON compression is optional! · Zero c
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
 
-![How mcptoon works: install once, auto-discover every tool, every AI can use them all](assets/how-it-works-en.svg)
+<p align="center">
+  <a href="assets/promo.mp4"><img src="assets/promo.gif" width="640" alt="39-second animated tour of mcptoon: a magical tool that changes how you use Agents"></a>
+  <br>
+  <sub>🎬 <b>mcptoon in 39 seconds</b> — the hook, the pain, install once, auto-discover, the token math, and the safety net · click for HD</sub>
+</p>
 
 ```bash
 pip install mcptoon        # pure stdlib, ~250KB, no deps
