@@ -34,6 +34,17 @@ mcptoon demo               # live side-by-side: JSON vs mcptoon, real token coun
 
 ---
 
+## 🗺️ Runtime architecture (interactive)
+
+Below is the mcptoon runtime architecture diagram (generated from the real source;
+nodes carry `SRC n` links back to verified code evidence). Click the preview to open
+the interactive version: search nodes, trace call paths, compare semantic roles,
+toggle light/dark themes, and export.
+
+[![mcptoon runtime architecture demo](assets/architecture-en-demo.gif)](assets/architecture-en.html)
+
+---
+
 ## ⚡ Get it in 30 seconds (beginner entrance)
 
 mcptoon is a cross-agent MCP management tool. Install it once, and every agent —

@@ -34,6 +34,15 @@ mcptoon demo               # 现场对比：JSON vs mcptoon，真实 token 数�
 
 ---
 
+## 🗺️ 运行架构（可交互）
+
+下方是 mcptoon 的运行时架构图（基于真实源码生成，节点带 `SRC n` 可回看代码证据）。
+点击预览图打开可交互版：支持搜索节点、追踪调用路径、对比语义角色、深浅主题切换与导出。
+
+[![mcptoon 运行架构演示](assets/architecture-zh-demo.gif)](assets/architecture-zh.html)
+
+---
+
 ## ⚡ 30 秒懂它（小白入口）
 
 mcptoon 是一个跨 agent MCP 管理工具，装一次，所有 agent，
