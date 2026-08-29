@@ -165,6 +165,19 @@ class MCPClient:
         })
         return self._extract_content(result)
 
+    def call_tool_full(self, name: str, arguments: dict | None = None) -> Any:
+        """Call a tool and return the COMPLETE MCP tools/call result envelope.
+
+        Unlike call_tool(), this keeps every protocol-level field intact:
+        structuredContent, _meta, resultType, isError, content — everything
+        the server sent. Required for newer MCP spec servers that return
+        structured output instead of plain text content.
+        """
+        return self._request("tools/call", {
+            "name": name,
+            "arguments": arguments or {},
+        })
+
     def close(self):
         """Clean up: kill subprocess or close HTTP session."""
         if self._transport == "stdio" and self._proc:
@@ -469,9 +482,17 @@ class MCPClient:
 
         MCP returns {"content": [{"type": "text", "text": "..."}], ...}
         We try to parse the text content as JSON for structured results.
+
+        New MCP spec (2025-06-18+) servers may return `structuredContent`
+        instead of / alongside text content — when present, it is preferred
+        as the authoritative result.
         """
         if not isinstance(result, dict):
             return result
+
+        # New protocol: structuredContent is the authoritative result
+        if result.get("structuredContent") is not None:
+            return result["structuredContent"]
 
         # Check for MCP error
         if result.get("isError"):
@@ -588,6 +609,14 @@ class MCPClientPool:
     def call(self, server: str, tool: str, arguments: dict | None = None) -> Any:
         """Call a tool on a specific server."""
         return self._get_client(server).call_tool(tool, arguments)
+
+    def call_full(self, server: str, tool: str, arguments: dict | None = None) -> Any:
+        """Call a tool and return the complete MCP tools/call result envelope.
+
+        Keeps protocol-level fields intact: structuredContent, _meta,
+        resultType, isError, content.
+        """
+        return self._get_client(server).call_tool_full(tool, arguments)
 
     def list_all_tools(self) -> dict[str, list[dict]]:
         """List tools from all configured servers. Returns {server: [tools]}."""

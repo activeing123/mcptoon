@@ -8,10 +8,15 @@
 
 已经符合原生 MCP JSON 格式！TOON 格式压缩为可选项！ · 零配置 · 零依赖
 
+> ✅ **兼容最新 MCP 规范（2025-06-18）**——原生解析结构化输出（`structuredContent`），
+> `call --envelope` 透传 `_meta` / `resultType`，新一代 SDK
+> （`@modelcontextprotocol/server`）构建的服务器开箱即用。
+
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-531%20passed-brightgreen)](#for-developers)
+[![Tests](https://img.shields.io/badge/Tests-548%20passed-brightgreen)](#给开发者)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2025--06--18_compat-blueviolet)](#兼容最新-mcp-规范)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -164,12 +169,33 @@ mcptoon serve --listen :8080   # HTTP，多 Agent 同时连 / 远程机器可用
 - **多 Agent 同时连**：HTTP 模式并发请求线程隔离，响应不串台
 - **并发安全记账**：使用记录线程锁 + 原子写，多 Agent 并发跑不损坏 `usage.json`
 
+## 兼容最新 MCP 规范
+
+MCP 生态正在向 2025-06-18 新规范迁移：用新一代 SDK（`@modelcontextprotocol/server`，
+替代已淘汰的 v1 `sdk` 包）构建的服务器可以返回**结构化输出**而非纯文本。
+mcptoon 今天就同时支持两代服务器：
+
+| 新规范特性 | mcptoon 支持 |
+|-----------|-------------|
+| `structuredContent`（结构化工具输出） | ✅ 原生解析——有则自动优先采用 |
+| `_meta` / `resultType` 协议字段 | ✅ `mcptoon call <server> <tool> --envelope` 透传 |
+| 新 SDK 服务器（`@modelcontextprotocol/server-*`） | ✅ 零配置，stdio 和 HTTP 通吃 |
+| 旧规范服务器（纯文本输出） | ✅ 行为不变，完全向后兼容 |
+
+```bash
+mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # 完整 MCP 结果信封，JSON 输出
+```
+
+日常使用不需要任何新参数：新规范服务器返回结构化输出时 mcptoon 自动识别。
+需要原始协议载荷（审计、调试、查 `_meta`）时才用 `--envelope`。
+
 ### 盒子里还有的一切
 
 | 命令 | 作用 |
 |------|------|
 | `mcptoon sync --watch` | 轮询配置，跨 Agent 持续重同步 MCP 服务器 |
 | `mcptoon call <server> <tool> '{…}'` | 调任意服务器上的任意工具 |
+| `mcptoon call <server> <tool> --envelope` | 返回完整 MCP 结果信封（structuredContent、_meta） |
 | `mcptoon call --auto <tool> '{…}'` | 只给工具名，自动路由到正确服务器 |
 | `mcptoon health` | 哪些服务器活着、死了、多快；CI 里全死退出码 1 |
 | `mcptoon install <name> --npm <pkg>` | 装服务器并自动发现工具 |
@@ -304,7 +330,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 531 个测试，预期全绿
+python -m pytest tests/ -v          # 548 个测试，预期全绿
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

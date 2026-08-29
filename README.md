@@ -8,10 +8,15 @@
 
 Already compatible with native MCP JSON! TOON compression is optional! · Zero config · Zero dependencies
 
+> ✅ **Compatible with the latest MCP spec (2025-06-18)** — structured output
+> (`structuredContent`) parsed natively, `_meta` / `resultType` passthrough via
+> `call --envelope`, works with new-SDK (`@modelcontextprotocol/server`) servers out of the box.
+
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-531%20passed-brightgreen)](#for-developers)
+[![Tests](https://img.shields.io/badge/Tests-548%20passed-brightgreen)](#for-developers)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2025--06--18_compat-blueviolet)](#compatible-with-the-latest-mcp-spec)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -169,12 +174,34 @@ mcptoon serve --listen :8080   # HTTP — multiple agents, remote machines
 - **Multiple agents at once**: HTTP mode isolates concurrent requests per thread
 - **Concurrency-safe accounting**: usage log uses thread locks + atomic writes
 
+## Compatible with the latest MCP spec
+
+The MCP ecosystem is moving to the 2025-06-18 spec: servers built on the new SDK
+(`@modelcontextprotocol/server`, replacing the deprecated v1 `sdk` package) can return
+**structured output** instead of plain text. mcptoon handles both generations today:
+
+| New-spec feature | mcptoon support |
+|------------------|-----------------|
+| `structuredContent` (structured tool output) | ✅ parsed natively — preferred over text content automatically |
+| `_meta` / `resultType` protocol fields | ✅ available via `mcptoon call <server> <tool> --envelope` |
+| New-SDK servers (`@modelcontextprotocol/server-*`) | ✅ zero config, stdio and HTTP |
+| Old-spec servers (text content only) | ✅ unchanged behavior, full backward compatibility |
+
+```bash
+mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # complete MCP result envelope as JSON
+```
+
+No flags needed for everyday use: when a new-spec server returns structured output,
+mcptoon picks it up automatically. `--envelope` is there when an agent needs the raw
+protocol payload (audit, debugging, `_meta` inspection).
+
 ### Everything else in the box
 
 | Command | What it does |
 |---------|--------------|
 | `mcptoon sync --watch` | Poll configs, re-sync MCP servers across agents continuously |
 | `mcptoon call <server> <tool> '{…}'` | Call any tool on any server |
+| `mcptoon call <server> <tool> --envelope` | Return the complete MCP result envelope (structuredContent, _meta) |
 | `mcptoon call --auto <tool> '{…}'` | Route by tool name, server found for you |
 | `mcptoon health` | Which servers are alive, dead, and how fast — exits 1 in CI if anything is dead |
 | `mcptoon install <name> --npm <pkg>` | Install a server, auto-discover tools |
@@ -312,7 +339,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 531 tests, green expected
+python -m pytest tests/ -v          # 548 tests, green expected
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

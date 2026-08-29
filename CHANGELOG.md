@@ -5,6 +5,32 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] — 2026-08-27
+
+### Added — Latest MCP spec compatibility (2025-06-18)
+
+- **`structuredContent` native parsing**: when a new-spec server returns
+  structured output, `call_tool()` now prefers it over text content
+  automatically — no flags needed. Old-spec servers behave exactly as before.
+- **`mcptoon call <server> <tool> --envelope`**: new flag returning the
+  complete MCP `tools/call` result envelope as JSON — `structuredContent`,
+  `_meta`, `resultType`, `isError`, `content` all intact. Works with
+  `--auto` routing too.
+- **Library API**: `MCPClient.call_tool_full()` and `MCPClientPool.call_full()`
+  for envelope-level access from Python.
+- 8 new tests (548 total). README (EN + zh-CN) documents the compatibility
+  matrix with a prominent spec badge.
+
+## [0.6.0] — 2026-08-26
+
+### Added — Usage dashboard & per-tool toggle
+
+- **`mcptoon stats`**: token-savings dashboard with per-server/per-tool breakdowns.
+- **`mcptoon toggle <server> <tool>`**: flip a single tool on/off without touching
+  the server config; `toggle --list` shows what is disabled. Tool-level control
+  no competitor offers at the CLI layer.
+- `TOGGLE_FILE` (`~/.mcptoon/toggles.json`) with safe-load defaults.
+
 ## [0.5.6] — 2026-08-26
 
 ### Changed — Error envelope & usage-tracking hardening

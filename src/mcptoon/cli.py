@@ -28,6 +28,7 @@ Usage:
     mcptoon search <query>              Search tools across all servers
     mcptoon call <server> <tool> [ARGS]  Call a tool
     mcptoon call --auto <tool> [ARGS]    Call a tool (auto-find server)
+    mcptoon call <server> <tool> --envelope   Return complete MCP result envelope
     mcptoon call <server> <tool> --stdin   Read args from stdin (large payloads)
     mcptoon init                         Create sample config
     mcptoon init --auto                  Auto-discover all MCP servers
@@ -334,6 +335,11 @@ def _cmd_inspect(rest, fmt, max_chars, full):
 
 def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json=False):
     """Call a tool."""
+    # Check for --envelope mode (complete MCP result envelope, new-protocol servers)
+    return_envelope = "--envelope" in rest
+    if return_envelope:
+        rest = [a for a in rest if a != "--envelope"]
+
     # Check for --auto mode
     is_auto = "--auto" in rest
     if is_auto:
@@ -379,7 +385,8 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
                     args[k] = v
 
         from .router import call_tool_auto
-        result = call_tool_auto(tool, args, is_destructive=is_destructive)
+        result = call_tool_auto(tool, args, is_destructive=is_destructive,
+                                return_envelope=return_envelope)
 
         if is_error(result):
             err = result["_error"]
@@ -395,13 +402,14 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
         return
 
     if len(rest) < 2:
-        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin]")
-        print("       mcptoon call --auto <tool> [JSON_ARGS] [--destructive] [--stdin]")
+        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin] [--envelope]")
+        print("       mcptoon call --auto <tool> [JSON_ARGS] [--destructive] [--stdin] [--envelope]")
         print("")
         print("Examples:")
         print('  mcptoon call fetch fetch \'{"url":"https://example.com"}\' --toon')
         print('  mcptoon call exa search \'{"query":"AI"}\' --json')
         print('  mcptoon call --auto search \'{"query":"AI"}\'  # auto-find server')
+        print('  mcptoon call db query \'{"sql":"SELECT 1"}\' --envelope  # full MCP result envelope')
         print('  echo \'{"huge":"payload"}\' | mcptoon call server tool --stdin --toon')
         sys.exit(1)
 
@@ -443,7 +451,8 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
                     pass
                 args[k] = v
 
-    result = call_tool(server, tool, args, is_destructive=is_destructive)
+    result = call_tool(server, tool, args, is_destructive=is_destructive,
+                       return_envelope=return_envelope)
 
     if is_error(result):
         err = result["_error"]

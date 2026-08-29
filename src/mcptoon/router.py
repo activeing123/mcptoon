@@ -256,6 +256,7 @@ def call_tool(
     args: dict | None = None,
     is_destructive: bool = False,
     skip_poisoning_check: bool = False,
+    return_envelope: bool = False,
 ) -> Any:
     """Route a tool call to the appropriate handler or MCP server.
 
@@ -276,6 +277,10 @@ def call_tool(
         args: Tool arguments dict
         is_destructive: Acknowledge dangerous operation
         skip_poisoning_check: Skip poisoning detection (for trusted sources)
+        return_envelope: Return the complete MCP tools/call result envelope
+            (structuredContent, _meta, resultType, isError, content) instead
+            of the extracted content. Only affects the MCP path — custom
+            handlers have no protocol envelope and return as before.
 
     Returns:
         Tool result (dict, list, or scalar)
@@ -332,7 +337,10 @@ def call_tool(
 
     try:
         pool = _get_pool()
-        result = pool.call(server, tool, args)
+        if return_envelope:
+            result = pool.call_full(server, tool, args)
+        else:
+            result = pool.call(server, tool, args)
 
         # Check for poisoning and credential leaks in result
         if not skip_poisoning_check:
@@ -377,6 +385,7 @@ def call_tool_auto(
     args: dict | None = None,
     is_destructive: bool = False,
     skip_poisoning_check: bool = False,
+    return_envelope: bool = False,
 ) -> Any:
     """Auto-route a tool call to the server that has this tool.
 
@@ -389,6 +398,7 @@ def call_tool_auto(
         args: Tool arguments dict
         is_destructive: Acknowledge dangerous operation
         skip_poisoning_check: Skip poisoning detection
+        return_envelope: Return the complete MCP result envelope (MCP path only)
 
     Returns:
         Tool result, or error dict if tool not found on any server.
@@ -408,7 +418,8 @@ def call_tool_auto(
             if mod and hasattr(mod, "SCHEMA"):
                 for td in mod.SCHEMA:
                     if td.get("name", "").lower() == tool.lower():
-                        return call_tool(server_name, tool, args, is_destructive, skip_poisoning_check)
+                        return call_tool(server_name, tool, args, is_destructive,
+                                         skip_poisoning_check, return_envelope)
         except Exception:
             continue
 
@@ -463,4 +474,4 @@ def call_tool_auto(
         except Exception:
             chosen = servers_with_tool[0]
 
-    return call_tool(chosen, tool, args, is_destructive, skip_poisoning_check)
+    return call_tool(chosen, tool, args, is_destructive, skip_poisoning_check, return_envelope)
