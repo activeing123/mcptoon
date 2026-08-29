@@ -2,7 +2,7 @@
 
 # mcptoon — 跨 Agent MCP 管理工具
 
-## **一个改变你使用 Agent 习惯的神器工具**
+## **一个改变你使用 Agent 工具习惯的神奇工具**
 
 ### **装一次，所有 Agent 自动发现使用你所有 MCP 工具，还能顺便节省你的 token**
 
@@ -24,7 +24,11 @@
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon 演示：安装，添加服务器，同步到所有 Agent，看 token 节省"></p>
 
-![一图看懂 mcptoon：装一次，自动发现所有工具，所有 AI 全都能用](assets/how-it-works-zh.svg)
+<p align="center">
+  <a href="assets/promo.mp4"><img src="assets/promo.gif" width="640" alt="39 秒动画看懂 mcptoon：一个改变你使用 Agent 工具习惯的神奇工具"></a>
+  <br>
+  <sub>🎬 <b>39 秒动画看懂 mcptoon</b> —— 开局一句话，痛点、装一次、自动发现、token 对比、安全把关全讲透 · 点击画面看高清版</sub>
+</p>
 
 ```bash
 pip install mcptoon        # 纯标准库，约 250KB，零依赖
