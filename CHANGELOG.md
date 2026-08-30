@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added — MCP 2026-07-28 support (latest spec, stateless revision)
 
+- **MCP Registry ready**: the package README now carries the
+  `mcp-name: io.github.activeing123/mcptoon` ownership marker required by the
+  official MCP Registry (registry.modelcontextprotocol.io).
+- serve help text: replaced an internal tool name with a neutral description
+  ("for Claude Code and other local agents").
+
 - **Automatic version negotiation** (`spec="auto"`, the new default): the client
   probes every server with the 2026-07-28 `server/discover` RPC first. Servers
   that answer get stateless modern semantics; anything that rejects the probe
