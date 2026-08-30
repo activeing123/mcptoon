@@ -920,7 +920,7 @@ Performance features:
   - HTTP mode: multiple agents can connect simultaneously
 
 Modes:
-  stdio (default)   Single agent, local process — for Claude Code, CatPaw
+  stdio (default)   Single agent, local process — for Claude Code and other local agents
   HTTP (--listen)    Multi-agent, remote access — for teams, K8s, cloud
 
 Options:
