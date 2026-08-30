@@ -340,6 +340,26 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
     if return_envelope:
         rest = [a for a in rest if a != "--envelope"]
 
+    # Check for --input-responses '<json>' (MCP 2026-07-28 MRTR retry)
+    input_responses = None
+    request_state = None
+    for i, a in enumerate(rest):
+        if a == "--input-responses" and i + 1 < len(rest):
+            try:
+                input_responses = json.loads(rest[i + 1])
+            except json.JSONDecodeError as e:
+                print(f"Error parsing --input-responses JSON: {e}", file=sys.stderr)
+                sys.exit(1)
+            rest = rest[:i] + rest[i + 2:]
+            break
+
+    # Check for --request-state '<token>' (MCP 2026-07-28 MRTR correlation)
+    for i, a in enumerate(rest):
+        if a == "--request-state" and i + 1 < len(rest):
+            request_state = rest[i + 1]
+            rest = rest[:i] + rest[i + 2:]
+            break
+
     # Check for --auto mode
     is_auto = "--auto" in rest
     if is_auto:
@@ -402,7 +422,7 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
         return
 
     if len(rest) < 2:
-        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin] [--envelope]")
+        print("Usage: mcptoon call <server> <tool> [JSON_ARGS] [--destructive] [--stdin] [--envelope] [--input-responses JSON] [--request-state TOKEN]")
         print("       mcptoon call --auto <tool> [JSON_ARGS] [--destructive] [--stdin] [--envelope]")
         print("")
         print("Examples:")
@@ -410,6 +430,7 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
         print('  mcptoon call exa search \'{"query":"AI"}\' --json')
         print('  mcptoon call --auto search \'{"query":"AI"}\'  # auto-find server')
         print('  mcptoon call db query \'{"sql":"SELECT 1"}\' --envelope  # full MCP result envelope')
+        print("  mcptoon call db query '{}' --input-responses '{\"answer\": 42}' --request-state 'st-42'  # MRTR retry (2026-07-28)")
         print('  echo \'{"huge":"payload"}\' | mcptoon call server tool --stdin --toon')
         sys.exit(1)
 
@@ -452,13 +473,27 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
                 args[k] = v
 
     result = call_tool(server, tool, args, is_destructive=is_destructive,
-                       return_envelope=return_envelope)
+                       return_envelope=return_envelope,
+                       input_responses=input_responses,
+                       request_state=request_state)
 
     if is_error(result):
         err = result["_error"]
         print(f"Error [{err['code']}]: {err['message']}", file=sys.stderr)
         if err.get("retry"):
             print("  (retryable)", file=sys.stderr)
+        # MRTR (MCP 2026-07-28): the tool asked for more input — show the
+        # requests and how to answer them.
+        if err["code"] == "INPUT_REQUIRED" and result.get("input_requests"):
+            print("  The tool needs more input (multi round-trip request):", file=sys.stderr)
+            for req in result["input_requests"]:
+                name = req.get("method", "?") if isinstance(req, dict) else str(req)
+                print(f"    - {name}", file=sys.stderr)
+            state_hint = ""
+            if result.get("request_state"):
+                state_hint = f" --request-state '{result['request_state']}'"
+            print(f'  Answer them and retry: mcptoon call ... --input-responses \'{{"method": "value"}}\'{state_hint}',
+                  file=sys.stderr)
         # Fuzzy match suggestions for unknown tools
         if err["code"] == "UNKNOWN_TOOL" and result.get("suggestions"):
             print(f"Did you mean: {', '.join(result['suggestions'])}", file=sys.stderr)
