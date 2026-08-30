@@ -8,15 +8,14 @@
 
 已经符合原生 MCP JSON 格式！TOON 格式压缩为可选项！ · 零配置 · 零依赖
 
-> ✅ **兼容最新 MCP 规范（2025-06-18）**——原生解析结构化输出（`structuredContent`），
-> `call --envelope` 透传 `_meta` / `resultType`，新一代 SDK
-> （`@modelcontextprotocol/server`）构建的服务器开箱即用。
+> ✅ **兼容最新 MCP 规范（2026-07-28）**——无状态自动协商、结构化输出原生解析、
+> MRTR 多轮补参，`server/discover` 探测新版服务器，旧版全兼容开箱即用。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-548%20passed-brightgreen)](#给开发者)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2025--06--18_compat-blueviolet)](#兼容最新-mcp-规范)
+[![Tests](https://img.shields.io/badge/Tests-569%20passed-brightgreen)](#给开发者)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-规范兼容性2026-07-28)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -173,21 +172,24 @@ mcptoon serve --listen :8080   # HTTP，多 Agent 同时连 / 远程机器可用
 - **多 Agent 同时连**：HTTP 模式并发请求线程隔离，响应不串台
 - **并发安全记账**：使用记录线程锁 + 原子写，多 Agent 并发跑不损坏 `usage.json`
 
-## 兼容最新 MCP 规范
+## MCP 规范兼容性（2026-07-28）
 
-MCP 生态正在向 2025-06-18 新规范迁移：用新一代 SDK（`@modelcontextprotocol/server`，
-替代已淘汰的 v1 `sdk` 包）构建的服务器可以返回**结构化输出**而非纯文本。
-mcptoon 今天就同时支持两代服务器：
+mcptoon 0.7.0 说的是**最新 MCP 规范 [2026-07-28](https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28)**——
+无状态化那一版——同时完全兼容所有旧版服务器：
 
-| 新规范特性 | mcptoon 支持 |
+| MCP 修订版 | mcptoon 支持 |
 |-----------|-------------|
-| `structuredContent`（结构化工具输出） | ✅ 原生解析——有则自动优先采用 |
-| `_meta` / `resultType` 协议字段 | ✅ `mcptoon call <server> <tool> --envelope` 透传 |
-| 新 SDK 服务器（`@modelcontextprotocol/server-*`） | ✅ 零配置，stdio 和 HTTP 通吃 |
-| 旧规范服务器（纯文本输出） | ✅ 行为不变，完全向后兼容 |
+| **2026-07-28**（最新 · 无状态） | ✅ `server/discover` 自动协商 · 每请求 `_meta` 协议标注 · `Mcp-Method`/`Mcp-Name` HTTP 标准头 · MRTR 多轮补参（`resultType: "input_required"` → `--input-responses` 应答重试） |
+| 2025-11-25 / 2025-06-18 | ✅ 经典 `initialize` 握手 · `structuredContent` 原生解析 · `--envelope` 透传 |
+| 2025-03-26 / 2024-11-05（旧服务器） | ✅ 行为不变，完全向后兼容 |
+
+版本选择全自动（`spec="auto"`）：客户端先用 `server/discover` 探测，
+服务器不认识就静默回落经典握手。也可以在 `~/.mcptoon/config.json` 里按服务器
+钉死：`spec: "legacy"` 或 `spec: "2026-07-28"`。
 
 ```bash
 mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # 完整 MCP 结果信封，JSON 输出
+mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR 多轮补参重试（2026-07-28）
 ```
 
 日常使用不需要任何新参数：新规范服务器返回结构化输出时 mcptoon 自动识别。
