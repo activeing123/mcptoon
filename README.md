@@ -8,15 +8,15 @@
 
 Already compatible with native MCP JSON! TOON compression is optional! · Zero config · Zero dependencies
 
-> ✅ **Compatible with the latest MCP spec (2025-06-18)** — structured output
-> (`structuredContent`) parsed natively, `_meta` / `resultType` passthrough via
-> `call --envelope`, works with new-SDK (`@modelcontextprotocol/server`) servers out of the box.
+> ✅ **Speaks the latest MCP spec (2026-07-28)** — stateless auto-negotiation,
+> structured output parsed natively, MRTR multi round-trips, `server/discover`
+> probing for new-spec servers with full backward compatibility.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-548%20passed-brightgreen)](#for-developers)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2025--06--18_compat-blueviolet)](#compatible-with-the-latest-mcp-spec)
+[![Tests](https://img.shields.io/badge/Tests-569%20passed-brightgreen)](#for-developers)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-spec-compatibility-2026-07-28)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -178,21 +178,25 @@ mcptoon serve --listen :8080   # HTTP — multiple agents, remote machines
 - **Multiple agents at once**: HTTP mode isolates concurrent requests per thread
 - **Concurrency-safe accounting**: usage log uses thread locks + atomic writes
 
-## Compatible with the latest MCP spec
+## MCP spec compatibility (2026-07-28)
 
-The MCP ecosystem is moving to the 2025-06-18 spec: servers built on the new SDK
-(`@modelcontextprotocol/server`, replacing the deprecated v1 `sdk` package) can return
-**structured output** instead of plain text. mcptoon handles both generations today:
+mcptoon 0.7.0 speaks the **latest MCP specification, [2026-07-28](https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28)** —
+the stateless revision — while staying fully compatible with every older server:
 
-| New-spec feature | mcptoon support |
+| MCP revision | mcptoon support |
 |------------------|-----------------|
-| `structuredContent` (structured tool output) | ✅ parsed natively — preferred over text content automatically |
-| `_meta` / `resultType` protocol fields | ✅ available via `mcptoon call <server> <tool> --envelope` |
-| New-SDK servers (`@modelcontextprotocol/server-*`) | ✅ zero config, stdio and HTTP |
-| Old-spec servers (text content only) | ✅ unchanged behavior, full backward compatibility |
+| **2026-07-28** (latest — stateless) | ✅ `server/discover` auto-negotiation · per-request `_meta` protocol annotation · `Mcp-Method`/`Mcp-Name` HTTP headers · MRTR multi round-trip (`resultType: "input_required"` → answer and retry with `--input-responses`) |
+| 2025-11-25 / 2025-06-18 | ✅ classic `initialize` handshake · structured output (`structuredContent`) parsed natively · `--envelope` passthrough |
+| 2025-03-26 / 2024-11-05 (old servers) | ✅ unchanged behavior, full backward compatibility |
+
+Version selection is automatic (`spec="auto"`): the client probes with
+`server/discover` and silently falls back to the legacy handshake when the
+server predates it. Pin a mode per server with `spec: "legacy"` or
+`spec: "2026-07-28"` in `~/.mcptoon/config.json`.
 
 ```bash
 mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # complete MCP result envelope as JSON
+mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR retry (2026-07-28)
 ```
 
 No flags needed for everyday use: when a new-spec server returns structured output,
