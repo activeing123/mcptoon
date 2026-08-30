@@ -5,6 +5,56 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-29
+
+### Added — MCP 2026-07-28 support (latest spec, stateless revision)
+
+- **Automatic version negotiation** (`spec="auto"`, the new default): the client
+  probes every server with the 2026-07-28 `server/discover` RPC first. Servers
+  that answer get stateless modern semantics; anything that rejects the probe
+  silently falls back to the classic `initialize` handshake (now declaring
+  `2025-06-18` instead of `2024-11-05`). Zero configuration change for
+  existing users — mixed fleets of new and old servers just work.
+- **Stateless request annotation**: in modern mode every request carries
+  `_meta` with `io.modelcontextprotocol/protocolVersion`,
+  `io.modelcontextprotocol/clientCapabilities` and
+  `io.modelcontextprotocol/clientInfo` — no initialize handshake, no session.
+- **Streamable HTTP 2026-07-28 headers**: requests carry the required
+  `Mcp-Method` (and `Mcp-Name` for `tools/call`); `Mcp-Session-Id` is never
+  sent in modern mode. Legacy mode keeps session capture/replay.
+- **MRTR — Multi Round-Trip Requests** (SEP-2322): a `resultType:
+  "input_required"` result raises `MCPInputRequired` (code `INPUT_REQUIRED`)
+  carrying `input_requests` / `request_state`. Answer and retry with
+  `call_tool(..., input_responses=..., request_state=...)` (API) or
+  `mcptoon call <server> <tool> --input-responses '<json>'
+  --request-state <token>` (CLI) — the retry echoes `params.requestState`
+  so a stateless server can correlate the two rounds. The router error
+  envelope exposes the same detail for Agent integrations.
+- **`UnsupportedProtocolVersionError` handling** (`-32022`): in auto mode the
+  client falls back to the legacy handshake once and replays the request.
+- **Per-server spec pinning**: `spec: "auto" | "2026-07-28" | "legacy"` in
+  `~/.mcptoon/config.json`; `spec="2026-07-28"` fails loudly
+  (`NO_MODERN_SUPPORT`) when a server can't keep up instead of guessing.
+- `MCPClient.server_info` / `MCPClient.server_capabilities` now populated in
+  both modes; `PROTOCOL_VERSION` alias moved to `2025-06-18` (was
+  `2024-11-05`); new constants `LATEST_PROTOCOL_VERSION`,
+  `LEGACY_PROTOCOL_VERSION`, `SUPPORTED_PROTOCOL_VERSIONS`.
+- 21 new tests (`tests/test_v07_spec2026.py`): negotiation, stateless shaping,
+  header/session semantics, MRTR raise + retry (incl. `requestState` echo),
+  -32022 fallback, pool spec config, string-command leniency. Live-fire
+  battery against a spec-accurate 2026-07-28 HTTP server, a real stdio
+  subprocess server and `mcptoon serve`: 10/10. Suite: **569 passed**.
+
+### Fixed
+
+- `MCPClientPool._make_client` accepts a bare string `"command": "python"`
+  (wrapped as `["python"]`) instead of crashing with `TypeError: can only
+  concatenate str (not "list") to str` — the old failure surfaced downstream
+  as a silent `0 tools` tool index in `mcptoon serve`.
+- `MCPClientPool.call/call_full` only forward `input_responses`/
+  `request_state` when provided, keeping subclasses with pre-0.7 signatures
+  working.
+
 ## [0.6.1] — 2026-08-27
 
 ### Added — Latest MCP spec compatibility (2025-06-18)
