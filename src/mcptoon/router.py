@@ -23,7 +23,7 @@ import re
 from typing import Any
 from collections.abc import Callable
 
-from .client import MCPClientPool, MCPError
+from .client import MCPClientPool, MCPError, MCPInputRequired
 from .config import load_config, resolve_server_name
 from .errors import make_error, is_error
 from . import usage
@@ -257,6 +257,8 @@ def call_tool(
     is_destructive: bool = False,
     skip_poisoning_check: bool = False,
     return_envelope: bool = False,
+    input_responses: dict | None = None,
+    request_state: str | None = None,
 ) -> Any:
     """Route a tool call to the appropriate handler or MCP server.
 
@@ -338,9 +340,12 @@ def call_tool(
     try:
         pool = _get_pool()
         if return_envelope:
-            result = pool.call_full(server, tool, args)
+            result = pool.call_full(server, tool, args,
+                                    input_responses=input_responses,
+                                    request_state=request_state)
         else:
-            result = pool.call(server, tool, args)
+            result = pool.call(server, tool, args, input_responses=input_responses,
+                               request_state=request_state)
 
         # Check for poisoning and credential leaks in result
         if not skip_poisoning_check:
@@ -374,6 +379,12 @@ def call_tool(
         err = make_error(e.code, e.message, "mcp", retry=e.retry, server=server, tool=tool)
         if suggestions:
             err["suggestions"] = suggestions
+        # MRTR (2026-07-28): surface the interim result's input requests so
+        # callers can answer them and retry with input_responses.
+        if isinstance(e, MCPInputRequired):
+            err["input_requests"] = e.input_requests
+            if e.request_state is not None:
+                err["request_state"] = e.request_state
         return err
     except Exception as e:
         usage.track_call(server, tool, ok=False)
