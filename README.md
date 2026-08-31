@@ -6,9 +6,9 @@
 
 ## **A magical tool that changes how you use Agents**
 
-### **Install once — every Agent automatically discovers and uses all your MCP tools, and saves your tokens along the way**
-
-Already compatible with native MCP JSON! TOON compression is optional! · Zero config · Zero dependencies
+<p align="center">
+  <img src="assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
+</p>
 
 > ✅ **Speaks the latest MCP spec (2026-07-28)** — stateless auto-negotiation,
 > structured output parsed natively, MRTR multi round-trips, `server/discover`
@@ -23,6 +23,22 @@ Already compatible with native MCP JSON! TOON compression is optional! · Zero c
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [中文文档](README.zh-CN.md) · [Developer docs](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
+
+## ⚡ 3 steps, any OS — no configuration
+
+```bash
+# 1 · install
+pip install mcptoon
+
+# 2 · plug in — auto-discovers tools you already configured
+mcptoon quickstart
+
+# 3 · see it work on your own machine — no trust required
+mcptoon demo
+```
+
+> `mcptoon demo` runs a live comparison **on your machine**: watch the tool list
+> shrink from thousands of tokens to a name index — then decide.
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
 
