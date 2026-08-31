@@ -46,8 +46,21 @@ from pathlib import Path
 
 HOME_DIR = Path.home()
 CONFIG_DIR = HOME_DIR / ".mcptoon"
-CONFIG_FILE = CONFIG_DIR / "config.json"
-CONFIG_FILE_TOML = CONFIG_DIR / "config.toml"
+# Env overrides let CI/tests redirect all config I/O without touching the
+# real ~/.mcptoon (same isolation pattern as MCPTOON_SERVERS). Resolved at
+# CALL time (not import time) so test processes can retarget safely.
+CONFIG_FILE = Path(os.environ.get(
+    "MCPTOON_CONFIG_FILE", str(CONFIG_DIR / "config.json")))
+CONFIG_FILE_TOML = Path(os.environ.get(
+    "MCPTOON_CONFIG_FILE_TOML", str(CONFIG_DIR / "config.toml")))
+
+
+def _config_file() -> Path:
+    return Path(os.environ.get("MCPTOON_CONFIG_FILE", str(CONFIG_FILE)))
+
+
+def _config_file_toml() -> Path:
+    return Path(os.environ.get("MCPTOON_CONFIG_FILE_TOML", str(CONFIG_FILE_TOML)))
 CACHE_DIR = HOME_DIR / ".cache" / "mcptoon"
 LOG_DIR = CONFIG_DIR / "logs"
 TOGGLE_FILE = CONFIG_DIR / "toggles.json"
@@ -112,15 +125,17 @@ def load_config() -> dict:
     servers = {}
 
     # 1. User global config — try TOML first, then JSON
-    if CONFIG_FILE_TOML.exists():
+    toml_file = _config_file_toml()
+    json_file = _config_file()
+    if toml_file.exists():
         try:
-            data = _parse_toml(CONFIG_FILE_TOML.read_text(encoding="utf-8"))
+            data = _parse_toml(toml_file.read_text(encoding="utf-8"))
             servers.update(data.get("servers", {}))
         except (OSError, ValueError):
             pass
-    if CONFIG_FILE.exists():
+    if json_file.exists():
         try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            data = json.loads(json_file.read_text(encoding="utf-8"))
             servers.update(data.get("servers", {}))
         except (json.JSONDecodeError, OSError):
             pass
@@ -162,19 +177,21 @@ def save_config(servers: dict, fmt: str = ""):
               defaults to JSON for new configs.
     """
     # Determine format: explicit > existing file > default JSON
+    json_file = _config_file()
+    toml_file = _config_file_toml()
     if not fmt:
-        if CONFIG_FILE_TOML.exists() and not CONFIG_FILE.exists():
+        if toml_file.exists() and not json_file.exists():
             fmt = "toml"
         else:
             fmt = "json"
 
     if fmt == "toml":
-        CONFIG_FILE_TOML.write_text(
+        toml_file.write_text(
             _dump_toml(servers),
             encoding="utf-8",
         )
     else:
-        CONFIG_FILE.write_text(
+        json_file.write_text(
             json.dumps({"servers": servers}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
@@ -300,7 +317,7 @@ SAMPLE_CONFIG = {
 
 def init_sample_config():
     """Create a sample config if none exists."""
-    if not CONFIG_FILE.exists() and not CONFIG_FILE_TOML.exists():
+    if not _config_file().exists() and not _config_file_toml().exists():
         save_config(SAMPLE_CONFIG["servers"])
         return True
     return False

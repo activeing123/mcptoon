@@ -152,6 +152,10 @@ def _mcptoon_to_agent_format(server_name: str, server_cfg: dict) -> dict:
         result["args"] = all_args
     if env:
         result["env"] = env
+    # Agent Plugins (v0.7.1): plugins may pin a working directory; the
+    # value is already an absolute expanded path set at install time.
+    if server_cfg.get("cwd"):
+        result["cwd"] = server_cfg["cwd"]
 
     return result
 

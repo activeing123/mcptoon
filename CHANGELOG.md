@@ -5,6 +5,46 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-08-31
+
+### Added — Agent Plugins Specification 1.0.0 support
+
+mcptoon now installs, validates and manages the new cross-vendor AI agent
+plugin standard (https://agent-plugins.org — backed by Amazon, Cursor,
+Microsoft, OpenAI and Vercel). The spec deliberately leaves installation,
+distribution and cross-agent sync undefined — mcptoon fills exactly that gap:
+install once, every agent can use it.
+
+- **`mcptoon plugin scan <dir>`**: strict read-only validation per spec 1.0.0 —
+  closed manifest schema (`$schema` pinned to 1.0.0; 1.1.0 drafts rejected),
+  name rules (1-64 chars, no `--`/`..`), three-variant closed union for
+  `mcpServers` (stdio / streamable-http / sse), single-token commands
+  (no shell strings, no expansion), HTTPS-only non-loopback URLs, no
+  credentials in headers, path-escape checks on `./` commands.
+  Failure boundaries follow the spec: structural problems are fatal;
+  a broken server entry skips that entry only.
+- **`mcptoon plugin install <dir> [--force] [--no-sync]`**: scan → copy to
+  `~/.mcptoon/plugins/<name>/` → merge `mcpServers` into `config.json` under
+  collision-free `<plugin>:<server>` namespaces → trigger the existing sync
+  flow to every agent. **The pivot**: mcptoon is the installer, so
+  `${PLUGIN_ROOT}` / `${PLUGIN_DATA}` are pre-expanded into absolute paths at
+  merge time — agents need zero plugin-loader support.
+- **`mcptoon plugin list` / `mcptoon plugin remove <name>`**: registry-backed
+  (`~/.mcptoon/plugins.json`); removal prunes the namespaced entries from
+  mcptoon config AND every agent config it reached (sync merges, it never
+  deletes — pruning closes that gap). The persistent data dir
+  `~/.mcptoon/plugins-data/<name>/` is kept across `--force` upgrades and
+  removal, per spec §PLUGIN_DATA.
+- **stdio `cwd` support** end to end: config entries may carry `cwd`, the
+  client passes it to the spawned process, and sync forwards it to agent
+  configs (needed by plugins that pin a working directory).
+- **Env-var injection**: plugin servers get `PLUGIN_ROOT` / `PLUGIN_DATA`
+  injected at start, as the spec requires.
+- 41 new tests (610 total) + 19-point acceptance livefire: scan → install →
+  list → verify expanded absolute paths in a real Claude Desktop config →
+  remove → verify everything cleaned. README (EN + zh-CN) carries an
+  Agent Plugins badge and section.
+
 ## [0.7.0] — 2026-08-29
 
 ### Added — MCP 2026-07-28 support (latest spec, stateless revision)

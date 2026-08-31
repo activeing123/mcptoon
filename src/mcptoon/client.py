@@ -139,6 +139,7 @@ class MCPClient:
         env: Optional[dict[str, str]] = None,
         timeout: float = 30,
         spec: str = "auto",
+        cwd: Optional[str] = None,
     ):
         if stdio and http:
             raise ValueError("Pass exactly one of stdio= or http=")
@@ -151,6 +152,7 @@ class MCPClient:
         self._headers = headers or {}
         self._env = env
         self._timeout = timeout
+        self._cwd = cwd
 
         # stdio state
         self._proc: Optional[subprocess.Popen] = None
@@ -382,6 +384,7 @@ class MCPClient:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
+            cwd=self._cwd,
             bufsize=0,  # unbuffered — critical for JSON-RPC over pipes
         )
 
@@ -776,11 +779,19 @@ class MCPClientPool:
             command = cfg.get("command", [])
             if isinstance(command, str):
                 command = [command]  # lenient: "command": "python" == ["python"]
+            # Agent Plugins (v0.7.1): inject the two reserved variables the
+            # spec requires at server start (paths were pre-expanded at install)
+            env = dict(cfg.get("env") or {})
+            if cfg.get("plugin_root"):
+                env.setdefault("PLUGIN_ROOT", cfg["plugin_root"])
+            if cfg.get("plugin_data"):
+                env.setdefault("PLUGIN_DATA", cfg["plugin_data"])
             return MCPClient(
                 stdio=command + cfg.get("args", []),
-                env=cfg.get("env"),
+                env=env or None,
                 timeout=cfg.get("timeout", 30),
                 spec=cfg.get("spec", "auto"),
+                cwd=cfg.get("cwd"),
             )
         elif transport == "http":
             return MCPClient(

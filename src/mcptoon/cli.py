@@ -203,6 +203,8 @@ def main():
         _cmd_sync(rest, fmt)
     elif command == "health":
         _cmd_health(rest, fmt)
+    elif command == "plugin":
+        _cmd_plugin(rest, fmt)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -1482,6 +1484,167 @@ def _cmd_completion(rest):
 
 
 # ═══════════════════════════════════════════════════
+# Agent Plugins command (spec 1.0.0)
+# ═══════════════════════════════════════════════════
+
+def _cmd_plugin(rest, fmt):
+    """mcptoon plugin — Agent Plugins 1.0.0 support (scan / install / list / remove)."""
+    if not rest:
+        print("Usage: mcptoon plugin <scan|install|list|remove> [args]")
+        print("")
+        print("Subcommands:")
+        print("  scan <dir>        Validate a plugin package (read-only)")
+        print("  install <dir>     Install a plugin into every agent (v0.7.1)")
+        print("  list              List installed plugins (v0.7.1)")
+        print("  remove <name>     Remove a plugin (v0.7.1)")
+        sys.exit(1)
+
+    sub = rest[0]
+    if sub == "scan":
+        _cmd_plugin_scan(rest[1:], fmt)
+    elif sub == "install":
+        _cmd_plugin_install(rest[1:])
+    elif sub == "list":
+        _cmd_plugin_list(fmt)
+    elif sub == "remove":
+        _cmd_plugin_remove(rest[1:])
+    else:
+        print(f"Unknown plugin subcommand: {sub}", file=sys.stderr)
+        print("Available: scan | install | list | remove", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_plugin_install(args):
+    """mcptoon plugin install <dir> [--force] [--no-sync]"""
+    from .plugin import install_plugin
+
+    force = "--force" in args
+    sync_agents = "--no-sync" not in args
+    positional = [a for a in args if not a.startswith("--")]
+    if not positional:
+        print("Usage: mcptoon plugin install <plugin-dir> [--force] [--no-sync]")
+        sys.exit(1)
+
+    result = install_plugin(positional[0], force=force, sync_agents=sync_agents)
+    if not result["ok"]:
+        if result.get("stage") == "scan":
+            print("❌ Plugin failed validation — fix these and retry:", file=sys.stderr)
+            for f in result["fatal"]:
+                print(f"  ❌ [{f['code']}] {f['message']}", file=sys.stderr)
+        else:
+            print(f"❌ {result.get('message', 'install failed')}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"✅ Installed plugin: {result['name']} v{result['version']}")
+    print(f"  Plugin dir:  {result['dest']}")
+    print(f"  Data dir:    {result['data_dir']}  (kept across upgrades)")
+    print(f"  Servers:     {', '.join(result['servers']) or '(none)'}")
+    if result["skills"]:
+        print(f"  Skills:      {', '.join(result['skills'])}")
+    sync = result.get("sync")
+    if isinstance(sync, dict) and "synced_agents" in sync:
+        print(f"  Synced to:   {sync['synced_agents']}/{sync['total_agents']} agents")
+    elif isinstance(sync, dict) and sync.get("error"):
+        print(f"  ⚠ sync failed: {sync['error']} — run `mcptoon sync` manually")
+    else:
+        print("  Sync:        skipped (--no-sync) — run `mcptoon sync` when ready")
+    sys.exit(0)
+
+
+def _cmd_plugin_list(fmt):
+    """mcptoon plugin list"""
+    import json as _json
+
+    from .plugin import list_plugins
+
+    plugins = list_plugins()
+    if fmt == "json":
+        print(_json.dumps(plugins, indent=2, ensure_ascii=False))
+        return
+    if not plugins:
+        print("No plugins installed. Try: mcptoon plugin install <dir>")
+        return
+    print(f"── Installed plugins: {len(plugins)} ──")
+    for p in plugins:
+        print(f"  {p['name']}  v{p['version']}  ({len(p['servers'])} servers)")
+        print(f"    installed: {p['installed_at']}")
+        for s in p["servers"]:
+            print(f"    · {s}")
+
+
+def _cmd_plugin_remove(args):
+    """mcptoon plugin remove <name> [--no-sync]"""
+    from .plugin import remove_plugin
+
+    sync_agents = "--no-sync" not in args
+    positional = [a for a in args if not a.startswith("--")]
+    if not positional:
+        print("Usage: mcptoon plugin remove <name> [--no-sync]")
+        sys.exit(1)
+
+    result = remove_plugin(positional[0], sync_agents=sync_agents)
+    if not result["ok"]:
+        print(f"❌ {result['message']}", file=sys.stderr)
+        sys.exit(1)
+    print(f"✅ Removed plugin: {result['name']}")
+    for s in result["removed_servers"]:
+        print(f"  − {s}")
+    if result.get("data_dir_kept"):
+        print(f"  Data dir kept: {result['data_dir_kept']}")
+    sync = result.get("sync")
+    if isinstance(sync, dict) and "synced_agents" in sync:
+        print(f"  Synced removal to: {sync['synced_agents']}/{sync['total_agents']} agents")
+    sys.exit(0)
+
+
+def _cmd_plugin_scan(args, fmt):
+    """mcptoon plugin scan <dir> — validate an Agent Plugins package."""
+    import json as _json
+
+    from .plugin import scan_plugin
+
+    if not args:
+        print("Usage: mcptoon plugin scan <plugin-dir>")
+        sys.exit(1)
+
+    report = scan_plugin(args[0])
+
+    if fmt == "json":
+        print(_json.dumps(report, indent=2, ensure_ascii=False))
+        sys.exit(0 if report["ok"] else 1)
+
+    plugin = report["plugin"]
+    name = plugin.get("name") or "(unknown)"
+    version = f" v{plugin.get('version')}" if plugin.get("version") else ""
+
+    print(f"── Agent Plugin scan: {report['dir']} ──")
+    print(f"  Plugin:  {name}{version}")
+    skills = report["skills"]
+    print(f"  Skills:  {len(skills)}" + (f" ({', '.join(skills)})" if skills else ""))
+    servers = report["servers"]
+    skipped = report["skipped_servers"]
+    print(f"  Servers: {len(servers)} valid, {len(skipped)} skipped")
+    for s in servers:
+        print(f"    · {s['name']}  [{s['type']}]")
+    for s in skipped:
+        print(f"    ✗ {s['name']}  skipped — {s['reason']}")
+
+    for w in report["warnings"]:
+        print(f"  ⚠ [{w['code']}] {w['message']}")
+    for f in report["fatal"]:
+        print(f"  ❌ [{f['code']}] {f['message']}")
+
+    if report["ok"]:
+        n_warn = len(report["warnings"])
+        tail = f" ({n_warn} warning{'s' if n_warn != 1 else ''})" if n_warn else ""
+        print(f"\n  ✅ Valid plugin — ready for mcptoon plugin install{tail}")
+        sys.exit(0)
+    else:
+        print(f"\n  ❌ Plugin rejected — {len(report['fatal'])} fatal issue(s)")
+        sys.exit(1)
+
+
+# ═══════════════════════════════════════════════════
 # Natural language fallback
 # ═══════════════════════════════════════════════════
 
@@ -1550,6 +1713,11 @@ Usage:
     mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
     mcptoon install --list               List installed servers
     mcptoon install --remove <name>      Remove an installed server
+
+    mcptoon plugin scan <dir>            Validate an Agent Plugins 1.0.0 package
+    mcptoon plugin install <dir>         Install a plugin into every agent
+    mcptoon plugin list                  List installed plugins
+    mcptoon plugin remove <name>         Remove a plugin
 
     mcptoon serve                        Run as MCP server (stdio bridge for agents)
     mcptoon demo                         Zero-config one-command demo

@@ -14,11 +14,18 @@
 > structured output parsed natively, MRTR multi round-trips, `server/discover`
 > probing for new-spec servers with full backward compatibility.
 
+> 🧩 **Agent Plugins Specification 1.0.0 compatible** — scan, install and sync
+> the new cross-vendor plugin standard (Amazon / Cursor / Microsoft / OpenAI /
+> Vercel) into **every** AI agent with one command:
+> `mcptoon plugin install <dir>` — including agents that have no native
+> plugin loader.
+
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-569%20passed-brightgreen)](#for-developers)
+[![Tests](https://img.shields.io/badge/Tests-610%20passed-brightgreen)](#for-developers)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-spec-compatibility-2026-07-28)
+[![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -221,6 +228,34 @@ No flags needed for everyday use: when a new-spec server returns structured outp
 mcptoon picks it up automatically. `--envelope` is there when an agent needs the raw
 protocol payload (audit, debugging, `_meta` inspection).
 
+## Agent Plugins support (1.0.0)
+
+The [Agent Plugins Specification](https://agent-plugins.org/specification) v1.0.0
+(vendor-backed by Amazon, Cursor, Microsoft, OpenAI and Vercel) defines how an AI
+agent plugin is **packaged** — a folder with `plugin.json` + `skills/` + `mcp.json`.
+It deliberately does **not** define installation, distribution or cross-agent sync.
+That is mcptoon's home turf:
+
+```bash
+mcptoon plugin scan <dir>        # validate a plugin package (read-only)
+mcptoon plugin install <dir>     # install into mcptoon + every synced agent
+mcptoon plugin list              # what is installed
+mcptoon plugin remove <name>     # remove everywhere (data dir is kept)
+```
+
+- **Strict spec validation** — closed manifest schema, single-token commands,
+  HTTPS-only non-loopback URLs, no credentials in headers, path-escape checks.
+- **`${PLUGIN_ROOT}` / `${PLUGIN_DATA}` pre-expanded** — mcptoon is the installer,
+  so it writes absolute paths into every agent's native config itself; agents need
+  no plugin-loader support at all.
+- **Namespaced servers** — `plugin:server` keys keep plugins collision-free, and
+  removal cleans every agent config it reached.
+- **Persistent data** — `~/.mcptoon/plugins-data/<name>/` survives upgrades (spec
+  §PLUGIN_DATA), so caches and state never vanish on `--force`.
+- Plugins land in the same `~/.mcptoon/config.json` as every other server, so
+  `manifest`, `call`, `serve`, `health` and the 99.8% token savings apply to them
+  automatically.
+
 ### Everything else in the box
 
 | Command | What it does |
@@ -229,6 +264,7 @@ protocol payload (audit, debugging, `_meta` inspection).
 | `mcptoon call <server> <tool> '{…}'` | Call any tool on any server |
 | `mcptoon call <server> <tool> --envelope` | Return the complete MCP result envelope (structuredContent, _meta) |
 | `mcptoon call --auto <tool> '{…}'` | Route by tool name, server found for you |
+| `mcptoon plugin install <dir>` | Install an Agent Plugin into every agent (spec 1.0.0) |
 | `mcptoon health` | Which servers are alive, dead, and how fast — exits 1 in CI if anything is dead |
 | `mcptoon install <name> --npm <pkg>` | Install a server, auto-discover tools |
 | `mcptoon search <query>` | Fuzzy search across every tool you have |
@@ -365,7 +401,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 548 tests, green expected
+python -m pytest tests/ -v          # 610 tests, green expected
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

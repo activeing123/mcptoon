@@ -11,11 +11,16 @@
 > ✅ **兼容最新 MCP 规范（2026-07-28）**——无状态自动协商、结构化输出原生解析、
 > MRTR 多轮补参，`server/discover` 探测新版服务器，旧版全兼容开箱即用。
 
+> 🧩 **兼容 Agent Plugins 规范 1.0.0**——Amazon / Cursor / Microsoft / OpenAI /
+> Vercel 五大厂商背书的新一代插件打包标准，一条命令安装进**所有** AI Agent：
+> `mcptoon plugin install <目录>`——包括没有原生插件加载器的 Agent。
+
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-569%20passed-brightgreen)](#给开发者)
+[![Tests](https://img.shields.io/badge/Tests-610%20passed-brightgreen)](#给开发者)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-规范兼容性2026-07-28)
+[![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
@@ -211,6 +216,29 @@ mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR 多轮�
 日常使用不需要任何新参数：新规范服务器返回结构化输出时 mcptoon 自动识别。
 需要原始协议载荷（审计、调试、查 `_meta`）时才用 `--envelope`。
 
+## Agent Plugins 插件支持（1.0.0）
+
+[Agent Plugins 规范](https://agent-plugins.org/specification) v1.0.0（Amazon、Cursor、
+Microsoft、OpenAI、Vercel 五大厂商共同制定）定义了 AI Agent 插件怎么**打包**——
+一个文件夹，装着 `plugin.json`（身份证）+ `skills/`（说明书）+ `mcp.json`（工具配置）。
+它刻意**不**定义安装、分发、跨 Agent 同步——这正好是 mcptoon 的本职：
+
+```bash
+mcptoon plugin scan <目录>       # 校验插件包（只读）
+mcptoon plugin install <目录>    # 装进 mcptoon + 所有已接管的 Agent
+mcptoon plugin list              # 看装了什么
+mcptoon plugin remove <名称>     # 处处移除（数据目录保留）
+```
+
+- **严格规范校验**——闭式清单、单 token 命令、非环回强制 HTTPS、headers 禁放凭据、路径逃逸检查
+- **`${PLUGIN_ROOT}` / `${PLUGIN_DATA}` 预展开**——mcptoon 自己当安装者，直接把绝对路径
+  写进每个 Agent 的原生配置，Agent 侧零插件加载器支持
+- **命名空间服务器**——`插件名:服务器名` 键名防撞，卸载时把它到达过的每个 Agent 配置都清干净
+- **数据目录持久化**——`~/.mcptoon/plugins-data/<名称>/` 跨升级保留（规范 §PLUGIN_DATA），
+  `--force` 强制升级也不会丢缓存和状态
+- 插件服务器与普通服务器落在同一份 `~/.mcptoon/config.json`——`manifest`、`call`、
+  `serve`、`health` 和 99.8% 省 token 对它们自动生效
+
 ### 盒子里还有的一切
 
 | 命令 | 作用 |
@@ -219,6 +247,7 @@ mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR 多轮�
 | `mcptoon call <server> <tool> '{…}'` | 调任意服务器上的任意工具 |
 | `mcptoon call <server> <tool> --envelope` | 返回完整 MCP 结果信封（structuredContent、_meta） |
 | `mcptoon call --auto <tool> '{…}'` | 只给工具名，自动路由到正确服务器 |
+| `mcptoon plugin install <目录>` | 一条命令把 Agent Plugin 装进所有 Agent（规范 1.0.0） |
 | `mcptoon health` | 哪些服务器活着、死了、多快；CI 里全死退出码 1 |
 | `mcptoon install <name> --npm <pkg>` | 装服务器并自动发现工具 |
 | `mcptoon search <query>` | 跨全部工具模糊搜索 |
@@ -352,7 +381,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 548 个测试，预期全绿
+python -m pytest tests/ -v          # 610 个测试，预期全绿
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
