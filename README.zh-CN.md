@@ -4,9 +4,9 @@
 
 ## **一个改变你使用 Agent 工具习惯的神奇工具**
 
-### **装一次，所有 Agent 自动发现使用你所有 MCP 工具，还能顺便节省你的 token**
-
-已经符合原生 MCP JSON 格式！TOON 格式压缩为可选项！ · 零配置 · 零依赖
+<p align="center">
+  <img src="assets/hero-powerstrip-zh.svg" width="860" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
+</p>
 
 > ✅ **兼容最新 MCP 规范（2026-07-28）**——无状态自动协商、结构化输出原生解析、
 > MRTR 多轮补参，`server/discover` 探测新版服务器，旧版全兼容开箱即用。
@@ -20,6 +20,22 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [English](README.md) · [开发者文档](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [提 Issue](https://github.com/activeing123/mcptoon/issues)
+
+## ⚡ 三步搞定，全平台通用 —— 无需任何配置
+
+```bash
+# 1 · 装上
+pip install mcptoon
+
+# 2 · 插上 —— 自动发现你已经配置过的工具
+mcptoon quickstart
+
+# 3 · 亲眼看着它工作 —— 不用信任何人，自己跑一遍
+mcptoon demo
+```
+
+> `mcptoon demo` 会在**你自己的电脑上**现场对比：工具清单从几万 token
+> 缩成一张名字目录 —— 看完再决定用不用。
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon 演示：安装，添加服务器，同步到所有 Agent，看 token 节省"></p>
 
