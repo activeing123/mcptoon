@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 460" font-family="-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f2f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/>
+      <stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="1" y="1" width="1178" height="458" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+
+  <text x="590" y="52" text-anchor="middle" font-size="34" font-weight="800" fill="#1f2328">Plug in once. Every AI can use every tool.</text>
+  <text x="590" y="84" text-anchor="middle" font-size="17" fill="#57606a">No config files. No restarts. One power strip for all your AI agents.</text>
+
+  <!-- Left: tools column -->
+  <text x="150" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#57606a" letter-spacing="1">YOUR TOOLS</text>
+  <g font-size="15" fill="#1f2328">
+    <rect x="34" y="146" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="150" y="174" text-anchor="middle">🔍 Web search</text>
+    <rect x="34" y="202" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="150" y="230" text-anchor="middle">🐙 GitHub</text>
+    <rect x="34" y="258" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="150" y="286" text-anchor="middle">🗂️ Files &amp; database</text>
+    <rect x="34" y="314" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="150" y="342" text-anchor="middle">🌐 Translate · + anything</text>
+  </g>
+
+  <!-- Right: agents column -->
+  <text x="1030" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#57606a" letter-spacing="1">YOUR AI AGENTS</text>
+  <g font-size="15" fill="#1f2328">
+    <rect x="914" y="146" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="1030" y="174" text-anchor="middle">🤖 Claude / Codex</text>
+    <rect x="914" y="202" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="1030" y="230" text-anchor="middle">🖱️ Cursor</text>
+    <rect x="914" y="258" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="1030" y="286" text-anchor="middle">💻 Copilot · Cline</text>
+    <rect x="914" y="314" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="1030" y="342" text-anchor="middle">✨ Any agent, any CLI</text>
+  </g>
+
+  <!-- cables -->
+  <path d="M266,169 C330,169 330,205 380,215" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M266,225 C330,225 330,228 380,228" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M266,281 C330,281 330,250 380,240" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M266,337 C330,337 330,260 380,252" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M914,169 C850,169 850,205 800,215" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M914,225 C850,225 850,228 800,228" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M914,281 C850,281 850,250 800,240" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M914,337 C850,337 850,260 800,252" fill="none" stroke="#8c959f" stroke-width="3"/>
+
+  <!-- power strip -->
+  <rect x="375" y="178" width="430" height="100" rx="24" fill="url(#strip)" filter="url(#glow)"/>
+  <rect x="395" y="192" width="390" height="34" rx="10" fill="#ffffff" opacity="0.14"/>
+  <text x="590" y="216" text-anchor="middle" font-size="20" font-weight="800" fill="#ffffff" font-family="ui-monospace,Consolas,monospace">mcptoon</text>
+  <g fill="#0f2e18">
+    <rect x="415" y="238" width="46" height="26" rx="6"/>
+    <rect x="495" y="238" width="46" height="26" rx="6"/>
+    <rect x="575" y="238" width="46" height="26" rx="6"/>
+    <rect x="655" y="238" width="46" height="26" rx="6"/>
+    <rect x="735" y="238" width="46" height="26" rx="6"/>
+  </g>
+  <g fill="#7ee787">
+    <circle cx="430" cy="248" r="3.4"/><circle cx="446" cy="248" r="3.4"/>
+    <circle cx="510" cy="248" r="3.4"/><circle cx="526" cy="248" r="3.4"/>
+    <circle cx="590" cy="248" r="3.4"/><circle cx="606" cy="248" r="3.4"/>
+    <circle cx="670" cy="248" r="3.4"/><circle cx="686" cy="248" r="3.4"/>
+    <circle cx="750" cy="248" r="3.4"/><circle cx="766" cy="248" r="3.4"/>
+  </g>
+
+  <!-- outlet lights -->
+  <g fill="#1a7f37">
+    <circle cx="438" cy="251" r="8" opacity="0.35" filter="url(#glow)"/>
+    <circle cx="598" cy="251" r="8" opacity="0.35" filter="url(#glow)"/>
+  </g>
+
+  <!-- bottom: 3 steps -->
+  <g font-size="15.5" fill="#1f2328">
+    <rect x="120" y="330" width="290" height="52" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="265" y="352" text-anchor="middle" font-weight="700" fill="#1a7f37">1 · Install</text>
+    <text x="265" y="372" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="13.5">pip install mcptoon</text>
+
+    <rect x="445" y="330" width="290" height="52" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="590" y="352" text-anchor="middle" font-weight="700" fill="#1a7f37">2 · Plug in</text>
+    <text x="590" y="372" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="13.5">mcptoon quickstart</text>
+
+    <rect x="770" y="330" width="290" height="52" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="915" y="352" text-anchor="middle" font-weight="700" fill="#1a7f37">3 · Done</text>
+    <text x="915" y="372" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="13.5">mcptoon demo</text>
+  </g>
+  <polygon points="414,356 434,356 424,368" fill="#8c959f"/>
+  <polygon points="739,356 759,356 749,368" fill="#8c959f"/>
+
+  <text x="590" y="424" text-anchor="middle" font-size="14.5" fill="#57606a">Zero config · Zero dependencies · Works offline · Apache-2.0</text>
+</svg>
