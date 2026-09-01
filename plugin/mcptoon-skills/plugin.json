@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mcptoon-skills",
+  "version": "1.0.0",
+  "description": "Skills that teach AI agents how to drive mcptoon: connecting agents to MCP servers, authoring new server entries, and triaging broken connections."
+}
