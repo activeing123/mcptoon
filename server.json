@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.activeing123/mcptoon",
+  "description": "Every Agent discovers all your MCP tools from one install; major token savings via TOON output.",
+  "version": "0.7.2",
+  "repository": {
+    "url": "https://github.com/activeing123/mcptoon",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "mcptoon",
+      "version": "0.7.2",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
