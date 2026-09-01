@@ -520,6 +520,30 @@ def _plugins_dir() -> Path:
         "MCPTOON_PLUGINS_DIR", str(CONFIG_DIR / "plugins")))
 
 
+def parse_skill_md(path: Path | str) -> tuple[str, str, str]:
+    """Parse a SKILL.md into (name, description, body). Zero-dependency.
+
+    Frontmatter (between the first two ``---`` lines) supplies name and
+    description; everything after it is the body. Missing frontmatter yields
+    empty name/description and the whole text as body. Raises OSError if the
+    file cannot be read (callers decide whether to skip).
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    name, description, body = "", "", text.strip()
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) == 3:
+            for line in parts[1].splitlines():
+                key, _, value = line.partition(":")
+                key = key.strip().lower()
+                if key == "name":
+                    name = value.strip()
+                elif key == "description":
+                    description = value.strip()
+            body = parts[2].strip()
+    return name, description, body
+
+
 def _plugins_data_dir() -> Path:
     return Path(os.environ.get(
         "MCPTOON_PLUGINS_DATA_DIR", str(CONFIG_DIR / "plugins-data")))

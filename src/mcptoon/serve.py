@@ -53,6 +53,7 @@ import sys
 import threading
 import time
 import traceback
+from pathlib import Path
 from typing import Any
 
 from . import __version__
@@ -99,6 +100,8 @@ class MCPServerBridge:
         # tool_index: namespaced_name → {server, tool, full_schema, full_def}
         self._tool_index: dict[str, dict] = {}
         self._tool_index_lock = threading.RLock()
+        # prompts_index: prompt_name → {path, description} (plugin skills)
+        self._prompts_index: dict[str, dict] = {}
         self._initialized = False
         self._lock = threading.Lock()
         self._shutdown = False
@@ -121,6 +124,7 @@ class MCPServerBridge:
             self._servers = load_config()
             self._pool = MCPClientPool(self._servers)
             self._build_tool_index()
+            self._build_prompts_index()
             self._initialized = True
 
     def _build_tool_index(self):
@@ -300,9 +304,15 @@ class MCPServerBridge:
             elif method == "resources/read":
                 _send_response(_make_success(req_id, {"contents": []}))
             elif method == "prompts/list":
-                _send_response(_make_success(req_id, {"prompts": []}))
+                result = self._handle_list_prompts()
+                _send_response(_make_success(req_id, result))
             elif method == "prompts/get":
-                _send_response(_make_error_response(req_id, -32601, "Prompts not supported"))
+                result = self._handle_get_prompt(params)
+                if result is None:
+                    _send_response(_make_error_response(
+                        req_id, -32602, "Unknown prompt"))
+                else:
+                    _send_response(_make_success(req_id, result))
             elif method == "logging/setLevel":
                 _log(f"Client set logging level: {params.get('level', 'info')}")
                 _send_response(_make_success(req_id, {}))
@@ -363,6 +373,75 @@ class MCPServerBridge:
             "tools": total_tools,
             "failed_servers": failed if failed > 0 else 0,
             "uptime": time.time() - getattr(self, "_start_time", time.time()),
+        }
+
+    # ═══════════════════════════════════════════════════
+    # Plugin skills as MCP prompts (v0.7.2)
+    # ═══════════════════════════════════════════════════
+
+    def _build_prompts_index(self):
+        """Index installed Agent Plugin skills as MCP prompts.
+
+        Layout: <plugins_dir>/<plugin>/skills/<skill>/SKILL.md. Prompt names
+        are namespaced as "plugin_skill" for consistency with tool
+        namespacing. Failures never break serve — a broken skill is skipped.
+        """
+        from .plugin import _plugins_dir, parse_skill_md
+
+        root = _plugins_dir()
+        if not root.is_dir():
+            return
+        for skill_md in sorted(root.glob("*/skills/*/SKILL.md")):
+            try:
+                name, description, body = parse_skill_md(skill_md)
+            except OSError:
+                continue
+            if not name:
+                name = skill_md.parts[-2]  # fall back to the skill dir name
+            plugin = skill_md.parts[-4]  # .../<plugin>/skills/<skill>/SKILL.md
+            prompt_name = f"{plugin}_{name}"
+            self._prompts_index[prompt_name] = {
+                "path": str(skill_md),
+                "description": description[:200],
+                "body": body,
+            }
+
+    def _handle_list_prompts(self) -> dict:
+        """prompts/list: Agent Plugin skills exposed as prompts."""
+        self._ensure_initialized()
+        prompts = [
+            {
+                "name": name,
+                "description": info.get("description", ""),
+            }
+            for name, info in sorted(self._prompts_index.items())
+        ]
+        _log(f"prompts/list: returning {len(prompts)} plugin skill prompts")
+        return {"prompts": prompts}
+
+    def _handle_get_prompt(self, params: dict) -> dict | None:
+        """prompts/get: return the skill's markdown as one user message."""
+        from .plugin import parse_skill_md
+
+        self._ensure_initialized()
+        name = str(params.get("name", ""))
+        info = self._prompts_index.get(name)
+        if info is None:
+            return None
+        # Re-read from disk: skills are static per install, but re-reading
+        # keeps serve honest after a `plugin install` while serving.
+        try:
+            _, _, body = parse_skill_md(Path(info["path"]))
+        except OSError:
+            body = info.get("body", "")
+        return {
+            "description": info.get("description", ""),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": {"type": "text", "text": body},
+                }
+            ],
         }
 
     def _handle_list_tools(self, params: dict) -> dict:
