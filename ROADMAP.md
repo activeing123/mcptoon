@@ -2,7 +2,7 @@
 
 > **唯一权威路线图。所有版本计划以此文件为准。**
 > **最后更新**: 2026-09-01
-> **当前版本**: v0.7.1 | 618 tests | 0 依赖 | Agent Plugins Spec 1.0.0
+> **当前版本**: v0.7.2 | 631 tests | 0 依赖 | Agent Plugins Spec 1.0.0
 > **目标**: 让"零配置 + Token 效率"成为轻量 CLI 区间的事实标准
 > **版本策略**: 产品上小步维护，**战略重心 = 推广与转化**（2026-08-27 用户定调）
 
@@ -25,8 +25,8 @@
 
 | 渠道 | 状态 | 地址 |
 |------|------|------|
-| GitHub | ✅ v0.7.1，CI 13 项全绿（skills→prompts 已入 main） | github.com/activeing123/mcptoon |
-| PyPI | ✅ 0.7.1 | pypi.org/project/mcptoon/0.7.1 |
+| GitHub | ✅ v0.7.2，CI 全绿 | github.com/activeing123/mcptoon |
+| PyPI | ✅ 0.7.2 | pypi.org/project/mcptoon/0.7.1 |
 | MCP Registry | ✅ 收录 v0.7.0（0.7.1 元数据更新：用户指示过几天再更） | registry.modelcontextprotocol.io |
 | Glama | ✅ 收录 + Dockerfile 构建检查通过（python -m 方案，见 .scratch 存档） | glama.ai/mcp/servers/activeing123/mcptoon |
 | awesome-mcp-servers | 🟡 PR #12910 就绪等合（listed+badge 双条件已满足） | github.com/punkpeye/awesome-mcp-servers/pull/12910 |
@@ -55,9 +55,9 @@ X/Reddit 一图+一句话     知乎/掘金/公号投放         一键安装脚
 ### A. 小白爽感增强（服务推广漏斗）
 | # | 项 | 状态 | 备注 |
 |---|----|------|------|
-| A1 | `mcptoon quickstart` 输出"成就感"改造（找到 N 个工具 → 大字庆祝 + 使用引导） | ⬜ | v0.7.2 营销核心爽点 |
-| A2 | `mcptoon demo` 输出小白化（前后对比大数字 + "现在你可以…"） | ⬜ | 与 A1 同版发布 v0.7.2 |
-| A3 | 一键安装脚本（install.ps1 / install.sh：检测 Python → 安装 → quickstart） | ⬜ | 教程第 0 步兜底 |
+| A1 | `mcptoon quickstart` 输出"成就感"改造（找到 N 个工具 → 大字庆祝 + 使用引导） | ✅ v0.7.2 | "🎉 N tools ready across M servers!" + Now you can |
+| A2 | `mcptoon demo` 输出小白化（前后对比大数字 + "现在你可以…"） | ✅ v0.7.2 | SAME data X% fewer + Now you can 清单 |
+| A3 | 一键安装脚本（install.ps1 / install.sh：检测 Python → 安装 → quickstart） | ✅ v0.7.2 | README 双语已挂一行命令 |
 | A4 | 「小白使用手册」独立页（图 + 三步 + FAQ + 反馈入口） | ⬜ | 篇三长文配套 |
 
 ### A+. Agent Plugins 生态（v0.7.1 新增，随 v0.7.1 已落地）
@@ -79,7 +79,7 @@ X/Reddit 一图+一句话     知乎/掘金/公号投放         一键安装脚
 
 ```
 v0.7.1  ✅ Agent Plugins Spec 1.0.0（实际发布内容，替代原"小白爽感"计划）
-v0.7.2  A1+A2+A3 小白爽感版 + skills→prompts（✅ 已入 main，f7f6381）  — 1-2 天
+v0.7.2  ✅ A1+A2+A3 小白爽感版 + skills→prompts + 官方插件
 v0.8.0  手册页 + 一键安装正式化 + SEP 新规范落地（如有）            — 视规范节奏
 后续    仅按"是否帮助推广/上手"准入新功能
 ```

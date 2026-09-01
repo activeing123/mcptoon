@@ -34,7 +34,7 @@
 ## ⚡ 3 steps, any OS — no configuration
 
 ```bash
-# 1 · install
+# 1 · install (or the one-liners below)
 pip install mcptoon
 
 # 2 · plug in — auto-discovers tools you already configured
@@ -42,6 +42,16 @@ mcptoon quickstart
 
 # 3 · see it work on your own machine — no trust required
 mcptoon demo
+```
+
+One-line install (no Python wrangling — script handles everything):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | iex
 ```
 
 > `mcptoon demo` runs a live comparison **on your machine**: watch the tool list

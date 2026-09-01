@@ -5,6 +5,39 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] — 2026-09-01
+
+### Added — first-run delight (beginner-friendly output)
+
+- **`mcptoon quickstart` celebration**: after a successful setup, quickstart now
+  closes with a big-number payoff — "🎉 N tools ready across M servers!" —
+  followed by a two-command "Now you can" block (`sync` to write configs into
+  every agent, `serve` to expose all servers as one stdio gateway).
+  `--dry` mode stays sober (no celebration, plain next-steps only).
+- **`mcptoon demo` before/after headline**: the token comparison now leads with
+  one plain sentence — "📊 SAME data, X% fewer tokens: 12,400 → 117" — before
+  the detailed table, and the benchmark ends with a "Now you can" checklist
+  (one config for every agent, one gateway, zero schema tokens).
+- **One-line installers**: `install.sh` (macOS/Linux/WSL, pipx → pip --user →
+  PEP 668 venv fallback) and `install.ps1` (Windows, py launcher detection,
+  PATH fix-up) — both end by handing off to `mcptoon quickstart`:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.sh | bash
+  ```
+  ```powershell
+  irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | iex
+  ```
+- **Official first-party plugin** `plugin/mcptoon-skills`: three SKILL.md files
+  (connect / authoring / triage) that teach any agent how to drive mcptoon.
+  Install it and the skills appear as MCP prompts through `mcptoon serve` —
+  mcptoon eats its own Agent Plugins dog food.
+
+### Fixed
+
+- Plugin skills are exposed as MCP prompts by `mcptoon serve`
+  (`prompts/list`, `prompts/get`; capability advertised in initialize) —
+  shipped in 0.7.1 codebase, documented from 0.7.2.
+
 ## [0.7.1] — 2026-08-31
 
 ### Added — Agent Plugins Specification 1.0.0 support

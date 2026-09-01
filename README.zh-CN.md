@@ -39,6 +39,16 @@ mcptoon quickstart
 mcptoon demo
 ```
 
+一键安装（不会折腾 Python？复制这行，脚本全搞定）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | iex
+```
+
 > `mcptoon demo` 会在**你自己的电脑上**现场对比：工具清单从几万 token
 > 缩成一张名字目录 —— 看完再决定用不用。
 

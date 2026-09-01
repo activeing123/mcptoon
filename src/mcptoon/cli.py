@@ -677,12 +677,14 @@ def _cmd_quickstart(rest, fmt="auto"):
     print(result.summary())
 
     # Step 4: The "aha moment" — show slim manifest
+    tool_count = None
     if not is_dry:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("  Your tools (--slim format, 93% smaller than JSON):")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         try:
             manifest = manifest_mod.get_manifest(use_cache=False)
+            tool_count = _manifest_tool_count(manifest)
             slim_output = manifest_mod.format_manifest(manifest, full=False)
             if slim_output.strip():
                 print(slim_output)
@@ -693,11 +695,55 @@ def _cmd_quickstart(rest, fmt="auto"):
             print("  Run 'mcptoon manifest --slim' after servers are started")
 
     print("")
-    print("Next steps:")
+    if not is_dry:
+        _quickstart_celebration(tool_count, result.count)
+    else:
+        print("Next steps (once you write the config):")
+        print("  mcptoon quickstart          # write config + celebrate")
+        print("  mcptoon manifest --slim     # see all available tools")
+        print("  mcptoon doctor              # check connectivity")
+
+
+def _manifest_tool_count(manifest) -> int:
+    """Best-effort tool count from a get_manifest() result."""
+    try:
+        if isinstance(manifest, dict):
+            tools = manifest.get("tools")
+            if isinstance(tools, list):
+                return len(tools)
+            return len(manifest)
+        if isinstance(manifest, list):
+            return len(manifest)
+    except Exception:
+        pass
+    return 0
+
+
+def _quickstart_celebration(tool_count, server_count):
+    """A1: the payoff block after a successful quickstart.
+
+    Zero-config feel: big number, one-line status, one clear next action.
+    """
+    line = "━" * 54
+    if tool_count:
+        print(line)
+        print(f"  🎉  {tool_count} tools ready across {server_count} servers!")
+        print(line)
+    else:
+        print(line)
+        print(f"  🎉  {server_count} MCP servers configured — you're set!")
+        print(line)
+    print("")
+    print("  Now you can:")
+    print("    mcptoon sync    # write this config into Claude Desktop,")
+    print("                    # Cursor, Codex, Cline, Windsurf, VS Code")
+    print("    mcptoon serve   # or expose ALL servers as ONE stdio server")
+    print("")
+    print("  Next steps:")
     print("  mcptoon manifest --slim     # see all available tools")
     print("  mcptoon call <server> <tool> '{...}'   # call a tool")
     print("  mcptoon doctor             # check connectivity")
-    if result.count <= 3:
+    if server_count <= 3:
         print("")
         print("  Want more servers?")
         print("  mcptoon add github --stdio npx -y @modelcontextprotocol/server-github")

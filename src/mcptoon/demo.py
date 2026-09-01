@@ -229,6 +229,12 @@ def _show_token_comparison(text: str):
         slim_savings = 0
 
     print()
+    best_tokens = min(toon_tokens, slim_tokens, json_tokens)
+    best_name = {toon_tokens: "TOON", slim_tokens: "SLIM", json_tokens: "JSON"}[best_tokens]
+    total_savings = round((1 - best_tokens / max(json_tokens, 1)) * 100)
+    print(f"  📊  SAME data, {total_savings}% fewer tokens:")
+    print(f"      {json_tokens:>10,}  →  {best_tokens:>10,}   ({best_name})")
+    print()
     print(f"  {'Format':<10} {'Tokens':>10} {'Savings':>10}")
     print(f"  {'─'*10} {'─'*10} {'─'*10}")
     print(f"  {'JSON':<10} {json_tokens:>10,} {'-':>10}")
@@ -248,6 +254,11 @@ def _show_benchmark():
     print(f"  {'TOON':<12} {'54,649':>10} {'40%':>10}")
     print(f"  {'SLIM':<12} {'6,174':>10} {'93%':>10}")
     print(f"  {'Compact':<12} {'117':>10} {'99.9%':>10}")
+    print()
+    print("  Now you can:")
+    print("  ✓ connect every agent with ONE config   →  mcptoon sync")
+    print("  ✓ expose ALL servers as ONE stdio server →  mcptoon serve")
+    print("  ✓ never paste tool schemas again         →  mcptoon manifest --slim")
     print()
     print("  Schemas in context with mcptoon: 0 tokens (always)")
     print()
