@@ -1,7 +1,7 @@
 # mcptoon 产品路线图 & 更新计划
 
 > **唯一权威路线图。所有版本计划以此文件为准。**
-> **最后更新**: 2026-09-01
+> **最后更新**: 2026-09-02
 > **当前版本**: v0.7.2 | 631 tests | 0 依赖 | Agent Plugins Spec 1.0.0
 > **目标**: 让"零配置 + Token 效率"成为轻量 CLI 区间的事实标准
 > **版本策略**: 产品上小步维护，**战略重心 = 推广与转化**（2026-08-27 用户定调）
@@ -26,11 +26,17 @@
 | 渠道 | 状态 | 地址 |
 |------|------|------|
 | GitHub | ✅ v0.7.2，CI 全绿 | github.com/activeing123/mcptoon |
-| PyPI | ✅ 0.7.2 | pypi.org/project/mcptoon/0.7.1 |
+| PyPI | ✅ 0.7.2 | pypi.org/project/mcptoon/0.7.2 |
 | MCP Registry | ✅ 收录 v0.7.0（0.7.1 元数据更新：用户指示过几天再更） | registry.modelcontextprotocol.io |
 | Glama | ✅ 收录 + Dockerfile 构建检查通过（python -m 方案，见 .scratch 存档） | glama.ai/mcp/servers/activeing123/mcptoon |
 | awesome-mcp-servers | 🟡 PR #12910 就绪等合（listed+badge 双条件已满足） | github.com/punkpeye/awesome-mcp-servers/pull/12910 |
-| 其他 | 🟡 mcpb #299 / claude-plugins #5653 / awesome-mcp-clients #283+#290 等审；mcp.so 爬虫观察中（topics 已布）；PulseMCP 暂停、mcpservers.org/mcp.so 收费 $39 不投、Smithery 转 MCPB 暂缓 | — |
+| claude-plugins / awesome-mcp-clients | 🟡 #5653 / #283+#290 等审 | — |
+| mcp.so | 👀 爬虫观察中（topics 已布） | — |
+| Product Hunt | ✅ 产品页 + 首条 maker 评论（2026-09-02） | producthunt.com/products/mcptoon |
+| Dev.to | ✅ 6 篇（最新 2026-09-02 v0.7.2 技能文，ID 4551846） | dev.to/mcptokensaver |
+| Hashnode | ✅ 文章已发布（Agent Plugins 篇） | mcptoon.hashnode.dev |
+| HN | ⛔ mcptokensaver/activeing123 双号 shadowban；mossfjord 冷藏养号中（勿碰 HN） | — |
+| Reddit | ⛔ IP 被封（403），回帖文案已备，解封即发 | r/mcp |
 
 ---
 
@@ -126,6 +132,12 @@ v0.8.0  手册页 + 一键安装正式化 + SEP 新规范落地（如有）     
 ---
 
 ## 📝 更新日志
+
+### 2026-09-02
+- ✅ Product Hunt 产品页发布 + 首条讨论型评论（config drift 话题切入）
+- ✅ Dev.to 第 6 篇：v0.7.2 一行安装 + quickstart 庆祝 + 官方 skills 插件（ID 4551846）
+- ✅ MCPCLI GitHub 令牌轮换完成（mcp-cli-agent-v2 最小权限 repo+workflow，旧肥卡删除，本地明文残留清零）
+- ✅ 渠道状态表刷新（mcpb #299 仓库已删除，从待审中移除）
 
 ### 2026-09-01
 - ✅ skills→prompts：serve 把插件 SKILL.md 暴露为 MCP prompts（f7f6381，已入 main，CI 全绿）
