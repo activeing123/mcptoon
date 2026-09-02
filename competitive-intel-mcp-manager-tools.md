@@ -55,3 +55,30 @@
 
 - github_api engine failed in all runs → run targeted GitHub lookups for star counts on: shane-kerval mcp-client-agent, theshadow27/mcp-cli, lastmile-ai/mcp-agent, rinadelph/Agent-MCP, mikusnuz/agent-link-mcp, Atlassian mcp-compressor.
 - Deep-read Requesty gateway comparison + Peliqan landscape for the enterprise vendor shortlist (LiteLLM/Portkey-class players were NOT directly surfaced by these queries).
+
+## F. Token-compressor peers — striki18/benchmark harness (verified 2026-09-02)
+
+`striki18/benchmark` (created 2026-08-21, 0★, single-maintainer) runs a tool-by-tool
+token-compression benchmark under `benchmark_harness/tools/`. mcptoon is registered
+there (`mcptoon_tool.py`) — third parties already treat mcptoon as a compressor. The
+same directory enumerates our head-to-head compressor peers; treat this list as the
+feature-comparison set for `docs/comparison.md`:
+
+| Peer | In harness as | What it is |
+|---|---|---|
+| microsoft/llmlingua | `llmlingua_tool.py` | prompt compression (LLM-based) |
+| dytok | `dytok_tool.py` | tokenizer/TOON-style encoder |
+| headroom | `headroom_tool.py` | context trimming |
+| rtk | `rtk_tool.py` | repo/knowledge tokenizer |
+| less_tokens (py + sdk) | `less_tokens_*_tool.py` | text compression utility |
+| mintoken (cli + extension) | `mintoken_*_tool.py` | minimal-token CLI tooling |
+| tokenbank | `tokenbank_tool.py` | token accounting/banking |
+| selective-context | `selective_context_tool.py` | selective context pruning |
+| context_packer | `context_packer_tool.py` | context packing |
+| claude_supertool | `claude_supertool_tool.py` | Claude-focused context tool |
+
+Known harness bug (upstream, 2026-09-02): `mcptoon_tool.py.compress()` invokes
+`mcptoon manifest --slim` without feeding content via stdin/args, so its mcptoon
+numbers measure a bare command, not compression of the sample. If a future decision
+allows upstream PRs, that fix is the highest-value contribution — until then quote
+no benchmark numbers sourced from this harness.

@@ -26,7 +26,11 @@
 | 渠道 | 状态 | 地址 |
 |------|------|------|
 | GitHub | ✅ v0.7.2，CI 全绿 | github.com/activeing123/mcptoon |
-| PyPI | ✅ 0.7.2 | pypi.org/project/mcptoon/0.7.2 |
+| PyPI | ✅ 0.7.2（pypistats 全量 2014 次 @2026-09-02——收录≠采用，以此为准绳） | pypi.org/project/mcptoon/0.7.2 |
+| numtide/llm-agents.nix | ✅ 官方打包（init PR#7839 by zimbatm；bot 自动跟版至 0.7.2）→ 发版纪律见 AGENTS.md | github.com/numtide/llm-agents.nix |
+| apify/mcpc 客户端对比表 | ✅ 收录（PR#370 by 联合创始人 jancurn） | github.com/apify/mcpc |
+| striki18/benchmark | ✅ 代码级集成：其 harness 注册 mcptoon 为压缩工具（上游调用有已知 bug，见 competitive-intel §F） | github.com/striki18/benchmark |
+| SimonSchubert/LinuxCommandLibrary | ✅ 收录 mcptoon.md 命令手册（1967★ App，2M+ 下载） | github.com/SimonSchubert/LinuxCommandLibrary |
 | MCP Registry | ✅ 收录 v0.7.0（0.7.1 元数据更新：用户指示过几天再更） | registry.modelcontextprotocol.io |
 | Glama | ✅ 收录 + Dockerfile 构建检查通过（python -m 方案，见 .scratch 存档） | glama.ai/mcp/servers/activeing123/mcptoon |
 | awesome-mcp-servers | 🟡 PR #12910 就绪等合（listed+badge 双条件已满足） | github.com/punkpeye/awesome-mcp-servers/pull/12910 |

@@ -31,6 +31,11 @@
 
 [中文文档](README.zh-CN.md) · [Developer docs](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
 
+> 💸 **The hidden bill, re-charged every session.** A 255-tool / 50-server setup costs
+> **71,929 tokens** just to list the tools — re-payed in full every single session
+> (~**$6.5/month** for a daily user at $3/M input tokens, before any tool call).
+> mcptoon lists the same tools in **123 tokens**. Same tools, same agents, smaller bill.
+
 ## ⚡ 3 steps, any OS — no configuration
 
 ```bash
