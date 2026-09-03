@@ -83,7 +83,7 @@ class ScriptedClient(MCPClient):
         self.seen = []
         self.seen_headers = []
 
-    def _stdio_request(self, payload: bytes) -> dict:
+    def _stdio_request(self, payload: bytes, timeout=None) -> dict:
         msg = json.loads(payload.decode())
         self.seen.append(msg)
         return self.handlers.pop(0)(msg)

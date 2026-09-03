@@ -35,10 +35,13 @@ Usage:
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
+import queue
 import subprocess
 import threading
+import time
 import urllib.request
 import urllib.error
 from typing import Any, Optional
@@ -91,6 +94,59 @@ def _next_id() -> int:
     with _id_lock:
         _id_counter[0] += 1
         return _id_counter[0]
+
+
+def _stdio_pump(proc, response_queues: dict, rq_lock,
+                late_queue, late_lock):
+    """Background stdout reader for stdio transport (v0.7.4).
+
+    Reads raw lines from ``proc.stdout`` forever and routes every JSON-RPC
+    message with an ``id`` into the matching per-id queue (popped from
+    ``response_queues``). Everything else — debug output, notifications,
+    responses for requests that already timed out — is parked in
+    ``late_queue`` (lost & found) instead of poisoning the next request.
+
+    On EOF, every registered waiter receives a ``None`` sentinel so
+    in-flight requests fail fast instead of hanging on a dead process.
+
+    Module-level so tests can drive it directly against a fake process.
+    """
+    stdout = proc.stdout
+    while True:
+        try:
+            line = stdout.readline()
+        except (OSError, ValueError):
+            line = b""
+        if not line:
+            with rq_lock:
+                for q in list(response_queues.values()):
+                    q.put(None)
+            return
+        text = line.decode("utf-8", errors="replace").strip()
+        if not text:
+            continue
+        try:
+            msg = json.loads(text)
+        except json.JSONDecodeError:
+            # Debug output / partial line — no response id to route.
+            with late_lock:
+                late_queue.append((text, time.time()))
+            continue
+        if not isinstance(msg, dict) or "id" not in msg:
+            # Notification — no response id; park for diagnostics.
+            with late_lock:
+                late_queue.append((msg, time.time()))
+            continue
+        rid = msg["id"]
+        with rq_lock:
+            q = response_queues.pop(rid, None)
+        if q is not None:
+            q.put(msg)
+        else:
+            # Response for a request that already timed out — park it
+            # (lost & found) instead of poisoning the next request.
+            with late_lock:
+                late_queue.append((msg, time.time()))
 
 
 class MCPError(Exception):
@@ -157,6 +213,18 @@ class MCPClient:
         # stdio state
         self._proc: Optional[subprocess.Popen] = None
         self._stdout_lock = threading.Lock()
+
+        # Response pump (v0.7.4): a background thread reads stdout lines and
+        # routes every JSON-RPC message into a queue keyed by response id.
+        # Requests then wait on the queue with a deadline — a silent server
+        # (e.g. one that never replies to unknown RPCs) can no longer hang
+        # the client forever via a blocking readline().
+        self._pump_thread: Optional[threading.Thread] = None
+        self._response_queues: dict[int, queue.Queue] = {}
+        self._response_queues_lock = threading.Lock()
+        self._late_queue: "collections.deque[tuple[Any, float]]" = collections.deque(
+            maxlen=16)
+        self._late_lock = threading.Lock()
 
         # http state
         self._session_id: Optional[str] = None
@@ -226,10 +294,15 @@ class MCPClient:
         Returns the discovery result on success; raises MCPError when the
         server clearly does not implement the modern protocol (unknown
         method, unsupported version, transport failure, ...).
+
+        Uses a short dedicated deadline (capped at 10s): a legacy server
+        that stays silent on this RPC should cost seconds, not the full
+        request timeout, before the auto-fallback to the classic handshake.
         """
         self._in_probe = True
         try:
-            return self._request("server/discover", {})
+            probe_timeout = min(self._timeout, 10.0)
+            return self._request("server/discover", {}, timeout=probe_timeout)
         finally:
             self._in_probe = False
 
@@ -387,48 +460,87 @@ class MCPClient:
             cwd=self._cwd,
             bufsize=0,  # unbuffered — critical for JSON-RPC over pipes
         )
+        self._start_response_pump()
 
-    def _stdio_request(self, payload: bytes) -> dict:
-        """Send JSON-RPC request over stdin, read response from stdout.
+    def _start_response_pump(self):
+        """Start the background stdout reader thread (v0.7.4).
 
-        Handles multi-line responses and skips notification lines.
+        The pump reads raw lines and routes JSON-RPC responses to per-id
+        queues. Requests block on ``queue.get(timeout=...)`` instead of a
+        blocking ``readline()`` — the fix for infinite hangs on servers
+        that never answer some RPCs (e.g. old servers that stay silent on
+        the 2026-07-28 ``server/discover`` probe).
         """
-        with self._stdout_lock:
-            assert self._proc is not None
-            assert self._proc.stdin is not None
-            assert self._proc.stdout is not None
+        self._pump_thread = threading.Thread(
+            target=_stdio_pump,
+            args=(self._proc, self._response_queues,
+                  self._response_queues_lock, self._late_queue,
+                  self._late_lock),
+            daemon=True,
+            name=f"mcptoon-stdio-pump-{id(self._proc)}",
+        )
+        self._pump_thread.start()
 
-            self._proc.stdin.write(payload + b"\n")
-            self._proc.stdin.flush()
+    def _stdio_request(self, payload: bytes, timeout: float | None = None) -> dict:
+        """Send JSON-RPC request over stdin, wait for the response with a
+        deadline.
 
-            # Read lines until we get a valid JSON-RPC response (has "id")
-            # Skip notifications (lines without "id" field)
-            while True:
-                line = self._proc.stdout.readline()
-                if not line:
-                    # Process may have died — check stderr
-                    stderr = ""
-                    if self._proc.stderr:
-                        stderr = self._proc.stderr.read().decode("utf-8", errors="replace")[:500]
-                    raise MCPError("PROCESS_DIED", f"MCP server process exited. stderr: {stderr}")
+        The background pump thread owns stdout; this method registers a
+        per-id queue, writes the request, then blocks on the queue with a
+        timeout. A server that never replies now surfaces as a
+        ``RESPONSE_TIMEOUT`` MCPError instead of hanging forever.
+        """
+        rid = None
+        try:
+            req_msg = json.loads(payload.decode("utf-8"))
+            rid = req_msg.get("id")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+        if not isinstance(rid, int):
+            raise MCPError("PROTOCOL_ERROR", "request payload has no numeric id")
 
-                text = line.decode("utf-8", errors="replace").strip()
-                if not text:
-                    continue
+        response_q: queue.Queue = queue.Queue(maxsize=1)
+        with self._response_queues_lock:
+            self._response_queues[rid] = response_q
 
+        try:
+            with self._stdout_lock:
+                assert self._proc is not None
+                assert self._proc.stdin is not None
+                self._proc.stdin.write(payload + b"\n")
+                self._proc.stdin.flush()
+        except (OSError, ValueError, BrokenPipeError) as e:
+            with self._response_queues_lock:
+                self._response_queues.pop(rid, None)
+            raise MCPError("PROCESS_DIED", f"failed writing to MCP server: {e}") from e
+
+        deadline = timeout if timeout is not None else self._timeout
+        try:
+            msg = response_q.get(timeout=deadline)
+        except queue.Empty:
+            with self._response_queues_lock:
+                self._response_queues.pop(rid, None)
+            raise MCPError(
+                "RESPONSE_TIMEOUT",
+                f"no JSON-RPC response for request id {rid} "
+                f"within {deadline}s (server went silent)",
+                retry=False,
+            ) from None
+
+        if msg is None:
+            # Pump EOF sentinel — process died. Surface stderr tail.
+            stderr = ""
+            if self._proc and self._proc.stderr:
                 try:
-                    msg = json.loads(text)
-                except json.JSONDecodeError:
-                    # Could be a partial line or debug output — skip
-                    continue
+                    stderr = self._proc.stderr.read().decode(
+                        "utf-8", errors="replace")[:500]
+                except Exception:
+                    pass
+            raise MCPError(
+                "PROCESS_DIED",
+                f"MCP server process exited. stderr: {stderr}")
 
-                # Skip notifications (no "id" field)
-                if isinstance(msg, dict) and "id" not in msg:
-                    continue
-
-                return msg
-
-            raise MCPError("EMPTY_RESPONSE", "No response received")
+        return msg
 
     def _stdio_notify(self, payload: bytes):
         """Send notification (no response expected) over stdio."""
@@ -561,7 +673,7 @@ class MCPClient:
         payload = json.dumps(msg).encode()
 
         if self._transport == "stdio":
-            data = self._stdio_request(payload)
+            data = self._stdio_request(payload, timeout=timeout)
         else:
             data = self._http_request(payload, timeout=timeout,
                                       extra_headers=extra_headers)

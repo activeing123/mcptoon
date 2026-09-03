@@ -5,6 +5,39 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] — 2026-09-03
+
+### Fixed — stdio hang: silent servers can no longer freeze the client
+
+Root cause found on 2026-09-03 while investigating "tool calls broke after
+the v0.7.3 update": the update was innocent. The real defect was old —
+`_stdio_request()` read server responses with a blocking
+`stdout.readline()` that had **no deadline**. A server that stays silent on
+the `server/discover` probe (e.g. `mcp_server_fetch` 2026.8.18, which sends
+nothing at all — not even a `-32601` error) hung the client **forever**.
+Any command that enumerates every configured server (`doctor`, `manifest`,
+`discover`, `--auto`) could be permanently stuck by one dead config entry.
+
+- **Response pump thread**: a background thread now owns stdout and routes
+  every JSON-RPC response to a per-id queue (`_stdio_pump`, module-level
+  and directly testable). Requests wait on the queue with a deadline —
+  silence now surfaces as `MCPError("RESPONSE_TIMEOUT")` instead of a
+  lifetime hang. Late responses for timed-out requests are parked in a
+  lost-and-found deque instead of poisoning the next request.
+- **EOF wakes all waiters**: a dead server process fails fast with
+  `PROCESS_DIED` instead of holding requests until their full timeout.
+- **Probe deadline capped at 10s**: `server/discover` probing uses
+  `min(timeout, 10s)`, so `spec="auto"` fallback to the legacy handshake
+  costs seconds, not the full request timeout. Servers answering the probe
+  within 10s still negotiate modern mode (slow-but-alive is preserved).
+- **Request-level timeout plumbing**: `_stdio_request(payload, timeout=)`
+  accepts the per-request deadline (HTTP transport already did).
+
+Tests: `tests/test_v074_stdio_timeout.py` (12) — real-subprocess
+reproductions of the silent-server hang, EOF fail-fast, slow-probe
+negotiation (3s stays modern / 12s falls back), lost-and-found parking,
+plus fake-process pump routing unit tests. Suite total: 682 (+12).
+
 ## [0.7.3] — 2026-09-02
 
 ### Security — HTTP serve hardening (red-team findings, 2026-09-02)
