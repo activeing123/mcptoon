@@ -47,6 +47,7 @@ Usage:
 from __future__ import annotations
 
 import concurrent.futures
+import io
 import json
 import os
 import sys
@@ -55,6 +56,8 @@ import time
 import traceback
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+from http.server import BaseHTTPRequestHandler
 
 from . import __version__
 from .config import load_config, resolve_server_name
@@ -434,6 +437,12 @@ class MCPServerBridge:
             _, _, body = parse_skill_md(Path(info["path"]))
         except OSError:
             body = info.get("body", "")
+        # v0.7.3: prompts were previously returned unscanned — a poisoned
+        # SKILL.md could inject instructions straight into the agent context.
+        # Run the same heuristic the tool-result path uses.
+        poison = router_mod._check_poisoning(body)
+        if poison:
+            raise MCPError(-32003, f"prompt blocked: {poison}")
         return {
             "description": info.get("description", ""),
             "messages": [
@@ -708,14 +717,17 @@ def _get_call_timeout() -> int:
 # Entry point
 # ═══════════════════════════════════════════════════
 
-def run_serve(args: list[str]):
-    """Entry point for `mcptoon serve` command.
+# Sentinel for `--auth` given without a value → token is generated at startup
+# and printed to stderr exactly once (Jupyter-style). Value is a placeholder
+# marker, never an actual credential.
+_AUTO_TOKEN = "<auto>"
 
-    Args:
-        args: Command line args after 'serve'
-              --format toon|slim|compact|json|raw|auto  (default: auto)
-              --listen <addr>  HTTP mode: listen on addr (e.g. :8080, 0.0.0.0:9090)
-              --http            Shorthand for --listen :8080
+
+def _parse_serve_args(args: list[str]) -> tuple[str, str | None, str | None]:
+    """Parse `mcptoon serve` arguments.
+
+    Returns (output_format, listen_addr, auth_token).
+    listen_addr None = stdio mode; auth_token _AUTO_TOKEN = generate at startup.
     """
     output_format = "auto"
     listen_addr = None  # None = stdio mode; "addr:port" = HTTP mode
@@ -729,7 +741,6 @@ def run_serve(args: list[str]):
             i += 1
         elif a.startswith("--format="):
             output_format = a.split("=", 1)[1]
-            i += 1
         elif a in ("--toon",):
             output_format = "toon"
         elif a in ("--slim",):
@@ -745,16 +756,20 @@ def run_serve(args: list[str]):
             i += 1
         elif a.startswith("--listen="):
             listen_addr = a.split("=", 1)[1]
-            i += 1
         elif a == "--http":
             listen_addr = ":8080"
-            i += 1
-        elif a == "--auth" and i + 1 < len(args):
-            auth_token = args[i + 1]
-            i += 1
+        elif a == "--auth":
+            # v0.7.3: bare `--auth` (or followed by another flag) generates
+            # a random token; `--auth <value>` sets it explicitly.
+            nxt = args[i + 1] if i + 1 < len(args) else None
+            if nxt is None or nxt.startswith("--"):
+                auth_token = _AUTO_TOKEN
+            else:
+                auth_token = nxt
+                i += 1
         elif a.startswith("--auth="):
-            auth_token = a.split("=", 1)[1]
-            i += 1
+            v = a.split("=", 1)[1]
+            auth_token = v if v else _AUTO_TOKEN
         elif a in ("-h", "--help"):
             _help_text = _serve_help()
             try:
@@ -764,8 +779,23 @@ def run_serve(args: list[str]):
                 sys.stdout.buffer.write(_help_text.encode("utf-8"))
                 sys.stdout.buffer.write(b"\n")
                 sys.stdout.buffer.flush()
-            return
+            sys.exit(0)
         i += 1
+
+    return output_format, listen_addr, auth_token
+
+
+def run_serve(args: list[str]):
+    """Entry point for `mcptoon serve` command.
+
+    Args:
+        args: Command line args after 'serve'
+              --format toon|slim|compact|json|raw|auto  (default: auto)
+              --listen <addr>  HTTP mode: listen on addr (e.g. :8080)
+              --http            Shorthand for --listen :8080 (binds 127.0.0.1)
+              --auth [token]    Bearer token; bare --auth generates one
+    """
+    output_format, listen_addr, auth_token = _parse_serve_args(args)
 
     bridge = MCPServerBridge(output_format=output_format)
 
@@ -780,166 +810,317 @@ def run_serve(args: list[str]):
 # ═══════════════════════════════════════════════════
 
 
+# ─── HTTP security helpers (v0.7.3) ──────────────────
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _parse_listen_addr(listen_addr: str) -> tuple[str, int]:
+    """Parse 'addr:port'. Bare ':port' binds loopback (v0.7.3 — was 0.0.0.0)."""
+    if ":" not in listen_addr:
+        listen_addr = ":" + listen_addr
+    host, _, port_str = listen_addr.rpartition(":")
+    if not host:
+        host = "127.0.0.1"
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = 8080
+    return host, port
+
+
+def _is_loopback(host: str) -> bool:
+    return host.lower().strip("[]") in _LOOPBACK_HOSTS
+
+
+def _allowed_browser_hosts(host: str) -> set[str]:
+    """Hosts acceptable in Origin/Host headers.
+
+    Loopback names always allowed; the explicit bind host allowed when it is
+    a specific address; extra names via MCPTOON_ALLOWED_HOSTS (comma-sep).
+    """
+    allowed = {h.lower() for h in _LOOPBACK_HOSTS}
+    if host and not _is_wildcard(host):
+        allowed.add(host.lower().strip("[]"))
+    extra = os.environ.get("MCPTOON_ALLOWED_HOSTS", "")
+    for name in extra.split(","):
+        name = name.strip().lower()
+        if name:
+            allowed.add(name)
+    return allowed
+
+
+def _is_wildcard(host: str) -> bool:
+    return host.lower().strip("[]") in {"0.0.0.0", "::"}
+
+
+def _browser_guard(headers, allowed: set[str], auth_enabled: bool) -> str | None:
+    """Reject browser-originated requests when they don't belong here.
+
+    Browsers always attach Origin on cross-origin fetch and always send Host;
+    curl/agents/scripts send neither or a loopback Host. DNS rebinding shows
+    up as a non-loopback Host on a loopback-bound server → caught here.
+
+    Returns a rejection reason, or None to allow.
+    """
+    origin = headers.get("Origin")
+    if origin:
+        try:
+            ohost = (urlsplit(origin).hostname or "").lower()
+        except ValueError:
+            return f"cross-origin request rejected: malformed Origin '{origin}'"
+        if ohost and ohost in allowed:
+            return None
+        return f"cross-origin request rejected: Origin '{origin}' not allowed"
+
+    host_hdr = headers.get("Host")
+    if host_hdr and not auth_enabled:
+        hname = host_hdr.rsplit(":", 1)[0].strip("[]").lower()
+        if hname and hname not in allowed:
+            return (f"DNS-rebinding guard: Host '{hname}' not allowed "
+                    f"(allow via MCPTOON_ALLOWED_HOSTS or enable --auth)")
+    return None
+
+
+def _validate_http_bind(host: str, auth_token: str | None) -> str | None:
+    """Return error message if this bind is unsafe, None if OK.
+
+    Policy (v0.7.3): loopback may run without a token; binding beyond
+    loopback REQUIRES one — the 'LAN-exposed + unauthenticated' combination
+    is refused outright instead of allowed by accident.
+    """
+    if not _is_loopback(host) and not auth_token:
+        return (
+            f"Refusing to bind {host} without authentication.\n"
+            f"  A network-exposed, unauthenticated MCP gateway would let anyone\n"
+            f"  on the network call your tools. Either:\n"
+            f"    - drop --host / --listen address to stay on 127.0.0.1 (default), or\n"
+            f"    - pass --auth <token> (or bare --auth to auto-generate one)"
+        )
+    return None
+
+
+class MCPHTTPHandler(BaseHTTPRequestHandler):
+    """HTTP handler that dispatches JSON-RPC to the bridge (v0.7.3 hardened).
+
+    Order of checks on every request:
+      1. Origin/Host browser guard (CSRF + DNS-rebinding)
+      2. Bearer token (if configured) — before any body parsing
+      3. Content-Type (POST only, when header is present)
+    """
+
+    def _browser_guard(self) -> str | None:
+        return _browser_guard(
+            self.headers,
+            getattr(self.server, "_mcptoon_allowed_hosts", set()),
+            bool(getattr(self.server, "_mcptoon_auth_token", None)),
+        )
+
+    def _check_auth(self) -> bool:
+        auth_token = getattr(self.server, "_mcptoon_auth_token", None)
+        if not auth_token:
+            return True
+        provided = self.headers.get("Authorization", "")
+        if provided.startswith("Bearer "):
+            provided = provided[7:]
+        return provided == auth_token
+
+    def do_POST(self):
+        reason = self._browser_guard()
+        if reason:
+            self.send_error(403, reason)
+            return
+        if not self._check_auth():
+            self._send_json({
+                "jsonrpc": "2.0",
+                "error": {"code": -32001, "message": "Unauthorized"},
+                "id": None,
+            }, status=401)
+            return
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        # Reject only browser form-post types (the CSRF vector). JSON clients
+        # and curl-style raw posts are unaffected; the Origin/Host guard above
+        # is the primary browser defense.
+        if ctype in ("text/plain", "multipart/form-data"):
+            self.send_error(415, "Content-Type must be application/json")
+            return
+
+        # Read request body
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length)
+
+        try:
+            request = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_json({
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": "Parse error"},
+                "id": None,
+            })
+            return
+
+        bridge = self.server._mcptoon_bridge
+
+        # Handle JSON-RPC batch (array of requests)
+        if isinstance(request, list):
+            responses = []
+            for req in request:
+                resp = self._handle_single(bridge, req)
+                if resp is not None:
+                    responses.append(resp)
+            if responses:
+                self._send_json(responses[0] if len(responses) == 1 else responses)
+            return
+
+        # Single request
+        response = self._handle_single(bridge, request)
+        if response is not None:
+            self._send_json(response)
+        else:
+            self._send_json({
+                "jsonrpc": "2.0",
+                "id": request.get("id") if isinstance(request, dict) else None,
+                "error": {"code": -32603, "message": "No response"},
+            })
+
+    def _handle_single(self, bridge, request: dict) -> dict | None:
+        """Handle a single JSON-RPC request, return response dict or None."""
+        if not isinstance(request, dict):
+            return {
+                "jsonrpc": "2.0",
+                "error": {"code": -32600, "message": "Invalid request"},
+                "id": None,
+            }
+
+        # Notification (no id) — don't respond
+        req_id = request.get("id")
+        if req_id is None:
+            # Handle cancellation notifications
+            method = request.get("method", "")
+            if method == "notifications/cancelled":
+                _log("Cancellation request received (best-effort)")
+            elif method == "notifications/initialized":
+                _log("Client initialized notification received")
+            return None
+
+        # Use thread-local capture buffer (concurrency-safe)
+        buf = io.StringIO()
+        _response_capture.buf = buf
+        try:
+            bridge._handle_request(request)
+        except Exception as e:
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {"code": -32603, "message": str(e)[:200]},
+            }
+        finally:
+            _response_capture.buf = None
+
+        output_text = buf.getvalue().strip()
+        if output_text:
+            try:
+                return json.loads(output_text)
+            except json.JSONDecodeError:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32603, "message": "Internal error"},
+                }
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32603, "message": "No response from bridge"},
+        }
+
+    def do_GET(self):
+        """Health check endpoint (v0.7.3: token + browser guard enforced)."""
+        reason = self._browser_guard()
+        if reason:
+            self.send_error(403, reason)
+            return
+        if not self._check_auth():
+            self._send_json({
+                "jsonrpc": "2.0",
+                "error": {"code": -32001, "message": "Unauthorized"},
+                "id": None,
+            }, status=401)
+            return
+        if self.path in ("/health", "/status", "/"):
+            bridge = self.server._mcptoon_bridge
+            bridge._ensure_initialized()
+            health = bridge._handle_health()
+            self._send_json(health)
+        else:
+            self.send_error(404, "Not found")
+
+    def _send_json(self, data: dict, status: int = 200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        # Suppress default logging (or route to stderr)
+        _log(f"HTTP {self.address_string()} - {format % args}")
+
+
+def _build_http_server(bridge, listen_addr: str, auth_token: str | None = None):
+    """Construct the hardened HTTPServer (bind + auth + browser guard).
+
+    Separated from _run_http so tests can build servers on ephemeral ports.
+    """
+    from http.server import HTTPServer
+
+    host, port = _parse_listen_addr(listen_addr)
+
+    # Resolve auth: explicit --auth value > bare --auth (generate) > env var
+    if auth_token == _AUTO_TOKEN:
+        import secrets
+        auth_token = secrets.token_urlsafe(32)
+        _log("Auth: auto-generated token (shown ONCE — store it now):")
+        sys.stderr.write(f"mcptoon auth token: {auth_token}\n")
+        sys.stderr.flush()
+    if not auth_token:
+        auth_token = os.environ.get("MCPTOON_AUTH_TOKEN", "")
+
+    error = _validate_http_bind(host, auth_token)
+    if error:
+        sys.stderr.write(f"mcptoon serve: {error}\n")
+        raise SystemExit(2)
+
+    server = HTTPServer((host, port), MCPHTTPHandler)
+    server._mcptoon_auth_token = auth_token or None
+    server._mcptoon_allowed_hosts = _allowed_browser_hosts(host)
+    server._mcptoon_bridge = bridge
+    return server
+
+
 def _run_http(bridge: MCPServerBridge, listen_addr: str, auth_token: str | None = None):
     """Run mcptoon serve as an HTTP server.
 
     Accepts JSON-RPC POST requests at /mcp endpoint.
     Supports multiple concurrent agents (unlike stdio which is single-connection).
 
-    Auth: If auth_token is set, requests must include
-    `Authorization: Bearer <token>` header.
+    Security (v0.7.3):
+      - Bare `:port` binds 127.0.0.1 (loopback) — was 0.0.0.0
+      - Non-loopback bind requires --auth (hard error otherwise)
+      - Token (if set) checked on POST /mcp AND GET health endpoints, before
+        any body parsing
+      - Origin/Host validation blocks browser CSRF and DNS rebinding
+      - POST requires Content-Type: application/json when header is present
     """
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-
-    # Parse listen address
-    if ":" not in listen_addr:
-        listen_addr = ":" + listen_addr
-    host, _, port_str = listen_addr.rpartition(":")
-    if not host:
-        host = "0.0.0.0"
-    try:
-        port = int(port_str)
-    except ValueError:
-        port = 8080
-
-    class MCPHTTPHandler(BaseHTTPRequestHandler):
-        """HTTP handler that dispatches JSON-RPC to the bridge."""
-
-        def do_POST(self):
-            # Read request body
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
-
-            try:
-                request = json.loads(body)
-            except json.JSONDecodeError:
-                self._send_json({
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32700, "message": "Parse error"},
-                    "id": None,
-                })
-                return
-
-            # Check auth token if configured
-            auth_token = getattr(self.server, "_mcptoon_auth_token", None)
-            if auth_token:
-                provided = self.headers.get("Authorization", "")
-                if provided.startswith("Bearer "):
-                    provided = provided[7:]
-                if provided != auth_token:
-                    self._send_json({
-                        "jsonrpc": "2.0",
-                        "error": {"code": -32001, "message": "Unauthorized"},
-                        "id": request.get("id") if isinstance(request, dict) else None,
-                    })
-                    return
-
-            # Handle JSON-RPC batch (array of requests)
-            if isinstance(request, list):
-                responses = []
-                for req in request:
-                    resp = self._handle_single(bridge, req)
-                    if resp is not None:
-                        responses.append(resp)
-                if responses:
-                    self._send_json(responses[0] if len(responses) == 1 else responses)
-                return
-
-            # Single request
-            response = self._handle_single(bridge, request)
-            if response is not None:
-                self._send_json(response)
-            else:
-                self._send_json({
-                    "jsonrpc": "2.0",
-                    "id": request.get("id") if isinstance(request, dict) else None,
-                    "error": {"code": -32603, "message": "No response"},
-                })
-
-        def _handle_single(self, bridge, request: dict) -> dict | None:
-            """Handle a single JSON-RPC request, return response dict or None."""
-            if not isinstance(request, dict):
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32600, "message": "Invalid request"},
-                    "id": None,
-                }
-
-            # Notification (no id) — don't respond
-            req_id = request.get("id")
-            if req_id is None:
-                # Handle cancellation notifications
-                method = request.get("method", "")
-                if method == "notifications/cancelled":
-                    _log("Cancellation request received (best-effort)")
-                elif method == "notifications/initialized":
-                    _log("Client initialized notification received")
-                return None
-
-            # Use thread-local capture buffer (concurrency-safe)
-            buf = io.StringIO()
-            _response_capture.buf = buf
-            try:
-                bridge._handle_request(request)
-            except Exception as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "error": {"code": -32603, "message": str(e)[:200]},
-                }
-            finally:
-                _response_capture.buf = None
-
-            output_text = buf.getvalue().strip()
-            if output_text:
-                try:
-                    return json.loads(output_text)
-                except json.JSONDecodeError:
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": req_id,
-                        "error": {"code": -32603, "message": "Internal error"},
-                    }
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32603, "message": "No response from bridge"},
-            }
-
-        def do_GET(self):
-            """Health check endpoint."""
-            if self.path in ("/health", "/status", "/"):
-                bridge._ensure_initialized()
-                health = bridge._handle_health()
-                self._send_json(health)
-            else:
-                self.send_error(404, "Not found")
-
-        def _send_json(self, data: dict):
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, format, *args):
-            # Suppress default logging (or route to stderr)
-            _log(f"HTTP {self.address_string()} - {format % args}")
-
     # Initialize bridge before accepting connections
-    _log(f"Initializing bridge...")
+    _log("Initializing bridge...")
     bridge._ensure_initialized()
     _log(f"Bridge ready: {len(bridge._tool_index)} tools from {len(bridge._servers)} servers")
 
-    # Determine auth token: explicit > env var
-    if not auth_token:
-        auth_token = os.environ.get("MCPTOON_AUTH_TOKEN", "")
-    if auth_token:
-        _log(f"Auth enabled: Bearer token required")
-
-    server = HTTPServer((host, port), MCPHTTPHandler)
-    server._mcptoon_auth_token = auth_token or None
+    server = _build_http_server(bridge, listen_addr, auth_token=auth_token)
+    host, port = server.server_address[0], server.server_address[1]
+    if server._mcptoon_auth_token:
+        _log("Auth enabled: Bearer token required")
     _log(f"mcptoon serve HTTP listening on {host}:{port}")
     _log(f"  Endpoint: POST http://{host}:{port}/mcp")
     _log(f"  Health:   GET  http://{host}:{port}/health")
@@ -967,9 +1148,16 @@ Usage:
   mcptoon serve --format toon      # compress results with TOON
   mcptoon serve --format slim      # compress results with SLIM
   mcptoon serve --format raw       # no compression (pass-through)
-  mcptoon serve --listen :8080     # HTTP mode: listen on port 8080
+  mcptoon serve --listen :8080     # HTTP mode: http://127.0.0.1:8080 (loopback)
   mcptoon serve --http             # Shorthand for --listen :8080
-  mcptoon serve --listen 0.0.0.0:9090  # HTTP mode: bind to all interfaces
+  mcptoon serve --http --auth      # HTTP mode with auto-generated token
+  mcptoon serve --listen 0.0.0.0:9090 --auth <token>  # LAN/remote (token required)
+
+Security (v0.7.3):
+  - Bare ':port' binds 127.0.0.1 (loopback) — never 0.0.0.0
+  - Binding beyond loopback REQUIRES --auth (refused otherwise)
+  - Browser CSRF / DNS-rebinding guard on every request
+  - Extra hostnames allowed via MCPTOON_ALLOWED_HOSTS env (comma-separated)
 
 Agent config (e.g. Claude Code ~/.claude.json):
   {
@@ -1008,11 +1196,14 @@ Options:
   --slim           Shorthand for --format slim
   --compact        Shorthand for --format compact
   --raw            Shorthand for --format raw (no compression)
-  --listen <addr>  HTTP mode: listen on addr (e.g. :8080, 0.0.0.0:9090)
+  --listen <addr>  HTTP mode: listen on addr (default bind 127.0.0.1)
   --http           Shorthand for --listen :8080
+  --auth [token]   Bearer token (bare --auth generates one, printed once)
   -h, --help       Show this help
 
 Environment:
   MCPTOON_CALL_TIMEOUT    Per-call timeout in seconds (default: 30)
   MCPTOON_CACHE_TTL       Manifest cache TTL in seconds (default: 300)
+  MCPTOON_AUTH_TOKEN      HTTP mode bearer token (same as --auth)
+  MCPTOON_ALLOWED_HOSTS   Extra hostnames accepted in Origin/Host checks
 """

@@ -5,6 +5,49 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] — 2026-09-02
+
+### Security — HTTP serve hardening (red-team findings, 2026-09-02)
+
+Findings from an adversarial security review of `mcptoon serve --http`.
+Found via line-level code audit; each fix ships with reproduction tests
+(`tests/test_v073_http_security.py`, 30 tests).
+
+- **Loopback-by-default binding**: bare `--http` / `--listen :8080` now binds
+  `127.0.0.1` instead of `0.0.0.0`. A network-exposed, unauthenticated MCP
+  gateway is no longer one flag away by accident.
+- **Non-loopback bind requires auth**: `--listen 0.0.0.0:9090` without
+  `--auth` is now refused outright (exit 2) instead of silently serving your
+  tools to the whole LAN. The risky combination can no longer be constructed.
+- **Bearer `--auth` without value auto-generates** a secure token
+  (`secrets.token_urlsafe(32)`), printed to stderr exactly once
+  (Jupyter-style). `MCPTOON_AUTH_TOKEN` env var still honored.
+- **Auth checked on GET too, before body parsing**: `/health`, `/status`, `/`
+  previously skipped the token check; POST parsed the request body before
+  verifying auth. Both closed — a bad token now short-circuits with 401
+  before any body is read.
+- **Browser CSRF / DNS-rebinding guard**: `Origin` and `Host` headers are
+  validated on every request (403 when they don't belong). curl, agents and
+  scripts that send neither header are unaffected; the attack surface is
+  browser pages, which always send both. Extra hostnames can be allowlisted
+  via `MCPTOON_ALLOWED_HOSTS`.
+- **Content-Type gate**: POST with `text/plain` or `multipart/form-data`
+  (browser form-post CSRF carriers) → 415. `application/json`, absent
+  headers and curl-style raw posts still accepted.
+- **`prompts/get` poisoning guard**: plugin SKILL.md bodies returned by
+  `prompts/get` previously bypassed the injection scanner entirely. The same
+  heuristic now runs; a poisoned skill raises MCPError -32003.
+- **`_check_poisoning` hardening**: full-text scan (the old first-5000-chars
+  truncation was a bypass), NFKC normalization (defeats fullwidth homoglyphs),
+  zero-width character stripping + density signal (defeats `ig\u200bnore`
+  splitting), and a Chinese indicator list. Still documented as a heuristic
+  safety net, not a security boundary.
+
+### Changed
+
+- `run_serve --help` exits via `SystemExit(0)` (was plain return)
+- New test-suite total: 660 passed (+30 security tests)
+
 ## [0.7.2] — 2026-09-01
 
 ### Added — first-run delight (beginner-friendly output)

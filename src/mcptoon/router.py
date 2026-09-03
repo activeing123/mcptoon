@@ -20,6 +20,7 @@ Supports custom handlers via decorator pattern.
 Includes tool poisoning detection, credential leak detection, and fuzzy match suggestions.
 """
 import re
+import unicodedata
 from typing import Any
 from collections.abc import Callable
 
@@ -139,27 +140,66 @@ _POISONING_INDICATORS = [
     "add this tool",
 ]
 
+# ── Chinese indicators (v0.7.3) ──
+_POISONING_INDICATORS_ZH = [
+    "忽略之前", "忽略以上", "忽略先前",
+    "无视之前", "无视以上",
+    "你的系统提示", "你的api key", "你的密钥",
+]
+
+
+# Zero-width and invisible characters used to split keywords past substring
+# matching (U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 WJ, U+FEFF BOM)
+_ZERO_WIDTH_RE = re.compile(r"[\u200b\u200c\u200d\u2060\ufeff]")
+# Fullwidth ASCII variants (U+FF01-U+FF5E) → homoglyph obfuscation
+_FULLWIDTH_RE = re.compile(r"[\uff01-\uff5e]")
+
+
+def _normalize_for_scan(text: str) -> str:
+    """Normalize obfuscation tricks before indicator matching (v0.7.3).
+
+    1. NFKC fold (fullwidth → ascii), lowercased
+    2. strip zero-width chars that would otherwise split keywords
+    """
+    folded = unicodedata.normalize("NFKC", text).lower()
+    return _ZERO_WIDTH_RE.sub("", folded)
+
 
 def _check_poisoning(result: Any) -> str | None:
     """Detect prompt injection in tool results.
 
     Returns reason string if poisoning detected, None otherwise.
     This is a heuristic check — not a security boundary, but a safety net.
+
+    v0.7.3 hardening:
+      - scans the full text (was: first 5000 chars only — truncation bypass)
+      - NFKC-normalizes (defeats fullwidth homoglyphs)
+      - strips zero-width chars (defeats 'ig\u200bnore' splitting)
+      - zero-width DENSITY is itself a signal (hiding something)
+      - Chinese indicator list added
     """
     if result is None:
         return None
 
     # Convert result to string for scanning
     try:
-        text = str(result).lower()
+        text = str(result)
     except Exception:
         return None
 
-    # Only check first 5000 chars (performance)
-    text = text[:5000]
+    # Zero-width density check (before stripping, on the original text)
+    zw_count = len(_ZERO_WIDTH_RE.findall(text))
+    if zw_count >= 3:
+        return (f"potential prompt injection detected: "
+                f"{zw_count} zero-width characters in output")
+
+    normalized = _normalize_for_scan(text)
 
     for indicator in _POISONING_INDICATORS:
-        if indicator.lower() in text:
+        if indicator.lower() in normalized:
+            return f"potential prompt injection detected: contains '{indicator}'"
+    for indicator in _POISONING_INDICATORS_ZH:
+        if indicator in normalized:
             return f"potential prompt injection detected: contains '{indicator}'"
 
     return None

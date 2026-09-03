@@ -366,15 +366,17 @@ class TestServeHttpMode:
         assert "HTTP" in result.stdout
 
     def test_run_serve_parses_listen_arg(self):
-        """run_serve parses --listen argument correctly."""
+        """run_serve --help exits via SystemExit(0) (v0.7.3)."""
+        import pytest
+
         from mcptoon.serve import run_serve
-        # Just verify it doesn't crash on --help (returns early)
-        # We can't actually start HTTP in a unit test
         import io
         import contextlib
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
-            run_serve(["--help"])
+            with pytest.raises(SystemExit) as cm:
+                run_serve(["--help"])
+        assert cm.value.code == 0
         output = f.getvalue()
         assert "stdio bridge" in output.lower()
 
