@@ -213,6 +213,10 @@ class MCPClient:
         # stdio state
         self._proc: Optional[subprocess.Popen] = None
         self._stdout_lock = threading.Lock()
+        # One-shot stderr tail cache: the FIRST consumer (EOF sentinel or
+        # write-failure path) drains the pipe; later error paths must reuse
+        # the cached tail instead of reading an already-empty pipe.
+        self._stderr_cache: Optional[str] = None
 
         # Response pump (v0.7.4): a background thread reads stdout lines and
         # routes every JSON-RPC message into a queue keyed by response id.
@@ -461,6 +465,8 @@ class MCPClient:
             bufsize=0,  # unbuffered — critical for JSON-RPC over pipes
         )
         self._start_response_pump()
+        # Fresh process → forget any stderr tail from the previous one.
+        self._stderr_cache = None
 
     def _start_response_pump(self):
         """Start the background stdout reader thread (v0.7.4).
@@ -480,6 +486,40 @@ class MCPClient:
             name=f"mcptoon-stdio-pump-{id(self._proc)}",
         )
         self._pump_thread.start()
+
+    def _stderr_tail(self) -> str:
+        """Best-effort tail of a dead server's stderr, cached one-shot.
+
+        Only the first call after a process death reads the pipe (EOF once
+        the child is gone); the result is cached so later error paths —
+        e.g. the auto-probe failure followed by the legacy-handshake
+        failure — all carry the same diagnostic tail.
+        """
+        if self._stderr_cache is not None:
+            return self._stderr_cache
+        if not (self._proc and self._proc.stderr):
+            return ""
+        # NOTE: do NOT gate this read on poll() — inside the exit race a
+        # child's pipe handles close (EOF becomes visible) before the
+        # process object flips to signaled, so poll() can still report
+        # alive on a process whose stderr is already fully written. Read
+        # in a helper thread with a 1s cap instead: post-mortem reads
+        # return immediately, and a live server never blocks the caller.
+        def _drain() -> None:
+            try:
+                tail = self._proc.stderr.read().decode(  # type: ignore[union-attr]
+                    "utf-8", errors="replace")[:500]
+            except Exception:
+                tail = ""  # stderr diagnostics are best-effort
+            self._stderr_cache = tail
+
+        t = threading.Thread(target=_drain, daemon=True,
+                             name="mcptoon-stderr-drain")
+        t.start()
+        t.join(timeout=1.0)
+        if self._stderr_cache is None:
+            return ""  # still draining in background; don't block callers
+        return self._stderr_cache
 
     def _stdio_request(self, payload: bytes, timeout: float | None = None) -> dict:
         """Send JSON-RPC request over stdin, wait for the response with a
@@ -512,7 +552,14 @@ class MCPClient:
         except (OSError, ValueError, BrokenPipeError) as e:
             with self._response_queues_lock:
                 self._response_queues.pop(rid, None)
-            raise MCPError("PROCESS_DIED", f"failed writing to MCP server: {e}") from e
+            # A write failure almost always means the process already
+            # exited (e.g. npx E404 on a missing package). Surface the
+            # stderr tail so users see the real cause, not just Errno 22.
+            stderr = self._stderr_tail()
+            detail = f"failed writing to MCP server: {e}"
+            if stderr.strip():
+                detail += f" | server stderr: {stderr.strip()}"
+            raise MCPError("PROCESS_DIED", detail) from e
 
         deadline = timeout if timeout is not None else self._timeout
         try:
@@ -528,14 +575,9 @@ class MCPClient:
             ) from None
 
         if msg is None:
-            # Pump EOF sentinel — process died. Surface stderr tail.
-            stderr = ""
-            if self._proc and self._proc.stderr:
-                try:
-                    stderr = self._proc.stderr.read().decode(
-                        "utf-8", errors="replace")[:500]
-                except Exception:
-                    pass
+            # Pump EOF sentinel — process died. Surface stderr tail
+            # (one-shot cached; later error paths reuse it).
+            stderr = self._stderr_tail()
             raise MCPError(
                 "PROCESS_DIED",
                 f"MCP server process exited. stderr: {stderr}")

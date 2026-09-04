@@ -5,6 +5,30 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — `mcptoon demo` broken on every machine without a stale npm cache
+
+`demo.py` spawned `npx -y @modelcontextprotocol/server-fetch`, a package
+that no longer exists on the npm registry (E404, verified 2026-09-05).
+The server died instantly; the client surfaced a bare
+`PROCESS_DIED failed writing ... [Errno 22]` (Windows) or broken pipe
+(POSIX) with the real `npm error 404` swallowed by the error path.
+
+- demo now runs the official `@modelcontextprotocol/server-everything`
+  reference server and its `echo` tool — self-contained, no API key,
+  no network fetch.
+- `PROCESS_DIED` from the stdio write path now includes the server's
+  stderr tail. The tail is drained once and cached (`_stderr_tail`) so
+  every failure along the probe → legacy-handshake fallback chain
+  carries the same diagnostic; the read runs in a 1s-capped helper
+  thread so a live server can never block the request path.
+- demo benchmark table aligned with `assets/benchmark_tiktoken.json`
+  (255 tools: 71,929 → 123 tokens, −99.8%); the old hardcoded
+  90,804 → 117 numbers predated the 2026-08-12 honest re-benchmark.
+
+Tests: `tests/test_demo_dead_package.py` (6).
+
 ## [0.7.4] — 2026-09-03
 
 ### Fixed — stdio hang: silent servers can no longer freeze the client

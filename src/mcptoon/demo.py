@@ -16,11 +16,12 @@
 mcptoon demo — Zero-config one-command demo (ADR 0003)
 
 Gives the user an "aha moment" in 30 seconds:
-  1. Download a zero-dependency MCP server (fetch, no API key needed)
+  1. Download a zero-dependency MCP server (the official "everything"
+     reference server — self-contained, no network, no API key)
   2. Add it to mcptoon config
   3. Call a tool
   4. Show token comparison: JSON vs TOON vs SLIM
-  5. Display the "90,804 tokens → 117 tokens" benchmark
+  5. Display the official 255-tool benchmark: "71,929 tokens → 123 tokens"
 
 Usage:
   mcptoon demo                    # Full demo
@@ -54,9 +55,13 @@ def run_demo(args: list[str]):
     if not _check_prerequisites():
         return
 
-    # Step 2: Demo server — use fetch (no API key, always works)
-    server_name = "demo-fetch"
-    server_cmd = ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+    # Step 2: Demo server — the official "everything" reference server
+    # (self-contained: no network, no API key, works offline after npx
+    # cache warms). Do NOT use @modelcontextprotocol/server-fetch: the
+    # package is gone from npm (registry E404, verified 2026-09-05) and
+    # every `mcptoon demo` died with PROCESS_DIED / Errno 22 on it.
+    server_name = "demo-everything"
+    server_cmd = ["npx", "-y", "@modelcontextprotocol/server-everything"]
 
     if not quick_mode:
         print("  Step 1/3: Starting demo server...")
@@ -64,13 +69,14 @@ def run_demo(args: list[str]):
     else:
         print("  Starting demo server...")
 
-    # Step 3: Call the fetch tool on example.com
-    url = "https://example.com"
-    result_text = _demo_call(server_name, server_cmd, url, quick_mode)
+    # Step 3: Call the echo tool (first tool call, zero setup)
+    message = "mcptoon demo works"
+    result_text = _demo_call(server_name, server_cmd, message, quick_mode)
 
     if result_text is None:
         print("  ❌ Demo failed. See error above.")
-        print("  Make sure Node.js is installed and npx is in PATH.")
+        print("  If the error mentions npm/404: check network or npm registry.")
+        print("  If it mentions npx not found: install Node.js: https://nodejs.org")
         return
 
     # Step 4: Show token comparison
@@ -95,7 +101,7 @@ def run_demo(args: list[str]):
     if keep_server:
         print()
         print("  --keep: demo server kept in config.")
-        print(f"  Run: mcptoon call {server_name} fetch '{{\"url\":\"...\"}}' --toon")
+        print(f"  Run: mcptoon call {server_name} echo '{{\"message\":\"...\"}}' --toon")
     else:
         _cleanup_demo(server_name)
 
@@ -135,8 +141,10 @@ def _check_prerequisites() -> bool:
     return True
 
 
-def _demo_call(server_name: str, server_cmd: list[str], url: str, quick: bool) -> str | None:
-    """Run the demo: start server, call tool, return result text."""
+def _demo_call(server_name: str, server_cmd: list[str], message: str,
+               quick: bool) -> str | None:
+    """Run the demo: start server, call the echo tool, return result text."""
+    client: MCPClient | None = None
     try:
         # Start the MCP server
         client = MCPClient(stdio=server_cmd, timeout=15)
@@ -147,8 +155,8 @@ def _demo_call(server_name: str, server_cmd: list[str], url: str, quick: bool) -
         if not quick:
             print(f"  ✓ Server '{server_name}' ready ({len(tools)} tools)")
 
-        # Call the fetch tool
-        result = client.call_tool("fetch", {"url": url})
+        # Call the echo tool
+        result = client.call_tool("echo", {"message": message})
 
         # Extract text from MCP content array
         result_text = _extract_text(result)
@@ -156,7 +164,7 @@ def _demo_call(server_name: str, server_cmd: list[str], url: str, quick: bool) -
             result_text = json.dumps(result, ensure_ascii=False)
 
         if not quick:
-            print(f"  ✓ Fetched {url} ({len(result_text)} chars)")
+            print(f"  ✓ Called echo: {result_text[:60]}")
         else:
             print(f"  ✓ Demo server ready")
 
@@ -165,6 +173,11 @@ def _demo_call(server_name: str, server_cmd: list[str], url: str, quick: bool) -
 
     except Exception as e:
         print(f"  ❌ Demo error: {e}")
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass  # best-effort cleanup after failure
         return None
 
 
@@ -202,7 +215,7 @@ def _show_token_comparison(text: str):
         def count_tokens(s: str) -> int:
             return max(len(s) // 4, 1)
 
-    sample = {"url": "https://example.com", "content": text[:500]}
+    sample = {"message": "mcptoon demo", "content": text[:500]}
 
     # JSON
     json_data = json.dumps(sample, ensure_ascii=False)
@@ -244,16 +257,16 @@ def _show_token_comparison(text: str):
 
 
 def _show_benchmark():
-    """Show the 255 tools benchmark (hardcoded tiktoken values)."""
+    """Show the official 255-tool benchmark (assets/benchmark_tiktoken.json)."""
     print()
-    print("  255 tools, tiktoken cl100k_base:")
+    print("  Official benchmark: 255 tools, 50 servers, tiktoken cl100k_base:")
     print()
     print(f"  {'Format':<12} {'Tokens':>10} {'Savings':>10}")
     print(f"  {'─'*12} {'─'*10} {'─'*10}")
-    print(f"  {'JSON':<12} {'90,804':>10} {'-':>10}")
-    print(f"  {'TOON':<12} {'54,649':>10} {'40%':>10}")
-    print(f"  {'SLIM':<12} {'6,174':>10} {'93%':>10}")
-    print(f"  {'Compact':<12} {'117':>10} {'99.9%':>10}")
+    print(f"  {'JSON':<12} {'71,929':>10} {'-':>10}")
+    print(f"  {'TOON':<12} {'47,438':>10} {'34%':>10}")
+    print(f"  {'SLIM':<12} {'8,282':>10} {'88.5%':>10}")
+    print(f"  {'Compact':<12} {'123':>10} {'99.8%':>10}")
     print()
     print("  Now you can:")
     print("  ✓ connect every agent with ONE config   →  mcptoon sync")
@@ -279,9 +292,9 @@ def _demo_help() -> str:
     return """mcptoon demo — Zero-config one-command demo
 
 Experience mcptoon's token savings in 30 seconds:
-  1. Starts a demo MCP server (fetch, no API key needed)
+  1. Starts the official "everything" MCP reference server (no API key)
   2. Calls a tool and shows JSON vs TOON vs SLIM comparison
-  3. Shows the 255 tools benchmark (90,804 -> 117 tokens)
+  3. Shows the official benchmark (71,929 -> 123 tokens, 255 tools)
 
 Usage:
   mcptoon demo                    # Full demo, step by step
