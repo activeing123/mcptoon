@@ -5,6 +5,70 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] — 2026-09-05
+
+### Fixed — the documented way to reproduce the numbers did not exist
+
+`mcptoon manifest --compact --tokens` was quoted in README.md, README.zh-CN.md,
+DEVELOPERS.md, both articles, `assets/benchmark.html` and both token charts as the
+way to verify the headline figures. `--tokens` was never implemented, and the parser
+dropped unknown long options silently — so the command printed a listing and no
+count, and nobody noticed.
+
+- Unknown long options now warn on stderr
+  (`mcptoon: unknown option '--tokens' ignored - see 'mcptoon --help'`) and are still
+  passed through unchanged, so no existing behaviour shifts.
+- `tests/test_cli_flags.py` pins the allowlist against the CLI source in both
+  directions: a new option missing from `KNOWN_FLAGS` fails, and a dead entry fails.
+- `scripts/bench_tokens.py` is the real reproduction path. It measures the tool lists
+  cached on your machine with tiktoken (`cl100k_base` and `o200k_base`) across raw
+  JSON, `--slim` and `--compact`, and prints the savings per format. tiktoken is a
+  dev-only import; the runtime package is still stdlib-only.
+- Every "reproduce it yourself" line now points at that script.
+- `mcptoon --version` / `-V` print the installed version; they used to fall through to
+  "Unknown command: --version".
+
+### Fixed — stale savings figures in shipped text
+
+- `--slim` was described as saving 93% (the pre-2026-08-12 artifact figure) in three
+  `cli.py` help strings, in `output.py`, in `docs/integrations/codex.md` and in the
+  `mcptoon demo` next-steps hint. Measured it is **88.5%**.
+- `--compact` was described as "~20 tokens for 96 tools"; measured it is
+  **~2.3 tokens per tool** (581 for 255).
+- `docs/tiktoken-benchmarks.md`: removed the row "Compact (30 names) = 63 tokens,
+  99.8%", which measured a listing truncated at 30 entries, and labelled its 39,964
+  baseline as *Sample A* against the canonical *Sample B* (71,929 → 581).
+- `assets/benchmark.svg` still charted 90,804 → 117 ("99.9%"); every bar is now
+  regenerated from `assets/benchmark_tiktoken.json`.
+
+### Fixed — README links and images were dead on PyPI
+
+Warehouse resolves relative targets against the project page, so all 15 relative
+links and images in README.md resolved to `https://pypi.org/project/mcptoon/<file>`
+and 404'd. They are absolute now, and `tests/test_readme_links.py` keeps them that way.
+
+### Changed — the English README no longer embeds Chinese-language assets
+
+- `assets/token-savings-en.svg`: English chart for README.md (the Chinese original
+  stays with README.zh-CN.md).
+- `assets/demo-en.gif`: English terminal demo, rendered from a real
+  `pip install mcptoon` + `mcptoon demo` transcript captured on a clean virtualenv;
+  `scripts/make_demo_gif.py` holds the transcript and does the rendering, so only the
+  frame pacing is synthetic.
+- `assets/benchmark.html` carries a "superseded snapshot" banner pointing at the
+  current caliber instead of silently showing old numbers.
+
+### Fixed — Windows-only flake in the HTTP auth suite
+
+`tests/test_v073_http_security.py` failed about one run in five on Windows with
+`ConnectionAbortedError [WinError 10053]`. The scenario is the point of the test: the
+server answers 401 *before* reading the request body, and the Windows stack aborts the
+connection while the client is still uploading, so urllib surfaces a transport error
+instead of `HTTPError`. `_do()` now retries that abort — bare, or wrapped in `URLError`
+— with a short backoff, keeping the assertion about the response the server produced
+rather than how the transport reported a rejected upload. 15 consecutive green runs
+verified.
+
 ## [0.7.4] — 2026-09-05
 
 ### Fixed — `mcptoon demo` broken on every machine without a stale npm cache
