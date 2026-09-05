@@ -31,6 +31,18 @@ The numtide bot turns PyPI releases into Nix bump PRs automatically. A version t
 exists on main but not on PyPI (or the reverse) leaves a broken bump in that channel.
 Breaking changes must land as deprecation warnings one minor version before removal.
 
+Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritual:
+
+- **Pushing a tag does not publish.** `publish.yml` triggers on `release: [published]`,
+  so a GitHub Release must be created (`gh release create vX.Y.Z --notes-file …`).
+- **Verify against the real index.** This machine's pip points at a mirror that lags;
+  confirm a fresh release with
+  `pip install --no-cache-dir --index-url https://pypi.org/simple/ --upgrade mcptoon`.
+- **Run the lint job locally** (`python -m ruff check src/mcptoon/ tests/`, ruff 0.15.20)
+  before pushing — unpushed commits never see CI, and one UP037 turned the release red.
+- **Update the `Tests-<n> passed` badges** in `README.md` and `README.zh-CN.md` (and the
+  matching comment in their contributor sections) to the suite total of the release.
+
 ## Ecosystem channel ledger
 
 What mcptoon has earned externally, and the standing obligation each one creates:

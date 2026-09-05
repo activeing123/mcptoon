@@ -31,37 +31,43 @@
   <text class="legend" x="658" y="40">Compact</text>
 
   <!-- Chart area: x=60..740, y=80..360 -->
-  <!-- Max value = 90804, scale: 280px / 90804 = 0.003084 -->
+  <!-- Max value = 71929, scale: 280px / 71929 = 0.003893 -->
   <!-- 3 bar groups: 5, 50, 255 -->
 
-  <!-- 5 tools: JSON=1897, TOON=1167, SLIM=111, compact=16 -->
-  <!-- Scale: 1897*0.003084=5.85, 1167*0.003084=3.6, 111*0.003084=0.34, 16*0.003084=0.05 -->
+  <!-- 5 tools: JSON=1519, TOON=1003, SLIM=147, compact=11 -->
+  <!-- Scale: 1519*0.003893=5.9, 1003*0.003893=3.9, 147*0.003893=0.6, 11*0.003893=0.04 -->
   <rect class="bar-json" x="120" y="354" width="22" height="6" rx="1"/>
-  <text class="value" x="131" y="349" text-anchor="middle">1.9K</text>
-  <rect class="bar-toon" x="146" y="357" width="22" height="3" rx="1"/>
+  <text class="value" x="131" y="349" text-anchor="middle">1.5K</text>
+  <rect class="bar-toon" x="146" y="356" width="22" height="4" rx="1"/>
+  <text class="value" x="157" y="351" text-anchor="middle">1.0K</text>
   <rect class="bar-slim" x="172" y="359" width="22" height="1" rx="1"/>
+  <text class="value" x="183" y="354" text-anchor="middle">147</text>
   <rect class="bar-compact" x="198" y="359" width="22" height="1" rx="1"/>
+  <text class="value" x="209" y="354" text-anchor="middle">11</text>
   <text class="label" x="170" y="375" text-anchor="middle">5</text>
 
-  <!-- 50 tools: JSON=17790, TOON=10688, SLIM=1203, compact=117 -->
-  <!-- Scale: 17790*0.003084=54.9, 10688*0.003084=33.0, 1203*0.003084=3.7, 117*0.003084=0.36 -->
+  <!-- 50 tools: JSON=14113, TOON=9287, SLIM=1624, compact=114 -->
+  <!-- Scale: 14113*0.003893=54.9, 9287*0.003893=36.1, 1624*0.003893=6.3, 114*0.003893=0.44 -->
   <rect class="bar-json" x="320" y="305" width="22" height="55" rx="1"/>
-  <text class="value" x="331" y="300" text-anchor="middle">17.8K</text>
-  <rect class="bar-toon" x="346" y="327" width="22" height="33" rx="1"/>
-  <text class="value" x="357" y="322" text-anchor="middle">10.7K</text>
-  <rect class="bar-slim" x="372" y="356" width="22" height="4" rx="1"/>
+  <text class="value" x="331" y="300" text-anchor="middle">14.1K</text>
+  <rect class="bar-toon" x="346" y="324" width="22" height="36" rx="1"/>
+  <text class="value" x="357" y="319" text-anchor="middle">9.3K</text>
+  <rect class="bar-slim" x="372" y="354" width="22" height="6" rx="1"/>
+  <text class="value" x="383" y="349" text-anchor="middle">1.6K</text>
   <rect class="bar-compact" x="398" y="359" width="22" height="1" rx="1"/>
+  <text class="value" x="409" y="354" text-anchor="middle">114</text>
   <text class="label" x="370" y="375" text-anchor="middle">50</text>
 
-  <!-- 255 tools: JSON=90804, TOON=54649, SLIM=6174, compact=117 -->
-  <!-- Scale: 90804*0.003084=280, 54649*0.003084=168.5, 6174*0.003084=19.0, 117*0.003084=0.36 -->
+  <!-- 255 tools: JSON=71929, TOON=47438, SLIM=8282, compact=581 -->
+  <!-- Scale: 71929*0.003893=280, 47438*0.003893=184.7, 8282*0.003893=32.2, 581*0.003893=2.3 -->
   <rect class="bar-json" x="520" y="80" width="22" height="280" rx="1"/>
-  <text class="value" x="531" y="75" text-anchor="middle">90.8K</text>
-  <rect class="bar-toon" x="546" y="192" width="22" height="168" rx="1"/>
-  <text class="value" x="557" y="187" text-anchor="middle">54.6K</text>
-  <rect class="bar-slim" x="572" y="341" width="22" height="19" rx="1"/>
-  <text class="value" x="583" y="336" text-anchor="middle">6.2K</text>
-  <rect class="bar-compact" x="598" y="359" width="22" height="1" rx="1"/>
+  <text class="value" x="531" y="75" text-anchor="middle">71.9K</text>
+  <rect class="bar-toon" x="546" y="175" width="22" height="185" rx="1"/>
+  <text class="value" x="557" y="170" text-anchor="middle">47.4K</text>
+  <rect class="bar-slim" x="572" y="328" width="22" height="32" rx="1"/>
+  <text class="value" x="583" y="323" text-anchor="middle">8.3K</text>
+  <rect class="bar-compact" x="598" y="358" width="22" height="2" rx="1"/>
+  <text class="value" x="609" y="353" text-anchor="middle">581</text>
   <text class="label" x="570" y="375" text-anchor="middle">255</text>
 
   <!-- Baseline -->
@@ -71,5 +77,5 @@
   <text class="axis" x="400" y="395" text-anchor="middle">Number of MCP tools</text>
 
   <!-- Key stat -->
-  <text class="subtitle" x="30" y="412">255 tools: JSON 90,804 tokens → Compact 117 tokens = 99.9% reduction (tiktoken cl100k_base)</text>
+  <text class="subtitle" x="30" y="412">255 tools: JSON 71,929 tokens → name index 581 tokens = −99.2% reduction (tiktoken cl100k_base)</text>
 </svg>

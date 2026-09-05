@@ -80,7 +80,7 @@ Agent 连上 MCP 服务器时，服务器会递过来一份工具目录，每一
 
 ```bash
 $ mcptoon manifest --compact
-fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
+fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
 ```
 
 这就是全部列表。255 个工具，581 个 token。完整的 schema 留在磁盘上的 `~/.mcptoon/config.json` 里，**根本不进入上下文**。这一点至关重要——它不是压缩。压缩是把整个载荷发过去之后再解包，字节迟早还是落进你的窗口；而这里 schema 压根就不发送。模型读完索引，判断哪个工具合适，只在需要细节时再去要。

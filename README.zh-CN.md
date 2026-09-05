@@ -20,7 +20,7 @@
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-610%20passed-brightgreen)](#给开发者)
+[![Tests](https://img.shields.io/badge/Tests-681%20passed-brightgreen)](#给开发者)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-规范兼容性2026-07-28)
 [![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
@@ -179,7 +179,7 @@ Agent 问"有哪些工具？"，mcptoon 回一个名字索引。schema 留在
 
 ```bash
 $ mcptoon manifest --compact
-fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
+fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
 ```
 
 ![mcptoon 省 token 实测：255 个工具从 71,929 tokens 降到 581](assets/token-savings.svg)
@@ -406,7 +406,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 610 个测试，预期全绿
+python -m pytest tests/ -v          # 681 个测试，预期全绿
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

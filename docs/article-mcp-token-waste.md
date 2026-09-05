@@ -81,7 +81,7 @@ That's the idea behind [mcptoon](https://github.com/activeing123/mcptoon), a zer
 
 ```bash
 $ mcptoon manifest --compact
-fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
+fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
 ```
 
 That's the whole listing. 581 tokens for 255 tools. The full schemas stay on disk in `~/.mcptoon/config.json` and **never enter the context at all**. This is the crucial part — it's not compression. Compression ships the whole payload and unpacks it later; the bytes still land in your window eventually. Here the schemas simply aren't sent. The model reads the index, decides which tool fits, and asks for details only if it needs them.
