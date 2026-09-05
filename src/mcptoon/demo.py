@@ -21,7 +21,7 @@ Gives the user an "aha moment" in 30 seconds:
   2. Add it to mcptoon config
   3. Call a tool
   4. Show token comparison: JSON vs TOON vs SLIM
-  5. Display the official 255-tool benchmark: "71,929 tokens → 123 tokens"
+  5. Display the official 255-tool benchmark: "71,929 tokens → 581 tokens"
 
 Usage:
   mcptoon demo                    # Full demo
@@ -266,7 +266,7 @@ def _show_benchmark():
     print(f"  {'JSON':<12} {'71,929':>10} {'-':>10}")
     print(f"  {'TOON':<12} {'47,438':>10} {'34%':>10}")
     print(f"  {'SLIM':<12} {'8,282':>10} {'88.5%':>10}")
-    print(f"  {'Compact':<12} {'123':>10} {'99.8%':>10}")
+    print(f"  {'Compact':<12} {'581':>10} {'99.2%':>10}")
     print()
     print("  Now you can:")
     print("  ✓ connect every agent with ONE config   →  mcptoon sync")
@@ -294,7 +294,7 @@ def _demo_help() -> str:
 Experience mcptoon's token savings in 30 seconds:
   1. Starts the official "everything" MCP reference server (no API key)
   2. Calls a tool and shows JSON vs TOON vs SLIM comparison
-  3. Shows the official benchmark (71,929 -> 123 tokens, 255 tools)
+  3. Shows the official benchmark (71,929 -> 581 tokens, 255 tools)
 
 Usage:
   mcptoon demo                    # Full demo, step by step

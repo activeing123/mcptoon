@@ -126,8 +126,8 @@ class TestBenchmarkOfficialNumbers(unittest.TestCase):
     """The benchmark table shows the official tiktoken numbers."""
 
     def test_benchmark_shows_official_numbers(self):
-        """255 tools: 71,929 → 123 (−99.8%), aligned with
-        assets/benchmark_tiktoken.json."""
+        """255 tools: 71,929 → 581 (−99.2%), aligned with
+        assets/benchmark_tiktoken.json (full name index, cl100k_base)."""
         buf = StringIO()
         with contextlib.redirect_stdout(buf):
             demo_mod._show_benchmark()
@@ -135,8 +135,8 @@ class TestBenchmarkOfficialNumbers(unittest.TestCase):
         self.assertIn("71,929", out)
         self.assertIn("47,438", out)
         self.assertIn("8,282", out)
-        self.assertIn("123", out)
-        self.assertIn("99.8%", out)
+        self.assertIn("581", out)
+        self.assertIn("99.2%", out)
 
 
 if __name__ == "__main__":
