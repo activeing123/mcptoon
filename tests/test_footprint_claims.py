@@ -98,6 +98,13 @@ class TestFootprintClaims(unittest.TestCase):
                 self.assertTrue((base / target).exists(),
                                 f"{rel} links to {target}, which is not in the repo")
 
+    def test_the_favicon_the_theme_links_exists(self):
+        """The Pages theme injects /<repo>/favicon.ico on every rendered page; it 404ed
+        until docs/favicon.ico landed. Repo-relative link checks cannot see it."""
+        icon = ROOT / "docs" / "favicon.ico"
+        self.assertTrue(icon.is_file(), "docs/favicon.ico is missing - every page 404s on it")
+        self.assertEqual(icon.read_bytes()[:4], b"\x00\x00\x01\x00", "not an ICO file")
+
 
 if __name__ == "__main__":
     unittest.main()
