@@ -23,5 +23,6 @@ mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 - **[MCP Context Tax calculator](tools/token-tax/)** — what your own tool listing costs
   in tokens, in dollars per month, and as a share of your context window. Sliders, not
   a blog post; it runs entirely in your browser and nothing is uploaded.
+  中文版本：[上下文税计算器](tools/token-tax/zh/)。
 
 This page is published at <https://activeing123.github.io/mcptoon/>.

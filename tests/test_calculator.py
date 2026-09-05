@@ -166,9 +166,10 @@ class TestCalculatorIsLinked(unittest.TestCase):
 
     def test_pages_site_root_links_the_tool(self):
         """docs/README.md is rendered as the Pages site root, so it is the one internal
-        path a crawler reaching the domain can follow."""
+        path a crawler reaching the domain can follow - in either language."""
         text = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
-        self.assertIn("tools/token-tax", text)
+        self.assertIn("tools/token-tax", text, "the site root does not link the calculator")
+        self.assertIn("tools/token-tax/zh/", text, "the site root does not link the Chinese page")
 
 
 if __name__ == "__main__":
