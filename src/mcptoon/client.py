@@ -226,7 +226,7 @@ class MCPClient:
         self._pump_thread: Optional[threading.Thread] = None
         self._response_queues: dict[int, queue.Queue] = {}
         self._response_queues_lock = threading.Lock()
-        self._late_queue: "collections.deque[tuple[Any, float]]" = collections.deque(
+        self._late_queue: collections.deque[tuple[Any, float]] = collections.deque(
             maxlen=16)
         self._late_lock = threading.Lock()
 
