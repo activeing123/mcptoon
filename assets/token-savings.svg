@@ -2,7 +2,7 @@
   <rect x="0.5" y="0.5" width="979" height="399" rx="16" fill="#ffffff" stroke="#d0d7de"/>
 
   <text x="490" y="52" text-anchor="middle" font-size="22" font-weight="700" fill="#1f2328">问一句「有哪些工具」，要花多少 token？</text>
-  <text x="490" y="78" text-anchor="middle" font-size="14" fill="#57606a">同样 255 个工具 · tiktoken cl100k_base 实测 · 可用 mcptoon manifest --compact --tokens 复现</text>
+  <text x="490" y="78" text-anchor="middle" font-size="14" fill="#57606a">同样 255 个工具 · tiktoken cl100k_base 实测 · 可用 python scripts/bench_tokens.py 复现</text>
 
   <!-- Row 1: raw JSON -->
   <text x="280" y="140" text-anchor="end" font-size="15" font-weight="600" fill="#1f2328">原始 JSON schema</text>

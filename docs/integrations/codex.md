@@ -17,7 +17,7 @@ When you need MCP tools, use mcptoon:
 
 ```bash
 mcptoon manifest --compact           # list available tools
-mcptoon manifest --slim              # get schemas (93% smaller)
+mcptoon manifest --slim              # names + param types (88.5% smaller than JSON)
 mcptoon call <server> <tool> '<json>' --toon  # call with token-optimized output
 ```
 ```

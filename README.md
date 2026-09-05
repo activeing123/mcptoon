@@ -6,7 +6,7 @@
 
 ## **Listing 255 MCP tools costs 71,929 tokens. mcptoon's name index: 581.**
 
-*tiktoken cl100k_base measured · reproduce it yourself: `mcptoon manifest --compact --tokens`*
+*tiktoken cl100k_base measured · measure your own setup: `python scripts/bench_tokens.py`*
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
@@ -73,7 +73,7 @@ irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | ie
 > `mcptoon demo` runs a live comparison **on your machine**: watch the tool list
 > shrink from thousands of tokens to a name index — then decide.
 
-<p align="center"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-en.gif" width="720" alt="mcptoon demo: pip install, run the zero-config demo, watch 255 tools collapse from 71,929 tokens to 581"></p>
 
 <p align="center">
   <a href="https://github.com/activeing123/mcptoon/blob/main/assets/promo-en.mp4"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/promo-en.gif" width="640" alt="39-second animated tour of mcptoon: a magical tool that changes how you use Agents"></a>
@@ -201,7 +201,7 @@ fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, e
 | `--compact` (names only)            |    581 | **−99.2%** |
 
 <sub>Measured with tiktoken cl100k_base over a real-world 255-tool config (50 MCP servers).
-Your mix will differ. Reproduce: `mcptoon manifest --compact --tokens`.
+Your mix will differ: `python scripts/bench_tokens.py` measures your own config the same way.
 71,929 tokens is roughly a 300-page book; 581 tokens is a paragraph.</sub>
 
 It is a dial, not a switch: `--json` is always available for zero ambiguity, and `call`

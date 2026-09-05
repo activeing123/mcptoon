@@ -59,7 +59,7 @@ Usage:
 Output flags (global):
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens, round-trip safe)
-    --slim         Ultra-compact tool manifests (93% savings)
+    --slim         Ultra-compact tool manifests (88.5% savings, tiktoken-measured)
     --json         JSON output
     --compact      Names only
     --raw          Raw output
@@ -680,7 +680,7 @@ def _cmd_quickstart(rest, fmt="auto"):
     tool_count = None
     if not is_dry:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("  Your tools (--slim format, 93% smaller than JSON):")
+        print("  Your tools (--slim format, 88.5% smaller than JSON):")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         try:
             manifest = manifest_mod.get_manifest(use_cache=False)
@@ -1776,7 +1776,7 @@ Usage:
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
-    --slim         Ultra-compact tool manifests (saves 93% tokens)
+    --slim         Ultra-compact tool manifests (saves 88.5% tokens, measured)
     --json         JSON output
     --compact      Names only
     --stdin        Read JSON args from stdin (for large payloads)

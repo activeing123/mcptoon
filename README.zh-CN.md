@@ -4,7 +4,7 @@
 
 ## **列出 255 个 MCP 工具要烧 71,929 tokens。mcptoon 的名字索引只要 581。**
 
-*tiktoken cl100k_base 实测 · 自己复现：`mcptoon manifest --compact --tokens`*
+*tiktoken cl100k_base 实测 · 在自己机器上复现：`python scripts/bench_tokens.py`*
 
 <p align="center">
   <img src="assets/hero-powerstrip-zh.svg" width="860" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
@@ -191,7 +191,7 @@ fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, e
 | `--compact`（仅名字） | 581 | **−99.2%** |
 
 <sub>基于真实 255 工具配置（50 台服务器）用 tiktoken cl100k_base 实测。
-你的组合数字会不同，复现命令：`mcptoon manifest --compact --tokens`。
+你的组合数字会不同，复现命令：`python scripts/bench_tokens.py`（需先 `pip install tiktoken`）。
 71,929 tokens 约等于一本 300 页的书，581 tokens 约等于一段话。</sub>
 
 这是旋钮不是开关：要零歧义随时 `--json`；`call` 结果默认纯文本且经过安全检查。

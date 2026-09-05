@@ -55,7 +55,7 @@ mcptoon manifest --compact   # 名字索引（255 工具 = 581 tokens），schem
 | `--slim`（名字+参数类型） | 8,282 | −88.5% |
 | `--compact`（仅名字） | 581 | **−99.2%** |
 
-复现：`mcptoon manifest --compact --tokens`. 这是一个旋钮不是开关：需要零歧义时切回 `--json`。
+复现：`python scripts/bench_tokens.py`（读 `~/.cache/mcptoon/schema_cache.json`，需 `pip install tiktoken`）。 这是一个旋钮不是开关：需要零歧义时切回 `--json`。
 
 ### 3 · One door in front of every server — `serve`
 

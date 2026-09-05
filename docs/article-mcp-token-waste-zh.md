@@ -93,7 +93,7 @@ fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, e
 | `--slim`（名称 + 参数类型）           |    8,282 | −88.5%        |
 | `--compact`（仅名称）                 |      581 | **−99.2%**    |
 
-*（基于真实环境中横跨 50 个 MCP 服务器的 255 工具配置实测。可用 `mcptoon manifest --compact --tokens` 复现。）*
+*（基于真实环境中横跨 50 个 MCP 服务器的 255 工具配置实测。可用 `python scripts/bench_tokens.py` 在自己机器上复现。）*
 
 输出侧同理。工具*结果*可以用 [TOON](https://github.com/toon-format/toon)（一种面向表格的 token 友好记法）编码，典型响应再省 **约 34%**——而且是可选参数，默认关闭，不会有意外。
 

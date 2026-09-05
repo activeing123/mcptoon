@@ -94,7 +94,7 @@ It's a dial, not a switch:
 | `--slim` (names + parameter types)  |  8,282 | −88.5%       |
 | `--compact` (names only)            |    581 | **−99.2%**   |
 
-*(Measured over a real-world 255-tool config spanning 50 MCP servers. Reproduce with `mcptoon manifest --compact --tokens`.)*
+*(Measured over a real-world 255-tool config spanning 50 MCP servers. Reproduce on your own setup with `python scripts/bench_tokens.py`.)*
 
 Same principle applies to outputs. Tool *results* get encoded with [TOON](https://github.com/toon-format/toon) (a tabular token-oriented notation), which trims another **~34%** off typical responses — and it's opt-in, off by default, so nothing surprises you.
 

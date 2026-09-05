@@ -19,8 +19,8 @@ Output modes:
   --json       Machine-readable JSON (default for piped output)
   --toon       Standard TOON (Token-Oriented Object Notation, toon-format/toon spec)
   --mcptoon    Legacy mcptoon pipe format (improved with escaping, round-trip safe)
-  --slim       Ultra-compact tool manifests (93% savings, mcptoon-specific)
-  --compact    Space-separated names only (~20 tokens for 96 tools)
+  --slim       Ultra-compact tool manifests (88.5% savings, mcptoon-specific)
+  --compact    Space-separated names only (~2.3 tokens per tool: 581 for 255)
   --raw        Raw response body (no JSON parsing)
   --head N     Limit array output to first N records
   --max-chars N  Truncate output to N chars (default: 4000, use --full for unlimited)

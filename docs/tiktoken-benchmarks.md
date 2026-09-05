@@ -49,17 +49,25 @@ search_web|query:s*|num_results:n
 
 `*` marks required params. `s`=string `n`=number `b`=boolean `a[type]`=array `o{keys}`=object.
 
-255 tools: JSON is a ~40,000 token wall. SLIM is a ~3,500 token screen. **91% tokens saved, tiktoken-verified.**
+255 tools: JSON is a ~40,000 token wall. SLIM is a ~3,500 token screen. **91% tokens saved, tiktoken-verified.** *(Sample A — see the caliber note below; the canonical figures are 71,929 → 8,282 → 581.)*
 
 ## Real tiktoken benchmarks
 
 I ran the actual numbers using `tiktoken` (OpenAI's official BPE tokenizer, `cl100k_base` for GPT-4 and `o200k_base` for GPT-4o). 255 MCP tool schemas:
 
+> **Caliber note (2026-09-05).** This table is *Sample A* — a 255-tool config whose
+> descriptions were shorter than the config quoted everywhere else, so its JSON baseline
+> is 39,964 rather than 71,929. The repo-wide canonical caliber is *Sample B*:
+> `assets/benchmark_tiktoken.json` — JSON 71,929 → SLIM 8,282 (−88.5%) → name index 581
+> (−99.2%). READMEs and posts quote Sample B. Run `python scripts/bench_tokens.py` to
+> measure your own setup. An earlier row here read "Compact (30 names) = 63 tokens,
+> 99.8% saved": that listing was truncated at 30 entries by a bug that is now fixed, so
+> the row has been removed rather than corrected — the full index is the 581 figure.
+
 | Format | tiktoken (cl100k) | tiktoken (o200k) | Savings vs JSON |
 |--------|-------------------|------------------|-----------------|
 | JSON (full schemas) | 39,964 | 39,978 | — |
 | **SLIM (name\|param:type)** | **3,511** | **3,525** | **91%** |
-| Compact (30 names) | 63 | 63 | 99.8% |
 | All 255 names | 581 | 595 | 98.5% |
 
 All numbers from actual `tiktoken.get_encoding()` calls, not `chars ÷ 4` approximations.
