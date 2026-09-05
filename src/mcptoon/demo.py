@@ -113,7 +113,7 @@ def run_demo(args: list[str]):
     print()
     print("    mcptoon quickstart     # Discover your existing MCP servers")
     print("    mcptoon serve           # Run as agent-connected MCP server")
-    print("    mcptoon manifest --slim  # See all tools (93% smaller than JSON)")
+    print("    mcptoon manifest --slim  # See all tools (88.5% smaller than JSON)")
     print("    mcptoon call <server> <tool> '{...}' --toon  # Call a tool")
     print()
     print("  📖 Docs: https://github.com/activeing123/mcptoon")
