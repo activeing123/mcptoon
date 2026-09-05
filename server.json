@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.activeing123/mcptoon",
-  "description": "Every agent discovers all your MCP tools from one synced config; tool listing costs 581 tokens instead of 71,929 (tiktoken-measured, 99.2% less).",
+  "description": "One config feeds every agent; 255 tools cost 581 tokens to list, not 71,929 (tiktoken cl100k_base).",
   "version": "0.7.5",
   "repository": {
     "url": "https://github.com/activeing123/mcptoon",

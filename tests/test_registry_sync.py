@@ -58,6 +58,20 @@ class TestServerJsonMatchesRelease(unittest.TestCase):
     def test_schema_is_pinned(self):
         self.assertEqual(SERVER["$schema"], SCHEMA)
 
+    def test_description_fits_the_registry_limit(self):
+        # The registry rejects a publish outright at 422 if this is too long, so the
+        # limit belongs in CI rather than in a failed release run.
+        self.assertLessEqual(
+            len(SERVER["description"]), 100,
+            f"description is {len(SERVER['description'])} chars; the MCP Registry "
+            "allows 100 and answers 422 above that",
+        )
+
+    def test_description_keeps_the_measured_anchor(self):
+        text = SERVER["description"]
+        self.assertIn("581", text, "the description must carry the measured name-index figure")
+        self.assertIn("71,929", text, "the description must carry the raw-JSON baseline")
+
 
 class TestOwnershipMarker(unittest.TestCase):
     """The registry proves PyPI ownership by finding `mcp-name:` in the package
