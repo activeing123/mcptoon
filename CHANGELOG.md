@@ -24,8 +24,30 @@ The server died instantly; the client surfaced a bare
   carries the same diagnostic; the read runs in a 1s-capped helper
   thread so a live server can never block the request path.
 - demo benchmark table aligned with `assets/benchmark_tiktoken.json`
-  (255 tools: 71,929 → 123 tokens, −99.8%); the old hardcoded
+  (255 tools: 71,929 → 581 tokens, −99.2%); the old hardcoded
   90,804 → 117 numbers predated the 2026-08-12 honest re-benchmark.
+
+### Fixed — `mcptoon manifest --compact` truncated the tool index
+
+For a manifest-shaped input (`{server: [tool names]}`), the compact encoder
+fell through to `json.dumps(...)[:200]`, producing a headless JSON fragment
+with ~9 tool names, no closing brace and no "more" hint — an agent using
+`--compact` for discovery silently saw only the first handful of tools.
+The manifest shape now expands to the FULL `server: n1, n2 · …` name index
+(no truncation, no JSON), matching the documented −99.2% claim (581 tokens
+for 255 tools). Scalar/dict-without-name behavior is unchanged.
+
+Tests: `tests/test_output.py::TestRender` (3 regression tests).
+
+### Docs — benchmark numbers unified to the measured 581 / −99.2% caliber
+
+The "255 tools = 123 tokens" figure was a 30-item truncation artifact from
+the benchmark harness; the full name index of the same 255-tool config
+measures 581 tokens (−99.2% vs 71,929 raw JSON). README (en/zh), FAQ,
+DEVELOPERS.md, comparison.md, articles (en/zh), token-savings.svg,
+benchmark_tiktoken.json, server.json, plugin skill copy, pyproject
+description and the demo table now all carry the measured 581 / 99.2%
+figures. Historical CHANGELOG entries are preserved as-is.
 
 Tests: `tests/test_demo_dead_package.py` (6).
 

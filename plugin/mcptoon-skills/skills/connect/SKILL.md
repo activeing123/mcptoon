@@ -1,6 +1,6 @@
 ---
 name: connect
-description: Connect any AI agent to MCP servers through mcptoon — one config synced everywhere, one stdio gateway, 99.8% fewer tokens on tool discovery.
+description: Connect any AI agent to MCP servers through mcptoon — one config synced everywhere, one stdio gateway, 99.2% fewer tokens on tool discovery.
 ---
 
 # Connect agents to MCP servers with mcptoon
@@ -60,7 +60,7 @@ small on purpose:
 ```bash
 mcptoon manifest --toon        # standard TOON format (30-60% saved)
 mcptoon manifest --slim        # ultra-compact schemas (93% saved)
-mcptoon manifest --compact     # names only (99.8% saved)
+mcptoon manifest --compact     # names only (99.2% saved)
 mcptoon search <query>         # find a tool without dumping the whole manifest
 mcptoon inspect <server> <tool>   # full schema for exactly one tool
 ```

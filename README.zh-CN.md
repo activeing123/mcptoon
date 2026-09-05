@@ -2,7 +2,9 @@
 
 # mcptoon — 跨 Agent MCP 管理工具
 
-## **一个改变你使用 Agent 工具习惯的神奇工具**
+## **列出 255 个 MCP 工具要烧 71,929 tokens。mcptoon 的名字索引只要 581。**
+
+*tiktoken cl100k_base 实测 · 自己复现：`mcptoon manifest --compact --tokens`*
 
 <p align="center">
   <img src="assets/hero-powerstrip-zh.svg" width="860" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
@@ -25,6 +27,19 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [English](README.md) · [开发者文档](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [提 Issue](https://github.com/activeing123/mcptoon/issues)
+
+### 看不见的 token 税
+
+接 5 个 MCP 服务器，光列出工具就要烧掉 **~10,000 tokens** 的纯 JSON 语法。
+20 次工具调用再搭进去 40,000-70,000 —— 全是括号、引号和 schema 声明，不是思考。
+128K 上下文里 **30-55% 就这么没了**，Agent 还没开始干活。mcptoon 用名字目录
+替代这堆 dump，tiktoken cl100k_base 实测：
+
+| 工具清单（255 个工具） | tokens | 相对原始 JSON |
+|---|---:|---:|
+| 原始 JSON schema | 71,929 | — |
+| `--slim`（名字+参数类型） | 8,282 | −88.5% |
+| `--compact`（纯名字目录） | 581 | **−99.2%** |
 
 ## ⚡ 三步搞定，全平台通用 —— 无需任何配置
 
@@ -67,7 +82,7 @@ mcptoon quickstart         # 找到你已配置的服务器，列出它们的工
 mcptoon demo               # 现场对比：JSON vs mcptoon，真实 token 数字
 ```
 
-省 99.8% token · Windows / macOS / Linux · 免费开源（Apache-2.0）
+省 99.2% token · Windows / macOS / Linux · 免费开源（Apache-2.0）
 
 </div>
 
@@ -167,17 +182,17 @@ $ mcptoon manifest --compact
 fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
 ```
 
-![mcptoon 省 token 实测：255 个工具从 71,929 tokens 降到 123](assets/token-savings.svg)
+![mcptoon 省 token 实测：255 个工具从 71,929 tokens 降到 581](assets/token-savings.svg)
 
 | 工具清单（tiktoken cl100k_base） | tokens | vs 原始 JSON |
 |--------------------------------|-------:|-------------:|
 | 原始 JSON schema（255 工具） | 71,929 | — |
 | `--slim`（名字+参数类型） | 8,282 | −88.5% |
-| `--compact`（仅名字） | 123 | **−99.8%** |
+| `--compact`（仅名字） | 581 | **−99.2%** |
 
 <sub>基于真实 255 工具配置（50 台服务器）用 tiktoken cl100k_base 实测。
 你的组合数字会不同，复现命令：`mcptoon manifest --compact --tokens`。
-71,929 tokens 约等于一本 300 页的书，123 tokens 约等于一张便利贴。</sub>
+71,929 tokens 约等于一本 300 页的书，581 tokens 约等于一段话。</sub>
 
 这是旋钮不是开关：要零歧义随时 `--json`；`call` 结果默认纯文本且经过安全检查。
 选型对比见 [docs/comparison.md](docs/comparison.md)（按类别拆解安装成本、token 成本、安全性）。
@@ -247,7 +262,7 @@ mcptoon plugin remove <名称>     # 处处移除（数据目录保留）
 - **数据目录持久化**——`~/.mcptoon/plugins-data/<名称>/` 跨升级保留（规范 §PLUGIN_DATA），
   `--force` 强制升级也不会丢缓存和状态
 - 插件服务器与普通服务器落在同一份 `~/.mcptoon/config.json`——`manifest`、`call`、
-  `serve`、`health` 和 99.8% 省 token 对它们自动生效
+  `serve`、`health` 和 99.2% 省 token 对它们自动生效
 
 ### 盒子里还有的一切
 
@@ -347,7 +362,7 @@ Codex · Gemini CLI · OpenCode**，外加 aider、shell 脚本、CI 任务，�
 管理多个 AI Agent 的 MCP 服务器配置的工具。mcptoon 是开源实现之一：一份配置同步到所有 Agent，不用逐个编辑 JSON，也不用常驻代理服务。
 
 **mcptoon 怎么帮我省 token？**
-Agent 问"有哪些工具"时只回一个名字索引（123 tokens），完整 schema 留在磁盘不进上下文。255 个工具从 71,929 降到 123，省 99.8%。
+Agent 问"有哪些工具"时只回一个名字索引（255 个工具 = 581 tokens），完整 schema 留在磁盘不进上下文。255 个工具从 71,929 降到 581，省 99.2%。
 
 **这不就是压缩吗？**
 不是。压缩把完整载荷送进上下文再解压，成本迟早落进窗口。mcptoon 把 schema 留在磁盘，它们根本不进上下文，Agent 看到的只是一份短短的名字索引。

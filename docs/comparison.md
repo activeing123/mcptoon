@@ -13,7 +13,7 @@
 | Agent-side setup required | yes (per agent) | yes (per agent) | yes (per agent) | **no — any shell-capable agent works day one** |
 | Platforms | — | usually macOS/Linux-first | often macOS-only (e.g. commercial managers) | **Windows / macOS / Linux equal** (pure Python stdlib) |
 | Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (~250KB)** |
-| Token cost of tool discovery | full JSON schemas | full JSON schemas | full JSON schemas | **−88.5% (slim) or −99.8% (name-only manifest)** |
+| Token cost of tool discovery | full JSON schemas | full JSON schemas | full JSON schemas | **−88.5% (slim) or −99.2% (name-only manifest)** |
 | Result payload size | raw JSON | raw JSON | raw JSON | **−34% (TOON encoding)** |
 | Security inspection of results | none | none | none | **injection / credential-leak / destructive-op guards on every call** |
 | Health checks across agents | manual | some | some | built-in (`mcptoon health`, CI exit codes) |
@@ -29,8 +29,8 @@ Same 255 tools, four encodings, token counts via tiktoken `cl100k_base`:
 | Tools loaded | Raw JSON | TOON results | Name-only manifest (compact) | Savings vs JSON |
 |---:|---:|---:|---:|---:|
 | 5 | 1,519 | 1,003 | 11 | −99.3% |
-| 50 | 14,113 | 9,287 | 123 | −99.1% |
-| **255** | **71,929** | 47,438 (−34%) | **123** | **−99.8%** |
+| 50 | 14,113 | 9,287 | 114 | −99.2% |
+| **255** | **71,929** | 47,438 (−34%) | **581** | **−99.2%** |
 
 Reading it plainly: at 255 tools, raw discovery costs about a 300-page book per
 session; mcptoon's compact manifest costs a sticky note.

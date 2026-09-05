@@ -23,7 +23,7 @@
 | 目标帖 (target) | 4 类配置地狱信号 + token 数字型补充（见下） |
 | 排除 (exclude) | 无痛点的纯 Show&Tell / 广告；已删/锁/重复帖 |
 | 落地话术 (landing) | **第一人称实操陈述**：『我做了个叫 mcptoon 的小工具，把单点真相同步到每个 agent』 |
-| 数字 (numbers) | **只用 Reddit 原生数字**（83.3k=41.6%、45k/5MCPs、15% input、55k/93tools、50k/run）；**绝不用 71k/99.8%**（那是 mcptoon 自家框架，会被认出 shill） |
+| 数字 (numbers) | **只用 Reddit 原生数字**（83.3k=41.6%、45k/5MCPs、15% input、55k/93tools、50k/run）；**绝不用 71k/99.2%**（那是 mcptoon 自家框架，会被认出 shill） |
 | subreddit 优先级 | **r/cursor + r/ClaudeCode 优先**；r/ClaudeAI 补充；r/mcp 谨慎克制（不推广） |
 
 ---
@@ -46,7 +46,7 @@
 
 1. **Angle A 各帖里很多 top 帖本身就是披着痛点的竞品自推**（"I got so fed up with MCP config hell that I built..."、"Router MCP"、"hypertool"）——观众对软广已疲劳，**回复必须真实有用，第一/第三人称实操，绝不"check out my tool"腔**。
 2. Angle B（token 成本）在 **r/ClaudeCode 最富**（top 帖 5 个属它），且数字型帖被当成真实调研读。
-3. `71k` / `99.8%` 不是 Reddit 原生说法，是 mcptoon 自创——**引用会被识破**。
+3. `71k` / `99.2%` 不是 Reddit 原生说法，是 mcptoon 自创——**引用会被识破**。
 4. r/mcp 是产品佬扎堆、对竞品自推最敏感的社区 → 铁律：**不在 r/mcp 推广**。
 5. 当前账号：**Alarming-List-1313**（2 post / 0 comment karma，Chrome sanzhang profile 已登录）；AstronomerNo223 未登录任何已连浏览器。单账号精细操作。
 

@@ -1,14 +1,14 @@
 ---
 title: How MCP Wastes 4-32× More Tokens Than CLI (and How to Fix It)
 published: false
-description: 255 MCP tools cost 71,929 tokens before your agent does any work. A names-only CLI manifest does the same job in 123. Here's the evidence, the math, and a fix you can run today.
+description: 255 MCP tools cost 71,929 tokens before your agent does any work. A names-only CLI manifest does the same job in 581. Here's the evidence, the math, and a fix you can run today.
 tags: mcp, ai, llm, python
 cover_image: https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-cover.png
 ---
 
 Here are two numbers that should ruin your morning coffee:
 
-**71,929 tokens** versus **123 tokens**. Same 255 tools. Same machine. Same day.
+**71,929 tokens** versus **581 tokens**. Same 255 tools. Same machine. Same day.
 
 The first number is what your agent pays — every single session — when 255 tools from 50 MCP servers load as raw JSON schemas into its context window. The second is what the same tool listing costs when discovery happens through a CLI instead.
 
@@ -84,7 +84,7 @@ $ mcptoon manifest --compact
 fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
 ```
 
-That's the whole listing. 123 tokens for 255 tools. The full schemas stay on disk in `~/.mcptoon/config.json` and **never enter the context at all**. This is the crucial part — it's not compression. Compression ships the whole payload and unpacks it later; the bytes still land in your window eventually. Here the schemas simply aren't sent. The model reads the index, decides which tool fits, and asks for details only if it needs them.
+That's the whole listing. 581 tokens for 255 tools. The full schemas stay on disk in `~/.mcptoon/config.json` and **never enter the context at all**. This is the crucial part — it's not compression. Compression ships the whole payload and unpacks it later; the bytes still land in your window eventually. Here the schemas simply aren't sent. The model reads the index, decides which tool fits, and asks for details only if it needs them.
 
 It's a dial, not a switch:
 
@@ -92,7 +92,7 @@ It's a dial, not a switch:
 |-------------------------------------|-------:|-------------:|
 | Raw JSON schemas, 255 tools         | 71,929 | —            |
 | `--slim` (names + parameter types)  |  8,282 | −88.5%       |
-| `--compact` (names only)            |    123 | **−99.8%**   |
+| `--compact` (names only)            |    581 | **−99.2%**   |
 
 *(Measured over a real-world 255-tool config spanning 50 MCP servers. Reproduce with `mcptoon manifest --compact --tokens`.)*
 

@@ -46,14 +46,14 @@ mcptoon sync --agent cursor # 只同步某个 Agent
 ### 2 · Pay for names, not schemas — `manifest`
 
 ```bash
-mcptoon manifest --compact   # 名字索引（123 tokens），schema 不出磁盘
+mcptoon manifest --compact   # 名字索引（255 工具 = 581 tokens），schema 不出磁盘
 ```
 
 | 工具清单开销（tiktoken cl100k_base） | tokens | 对比原始 JSON |
 |-------------------------------------|-------:|--------------:|
 | 完整 JSON schema（255 工具 / 50 服务器） | 71,929 | — |
 | `--slim`（名字+参数类型） | 8,282 | −88.5% |
-| `--compact`（仅名字） | 123 | **−99.8%** |
+| `--compact`（仅名字） | 581 | **−99.2%** |
 
 复现：`mcptoon manifest --compact --tokens`. 这是一个旋钮不是开关：需要零歧义时切回 `--json`。
 

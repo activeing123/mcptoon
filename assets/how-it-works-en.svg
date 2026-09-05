@@ -63,7 +63,7 @@
   <text x="914" y="192" text-anchor="middle" font-size="34">🤖</text>
   <text x="862" y="238" text-anchor="middle" font-size="26" fill="#1a7f37">✓</text>
   <text x="862" y="280" text-anchor="middle" font-size="15" fill="#57606a">every AI can use them —</text>
-  <text x="862" y="304" text-anchor="middle" font-size="15" fill="#57606a">−99.8% tokens</text>
+  <text x="862" y="304" text-anchor="middle" font-size="15" fill="#57606a">−99.2% tokens</text>
 
   <!-- footer -->
   <text x="490" y="400" text-anchor="middle" font-size="13" fill="#8c959f">mcptoon — a power strip for AI tools</text>

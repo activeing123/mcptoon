@@ -12,7 +12,7 @@
 
 > **CLI-first，推广优先于堆功能。**
 
-- 产品护城河已清晰且竞品无法快速复制：99.8% Token 节省（names-only manifest）、
+- 产品护城河已清晰且竞品无法快速复制：99.2% Token 节省（names-only manifest）、
   工具级 Toggle、实时 Watch、零依赖、投毒检测。
 - 一切"功能堆叠型"路线（Profile 系统 / 多 IDE 扩展同步 / 企业审计 / K8s）**已否决**，
   详见文末「已否决方向」——重新提议前必须先回答"它如何帮助推广或小白上手"。
@@ -107,7 +107,7 @@ v0.8.0  手册页 + 一键安装正式化 + SEP 新规范落地（如有）     
 
 | 优势 | 竞品现状 | 我们的壁垒 |
 |------|---------|-----------|
-| 99.8% Token 节省 | ToolHive 最高 85% | names-only manifest，竞品做不到 |
+| 99.2% Token 节省 | ToolHive 最高 85% | names-only manifest，竞品做不到 |
 | 工具级 Toggle | 竞品仅 Server 级 | 精细控制单个工具开关 |
 | 实时 Watch 监听 | 竞品无 | 毫秒级配置同步 |
 | 零依赖安装 | mcpm 需 Node / ToolHive 需 Go | `pip install mcptoon` 即用 |

@@ -16,15 +16,15 @@
 
   <!-- Row 3: compact -->
   <text x="280" y="252" text-anchor="end" font-size="15" font-weight="600" fill="#1f2328">mcptoon --compact</text>
-  <rect x="296" y="234" width="7" height="30" rx="3" fill="#1a7f37"/>
-  <rect x="293" y="231" width="13" height="36" rx="6" fill="#1a7f37" opacity="0.25"/>
-  <text x="316" y="255" font-size="16" font-weight="700" fill="#1a7f37" font-family="ui-monospace,Consolas,monospace">123（−99.8%）</text>
+  <rect x="296" y="234" width="10" height="30" rx="3" fill="#1a7f37"/>
+  <rect x="293" y="231" width="16" height="36" rx="6" fill="#1a7f37" opacity="0.25"/>
+  <text x="322" y="255" font-size="16" font-weight="700" fill="#1a7f37" font-family="ui-monospace,Consolas,monospace">581（−99.2%）</text>
 
   <!-- annotation -->
-  <path d="M310,234 C330,210 350,196 372,190" fill="none" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+  <path d="M316,234 C336,210 356,196 378,190" fill="none" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
 
   <!-- footer -->
-  <text x="490" y="330" text-anchor="middle" font-size="15" fill="#57606a">71,929 ≈ 一本 300 页的书 · 123 ≈ 一张便利贴</text>
+  <text x="490" y="330" text-anchor="middle" font-size="15" fill="#57606a">71,929 ≈ 一本 300 页的书 · 581 ≈ 半页纸</text>
   <text x="490" y="360" text-anchor="middle" font-size="15" font-weight="600" fill="#1a7f37">关键不是压缩：schema 根本不进上下文</text>
   <text x="490" y="386" text-anchor="middle" font-size="12" fill="#8c959f">mcptoon · 跨 Agent MCP 管理工具</text>
 </svg>

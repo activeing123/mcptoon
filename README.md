@@ -4,7 +4,9 @@
 
 <!-- mcp-name: io.github.activeing123/mcptoon -->
 
-## **A magical tool that changes how you use Agents**
+## **Listing 255 MCP tools costs 71,929 tokens. mcptoon's name index: 581.**
+
+*tiktoken cl100k_base measured · reproduce it yourself: `mcptoon manifest --compact --tokens`*
 
 <p align="center">
   <img src="assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
@@ -30,6 +32,20 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
 [中文文档](README.zh-CN.md) · [Developer docs](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
+
+### The token tax nobody sees
+
+Connect 5 MCP servers and listing their tools burns **~10,000 tokens** of pure
+JSON syntax. Twenty tool calls add 40,000-70,000 more — brackets, quotes and
+schema declarations, not thinking. On a 128K context that's **30-55% gone**
+before the agent starts working. mcptoon replaces the dump with a name index,
+measured with tiktoken cl100k_base:
+
+| Tool listing (255 tools) | tokens | vs raw JSON |
+|---|---:|---:|
+| Raw JSON schemas | 71,929 | — |
+| `--slim` (names + parameter types) | 8,282 | −88.5% |
+| `--compact` (names only) | 581 | **−99.2%** |
 
 ## ⚡ 3 steps, any OS — no configuration
 
@@ -72,7 +88,7 @@ mcptoon quickstart         # finds servers you already configured, lists their t
 mcptoon demo               # live side-by-side: JSON vs mcptoon, real token counts
 ```
 
-99.8% fewer tokens · Windows / macOS / Linux · Free & open source (Apache-2.0)
+99.2% fewer tokens · Windows / macOS / Linux · Free & open source (Apache-2.0)
 
 </div>
 
@@ -176,17 +192,17 @@ $ mcptoon manifest --compact
 fetch: fetch(url) · github: search_repos(q), get_file(repo, path) · sqlite: query(sql) · ...
 ```
 
-![Token savings measured: 255 tools drop from 71,929 tokens to 123](assets/token-savings.svg)
+![Token savings measured: 255 tools drop from 71,929 tokens to 581](assets/token-savings.svg)
 
 | Tool listing (tiktoken cl100k_base) | tokens | vs raw JSON |
 |-------------------------------------|-------:|------------:|
 | Raw JSON schemas, 255 tools         | 71,929 | — |
 | `--slim` (names + parameter types)  |  8,282 | −88.5% |
-| `--compact` (names only)            |    123 | **−99.8%** |
+| `--compact` (names only)            |    581 | **−99.2%** |
 
 <sub>Measured with tiktoken cl100k_base over a real-world 255-tool config (50 MCP servers).
 Your mix will differ. Reproduce: `mcptoon manifest --compact --tokens`.
-71,929 tokens is roughly a 300-page book; 123 tokens is a sticky note.</sub>
+71,929 tokens is roughly a 300-page book; 581 tokens is a paragraph.</sub>
 
 It is a dial, not a switch: `--json` is always available for zero ambiguity, and `call`
 results default to plain text, security-checked. Choosing between approaches?
@@ -263,7 +279,7 @@ mcptoon plugin remove <name>     # remove everywhere (data dir is kept)
 - **Persistent data** — `~/.mcptoon/plugins-data/<name>/` survives upgrades (spec
   §PLUGIN_DATA), so caches and state never vanish on `--force`.
 - Plugins land in the same `~/.mcptoon/config.json` as every other server, so
-  `manifest`, `call`, `serve`, `health` and the 99.8% token savings apply to them
+  `manifest`, `call`, `serve`, `health` and the 99.2% token savings apply to them
   automatically.
 
 ### Everything else in the box
@@ -367,7 +383,7 @@ They also compose: `serve` mode gives you the proxy shape when you want it.
 A tool that manages MCP server configuration across multiple AI agents. mcptoon is one open-source implementation: one config synced to every agent, no per-agent JSON editing, no resident proxy service.
 
 **How does mcptoon save tokens?**
-When an agent asks "what tools exist?" it gets a name index (123 tokens); full schemas stay on disk and never enter the context. 255 tools drop from 71,929 to 123 — a 99.8% saving.
+When an agent asks "what tools exist?" it gets a name index (581 tokens for 255 tools); full schemas stay on disk and never enter the context. 255 tools drop from 71,929 to 581 — a 99.2% saving.
 
 **Isn't this just compression?**
 No. Compression ships the full payload into context and unpacks it later — the cost still lands in the window eventually. mcptoon keeps schemas on disk; they never enter the context at all.
