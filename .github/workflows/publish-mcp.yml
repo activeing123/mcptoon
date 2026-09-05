@@ -1,0 +1,47 @@
+name: Publish to MCP Registry
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run exists (backfill a missed release, retry, etc.)
+        required: false
+        default: manual
+
+# Publishing is not idempotent-safe to interrupt: never cancel a record mid-push.
+concurrency:
+  group: mcp-registry-publish
+  cancel-in-progress: false
+
+# The registry proves ownership of io.github.activeing123/* from this workflow's
+# OIDC token, so id-token: write is required and the job must run in this repo.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Gives every registry publish a visible deploy history; this is what we lacked
+    # when 0.7.0 and 0.7.2 were pushed from a laptop.
+    environment: mcp-registry
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          ASSET="mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
+          echo "fetching ${ASSET} from the latest registry release"
+          curl -fsSL \
+            "https://github.com/modelcontextprotocol/registry/releases/latest/download/${ASSET}" \
+            | tar xz mcp-publisher
+          ls -l mcp-publisher
+
+      - name: Authenticate to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server record
+        run: ./mcp-publisher publish

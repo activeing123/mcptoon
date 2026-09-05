@@ -42,6 +42,12 @@ Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritu
   before pushing — unpushed commits never see CI, and one UP037 turned the release red.
 - **Update the `Tests-<n> passed` badges** in `README.md` and `README.zh-CN.md` (and the
   matching comment in their contributor sections) to the suite total of the release.
+- **The MCP Registry record used to be pushed by hand.** 0.7.0 and 0.7.2 were published
+  from a laptop; 0.7.3–0.7.5 never reached it, and `server.json`'s package version had
+  drifted a release behind its own top-level version. `publish-mcp.yml` now publishes on
+  every release, and `tests/test_registry_sync.py` fails CI if the versions, the
+  `mcp-name:` marker in the PyPI README, or the workflow drift apart. Do not remove that
+  marker when rewriting the README — it is invisible when rendered and load-bearing.
 
 ## Ecosystem channel ledger
 
@@ -51,7 +57,7 @@ What mcptoon has earned externally, and the standing obligation each one creates
 |---|---|---|
 | numtide/llm-agents.nix | S-tier: packaged; bot auto-follows since init PR #7839 (zimbatm) | Release discipline above; after each release, confirm the bot PR merged |
 | PyPI | every release | publish workflow green before announcing |
-| MCP Registry (`server.json`) | listed | keep `server.json` in sync when commands/flags change |
+| MCP Registry (`server.json`) | listed; published automatically by `.github/workflows/publish-mcp.yml` on every release (OIDC) | keep `server.json` in sync — CI enforces the versions, the `mcp-name:` README marker and the workflow itself via `tests/test_registry_sync.py` |
 | apify/mcpc client comparison | listed in comparison table | none — leave the table alone |
 | awesome-mcp-clients PR #283 | pending | do not nag maintainers until ≥500 stars |
 | striki18/benchmark | third-party benchmark harness running mcptoon | external repo — read for intel, do not touch |
