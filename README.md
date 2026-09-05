@@ -9,7 +9,7 @@
 *tiktoken cl100k_base measured · reproduce it yourself: `mcptoon manifest --compact --tokens`*
 
 <p align="center">
-  <img src="assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
 </p>
 
 > ✅ **Speaks the latest MCP spec (2026-07-28)** — stateless auto-negotiation,
@@ -25,13 +25,13 @@
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-681%20passed-brightgreen)](#for-developers)
+[![Tests](https://img.shields.io/badge/Tests-684%20passed-brightgreen)](#for-developers)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-spec-compatibility-2026-07-28)
 [![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
-[中文文档](README.zh-CN.md) · [Developer docs](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
+[中文文档](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Changelog](https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
 
 ### The token tax nobody sees
 
@@ -73,10 +73,10 @@ irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | ie
 > `mcptoon demo` runs a live comparison **on your machine**: watch the tool list
 > shrink from thousands of tokens to a name index — then decide.
 
-<p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo.gif" width="720" alt="mcptoon demo: install, add a server, sync to every agent, see the token savings"></p>
 
 <p align="center">
-  <a href="assets/promo-en.mp4"><img src="assets/promo-en.gif" width="640" alt="39-second animated tour of mcptoon: a magical tool that changes how you use Agents"></a>
+  <a href="https://github.com/activeing123/mcptoon/blob/main/assets/promo-en.mp4"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/promo-en.gif" width="640" alt="39-second animated tour of mcptoon: a magical tool that changes how you use Agents"></a>
   <br>
   <sub>🎬 <b>mcptoon in 39 seconds</b> — the hook, the pain, install once, auto-discover, the token math, and the safety net · click for HD</sub>
 </p>
@@ -101,7 +101,7 @@ nodes carry `SRC n` links back to verified code evidence). Click the preview to 
 the interactive version: search nodes, trace call paths, compare semantic roles,
 toggle light/dark themes, and export.
 
-[![mcptoon runtime architecture demo](assets/architecture-en-demo.gif)](assets/architecture-en.html)
+[![mcptoon runtime architecture demo](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/architecture-en-demo.gif)](https://github.com/activeing123/mcptoon/blob/main/assets/architecture-en.html)
 
 ---
 
@@ -192,7 +192,7 @@ $ mcptoon manifest --compact
 fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
 ```
 
-![Token savings measured: 255 tools drop from 71,929 tokens to 581](assets/token-savings.svg)
+![Token savings measured: 255 tools drop from 71,929 tokens to 581](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings-en.svg)
 
 | Tool listing (tiktoken cl100k_base) | tokens | vs raw JSON |
 |-------------------------------------|-------:|------------:|
@@ -206,7 +206,7 @@ Your mix will differ. Reproduce: `mcptoon manifest --compact --tokens`.
 
 It is a dial, not a switch: `--json` is always available for zero ambiguity, and `call`
 results default to plain text, security-checked. Choosing between approaches?
-[docs/comparison.md](docs/comparison.md) breaks down setup cost, token cost and safety.
+[docs/comparison.md](https://github.com/activeing123/mcptoon/blob/main/docs/comparison.md) breaks down setup cost, token cost and safety.
 
 **3 · One door in front of every server — `serve`**
 
@@ -427,16 +427,16 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 681 tests, green expected
+python -m pytest tests/ -v          # 684 tests, green expected
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
 Zero third-party imports is a hard rule enforced in review. New features need tests.
-~6,800 lines of Python across 14 modules — see [CONTRIBUTING.md](CONTRIBUTING.md).
+~6,800 lines of Python across 14 modules — see [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md).
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache 2.0 — see [LICENSE](https://github.com/activeing123/mcptoon/blob/main/LICENSE) and [NOTICE](https://github.com/activeing123/mcptoon/blob/main/NOTICE).
 
 <div align="center" markdown="1">
 
