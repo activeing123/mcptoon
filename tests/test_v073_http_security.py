@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -86,17 +87,49 @@ class _HTTPServerMixin:
         req = urllib.request.Request(self.base + path, headers=headers or {})
         return self._do(req)
 
+    # Winsock surfaces "the server hung up while we were still uploading" as an
+    # aborted connection; urllib may raise it bare or wrapped in URLError.
+    _TRANSPORT_ABORTS = (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)
+
     @staticmethod
-    def _do(req):
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status, json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            raw = e.read().decode("utf-8", "replace")
+    def _is_transport_abort(exc):
+        if isinstance(exc, _HTTPServerMixin._TRANSPORT_ABORTS):
+            return True
+        return isinstance(exc, urllib.error.URLError) and isinstance(
+            exc.reason, _HTTPServerMixin._TRANSPORT_ABORTS
+        )
+
+    @staticmethod
+    def _do(req, attempts=4):
+        """Send a request, tolerating Winsock's early-abort of the connection.
+
+        The auth tests deliberately talk to a server that answers 401 *before*
+        reading the body. On Windows the stack can then abort the connection
+        while the client is still sending, which surfaces as
+        ConnectionAbortedError [WinError 10053] - bare, or wrapped in URLError -
+        instead of an HTTP error. Whether it happens at all is a race between the
+        server's close and our own send(), so it is intermittent (~1 run in 5).
+
+        Retrying settles the race without weakening anything: the assertion stays
+        about the response the server produced for the same bytes, not about how
+        the transport chose to report a rejected upload.
+        """
+        for attempt in range(attempts):
             try:
-                return e.code, json.loads(raw)
-            except json.JSONDecodeError:
-                return e.code, {"_raw": raw}
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return resp.status, json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                raw = e.read().decode("utf-8", "replace")
+                try:
+                    return e.code, json.loads(raw)
+                except json.JSONDecodeError:
+                    return e.code, {"_raw": raw}
+            except Exception as e:  # noqa: BLE001 - narrowed by the check below
+                if not _HTTPServerMixin._is_transport_abort(e):
+                    raise
+                if attempt + 1 == attempts:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
 
 
 class TestBindDefaults(unittest.TestCase):
