@@ -17,7 +17,7 @@
 需要先 clone（这个脚本在仓库里，不在 wheel 里）。*
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-zh.svg" width="820" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-zh.svg" width="820" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零手写配置、零重启">
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -55,7 +55,7 @@ irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | ie
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo.gif" width="700" alt="mcptoon demo：pip install 后跑零配置演示，眼看工具清单从 schema 转储塌缩成一份名字目录">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo.gif" width="700" alt="mcptoon demo：pip install 后跑一条命令演示，眼看工具清单从 schema 转储塌缩成一份名字目录">
 </p>
 
 Windows · macOS · Linux · Python 3.10+ · Apache-2.0
@@ -119,6 +119,81 @@ JSON Schema——`type`、`properties`、`required` 和一句话描述都保留�
 
 ---
 
+## 这些 token 到底花在哪
+
+"14,113 → 114" 是一个数字在替整个论证站岗。这里是一份工具清单**物理上**由什么组成——
+用同一个分词器逐字段量，样本是这台机器上的 12 工具真实缓存：
+
+| 一个工具条目的组成部分 | tokens | 占账单 |
+|---|---:|---:|
+| 工具的**名字** | 26 | **2.2%** |
+| 给人看的描述 | 232 | 19.9% |
+| 参数 schema（`type`、`properties`、`required`） | 635 | **54.5%** |
+| JSON 键名、花括号、每个工具的信封 | 273 | 23.4% |
+| **合计** | **1,166** | 100% |
+
+掉出来两件事，都不是大家以为的那件。
+
+**名字只占账单的 2.2%。** Agent 用来*决定*该用哪个工具的全部信息，花掉它百分之二。
+剩下 97.8% 是它*正确调用*一个工具所需的信息——而它只需要这一件事的那**一个**工具，
+不是十二个，更不是二百五十五个。mcptoon 的全部机关就是把后一半从"开场白"变成"要了再查"。
+
+**贵的不是文字。** 描述占 19.9%，参数 schema 占 54.5%。账单的大头是机器形状的 JSON——
+`{"type":"string","description":…}` 给每个工具的每个参数重复一遍。这也解释了为什么
+`--slim` 还能省 88.5%：它砍掉文字、留下骨架，而骨架本来就是更贵的那一半。
+
+这个样本很小、而且是我们自己的：12 个工具，被一个浏览器服务器占多数。请把百分比当成
+成本的**形状**，不是你的数字。你的形状取决于你那些服务器描述写得多啰嗦。
+
+### 省下来的是一个比率，永远不是一个固定数
+
+与上面表格同源，实测每工具 token 数：
+
+| 配置 | raw 每工具 | `--compact` 每工具 |
+|---|---:|---:|
+| 5 工具 | 303.8 | 2.20 |
+| 50 工具 | 282.3 | 2.28 |
+| 255 工具 | 282.1 | 2.28 |
+| 活的 12 工具缓存 | 97.2 | 3.50–4.58 |
+
+raw 比率稳得惊人（两份基准配置都是 282 token/工具），所以计算器拿它当默认值。
+名字索引的比率**不是**常数：基准配置 2.20，活缓存高到 4.58——因为名字长短不一，
+`opencli_profile_list` 在索引里就是比 `echo` 贵。所以任何"N 个 token 封顶"式说法都是
+错的；诚实的写法永远是**比率 × 你的工具数**。
+
+### 每一档留下什么
+
+| 档位 | 留下 | 砍掉 | 50 工具 | 255 工具 |
+|---|---|---|---:|---:|
+| 默认 | 全部 | — | 14,113 | 71,929 |
+| `--slim` | 名字、参数名与类型 | 描述、枚举、约束 | 1,624 | 8,282 |
+| `--compact` | 只有名字 | 其余一切 | **114** | **581** |
+| `serve` | 精简但仍合法的 JSON Schema | `examples`、`$ref`、`format`、`pattern`、长文字 | 看你 | 看你 |
+
+`serve` 放最后、而且故意不给数字：它省多少完全取决于你的服务器描述有多啰嗦，
+我们宁可什么都不印，也不印一个你复现不出来的数。
+
+### 同一张账单换成钱
+
+写长一点，每一步你都能自己核：
+
+```text
+50 工具    raw 14,113 − compact 114  = 每次清单省 13,999 tokens
+13,999     × 每天 20 次 × 30 天       = 每月 8,399,400 tokens
+8,399,400  × 每百万输入 token $3      = 每月 $25.20
+255 工具   raw 71,929 − compact 581  = 71,348  →  每月 $128.43
+```
+
+三个输入里有两个归你定：每天列几次（每来一个任务就重开一个 Agent，一天能列 20+ 次；
+一个一直开着的聊天只列一次），以及你模型的输入单价。第一行是唯一属于我们的，
+而且是实测。
+
+> **误差棒，实测的。** 在一份活的 12 工具缓存上，真实节省量出来是 **96.1%**，
+> 而计算器对同一份配置估的是 **97.5%**——乐观了 1.4 个百分点。小配置省得比模型说的
+> 略少一点。大配置是直接量的，不是估的。
+
+---
+
 ## 三大动作
 
 **1 · `sync`——配一次就够**
@@ -150,7 +225,7 @@ mcptoon serve --listen :8080   # HTTP，多 Agent 或远程
 
 所有已配置服务器合成一个 MCP 端点，带连接池和按 Agent 隔离的 API Key。
 
-**而且这是别人没有的部分：Agent 端零配置。** 原生 MCP 意味着给每个 Agent 各改一份
+**而且这是别人没有的部分：你一行配置都不用手写。** 原生 MCP 意味着给每个 Agent 各改一份
 JSON，而且格式各不相同——`claude_desktop_config.json`、`.claude.json`、
 `.cursor/mcp.json`，如此类推。mcptoon 是你的 Agent 本来就会运行的程序：
 
@@ -160,9 +235,13 @@ Agent: $ mcptoon manifest --compact
 Agent: $ mcptoon call fetch fetch '{"url":"https://example.com"}'
 ```
 
-没有 `mcpServers` 条目，没有插件 API，什么都不用重启。这也是 mcptoon 能到达 MCP
-到不了的地方的原因：shell 脚本、CI 流水线、cron 任务、aider、纯终端环境——
-任何能执行命令的东西。
+能跑 shell 命令的 Agent，配置到此为止：没有 `mcpServers` 条目，没有插件 API，什么都不用
+重启。不能跑的——Claude Desktop 和任何 GUI 客户端——由 `mcptoon sync` 替它写原生 JSON。
+两条路加起来，**需要你亲手打字的配置文件是零个**。mcptoon 自己的清单在
+`~/.mcptoon/config.json`，由 `mcptoon quickstart` 扫描本机已有配置填上。
+
+这也是 mcptoon 能到达 MCP 到不了的地方的原因：shell 脚本、CI 流水线、cron 任务、aider、
+纯终端环境——任何能执行命令的东西。
 
 ---
 
@@ -291,6 +370,23 @@ schema：它留在磁盘上，你要的时候 `--json` 随时给。
 `--compact` 放弃名字以外的一切——Agent 要先要一份 schema 再来组参数。`--slim` 放弃
 描述和约束。两个都是同一条命令上的单次开关，所以这是你按 Agent 逐个拧的旋钮，
 不是一次迁移。
+
+### 跟 McpHub 之类的 MCP 网关有什么不同？
+网关是一个你要跑起来、然后把 Agent 指过去的服务。比如
+[mcphub](https://github.com/samanhappy/mcphub)，它自己存一份服务器清单，对外提供
+`http://localhost:3000/mcp`（还有 `/mcp/{group}`、`/mcp/{server}` 路由），每个 Agent
+都要加一条指向它的配置。团队想要一个可审计的大门时，那是对的形态。mcptoon 没有门可以
+指：能跑 shell 命令的 Agent 直接敲 `mcptoon call <server.tool>`，所以没有服务要养，
+也没有逐 Agent 的条目要加。token 账单的差别也在同一处——网关把多个服务器聚合到一个
+端点后面，Agent 仍然要从它那里收到合并后的 `tools/list`。**聚合不会让清单变短，
+不发它才会。**
+
+### 所以你们到底有没有配置文件？
+有：`~/.mcptoon/config.json`。它是扫描本机已有配置写出来的——`mcptoon quickstart`
+会读 Claude Desktop、Cursor、Cline、Windsurf 的配置，加上环境变量和本地工具——
+不是你写的。而不能跑 shell 命令的 Agent，由 `mcptoon sync` 替它写原生 JSON。
+本 README 的主张是"**你从来不用手写配置文件**"，这句话经得起 `ls ~/.mcptoon`；
+"没有配置文件"经不起，所以不说。
 
 <details markdown="1">
 <summary><strong>诚实局限</strong></summary>

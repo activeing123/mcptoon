@@ -17,7 +17,7 @@
   <rect x="1" y="1" width="1178" height="458" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
 
   <text x="590" y="52" text-anchor="middle" font-size="34" font-weight="800" fill="#1f2328">Plug in once. Every AI can use every tool.</text>
-  <text x="590" y="84" text-anchor="middle" font-size="17" fill="#57606a">No config files. No restarts. One power strip for all your AI agents.</text>
+  <text x="590" y="84" text-anchor="middle" font-size="17" fill="#57606a">No hand-written config. No restarts. One power strip for all your AI agents.</text>
 
   <!-- Left: tools column -->
   <text x="150" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#57606a" letter-spacing="1">YOUR TOOLS</text>
@@ -97,5 +97,5 @@
   <polygon points="414,356 434,356 424,368" fill="#8c959f"/>
   <polygon points="739,356 759,356 749,368" fill="#8c959f"/>
 
-  <text x="590" y="424" text-anchor="middle" font-size="14.5" fill="#57606a">Zero config · Zero dependencies · Works offline · Apache-2.0</text>
+  <text x="590" y="424" text-anchor="middle" font-size="14.5" fill="#57606a">You edit no JSON · Zero dependencies · Works offline · Apache-2.0</text>
 </svg>

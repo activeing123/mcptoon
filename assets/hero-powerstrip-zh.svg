@@ -91,5 +91,5 @@
   <polygon points="414,356 434,356 424,368" fill="#8c959f"/>
   <polygon points="739,356 759,356 749,368" fill="#8c959f"/>
 
-  <text x="590" y="424" text-anchor="middle" font-size="14.5" fill="#57606a">零配置 · 零依赖 · 离线可用 · Apache-2.0</text>
+  <text x="590" y="424" text-anchor="middle" font-size="14.5" fill="#57606a">零手写配置 · 零依赖 · 离线可用 · Apache-2.0</text>
 </svg>

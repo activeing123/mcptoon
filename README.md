@@ -20,7 +20,7 @@ month spent reading manuals.**
 `python scripts/bench_tokens.py` from a clone (it lives in the repo, not in the wheel).*
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="820" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="820" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no hand-written config, no restarts">
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -58,7 +58,7 @@ irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | ie
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-en.gif" width="700" alt="mcptoon demo: pip install, run the zero-config demo, watch the tool list collapse from a schema dump to a name index">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-en.gif" width="700" alt="mcptoon demo: pip install, run the one-command demo, watch the tool list collapse from a schema dump to a name index">
 </p>
 
 Windows · macOS · Linux · Python 3.10+ · Apache-2.0
@@ -132,6 +132,91 @@ are — measure it on your own config rather than trusting a number.
 
 ---
 
+## Where the tokens actually go
+
+"14,113 → 114" is one number carrying an argument. Here is what a tool listing is
+physically made of, measured field by field with the same tokenizer, on a live 12-tool
+cache from this machine:
+
+| Part of a tool entry | Tokens | Share of the bill |
+|---|---:|---:|
+| the tool's **name** | 26 | **2.2%** |
+| its human-readable description | 232 | 19.9% |
+| its parameter schema (`type`, `properties`, `required`) | 635 | **54.5%** |
+| JSON keys, braces, the per-tool envelope | 273 | 23.4% |
+| **total** | **1,166** | 100% |
+
+Two things fall out, and neither is what people expect.
+
+**The name is 2.2% of the bill.** Everything an agent needs in order to *decide* which
+tool to use costs it two percent. The other 97.8% is what it needs in order to *call*
+one correctly — and it needs that for the one tool it picked, not for all twelve, let
+alone all 255. mcptoon's whole move is to make that second part a lookup instead of a
+preamble.
+
+**The expensive part is not the prose.** Descriptions are 19.9% of the bill; the
+parameter schema is 54.5%. Most of what you pay for is machine-shaped JSON —
+`{"type":"string","description":…}` repeated for every argument of every tool. That is
+why `--slim` still saves 88.5%: it drops the prose and keeps the skeleton, and the
+skeleton was already the larger half.
+
+This sample is small and it is ours: 12 tools, dominated by one browser server. Read the
+percentages as the *shape* of the cost, not as your number. Your shape depends on how
+verbosely your servers are written.
+
+### The saving is a rate, never a flat number
+
+Measured tokens per tool, from the same artifact as the tables above:
+
+| Config | raw, per tool | `--compact`, per tool |
+|---|---:|---:|
+| 5 tools | 303.8 | 2.20 |
+| 50 tools | 282.3 | 2.28 |
+| 255 tools | 282.1 | 2.28 |
+| live 12-tool cache | 97.2 | 3.50–4.58 |
+
+The raw rate is remarkably stable (282 tokens per tool across both benchmark configs),
+which is why the calculator defaults to it. The name-index rate is **not** constant:
+2.20 on the benchmark configs, up to 4.58 on the live cache, because names vary in
+length — `opencli_profile_list` costs more in an index than `echo` does. Any claim of
+the form "N tokens flat" is therefore wrong; the honest form is a rate times your tool
+count.
+
+### What each rung keeps
+
+| Rung | Kept | Dropped | 50 tools | 255 tools |
+|---|---|---|---:|---:|
+| default | everything | — | 14,113 | 71,929 |
+| `--slim` | name, parameter names and types | descriptions, enums, constraints | 1,624 | 8,282 |
+| `--compact` | names only | everything else | **114** | **581** |
+| `serve` | valid JSON Schema, thinned | `examples`, `$ref`, `format`, `pattern`, long prose | depends | depends |
+
+`serve` is last and deliberately has no number beside it. How much it saves depends
+entirely on how verbose your servers' descriptions are, and we would rather print
+nothing than print a figure you cannot reproduce.
+
+### The same bill in money
+
+Written out long, so every step is checkable:
+
+```text
+50 tools    raw 14,113 − compact 114  = 13,999 tokens saved per listing
+13,999      × 20 listings/day × 30    = 8,399,400 tokens/month
+8,399,400   × $3 per 1M input tokens  = $25.20 / month
+255 tools   raw 71,929 − compact 581  = 71,348  →  $128.43 / month
+```
+
+Two of those inputs are yours to set: listings per day (an agent that re-spawns per task
+lists its tools twenty times a day; a chat you leave open lists once) and your model's
+input price. The first line is the only one that is ours, and it is measured.
+
+> **The error bar, measured.** On a live 12-tool cache the real saving came out at
+> **96.1%**, where the calculator's model estimates **97.5%** for the same config — 1.4
+> points of optimism. Small setups save a little less than the model says. Large ones
+> are measured directly, not modelled.
+
+---
+
 ## The three moves
 
 **1 · `sync` — configure once**
@@ -166,10 +251,10 @@ mcptoon serve --listen :8080   # HTTP, many agents or remote
 Every configured server appears as one MCP endpoint, with connection pooling and
 per-agent API-key isolation.
 
-**And the part nobody else has: agents need zero setup.** Native MCP means editing
-a JSON file per agent, in a different shape each time — `claude_desktop_config.json`,
-`.claude.json`, `.cursor/mcp.json`, and so on. mcptoon is a program your agent already
-knows how to run:
+**And the part nobody else has: you never hand-edit a config file.** Native MCP
+means editing a JSON file per agent, in a different shape each time —
+`claude_desktop_config.json`, `.claude.json`, `.cursor/mcp.json`, and so on. mcptoon is
+a program your agent already knows how to run:
 
 ```text
 You:    "What tools do we have? Then fetch https://example.com and summarize."
@@ -177,9 +262,14 @@ Agent:  $ mcptoon manifest --compact
 Agent:  $ mcptoon call fetch fetch '{"url":"https://example.com"}'
 ```
 
-No `mcpServers` entry, no plugin API, nothing to restart. That is also why mcptoon
-reaches where MCP cannot: shell scripts, CI pipelines, cron jobs, aider, and
-terminal-only environments — anything that can execute a command.
+For an agent that can run a shell command that is the entire setup: no `mcpServers`
+entry, no plugin API, nothing to restart. For one that cannot — Claude Desktop, any GUI
+client — `mcptoon sync` writes its native JSON for you. Either way the number of config
+files *you* type into is zero. mcptoon keeps its own list at `~/.mcptoon/config.json`,
+and `mcptoon quickstart` fills it by scanning what is already on the machine.
+
+That is also why mcptoon reaches where MCP cannot: shell scripts, CI pipelines, cron
+jobs, aider, and terminal-only environments — anything that can execute a command.
 
 ---
 
@@ -321,6 +411,25 @@ lines of stdlib Python, and zero third-party imports enforced at review.
 At `--compact`, everything except tool names — your agent asks for a schema before it
 builds an argument. At `--slim`, descriptions and constraints. Both are per-call flags
 on one command, so this is a dial you set per agent, not a migration.
+
+### How is this different from McpHub or another MCP gateway?
+A gateway is a service you run and then point your agents at. [mcphub](https://github.com/samanhappy/mcphub),
+for example, keeps its own server list, serves it at `http://localhost:3000/mcp` (with
+`/mcp/{group}` and `/mcp/{server}` routes), and each agent gets a config entry pointing
+there. That is the right shape when a team wants one audited door. mcptoon has no door
+to point at: an agent that can run a shell command calls `mcptoon call <server.tool>`
+directly, so there is no service to keep up and no per-agent entry to add. The token
+bill differs for the same reason — a gateway aggregates servers behind one endpoint, and
+the agent still receives the combined `tools/list` from it. Aggregating does not shrink
+a listing; only refusing to send it does.
+
+### So do you have a config file, or not?
+You do: `~/.mcptoon/config.json`. It is written by scanning what the machine already has
+— `mcptoon quickstart` reads Claude Desktop, Cursor, Cline and Windsurf configs, plus
+environment variables and local tools — not by you. And for agents that cannot run a
+shell command, `mcptoon sync` writes their native JSON. The claim this README makes is
+"you never hand-edit a config file", which survives `ls ~/.mcptoon`. "No config file"
+would not, so it is not claimed.
 
 <details markdown="1">
 <summary><strong>Honest limitations</strong></summary>
