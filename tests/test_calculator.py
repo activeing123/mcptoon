@@ -118,6 +118,11 @@ class _PageTests:
         canonical = re.search(r'<link rel="canonical" href="([^"]+)"', self.html).group(1)
         self.assertIn(canonical, alts.values(),
                       "each page must list its own URL in its hreflang cluster")
+        # Self-reference must be tagged with this page's own language, not carried only
+        # by x-default - otherwise the cluster is ambiguous once a third language lands.
+        own = "zh-Hans" if self.PAGE.parent.name == "zh" else "en"
+        self.assertEqual(alts.get(own), canonical,
+                         f"hreflang={own} should point at this page's own canonical")
 
 
 class TestPageEn(_PageTests, unittest.TestCase):
