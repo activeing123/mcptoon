@@ -5,7 +5,7 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.4] — 2026-09-05
 
 ### Fixed — `mcptoon demo` broken on every machine without a stale npm cache
 
@@ -26,6 +26,8 @@ The server died instantly; the client surfaced a bare
 - demo benchmark table aligned with `assets/benchmark_tiktoken.json`
   (255 tools: 71,929 → 581 tokens, −99.2%); the old hardcoded
   90,804 → 117 numbers predated the 2026-08-12 honest re-benchmark.
+
+Tests: `tests/test_demo_dead_package.py` (6).
 
 ### Fixed — `mcptoon manifest --compact` truncated the tool index
 
@@ -48,10 +50,6 @@ DEVELOPERS.md, comparison.md, articles (en/zh), token-savings.svg,
 benchmark_tiktoken.json, server.json, plugin skill copy, pyproject
 description and the demo table now all carry the measured 581 / 99.2%
 figures. Historical CHANGELOG entries are preserved as-is.
-
-Tests: `tests/test_demo_dead_package.py` (6).
-
-## [0.7.4] — 2026-09-03
 
 ### Fixed — stdio hang: silent servers can no longer freeze the client
 
