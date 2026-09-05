@@ -801,7 +801,13 @@ def _slim_tool(tool):
 # ═══════════════════════════════════════════════════════════════
 
 def compact(obj, max_items=30):
-    """Extract name/id strings only, space-separated."""
+    """Extract name/id strings only, space-separated.
+
+    Manifest-shaped dicts ({server: [tool names]}) expand to a FULL
+    "server: n1, n2" name index with no truncation — this is the discovery
+    answer an agent consumes. Historical behavior truncated dicts to a
+    200-char JSON fragment, which silently hid most tools.
+    """
     if isinstance(obj, list):
         names = []
         for item in obj:
@@ -814,7 +820,15 @@ def compact(obj, max_items=30):
         return " ".join(names[:max_items])
     if isinstance(obj, dict):
         n = obj.get("name") or obj.get("id") or obj.get("title") or ""
-        return str(n) if n else json.dumps(obj, ensure_ascii=False)[:200]
+        if n:
+            return str(n)
+        # Manifest shape: every value is a non-empty list of strings
+        if obj and all(
+            isinstance(v, list) and v and all(isinstance(i, str) for i in v)
+            for v in obj.values()
+        ):
+            return " · ".join(f"{s}: {', '.join(v)}" for s, v in obj.items())
+        return json.dumps(obj, ensure_ascii=False)[:200]
     return str(obj)[:200]
 
 

@@ -699,3 +699,23 @@ class TestRender:
         result = render({"url": "https://example.com"}, fmt="mcptoon")
         assert "example.com" in result
         assert "\\c" in result  # Colon escaped, not replaced
+
+    def test_compact_dict_names_all_servers(self):
+        """--compact on a {server: [names]} manifest lists every name.
+
+        Regression: dict input used to fall through to json.dumps[:200],
+        producing a headless JSON fragment with ~9 names and no closure."""
+        result = render({"github": [f"tool_{i}" for i in range(255)]}, fmt="compact")
+        for name in ("tool_0", "tool_254", "tool_128"):
+            assert name in result
+        assert result.count(",") == 254  # 255 names joined
+
+    def test_compact_dict_no_json_fragment(self):
+        """--compact output must never be a JSON fragment (no braces/quotes)."""
+        result = render({"srv": ["alpha", "beta"]}, fmt="compact")
+        assert "{" not in result and '"' not in result
+        assert result == "srv: alpha, beta"
+
+    def test_compact_scalar_unchanged(self):
+        """Scalar/dict-without-name-list behavior stays as before."""
+        assert render({"a": 1}, fmt="compact") == json.dumps({"a": 1}, ensure_ascii=False)[:200]
