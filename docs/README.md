@@ -17,3 +17,11 @@ mcptoon init
 mcptoon manifest --compact
 mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
 ```
+
+## Tools
+
+- **[MCP Context Tax calculator](tools/token-tax/)** — what your own tool listing costs
+  in tokens, in dollars per month, and as a share of your context window. Sliders, not
+  a blog post; it runs entirely in your browser and nothing is uploaded.
+
+This page is published at <https://activeing123.github.io/mcptoon/>.

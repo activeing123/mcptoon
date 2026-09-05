@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import re
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / "docs" / "tools" / "token-tax" / "index.html"
@@ -42,8 +42,11 @@ class TestCalculatorPage(unittest.TestCase):
         self.assertFalse(hits, f"calculator must not be able to talk to the network: {hits}")
 
     def test_no_external_subresources(self):
+        """A canonical link is metadata the browser never fetches; these are not."""
         lowered = self.html.lower()
-        for tag in ("<script src", "<link ", "<img ", "<iframe", "<video", "<audio", "<object"):
+        for tag in ("<script src", "<img ", "<iframe", "<video", "<audio", "<object",
+                    '<link rel="stylesheet"', '<link rel="preload"', '<link rel="icon"',
+                    '<link rel="manifest"'):
             self.assertNotIn(tag, lowered, f"{tag} would pull something in from elsewhere")
 
     def test_every_script_targeted_id_exists(self):
@@ -76,6 +79,56 @@ class TestCalculatorPage(unittest.TestCase):
                       "the repo-script disclosure was removed")
         self.assertRegex(self.html, r"nothing is sent anywhere|runs entirely in your browser",
                          "the local-only promise was removed")
+
+
+class TestSocialPreview(unittest.TestCase):
+    """The page exists to be shared. A share that renders as a bare text link is a
+    lost click, so the card tags and the image behind them are gated here."""
+
+    OG = PAGE.parent / "og.png"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = PAGE.read_text(encoding="utf-8")
+
+    def meta(self, prop):
+        m = re.search(
+            rf'<meta (?:property|name)="{re.escape(prop)}" content="([^"]*)"', self.html)
+        return m.group(1) if m else None
+
+    def test_card_tags_present(self):
+        for prop in ("og:type", "og:title", "og:description", "og:url", "og:image",
+                     "og:image:alt", "twitter:card"):
+            self.assertTrue(self.meta(prop), f"{prop} missing - the share card degrades to a link")
+        self.assertEqual(self.meta("twitter:card"), "summary_large_image")
+
+    def test_image_is_same_origin_as_the_canonical(self):
+        canonical = self.meta("og:url")
+        self.assertTrue(canonical, "no og:url to compare against")
+        origin = re.match(r"https?://[^/]+", canonical).group(0)
+        self.assertTrue(self.meta("og:image").startswith(origin + "/"),
+                        "og:image must be served from the same Pages origin")
+
+    def test_image_file_exists_where_the_url_says(self):
+        path = re.sub(r"^https?://[^/]+", "", self.meta("og:image")).strip("/")
+        # A GitHub *project* page serves /docs under /<repo>/: the first URL segment is
+        # the repository name, the remainder is relative to docs/.
+        repo, _, rest = path.partition("/")
+        self.assertEqual(repo, "mcptoon", f"unexpected Pages base segment: {repo!r}")
+        target = ROOT / "docs" / PurePosixPath(rest)
+        self.assertTrue(target.is_file(), f"{rest} is not in docs/ - the card would 404")
+
+    def test_image_is_a_real_png_at_the_declared_size(self):
+        raw = self.OG.read_bytes()
+        self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n", "og.png is not a PNG")
+        size = (int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big"))
+        self.assertEqual(size, (1200, 630), "the card must be the size the crawlers ask for")
+        self.assertEqual((self.meta("og:image:width"), self.meta("og:image:height")),
+                         ("1200", "630"), "declared dimensions disagree with the file")
+
+    def test_canonical_points_at_the_deployed_url(self):
+        self.assertEqual(self.meta("og:url"),
+                         "https://activeing123.github.io/mcptoon/tools/token-tax/")
 
 
 class TestCalculatorIsLinked(unittest.TestCase):
