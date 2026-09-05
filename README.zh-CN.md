@@ -4,7 +4,7 @@
 
 ## **列出 255 个 MCP 工具要烧 71,929 tokens。mcptoon 的名字索引只要 581。**
 
-*tiktoken cl100k_base 实测 · 在自己机器上复现：`python scripts/bench_tokens.py`*
+*tiktoken cl100k_base 实测 · 自己复现：`scripts/bench_tokens.py`（仓库脚本，需 `pip install tiktoken`）*
 
 <p align="center">
   <img src="assets/hero-powerstrip-zh.svg" width="860" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
@@ -20,7 +20,7 @@
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-694%20passed-brightgreen)](#给开发者)
+[![Tests](https://img.shields.io/badge/Tests-703%20passed-brightgreen)](#给开发者)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-规范兼容性2026-07-28)
 [![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
 [![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
@@ -191,8 +191,10 @@ fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, e
 | `--compact`（仅名字） | 581 | **−99.2%** |
 
 <sub>基于真实 255 工具配置（50 台服务器）用 tiktoken cl100k_base 实测。
-你的组合数字会不同，复现命令：`python scripts/bench_tokens.py`（需先 `pip install tiktoken`）。
+你的组合数字会不同，复现方式：克隆本仓库后运行 `python scripts/bench_tokens.py`（需先 `pip install tiktoken`；它是仓库脚本，不在 wheel 里）。
 71,929 tokens 约等于一本 300 页的书，581 tokens 约等于一段话。</sub>
+
+<sub>想知道自己那套配置值多少 token？[上下文税计算器](https://activeing123.github.io/mcptoon/tools/token-tax/) 30 秒估出来，全程在你浏览器里算，不上传任何东西。</sub>
 
 这是旋钮不是开关：要零歧义随时 `--json`；`call` 结果默认纯文本且经过安全检查。
 选型对比见 [docs/comparison.md](docs/comparison.md)（按类别拆解安装成本、token 成本、安全性）。
@@ -406,7 +408,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 694 个测试，预期全绿
+python -m pytest tests/ -v          # 703 个测试，预期全绿
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 

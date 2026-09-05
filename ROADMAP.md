@@ -35,7 +35,7 @@
 | Product Hunt | ✅ 产品页 + 首条 maker 评论（2026-09-02） | producthunt.com/products/mcptoon |
 | Dev.to | ✅ 6 篇（最新 2026-09-02 v0.7.2 技能文，ID 4551846） | dev.to/mcptokensaver |
 | Hashnode | ✅ 文章已发布（Agent Plugins 篇） | mcptoon.hashnode.dev |
-| HN | ⛔ mcptokensaver/activeing123 双号 shadowban；mossfjord 冷藏养号中（勿碰 HN） | — |
+| HN | ⛔ 渠道暂停：账号信誉受限，勿再提交 | — |
 | Reddit | ⛔ IP 被封（403），回帖文案已备，解封即发 | r/mcp |
 
 ---
@@ -65,6 +65,8 @@ X/Reddit 一图+一句话     知乎/掘金/公号投放         一键安装脚
 | A2 | `mcptoon demo` 输出小白化（前后对比大数字 + "现在你可以…"） | ✅ v0.7.2 | SAME data X% fewer + Now you can 清单 |
 | A3 | 一键安装脚本（install.ps1 / install.sh：检测 Python → 安装 → quickstart） | ✅ v0.7.2 | README 双语已挂一行命令 |
 | A4 | 「小白使用手册」独立页（图 + 三步 + FAQ + 反馈入口） | ⬜ | 篇三长文配套 |
+| A5 | 上下文税计算器（浏览器本地跑的估算页） | ✅ 2026-09-05 | `docs/tools/token-tax/index.html` → activeing123.github.io/mcptoon/tools/token-tax/ ；`tests/test_calculator.py` 钉住"零网络 + 率值来自 benchmark 工件 + 免责声明不许删" |
+| A6 | `python -m mcptoon.bench_tokens`（把复现脚本装进包里） | ⬜ | 0.7.5 的 wheel 实测只有 28 个文件、不含 `scripts/`，所以 README 首屏目前只能写"克隆仓库后运行"。进包之后那行才对 pip 用户为真；tiktoken 保持可选，缺了就打印安装提示 |
 
 ### A+. Agent Plugins 生态（v0.7.1 新增，随 v0.7.1 已落地）
 | # | 项 | 状态 | 备注 |

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP Context Tax Calculator — what your tool list really costs</title>
+<meta name="description" content="Estimate how many tokens your MCP servers burn on tool discovery, what that costs per month, and how much of your context window it eats. Runs 100% locally; nothing is uploaded.">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#30363d; --ink:#e6edf3;
+    --dim:#8b949e; --accent:#58a6ff; --good:#3fb950; --bad:#f85149; --warn:#d29922;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:30px;line-height:1.25;margin:0 0 8px;letter-spacing:-.01em}
+  .sub{color:var(--dim);margin:0 0 28px;max-width:62ch}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:24px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:0 0 18px}
+  label{display:block;font-size:14px;margin:0 0 6px}
+  label b{font-variant-numeric:tabular-nums;color:var(--accent)}
+  input[type=range]{width:100%;margin:0 0 4px;accent-color:var(--accent)}
+  .row{margin-bottom:20px}
+  .hint{font-size:12px;color:var(--dim);margin:2px 0 0}
+  select,input[type=number]{background:#0d1117;color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:6px 8px;font:inherit;font-size:14px;width:100%}
+  .presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .presets button{background:#21262d;color:var(--ink);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+  .presets button:hover{border-color:var(--accent);color:var(--accent)}
+  .big{font-size:40px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.02em}
+  .big.good{color:var(--good)} .big.bad{color:var(--bad)}
+  .cap{font-size:13px;color:var(--dim);margin:2px 0 0}
+  .stat{margin-bottom:22px}
+  table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+  th,td{padding:7px 0;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left;color:var(--dim);font-weight:400}
+  th{color:var(--dim);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  td.good{color:var(--good)} td.bad{color:var(--bad)}
+  .bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;display:flex;margin:6px 0 2px}
+  .bar i{display:block;height:100%}
+  .bar .used{background:var(--bad)} .bar .free{background:#238636}
+  footer{margin-top:28px;font-size:13px;color:var(--dim)}
+  code{background:#0d1117;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+  a{color:var(--accent)}
+  .privacy{display:inline-block;margin-bottom:14px;font-size:12px;color:var(--good);
+    border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>What does your MCP tool list cost you?</h1>
+  <p class="sub">Every MCP client ships the model the <b>full JSON schema of every tool</b> before
+  you ask a single question. This calculator estimates that bill for your own setup.
+  <span class="privacy">🔒 runs entirely in your browser — nothing is sent anywhere</span></p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Your setup</h2>
+
+      <div class="presets">
+        <button type="button" data-preset="13,154.23">2 servers · 13 tools</button>
+        <button type="button" data-preset="97,282.0745">4 servers · 97 tools</button>
+        <button type="button" data-preset="255,282.0745">50 servers · 255 tools</button>
+      </div>
+      <p class="hint" style="margin-top:-12px;margin-bottom:18px">Three setups we measured
+      end to end; each loads its own measured tokens-per-tool rate.</p>
+
+      <div class="row">
+        <label for="tools">Tools discovered per listing: <b id="toolsV">97</b></label>
+        <input type="range" id="tools" min="1" max="600" value="97">
+        <p class="hint">Count them with <code>mcptoon manifest --compact</code>.</p>
+      </div>
+
+      <div class="row">
+        <label for="perTool">Tokens per raw tool schema: <b id="perToolV">282.07</b></label>
+        <input type="range" id="perTool" min="80" max="600" step="0.01" value="282.07">
+        <p class="hint">282 is the measured mean of a 255-tool / 50-server listing
+        (71,929 tokens, tiktoken <code>cl100k_base</code>). Descriptions tuned for LLM
+        comprehension push this up; terse servers pull it down.</p>
+      </div>
+
+      <div class="row">
+        <label for="listings">Listings per working day</label>
+        <select id="listings">
+          <option value="1">1 — you start the agent, it discovers once</option>
+          <option value="5">5 — a few sessions a day</option>
+          <option value="20" selected>20 — agentic loops, each subagent discovers</option>
+          <option value="50">50 — batch pipelines</option>
+        </select>
+        <p class="hint">The assumption changes the answer by 20×, so it is stated, not buried.</p>
+      </div>
+
+      <div class="row">
+        <label for="price">Price per million input tokens ($)</label>
+        <input type="number" id="price" value="3" min="0" step="0.5">
+      </div>
+
+      <div class="row">
+        <label for="window">Model context window</label>
+        <select id="window">
+          <option value="8000">8,000</option>
+          <option value="32000">32,000</option>
+          <option value="128000" selected>128,000</option>
+          <option value="200000">200,000</option>
+          <option value="1000000">1,000,000</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-bottom:0">
+        <label for="days">Days per month</label>
+        <input type="number" id="days" value="30" min="1" max="31">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>What you pay for discovery</h2>
+
+      <div class="stat">
+        <div class="big bad" id="rawTok">—</div>
+        <p class="cap">tokens per listing, sent before your first question</p>
+      </div>
+
+      <div class="stat">
+        <div class="big good" id="savePct">—</div>
+        <p class="cap">of that never has to enter the window (<span id="idxTok">—</span> tokens instead)</p>
+      </div>
+
+      <div class="stat">
+        <div class="big" id="monthUsd">—</div>
+        <p class="cap">per month at this usage — <span id="dayTok">—</span> tokens/day burned</p>
+      </div>
+
+      <div class="stat">
+        <label>Share of your context window eaten by the tool list</label>
+        <div class="bar"><i class="used" id="barUsed" style="width:0%"></i><i class="free" style="flex:1"></i></div>
+        <p class="cap" id="windowPct">—</p>
+      </div>
+
+      <table>
+        <thead><tr><th>Format</th><th>Tokens</th><th>vs raw</th></tr></thead>
+        <tbody id="fmtBody"></tbody>
+      </table>
+
+      <footer>
+        <p><b>What the numbers mean.</b> Raw = the JSON Schema every client uploads for
+        every tool. Name index = the tool names only, which is what you actually need to
+        decide <i>which</i> tool to call; full schemas are fetched on demand for one tool
+        instead of pushed for all of them.</p>
+        <p>Estimates scale linearly from one measured anchor, so your mix will differ.
+        The name-index row is the softest number here: measured across our three setups
+        it costs <b>2.3–4.1 tokens per tool</b> depending on how long your tool names
+        are, and this page uses the 2.28 tokens/tool of the 255-tool anchor. On the two
+        smaller setups that flatters the savings by about 1%. Small raw listings also
+        cost a little more per tool than the mean, because each server carries its own
+        header. The anchor numbers are measured byte by byte — they are the 255-tool row
+        of <code>assets/benchmark_tiktoken.json</code> in this repository; this page is the
+        30-second estimate. Measure your own for real: run <code>python scripts/bench_tokens.py</code>
+        from a clone of this repository (it is a repo script, not part of the wheel).</p>
+        <p>Tool: <a href="https://github.com/activeing123/mcptoon">mcptoon</a> ·
+        zero dependencies · Apache-2.0.</p>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+/*__MATH_START__*/
+// Rates derived from the canonical 2026-08-12 anchor measurement
+// (255 tools across 50 servers, tiktoken cl100k_base):
+//   raw JSON 71,929 -> 282.07 tok/tool
+//   --slim    8,282 ->  32.48 tok/tool
+//   --compact   581 ->   2.28 tok/tool
+//   TOON     47,438 -> 186.03 tok/tool
+const RATE = { raw: 71929 / 255, slim: 8282 / 255, compact: 581 / 255, toon: 47438 / 255 };
+
+function taxCalc(tools, perTool, listingsPerDay, pricePerMTok, window, days) {
+  const raw = Math.round(tools * perTool);
+  const slim = Math.round(tools * RATE.slim);
+  const compact = Math.round(tools * RATE.compact);
+  const toon = Math.round(tools * RATE.toon);
+  const savedPerListing = raw - compact;
+  const perDay = savedPerListing * listingsPerDay;
+  const perMonth = perDay * days;
+  return {
+    raw, slim, compact, toon,
+    savedPct: raw ? (savedPerListing / raw) * 100 : 0,
+    savedPerListing,
+    tokensPerDay: raw * listingsPerDay,
+    perDay, perMonth,
+    usdPerMonth: perMonth * pricePerMTok / 1e6,
+    usdBaselineMonth: savedPerListing * 1 * days * pricePerMTok / 1e6,
+    windowPct: window ? raw / window * 100 : 0,
+    pages: raw / 240
+  };
+}
+/*__MATH_END__*/
+
+const $ = (id) => document.getElementById(id);
+const nf = (n) => Math.round(n).toLocaleString('en-US');
+const money = (n) => '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+function render() {
+  const tools = +$('tools').value;
+  const perTool = +$('perTool').value;
+  const listings = +$('listings').value;
+  const price = +$('price').value;
+  const win = +$('window').value;
+  const days = +$('days').value;
+
+  $('toolsV').textContent = nf(tools);
+  $('perToolV').textContent = perTool.toFixed(2);
+
+  const r = taxCalc(tools, perTool, listings, price, win, days);
+  $('rawTok').textContent = nf(r.raw);
+  $('savePct').textContent = '−' + r.savedPct.toFixed(1) + '%';
+  $('idxTok').textContent = nf(r.compact);
+  $('monthUsd').textContent = money(r.usdPerMonth);
+  $('dayTok').textContent = nf(r.tokensPerDay);
+  $('barUsed').style.width = Math.min(100, r.windowPct) + '%';
+  $('windowPct').textContent = r.windowPct.toFixed(1) + '% of a ' + nf(win) +
+    '-token window (' + Math.round(r.pages) + ' pages of prose) before you type anything';
+
+  const rows = [
+    ['Raw JSON schemas (what clients send today)', r.raw, '—', 'bad'],
+    ['TOON-encoded schemas (same data, tighter syntax)', r.toon, '−' + ((1 - r.toon / r.raw) * 100).toFixed(1) + '%', ''],
+    ['mcptoon --slim (names + parameter types)', r.slim, '−' + ((1 - r.slim / r.raw) * 100).toFixed(1) + '%', ''],
+    ['mcptoon --compact (name index)', r.compact, '−' + ((1 - r.compact / r.raw) * 100).toFixed(1) + '%', 'good'],
+  ];
+  $('fmtBody').innerHTML = rows.map(([n, t, d, cls]) =>
+    '<tr><td>' + n + '</td><td>' + nf(t) + '</td><td class="' + cls + '">' + d + '</td></tr>').join('');
+}
+
+document.querySelectorAll('input,select').forEach((el) => el.addEventListener('input', render));
+document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+  const [tools, perTool] = b.dataset.preset.split(',');
+  $('tools').value = tools;
+  $('perTool').value = perTool;
+  render();
+}));
+render();
+</script>
+</body>
+</html>
