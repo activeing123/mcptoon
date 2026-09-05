@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Measure the token cost of your own MCP tool listing.
 
-This is the reproduction path behind the numbers in README.md. It takes a
-mcptoon config (default: ~/.mcptoon/config.json, override with --config or
-MCPTOON_CONFIG_FILE) and counts, with the real OpenAI BPE tokenizers:
+This is the reproduction path behind the numbers in README.md. It reads the
+schema cache mcptoon already maintains on disk (default:
+~/.cache/mcptoon/schema_cache.json) and counts, with the real OpenAI BPE
+tokenizers:
 
   * the raw JSON tool list an agent would receive
   * the --slim listing (names + params)
@@ -15,9 +16,9 @@ part of the zero-dependency runtime. Install it first:
     pip install tiktoken
 
 Usage:
-    python scripts/bench_tokens.py                     # your own config
-    python scripts/bench_tokens.py --config my.json    # a specific config
-    python scripts/bench_tokens.py --json              # machine-readable
+    mcptoon manifest                           # populate the schema cache
+    python scripts/bench_tokens.py             # your own numbers
+    python scripts/bench_tokens.py --json      # machine-readable
 """
 
 from __future__ import annotations

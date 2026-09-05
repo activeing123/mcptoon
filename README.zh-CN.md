@@ -1,60 +1,50 @@
 <div align="center" markdown="1">
 
-# mcptoon — 跨 Agent MCP 管理工具
+# mcptoon — MCP 工具发现只要 114 个 token，不是 14,113 个
 
-## **列出 255 个 MCP 工具要烧 71,929 tokens。mcptoon 的名字索引只要 581。**
+**你装了几个 MCP 服务器，然后 Agent 变差了：更慢、更健忘、更容易答非所问。这不
+是模型的锅。每个 MCP 工具都自带一份完整的 JSON Schema，而你的 Agent 必须先把它们
+全读一遍，才有资格挑一个。**
 
-*tiktoken cl100k_base 实测 · 自己复现：`scripts/bench_tokens.py`（仓库脚本，需 `pip install tiktoken`）*
+**50 个工具就是 14,113 个 token——128K 上下文的 11%，你还没打字就没了。mcptoon
+递过去的是名字：114 个 token，同样的工具，−99.2%。255 个工具那一档是 71,929 → 581，
+超过半个窗口；按 agentic 用法算，每月 $25 到 $128 只花在"读说明书"上。**
+
+*两行都是实测配置，不是拿一个数上下缩放（tiktoken `cl100k_base`，
+`assets/benchmark_tiktoken.json`）。你的组合会不同——
+[在浏览器里算你自己的数](https://activeing123.github.io/mcptoon/tools/token-tax/)，
+30 秒，不上传任何东西；或者精确测量：`python scripts/bench_tokens.py`，
+需要先 clone（这个脚本在仓库里，不在 wheel 里）。*
 
 <p align="center">
-  <img src="assets/hero-powerstrip-zh.svg" width="860" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-zh.svg" width="820" alt="mcptoon 万能插排：把 MCP 工具插一次，Claude、Cursor、Codex 或任何 AI 都能用 —— 零配置、零重启">
 </p>
 
-> ✅ **兼容最新 MCP 规范（2026-07-28）**——无状态自动协商、结构化输出原生解析、
-> MRTR 多轮补参，`server/discover` 探测新版服务器，旧版全兼容开箱即用。
-
-> 🧩 **兼容 Agent Plugins 规范 1.0.0**——Amazon / Cursor / Microsoft / OpenAI /
-> Vercel 五大厂商背书的新一代插件打包标准，一条命令安装进**所有** AI Agent：
-> `mcptoon plugin install <目录>`——包括没有原生插件加载器的 Agent。
-
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-703%20passed-brightgreen)](#给开发者)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-规范兼容性2026-07-28)
-[![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
-[![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/Tests-738%20passed-brightgreen)](#开发者)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](#mcp-规范兼容性2026-07-28)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
-[English](README.md) · [开发者文档](DEVELOPERS.md) · [Changelog](CHANGELOG.md) · [提 Issue](https://github.com/activeing123/mcptoon/issues)
+[English](https://github.com/activeing123/mcptoon/blob/main/README.md) ·
+[开发者文档](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) ·
+[更新日志](https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md) ·
+[提 Issue](https://github.com/activeing123/mcptoon/issues)
 
-### 看不见的 token 税
+</div>
 
-接 5 个 MCP 服务器，光列出工具就要烧掉 **~10,000 tokens** 的纯 JSON 语法。
-20 次工具调用再搭进去 40,000-70,000 —— 全是括号、引号和 schema 声明，不是思考。
-128K 上下文里 **30-55% 就这么没了**，Agent 还没开始干活。mcptoon 用名字目录
-替代这堆 dump，tiktoken cl100k_base 实测：
+---
 
-| 工具清单（255 个工具） | tokens | 相对原始 JSON |
-|---|---:|---:|
-| 原始 JSON schema | 71,929 | — |
-| `--slim`（名字+参数类型） | 8,282 | −88.5% |
-| `--compact`（纯名字目录） | 581 | **−99.2%** |
-
-## ⚡ 三步搞定，全平台通用 —— 无需任何配置
+## 装一次，所有 Agent 都能用
 
 ```bash
-# 1 · 装上
-pip install mcptoon
+pip install mcptoon          # 纯标准库，128KB wheel，零依赖
 
-# 2 · 插上 —— 自动发现你已经配置过的工具
-mcptoon quickstart
-
-# 3 · 亲眼看着它工作 —— 不用信任何人，自己跑一遍
-mcptoon demo
+mcptoon quickstart           # 自动发现你已经配好的 MCP 服务器
+mcptoon demo                 # 在你自己机器上现场对比，不用信任何人
 ```
 
-一键安装（不会折腾 Python？复制这行，脚本全搞定）：
+不想折腾 Python？一行搞定，脚本全包：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.sh | bash
@@ -64,338 +54,259 @@ curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.s
 irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | iex
 ```
 
-> `mcptoon demo` 会在**你自己的电脑上**现场对比：工具清单从几万 token
-> 缩成一张名字目录 —— 看完再决定用不用。
-
-<p align="center"><img src="assets/demo.gif" width="720" alt="mcptoon 演示：安装，添加服务器，同步到所有 Agent，看 token 节省"></p>
-
 <p align="center">
-  <a href="assets/promo-zh.mp4"><img src="assets/promo-zh.gif" width="640" alt="39 秒动画看懂 mcptoon：一个改变你使用 Agent 工具习惯的神奇工具"></a>
-  <br>
-  <sub>🎬 <b>39 秒动画看懂 mcptoon</b> —— 开局一句话，痛点、装一次、自动发现、token 对比、安全把关全讲透 · 点击画面看高清版</sub>
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo.gif" width="700" alt="mcptoon demo：pip install 后跑零配置演示，眼看工具清单从 schema 转储塌缩成一份名字目录">
 </p>
 
-```bash
-pip install mcptoon        # 纯标准库，约 250KB，零依赖
-
-mcptoon quickstart         # 找到你已配置的服务器，列出它们的工具
-mcptoon demo               # 现场对比：JSON vs mcptoon，真实 token 数字
-```
-
-省 99.2% token · Windows / macOS / Linux · 免费开源（Apache-2.0）
-
-</div>
+Windows · macOS · Linux · Python 3.10+ · Apache-2.0
 
 ---
 
-## 🗺️ 运行架构（可交互）
+## 它解决什么
 
-下方是 mcptoon 的运行时架构图（基于真实源码生成，节点带 `SRC n` 可回看代码证据）。
-点击预览图打开可交互版：支持搜索节点、追踪调用路径、对比语义角色、深浅主题切换与导出。
+每个 MCP 工具都自带一份说明书：它叫什么、干什么、接受哪些参数、每个参数能填什么。
+你的 Agent 在挑用某个工具之前，得把这些全部读一遍——每个会话、每个 Agent 都重读一次，
+而且是在任何活开始干之前。就是这一步把它的上下文窗口塞满，让它变慢、变健忘。
 
-[![mcptoon 运行架构演示](assets/architecture-zh-demo.gif)](assets/architecture-zh.html)
+| | 没有 mcptoon | 有 mcptoon |
+|---|---|---|
+| 找一个工具 | 读完每份说明书 | 读一份名字清单 |
+| 加一个服务器 | 逐个改每个 Agent 的 JSON，重启 | `mcptoon sync`，不用重启 |
+| 多个 Agent | 每种格式各存一份配置 | 一份唯一事实来源，同步到各处 |
+| 死服务器 | 等到调用时才发现 | `mcptoon health`，带 CI 退出码 |
 
----
-
-## ⚡ 30 秒懂它（小白入口）
-
-mcptoon 是一个跨 agent MCP 管理工具，装一次，所有 agent，
-Claude Code、Cursor、Codex 全部开箱即可使用。
-
-| 以前 | 用 mcptoon |
-|------|-----------|
-| 每个 Agent 单独配一遍 MCP，配错浪费时间 | 工具插一次，所有 Agent 直接用 |
-| 改完要重启，还常配错 | 装上就能用，不用重启 |
-| 记不清哪个 Agent 配过什么 | `quickstart` 自动找到你已有的工具 |
-| 想换工具要挨个 Agent 改 | 一处修改，处处生效 |
-
-**3 步装好（不用会写代码）：**
-
-1. 装 Python：去 [python.org](https://www.python.org) 下载，勾选 "Add Python to PATH"
-2. 复制回车：`pip install mcptoon`
-3. 一键发现：`mcptoon quickstart`，再跑 `mcptoon demo` 亲眼看它在你机器上省多少
-
-技术版本一句话：mcptoon 是一个零依赖 CLI，把任何 Agent 接到所有
-MCP 服务器上，不管这个 Agent 支不支持 MCP。
+换成协议术语："说明书"就是 JSON Schema，"名字清单"就是名字索引。mcptoon 是一个零依赖
+CLI，把任意 Agent 接到每一个 Model Context Protocol 服务器上——包括根本不支持 MCP 的 Agent。
 
 ---
 
-## 🛠 30 秒评估它（技术员入口）
+## 它是旋钮，不是开关
 
-一句话架构：`~/.mcptoon/config.json` 是唯一事实来源，
-`sync` 写进所有 Agent，`manifest` 按需给名字索引，`serve` 合成单入口代理。
-零第三方依赖，Python 3.10+，纯标准库约 6,800 行。
+你的 Agent 要读多少，是你每次调用自己选的。下面**两列都是实测配置**，不是拿一个
+数上下缩放：
 
-### 别人没有的部分：Agent 端零配置
+| 档位 | 你的 Agent 读什么 | 50 工具 | 255 工具 | 你放弃了什么 |
+|---|---|---:|---:|---|
+| 默认 | 每个工具的完整 JSON Schema | 14,113 | 71,929 | 什么都不放弃——这就是你今天一直在付的账单 |
+| `--slim` | 名字 + 参数类型 | 1,624 | 8,282 | 描述和约束 |
+| `--compact` | 只有名字 | **114** | **581** | 除了名字全都放弃 |
 
-原生 MCP 意味着给每个 Agent 编辑一份 JSON，格式还各不相同：
+省下来的比例不随规模缩水——`--slim` 两档都是 −88.5%，`--compact` 两档都是 −99.2%，
+全部实测。随规模长大的是**赌注**：50 个工具
+占 128K 窗口的 11%，255 个占 56%。而且每开一个新 Agent 都要重发一遍清单，按每天 20 次、
+每百万输入 token $3 算，光是"读"这一步，小配置**每月 $25**，大配置**每月 $128**。
 
-| Agent | 配置文件 |
-|-------|---------|
-| Claude Desktop | `claude_desktop_config.json` |
-| Claude Code | `.claude.json` |
-| Cursor | `.cursor/mcp.json` |
-| Cline / Windsurf / VS Code Copilot | 各种 JSON、各种格式 |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings.svg" width="700" alt="同一份 255 工具配置的柱状图：原始 JSON schema 71,929 tokens，slim 8,282，compact 581">
+</p>
 
-在 Cursor 加服务器，忘了 Claude；修好 Claude，弄坏 Cursor，每周循环。
-代理工具则要你跑一个常驻服务，再把每个 Agent 指向它。
+这些说明书留在磁盘上的 `~/.mcptoon/config.json` 里，你的 Agent 不主动要就永远读不到。
+这就是全部机关，也是为什么它**不是压缩**：压缩器把完整载荷送进窗口、之后再解包，
+成本最终还是要落地。mcptoon 干脆不发。想要完整 schema 时，`--json` 随时都在。
 
-mcptoon 两者都不需要。它是你的 Agent 本来就会跑的程序：
+**需要真说明书、但还想省钱？** `mcptoon serve` 返回的是**精简但仍然合法**的
+JSON Schema——`type`、`properties`、`required` 和一句话描述都保留，任何 MCP 客户端
+照样能正确调用工具；被剪掉的是 `examples`、`$ref`、`format`、`pattern` 和那些 500 字的
+长描述，而参数校验用的是 mcptoon 中间层里的**完整** schema，转发给底层服务器之前就拦。
+这一档能省多少，取决于你的服务器描述写得多啰嗦——**量你自己的配置，别信任何现成数字**。
 
-```text
-你:    "我们有哪些工具？然后抓取 https://example.com 总结一下"
-Agent: $ mcptoon manifest --compact        ← 拿到名字索引，不是 schema
-Agent: $ mcptoon call fetch fetch '{"url":"https://example.com"}'
-```
+> **关于数字。** 本 README 早期版本宣传过 97%，后来又写 99.8% / 123 tokens。两个都错：
+> 123 是我们自家 benchmark 脚本把清单截断到 30 条产生的伪影，不是完整名字目录。
+> 上面这些是校准后、可复现的数字，而且是**我们自己审计出来的**（提交 `9760bbc`），
+> 不是读者发现的——所以这次修正连着测试一起进仓库：某个作废数字一旦回来，CI 就红。
+> 如果你又发现对不上的地方，
+> [开个 issue](https://github.com/activeing123/mcptoon/issues)。
 
-没有 `mcpServers` 条目，没有插件 API，没有要注册的东西，没有要重启的东西。
-想全自动？在 Agent 的指令文件（CLAUDE.md / AGENTS.md / 系统提示词）里写一行
-就够——那是提示词，不是配置。
+---
 
-这也是 mcptoon 能到达 MCP 到不了的地方的原因：shell 脚本、CI 流水线、
-cron 任务、aider、纯终端环境——一切能执行命令的东西。
+## 三大动作
 
-### 三大动作
+**1 · `sync`——配一次就够**
 
-**1 · 配一次，处处同步：`sync`**
 ```bash
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
-mcptoon sync                # 把原生配置写进每个检测到的 Agent
+mcptoon sync                 # 把原生配置写进每个检测到的 Agent
+mcptoon sync --watch         # 你边改它边对齐
+mcptoon sync --dry           # 预览要写什么
 ```
-合并不覆盖，你手动配的服务器原地不动。一条命令得到跨 Agent 工具管理：
-全机器 MCP 服务器的单一事实来源，不用在 Cursor、Claude 之间复制粘贴 JSON。
 
-```bash
-mcptoon sync --watch        # 轮询配置文件，任何变更持续对齐所有 Agent
-mcptoon sync --dry          # 预览要写什么
-mcptoon sync --agent cursor # 只写指定 Agent
-```
-漂移检测捕捉外部改动；merge/strict 两种模式。
+合并而非覆盖：你手工配好的服务器原地保留。漂移检测能抓住在 mcptoon 之外做的编辑。
 
-**2 · 只为名字付费，schema 不进上下文：`manifest`**
-
-Agent 问"有哪些工具？"，mcptoon 回一个名字索引。schema 留在
-`~/.mcptoon/config.json` 磁盘上，从不进入上下文。
+**2 · `manifest`——一份名字清单，不是一摞说明书**
 
 ```bash
 $ mcptoon manifest --compact
-fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
+bsk-tools: resolve, map_list, map_get · echo: echo, add, delete_item
 ```
 
-![mcptoon 省 token 实测：255 个工具从 71,929 tokens 降到 581](assets/token-savings.svg)
+真实输出、真实配置。你的 Agent 拿到的是"有什么"的清单，定义留在磁盘上，等它要时再取。
 
-| 工具清单（tiktoken cl100k_base） | tokens | vs 原始 JSON |
-|--------------------------------|-------:|-------------:|
-| 原始 JSON schema（255 工具） | 71,929 | — |
-| `--slim`（名字+参数类型） | 8,282 | −88.5% |
-| `--compact`（仅名字） | 581 | **−99.2%** |
-
-<sub>基于真实 255 工具配置（50 台服务器）用 tiktoken cl100k_base 实测。
-你的组合数字会不同，复现方式：克隆本仓库后运行 `python scripts/bench_tokens.py`（需先 `pip install tiktoken`；它是仓库脚本，不在 wheel 里）。
-71,929 tokens 约等于一本 300 页的书，581 tokens 约等于一段话。</sub>
-
-<sub>想知道自己那套配置值多少 token？[上下文税计算器](https://activeing123.github.io/mcptoon/tools/token-tax/) 30 秒估出来，全程在你浏览器里算，不上传任何东西。</sub>
-
-这是旋钮不是开关：要零歧义随时 `--json`；`call` 结果默认纯文本且经过安全检查。
-选型对比见 [docs/comparison.md](docs/comparison.md)（按类别拆解安装成本、token 成本、安全性）。
-
-**3 · 每台服务器门前只开一扇门：`serve`**
-
-让 Agent 指向单一入口，而不是 N 台服务器：
-
-```json
-"mcptoon": { "command": "mcptoon", "args": ["serve"] }
-```
+**3 · `serve`——所有服务器只开一扇门**
 
 ```bash
 mcptoon serve                  # stdio，单 Agent
-mcptoon serve --listen :8080   # HTTP，多 Agent 同时连 / 远程机器可用
+mcptoon serve --listen :8080   # HTTP，多 Agent 或远程
 ```
 
-### 并发与稳定性
+所有已配置服务器合成一个 MCP 端点，带连接池和按 Agent 隔离的 API Key。
 
-- **并行发现**：20 并发 worker 加载 manifest，100 台服务器约 5 秒（串行要 500 秒）
-- **schema 缓存 5 分钟**：重复发现不重复付钱
-- **单调用 30 秒超时**（`MCPTOON_CALL_TIMEOUT` 可调）：一台服务器卡死不拖垮整个会话
-- **多 Agent 同时连**：HTTP 模式并发请求线程隔离，响应不串台
-- **并发安全记账**：使用记录线程锁 + 原子写，多 Agent 并发跑不损坏 `usage.json`
+**而且这是别人没有的部分：Agent 端零配置。** 原生 MCP 意味着给每个 Agent 各改一份
+JSON，而且格式各不相同——`claude_desktop_config.json`、`.claude.json`、
+`.cursor/mcp.json`，如此类推。mcptoon 是你的 Agent 本来就会运行的程序：
+
+```text
+你：  "我们有哪些工具？然后把 https://example.com 抓下来总结一下。"
+Agent: $ mcptoon manifest --compact
+Agent: $ mcptoon call fetch fetch '{"url":"https://example.com"}'
+```
+
+没有 `mcpServers` 条目，没有插件 API，什么都不用重启。这也是 mcptoon 能到达 MCP
+到不了的地方的原因：shell 脚本、CI 流水线、cron 任务、aider、纯终端环境——
+任何能执行命令的东西。
+
+---
+
+## 为什么是 CLI，不是库、也不是代理
+
+MCP 的前提是：每一项能力都是一个*服务器*，而你的 Agent 必须被配置成能够到它。
+正是这个前提，导致加一个工具就得给每个 Agent 各改一份 JSON、格式还各不相同、
+然后全部重启——也导致每个 Agent 在干任何活之前，都要重付一次完整的 schema 成本。
+
+命令行是所有 Agent 都已经有的那一个接口。模型是在数十亿条 CLI 样本上训练出来的，
+它们不需要人教怎么用 `mcptoon`。而且这个形态本身就更便宜，这与 mcptoon 做了什么无关：
+
+- Firecrawl 的基准：同一任务 **CLI 花 1,365 tokens，MCP 花 44,026——差 32 倍**（[出处](https://www.firecrawl.dev/blog/mcp-vs-cli)）
+- Scalekit 的基准：CLI **便宜 10–32 倍，可靠性 100%，MCP 是 72%**（[出处](https://www.scalekit.com/blog/mcp-vs-cli-use)）
+
+**为什么不做成库？** 库需要一个能 import 它的宿主进程，还得是宿主说的语言。CLI 只需要一个
+shell——而这恰恰是每个 Agent、CI runner、cron 任务都已经有的东西。
+
+**为什么不做成代理？** 代理是又一个要跑起来、再让 Agent 指向它的服务。mcptoon 零安装即可试用，
+平时不挡路；真需要代理形态时，`mcptoon serve` 就是那个模式。
+
+---
+
+## 为什么这是个真问题（不是我们自己说的）
+
+下面每一条都对照原页面逐字核验过：
+
+| 来源 | 原文实际说了什么 |
+|---|---|
+| [Anthropic — Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) | "reduces the token usage from 150,000 tokens to 2,000 tokens — a time and cost saving of 98.7%"（把 token 用量从 150,000 降到 2,000，节省 98.7%） |
+| [Firecrawl — MCP vs CLI](https://www.firecrawl.dev/blog/mcp-vs-cli) | CLI "~200 tokens per command" vs MCP "~44K tokens (full schema loaded upfront)" |
+| [Scalekit](https://www.scalekit.com/blog/mcp-vs-cli-use) | "CLI won on every efficiency metric — 10 to 32× cheaper, 100% reliable versus MCP's 72%" |
+| [MCP-Zero（arXiv:2506.01056）](https://arxiv.org/abs/2506.01056) | 按需工具检索可实现与工具数量近乎无关的常数成本 |
+| [ProMCP — ACL 2026 Findings](https://doi.org/10.18653/v1/2026.findings-acl.1967) | 对 MCP Agent 的 token 流与延迟成本做同行评审过的量化分析 |
+| [SEP-1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | MCP 官方在途提案，正打算削减 schema 冗余——上游已承认这个问题 |
+
+测过这件事的不是我们一家；协议自己的工作组现在也在提修复方案。mcptoon 是**今天就能用**、
+**一次覆盖所有 Agent**、不用等那个提案落地的那一个。
+
+---
 
 ## MCP 规范兼容性（2026-07-28）
 
-mcptoon 0.7.0 说的是**最新 MCP 规范 [2026-07-28](https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28)**——
-无状态化那一版——同时完全兼容所有旧版服务器：
+| 规范特性 | 状态 |
+|---|---|
+| 无状态自动协商 | ✅ |
+| 结构化工具输出 | ✅ 原生解析 |
+| MRTR 多轮补参 | ✅ |
+| `server/discover` 探测 | ✅ |
+| 长轮询 SSE 响应 | ✅ |
+| 向后兼容（2024-10-07 → 2025-11-25） | ✅ |
 
-| MCP 修订版 | mcptoon 支持 |
-|-----------|-------------|
-| **2026-07-28**（最新 · 无状态） | ✅ `server/discover` 自动协商 · 每请求 `_meta` 协议标注 · `Mcp-Method`/`Mcp-Name` HTTP 标准头 · MRTR 多轮补参（`resultType: "input_required"` → `--input-responses` 应答重试） |
-| 2025-11-25 / 2025-06-18 | ✅ 经典 `initialize` 握手 · `structuredContent` 原生解析 · `--envelope` 透传 |
-| 2025-03-26 / 2024-11-05（旧服务器） | ✅ 行为不变，完全向后兼容 |
+规范发布按兼容性矩阵对待，不当 changelog 看：每一版都带对真实服务器的线路级测试。
+详见 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-版本选择全自动（`spec="auto"`）：客户端先用 `server/discover` 探测，
-服务器不认识就静默回落经典握手。也可以在 `~/.mcptoon/config.json` 里按服务器
-钉死：`spec: "legacy"` 或 `spec: "2026-07-28"`。
+## Agent Plugins 1.0.0
 
-```bash
-mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # 完整 MCP 结果信封，JSON 输出
-mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR 多轮补参重试（2026-07-28）
-```
+扫描、安装、同步这套跨厂商插件标准（Amazon / Cursor / Microsoft / OpenAI / Vercel）
+到每个 Agent，一条命令：`mcptoon plugin install <目录>`——包括没有原生插件加载器的
+Agent。
 
-日常使用不需要任何新参数：新规范服务器返回结构化输出时 mcptoon 自动识别。
-需要原始协议载荷（审计、调试、查 `_meta`）时才用 `--envelope`。
+## 安全，应用于每一次调用
 
-## Agent Plugins 插件支持（1.0.0）
+MCP 服务器在你机器上跑代码，并把任意文本送回你 Agent 的上下文。mcptoon 在它进去之前
+逐条检查：
 
-[Agent Plugins 规范](https://agent-plugins.org/specification) v1.0.0（Amazon、Cursor、
-Microsoft、OpenAI、Vercel 五大厂商共同制定）定义了 AI Agent 插件怎么**打包**——
-一个文件夹，装着 `plugin.json`（身份证）+ `skills/`（说明书）+ `mcp.json`（工具配置）。
-它刻意**不**定义安装、分发、跨 Agent 同步——这正好是 mcptoon 的本职：
+| 检查项 | 拦什么 |
+|---|---|
+| 提示词注入 | 藏在工具输出里的 `"ignore previous instructions"` |
+| 凭据泄漏 | 输出里的 `sk-…`、`AKIA…`、`ghp_…` 特征 |
+| 危险操作 | 除非你显式传 `--destructive`，否则拦 `delete` / `drop` / `purge` |
 
-```bash
-mcptoon plugin scan <目录>       # 校验插件包（只读）
-mcptoon plugin install <目录>    # 装进 mcptoon + 所有已接管的 Agent
-mcptoon plugin list              # 看装了什么
-mcptoon plugin remove <名称>     # 处处移除（数据目录保留）
-```
+零依赖本身就是安全叙事的一部分：没有 npm 子树、没有 postinstall 脚本、要审计的只有
+11,400 行可读 Python。无遥测、无统计、无外呼。API Key 从你的配置或环境变量透传，
+mcptoon 从不存储。
 
-- **严格规范校验**——闭式清单、单 token 命令、非环回强制 HTTPS、headers 禁放凭据、路径逃逸检查
-- **`${PLUGIN_ROOT}` / `${PLUGIN_DATA}` 预展开**——mcptoon 自己当安装者，直接把绝对路径
-  写进每个 Agent 的原生配置，Agent 侧零插件加载器支持
-- **命名空间服务器**——`插件名:服务器名` 键名防撞，卸载时把它到达过的每个 Agent 配置都清干净
-- **数据目录持久化**——`~/.mcptoon/plugins-data/<名称>/` 跨升级保留（规范 §PLUGIN_DATA），
-  `--force` 强制升级也不会丢缓存和状态
-- 插件服务器与普通服务器落在同一份 `~/.mcptoon/config.json`——`manifest`、`call`、
-  `serve`、`health` 和 99.2% 省 token 对它们自动生效
+## 支持哪些 Agent
 
-### 盒子里还有的一切
+**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex ·
+Gemini CLI · OpenCode**——外加 aider、shell 脚本、CI 任务，以及任何能执行命令的东西，
+包括完全没有 MCP 支持的环境。
 
-| 命令 | 作用 |
-|------|------|
-| `mcptoon sync --watch` | 轮询配置，跨 Agent 持续重同步 MCP 服务器 |
-| `mcptoon call <server> <tool> '{…}'` | 调任意服务器上的任意工具 |
-| `mcptoon call <server> <tool> --envelope` | 返回完整 MCP 结果信封（structuredContent、_meta） |
-| `mcptoon call --auto <tool> '{…}'` | 只给工具名，自动路由到正确服务器 |
-| `mcptoon plugin install <目录>` | 一条命令把 Agent Plugin 装进所有 Agent（规范 1.0.0） |
-| `mcptoon health` | 哪些服务器活着、死了、多快；CI 里全死退出码 1 |
-| `mcptoon install <name> --npm <pkg>` | 装服务器并自动发现工具 |
-| `mcptoon search <query>` | 跨全部工具模糊搜索 |
-| `mcptoon doctor` | 自检 Python、配置、连通性 |
-
-`health` 为什么重要：2026 年社区审计发现
-[52% 已发布的 MCP 服务器不可达](https://www.163.com/dy/article/KSSN2L5E05561FZP.html)。
-配置了 ≠ 活着。
-
-```text
-── mcptoon health: 3/5 alive ──────────────
-  ✓ fetch     [stdio]  1 tool     120ms  ok
-  ✗ brave     [stdio]  0 tools  10002ms  timeout → Timed out after 10s
-  ✓ github    [http]  12 tools    340ms  ok
-```
-
-**底层细节**
-
-- **Agent 能行动的报错**：每次失败返回结构化信封带修复建议
-  （"server `fetchh` not found — did you mean `fetch`?"），Agent 自我纠正而不是卡死等你救
-- **持续同步（`--watch`）**：漂移检测，merge/strict 模式
-- **跨服务器模糊搜索**：`mcptoon search star` 带相关性评分找对工具
-- **Shell 补全**：bash / zsh / fish / PowerShell
-- **JSON 或 TOML 配置**：都在 `~/.mcptoon/`，哪个顺眼用哪个
-- **本地使用记录**：哪些工具何时被调过，记录永不出你的机器
-
-### 安全扫描，应用于每次调用
-
-零依赖免费送供应链安全：没有 npm 子树、没有 postinstall 脚本、
-没有要审计的东西，只有约 6,800 行可读的 Python。
-
-MCP 服务器在你机器上跑代码，还会把任意文本塞进 Agent 上下文。
-mcptoon 在文本到达 Agent 之前检查每一次结果：
-
-| 检查 | 拦截内容 |
-|------|---------|
-| 提示词注入 | 工具输出里埋的 "ignore previous instructions" |
-| 凭据泄漏 | 输出中的 `sk-…` / `AKIA…` / `ghp_…` 特征 |
-| 危险操作 | 名带 `delete` / `drop` / `purge` 的调用，除非显式 `--destructive` |
-
-无遥测、无统计、无外呼。API Key 只从你的配置或环境变量透传，mcptoon 绝不存储。
-
-### 学术与行业验证
-
-这些独立来源验证 mcptoon 解决的问题：
-
-| 引用 | 来源 | 结论 |
-|------|------|------|
-| SEP-1576 | [modelcontextprotocol issue #1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | MCP 官方提案：schema 冗余削减 + 更聪明的工具选择，验证零 token 方向 |
-| Firecrawl 基准 (2026) | [firecrawl.dev/blog/mcp-vs-cli](https://firecrawl.dev/blog/mcp-vs-cli) | 同样任务 CLI 约 200 tokens，MCP 约 44K，贵 4~32× |
-| Anthropic code-execution | [anthropic.com/engineering/code-execution-with-mcp](https://www.anthropic.com/engineering/code-execution-with-mcp) | 代码执行模式削减上下文开销至 98.7%（150K→约 2K tokens） |
-| MCP-Zero（厦门大学+中科大） | [arXiv:2506.01056](https://arxiv.org/abs/2506.01056) | 按需工具检索实现与工具数量无关的常数成本 |
-| ProMCP（ACL ARR 2026） | arXiv | MCP Agent 的 token 流与延迟剖析 |
-| Microsoft 动态工具发现 | [Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery) | 动态工具发现是 MCP 客户端的 token 效率模式 |
-| Scalekit (2026) | [scalekit.com/blog/mcp-vs-cli-use](https://scalekit.com/blog/mcp-vs-cli-use) | 确认 MCP 与 CLI 之间 32× token 成本差 |
-
-### Works with
-
-**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot ·
-Codex · Gemini CLI · OpenCode**，外加 aider、shell 脚本、CI 任务，以及一切
-能执行命令的东西，包括完全不支持 MCP 的环境。CLI 优先就是这个意思。
+最后那半句才是重点：正因为 mcptoon 首先是个 CLI，它才能走到 MCP 客户端到不了的地方。
 
 <details markdown="1">
-<summary><strong>和原生配置、工具搜索代理比，差在哪？</strong></summary>
+<summary><strong>这和逐 Agent 配置、或者工具搜索代理有什么区别？</strong></summary>
 
-| | 每个 Agent 单独配 | 工具搜索代理 | mcptoon |
+| | 逐 Agent 配置 | 工具搜索代理 | mcptoon |
 |---|---|---|---|
-| Agent 端安装 | 每个 Agent 编辑 JSON + 重启 | 跑一个服务，Agent 指向它 | **零——它就是一条命令** |
-| 维护文件数 | 每个 Agent 一份 | 每个 Agent 一份 | **一份，处处同步** |
-| 发现成本 | 全量 schema | 先搜索再按需加载 | **名字索引，schema 永不出磁盘** |
-| 死服务器检测 | 无 | 看实现 | 内建，CI 友好退出码 |
-| 输出检查 | 无 | 看实现 | 每次调用做注入 + 泄漏检查 |
-| 采用方式 | 原生支持 | 跑一个服务 | `pip install mcptoon` |
+| Agent 侧设置 | 每个 Agent 改 JSON + 重启 | 跑一个服务，再逐个指向它 | **零——它就是一条命令** |
+| 要维护的文件 | 每个 Agent 一份 | 每个 Agent 一份 | **一份，同步到各处** |
+| 发现成本 | 完整 schema | 先搜索，按需加载 | **名字目录；schema 永不出盘** |
+| 死服务器检测 | — | 看实现 | 内建，带 CI 友好退出码 |
+| 输出检查 | — | 看实现 | 每次调用都做注入 + 泄漏检查 |
+| 接入成本 | 需要原生支持 | 要跑一个服务 | `pip install mcptoon` |
 
-还能组合：要代理形态的时候，`serve` 模式就是。
+它们还能叠加：想要代理形态时用 `serve` 模式就行。
+
+</details>
+
+## 值得问的问题
+
+### 这不就是压缩吗？
+不是。压缩把完整载荷送进上下文、之后再解包——成本最终仍要落地。mcptoon 干脆不发
+schema：它留在磁盘上，你要的时候 `--json` 随时给。
+
+### Claude Code 不是已经延迟加载工具了？
+是，而且两者可叠加。延迟加载决定定义*什么时候*进上下文，只管一个 Agent。mcptoon
+决定一次清单*值多少钱*，一次覆盖所有 Agent，还额外提供 sync、health 和输出检查。
+
+### 99.2% 是不是格式花招？
+不是 `null` → `∅` 这类替换。那个误解来自早期 TOON 风格实验，那些替换在 v0.3.0 就被
+删掉了，因为 tiktoken 证明其中两个比原样更贵。可选的 `--toon` 工具*结果*编码再省约
+34%，默认关闭。
+
+### 我少装几个 MCP 服务器不行吗？
+行——这正是今天 MCP 用户在做的取舍：为了腾出上下文先卸一个，等要用那周再装回来。
+它管用，但也正因为如此，上面那一列「50 工具」比「255 工具」更值得你看。mcptoon 让你
+全都留着，窗口里还剩得下干活的地方。
+
+### 我要把 API Key 交给它吗？
+不注册、不遥测、不外呼。Key 从你自己的配置或环境变量透传，mcptoon 从不存储。而且能
+藏东西的地方也少：11,400 行纯标准库 Python，零第三方 import 是评审阶段的硬规则。
+
+### 我到底放弃了什么？
+`--compact` 放弃名字以外的一切——Agent 要先要一份 schema 再来组参数。`--slim` 放弃
+描述和约束。两个都是同一条命令上的单次开关，所以这是你按 Agent 逐个拧的旋钮，
+不是一次迁移。
+
+<details markdown="1">
+<summary><strong>诚实局限</strong></summary>
+
+- `--compact` 只列工具**名字**——没有描述和参数细节。要签名用 `--slim`，要全部用 `--json`。
+- token 数用 tiktoken `cl100k_base` 量。其他分词器会有差异（±10–25%）；主要那笔节省——
+  schema 不进上下文——与分词器无关。
+- 百分比取决于你的工具集——配置越小摊得越薄。在一份 12 工具的配置上我们量到 −96.1%，不是 −99.2%。
+- 每次 stdio 调用会起一个进程（冷启动约 300ms）。热路径请用 `serve` 模式。
+- 终端优先。没有 GUI。
 
 </details>
 
 ---
 
-## ❓ FAQ
-
-<details markdown="1">
-<summary><strong>常见问题</strong></summary>
-
-**什么是跨 Agent MCP 管理工具？**
-管理多个 AI Agent 的 MCP 服务器配置的工具。mcptoon 是开源实现之一：一份配置同步到所有 Agent，不用逐个编辑 JSON，也不用常驻代理服务。
-
-**mcptoon 怎么帮我省 token？**
-Agent 问"有哪些工具"时只回一个名字索引（255 个工具 = 581 tokens），完整 schema 留在磁盘不进上下文。255 个工具从 71,929 降到 581，省 99.2%。
-
-**这不就是压缩吗？**
-不是。压缩把完整载荷送进上下文再解压，成本迟早落进窗口。mcptoon 把 schema 留在磁盘，它们根本不进上下文，Agent 看到的只是一份短短的名字索引。
-
-**Claude Code 已经延迟加载 MCP 工具了，还有必要吗？**
-有。延迟加载决定"何时加载"，mcptoon 决定"清单花多少 token"，且对所有 Agent 同时生效，还叠加 sync、health、安全检查。两者解决不同层，可以叠加。
-
-**为什么是 CLI 而不是库或代理？**
-因为 shell 是所有 Agent 都已经会说的唯一接口。没有插件 API、没有 SDK、没有每 Agent 配置文件、没有要保活的服务，连完全不支持 MCP 的 Agent 也能通过它驱动所有 MCP 服务器。要长连接？`mcptoon serve` 就是代理形态的同一个工具，stdio 或 HTTP。
-
-**省 token 是靠把 `null` 换成符号之类的把戏吗？**
-不是，那是早期 TOON 式实验留下的误解。头条数字来自架构：完整 schema 根本不发。可选的 `--toon` 对工具**输出结果**编码再省约 30~40%，默认关闭。
-
-</details>
-
-<details markdown="1">
-<a id="honest-limitations"></a>
-<summary><strong>坦诚的局限</strong></summary>
-
-- `--compact` 只列工具**名字**，没有描述和参数。要签名用 `--slim`，要全部用 `--json`。
-- token 数字用 tiktoken `cl100k_base` 实测，其他分词器有 ±10~25% 出入。核心节省（schema 根本不进上下文）与分词器无关。
-- stdio 每次调用起一个进程（约 300ms 冷启动），高频路径用 `serve` 模式，schema 缓存吸收 5 分钟内的重复列表。
-- 终端优先，没有 GUI。
-
-</details>
-
----
-
-<a id="for-developers"></a>
-
-## 👨‍💻 给开发者
+## 开发者
 
 ```python
 from mcptoon.client import MCPClient
@@ -408,21 +319,25 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 703 个测试，预期全绿
-docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
+python -m pytest tests/ -v          # 738 passed, 1 skipped
 ```
 
-零第三方导入是 review 强制执行的红线。新功能必须带测试。
-约 6,800 行 Python、14 个模块，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+零第三方 import 是评审阶段强制的硬规则；新行为必须带测试。11,400 行 Python、
+21 个模块——见
+[CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md)。
 
-## License
+## 许可证
 
-Apache 2.0，见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
+Apache 2.0——见
+[LICENSE](https://github.com/activeing123/mcptoon/blob/main/LICENSE) 与
+[NOTICE](https://github.com/activeing123/mcptoon/blob/main/NOTICE)。
 
 <div align="center" markdown="1">
 
-*Model Context Protocol 的独立第三方客户端。与 Anthropic、Cursor、Microsoft 无隶属关系。*
+*Model Context Protocol 的独立第三方客户端，与 Anthropic、Cursor、微软均无关联。*
 
-**如果 mcptoon 今天帮你省了 token，一个 ⭐ 能让更多人找到它**
+**不信？很好。`pip install mcptoon && mcptoon demo` 只要 30 秒，跑在你自己机器上。**
+
+<sub>点个 ⭐，是让下一个人找到这份 README 的唯一办法。</sub>
 
 </div>

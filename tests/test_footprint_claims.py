@@ -9,14 +9,17 @@ The line count here is deliberately the *physical* line count of src/mcptoon/*.p
 give 7,509, 7,873 and 8,328 - so a public claim that depends on the definition is a
 claim an auditor cannot check. Physical lines are `wc -l` and beyond argument.
 
-README.md and README.zh-CN.md are not covered yet: they carry the same stale trio
-(~250KB, ~6,800 lines, 14 modules) and are mid-rewrite by a human. Add them to COVERED
-once that lands.
+README.md and README.zh-CN.md joined COVERED on 2026-09-05, after their stale trio
+(~250KB, ~6,800 lines, 14 modules) and a badge that had drifted twice were corrected.
+They are the highest-traffic surface in the repo, so they are the ones this guard most
+needs to own.
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -24,7 +27,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "mcptoon"
 
 # Files whose claims this guard owns.
-COVERED = ("DEVELOPERS.md", "docs/comparison.md", "docs/tiktoken-benchmarks.md")
+COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md",
+           "docs/tiktoken-benchmarks.md")
 
 # Sizes once written down that are wrong now. A doc may not resurrect them.
 RETIRED_KB = ("50KB", "200KB", "250KB")
@@ -61,7 +65,8 @@ class TestFootprintClaims(unittest.TestCase):
     def test_the_current_wheel_size_is_stated_where_it_matters(self):
         """The live pages must carry the number that is true, not merely lack the old
         wrong ones - otherwise a later edit can delete the claim and pass quietly."""
-        for rel in ("docs/comparison.md", "docs/tiktoken-benchmarks.md"):
+        for rel in ("README.md", "README.zh-CN.md", "docs/comparison.md",
+                    "docs/tiktoken-benchmarks.md"):
             self.assertIn(WHEEL_KB, self.texts[rel], f"{rel} no longer states the {WHEEL_KB} wheel")
 
     def test_module_count_claims_match_the_tree(self):
@@ -87,6 +92,20 @@ class TestFootprintClaims(unittest.TestCase):
                     msg=(f"{rel} claims {n:,} lines; src/mcptoon/*.py is {self.lines:,} "
                          "physical lines"))
         self.assertGreater(seen, 0, "no line-count claim found - did the wording change?")
+
+    def test_test_count_badge_has_not_drifted(self):
+        """`Tests-<n> passed` drifted 694 -> 703 -> 713 unnoticed, and this guard's own
+        author then wrote 736 when the truth was 737. A stale badge is a stale claim, so
+        the number is compared against collection rather than against someone's memory.
+        The gap allows only what skipped tests can explain."""
+        proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
+                              capture_output=True, text=True, cwd=ROOT)
+        collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
+        self.assertGreater(collected, 500, "collection failed - the badge cannot be judged")
+        for rel in ("README.md", "README.zh-CN.md"):
+            for n in re.findall(r"Tests-(\d+)%20passed", self.texts[rel]):
+                self.assertTrue(collected - 5 <= int(n) <= collected,
+                                f"{rel} badge says {n} but {collected} tests are collected")
 
     def test_no_page_links_a_file_that_does_not_exist(self):
         """comparison.html advertised a companion page that was never written."""

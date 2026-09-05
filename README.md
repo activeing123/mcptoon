@@ -1,66 +1,53 @@
+<!-- mcp-name: io.github.activeing123/mcptoon -->
 <div align="center" markdown="1">
 
-# mcptoon — Cross-Agent MCP Management Tool
+# mcptoon — MCP tool discovery that costs 114 tokens, not 14,113
 
-<!-- mcp-name: io.github.activeing123/mcptoon -->
+**You added a few MCP servers and your agent got worse: slower, more forgetful, more
+likely to answer the wrong question. That is not the model. Every MCP tool ships a
+full JSON Schema, and your agent must read all of them before it is allowed to pick
+one.**
 
-## **Listing 255 MCP tools costs 71,929 tokens. mcptoon's name index: 581.**
+**Fifty tools is 14,113 tokens — 11% of a 128K context window, gone before you type a
+word. mcptoon sends the names instead: 114 tokens, same tools, −99.2%. At 255 tools it
+is 71,929 → 581, over half your window, and on agentic usage that is $25 to $128 a
+month spent reading manuals.**
 
-*tiktoken cl100k_base measured · reproduce it on your own setup: `scripts/bench_tokens.py` (repo script, needs `pip install tiktoken`)*
+*Both rows are measured configs, not extrapolations (tiktoken `cl100k_base`,
+`assets/benchmark_tiktoken.json`). Your mix will differ —
+[work out your own number in the browser](https://activeing123.github.io/mcptoon/tools/token-tax/),
+30 seconds and nothing is uploaded; or measure it exactly with
+`python scripts/bench_tokens.py` from a clone (it lives in the repo, not in the wheel).*
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="860" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/hero-powerstrip-en.svg" width="820" alt="mcptoon power strip: plug your MCP tools in once, and Claude, Cursor, Codex or any agent can use them — no config, no restarts">
 </p>
 
-> ✅ **Speaks the latest MCP spec (2026-07-28)** — stateless auto-negotiation,
-> structured output parsed natively, MRTR multi round-trips, `server/discover`
-> probing for new-spec servers with full backward compatibility.
-
-> 🧩 **Agent Plugins Specification 1.0.0 compatible** — scan, install and sync
-> the new cross-vendor plugin standard (Amazon / Cursor / Microsoft / OpenAI /
-> Vercel) into **every** AI agent with one command:
-> `mcptoon plugin install <dir>` — including agents that have no native
-> plugin loader.
-
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-703%20passed-brightgreen)](#for-developers)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28_compat-blueviolet)](#mcp-spec-compatibility-2026-07-28)
-[![Agent Plugins](https://img.shields.io/badge/Agent_Plugins-1.0.0_compat-9146FF)](https://agent-plugins.org/specification)
-[![Dependencies](https://img.shields.io/badge/Dependencies-ZERO-orange)](#honest-limitations)
+[![Tests](https://img.shields.io/badge/Tests-738%20passed-brightgreen)](#for-developers)
+[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](#mcp-spec-compatibility-2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
-[中文文档](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Changelog](https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md) · [Report an issue](https://github.com/activeing123/mcptoon/issues)
+[中文文档](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) ·
+[DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) ·
+[Changelog](https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md) ·
+[Issues](https://github.com/activeing123/mcptoon/issues)
 
-### The token tax nobody sees
+</div>
 
-Connect 5 MCP servers and listing their tools burns **~10,000 tokens** of pure
-JSON syntax. Twenty tool calls add 40,000-70,000 more — brackets, quotes and
-schema declarations, not thinking. On a 128K context that's **30-55% gone**
-before the agent starts working. mcptoon replaces the dump with a name index,
-measured with tiktoken cl100k_base:
+---
 
-| Tool listing (255 tools) | tokens | vs raw JSON |
-|---|---:|---:|
-| Raw JSON schemas | 71,929 | — |
-| `--slim` (names + parameter types) | 8,282 | −88.5% |
-| `--compact` (names only) | 581 | **−99.2%** |
-
-## ⚡ 3 steps, any OS — no configuration
+## Install once, every agent works
 
 ```bash
-# 1 · install (or the one-liners below)
-pip install mcptoon
+pip install mcptoon          # pure stdlib, 128KB wheel, zero dependencies
 
-# 2 · plug in — auto-discovers tools you already configured
-mcptoon quickstart
-
-# 3 · see it work on your own machine — no trust required
-mcptoon demo
+mcptoon quickstart           # finds the MCP servers you already configured
+mcptoon demo                 # live before/after on your own machine
 ```
 
-One-line install (no Python wrangling — script handles everything):
+No Python wrangling? One line, script handles the rest:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.sh | bash
@@ -70,302 +57,229 @@ curl -fsSL https://raw.githubusercontent.com/activeing123/mcptoon/main/install.s
 irm https://raw.githubusercontent.com/activeing123/mcptoon/main/install.ps1 | iex
 ```
 
-> `mcptoon demo` runs a live comparison **on your machine**: watch the tool list
-> shrink from thousands of tokens to a name index — then decide.
-
-<p align="center"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-en.gif" width="720" alt="mcptoon demo: pip install, run the zero-config demo, watch 255 tools collapse from 71,929 tokens to 581"></p>
-
 <p align="center">
-  <a href="https://github.com/activeing123/mcptoon/blob/main/assets/promo-en.mp4"><img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/promo-en.gif" width="640" alt="39-second animated tour of mcptoon: a magical tool that changes how you use Agents"></a>
-  <br>
-  <sub>🎬 <b>mcptoon in 39 seconds</b> — the hook, the pain, install once, auto-discover, the token math, and the safety net · click for HD</sub>
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/demo-en.gif" width="700" alt="mcptoon demo: pip install, run the zero-config demo, watch the tool list collapse from a schema dump to a name index">
 </p>
 
-```bash
-pip install mcptoon        # pure stdlib, ~250KB, no deps
-
-mcptoon quickstart         # finds servers you already configured, lists their tools
-mcptoon demo               # live side-by-side: JSON vs mcptoon, real token counts
-```
-
-99.2% fewer tokens · Windows / macOS / Linux · Free & open source (Apache-2.0)
-
-</div>
+Windows · macOS · Linux · Python 3.10+ · Apache-2.0
 
 ---
 
-## 🗺️ Runtime architecture (interactive)
+## What it does
 
-Below is the mcptoon runtime architecture diagram (generated from the real source;
-nodes carry `SRC n` links back to verified code evidence). Click the preview to open
-the interactive version: search nodes, trace call paths, compare semantic roles,
-toggle light/dark themes, and export.
+Every MCP tool ships with an instruction sheet: its name, what it does, every
+parameter it accepts and what each of those allows. Before your agent can pick a
+tool, it has to read all of them — every session, in every agent, before any work
+starts. That reading is what fills up its context window and makes an agent slow and
+forgetful.
 
-[![mcptoon runtime architecture demo](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/architecture-en-demo.gif)](https://github.com/activeing123/mcptoon/blob/main/assets/architecture-en.html)
+| | Without mcptoon | With mcptoon |
+|---|---|---|
+| Finding a tool | reads every instruction sheet | reads a list of names |
+| Adding a server | edit each agent's JSON, restart | `mcptoon sync`, no restart |
+| Multiple agents | one config file per format | one source of truth, synced |
+| Dead servers | discovered at call time | `mcptoon health`, CI exit codes |
 
----
-
-## ⚡ Get it in 30 seconds (beginner entrance)
-
-mcptoon is a cross-agent MCP management tool. Install it once, and every agent —
-Claude Code, Cursor, Codex — works with all your tools out of the box.
-
-| Before | With mcptoon |
-|--------|--------------|
-| Configure MCP for every agent separately, waste time on mistakes | Plug each tool in once, every agent uses it |
-| Restart after every change, still get it wrong | Works immediately, no restarts |
-| Lose track of which agent has which tools | `quickstart` auto-discovers what you already have |
-| Change a tool, edit every agent | Change once, effective everywhere |
-
-**3 steps to install (no coding needed):**
-
-1. Install Python from [python.org](https://www.python.org) — check "Add Python to PATH"
-2. Copy, paste, Enter: `pip install mcptoon`
-3. One command: `mcptoon quickstart`, then `mcptoon demo` and watch it save tokens on your machine
-
-Technical version in one sentence: mcptoon is a zero-dependency CLI that connects any
-agent to every Model Context Protocol server — whether or not the agent supports MCP.
+In protocol terms: "instruction sheet" is a JSON Schema, and "list of names" is a name
+index. mcptoon is a zero-dependency CLI that connects any agent to every Model Context
+Protocol server — including agents that don't support MCP.
 
 ---
 
-## 🛠 Evaluate it in 30 seconds (technician entrance)
+## It's a dial, not a switch
 
-Architecture in one line: `~/.mcptoon/config.json` is the single source of truth;
-`sync` writes it into every agent, `manifest` serves a name index on demand,
-`serve` composes a single-entry proxy. Zero third-party dependencies, Python 3.10+,
-~6,800 lines of pure stdlib.
+How much of that reading your agent does is a choice you make per call. Both columns
+are measured configs, not one number scaled up and down:
 
-### The part nobody else has: agents need zero setup
+| Rung | What your agent reads | 50 tools | 255 tools | What you give up |
+|---|---|---:|---:|---|
+| default | every tool's full JSON Schema | 14,113 | 71,929 | nothing — this is the bill you pay today |
+| `--slim` | names + parameter types | 1,624 | 8,282 | descriptions and constraints |
+| `--compact` | just the names | **114** | **581** | everything but the names |
 
-Native MCP means editing a JSON file for every agent, in every format:
+The saving does not evaporate as you grow: `--slim` is −88.5% and `--compact` −99.2%, at
+both sizes, measured. What
+grows is the stake: 11% of a 128K window at fifty tools, 56% at two hundred and
+fifty. And the listing is re-sent by every fresh agent, so at 20 listings a day and
+$3 per million input tokens, the reading alone costs **$25 a month** on the small
+setup and **$128** on the big one.
 
-| Agent | Config file |
-|-------|-------------|
-| Claude Desktop | `claude_desktop_config.json` |
-| Claude Code | `.claude.json` |
-| Cursor | `.cursor/mcp.json` |
-| Cline / Windsurf / VS Code Copilot | various JSON, various shapes |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings-en.svg" width="700" alt="Bar chart on one 255-tool config: raw JSON schemas 71,929 tokens, slim 8,282, compact 581">
+</p>
 
-Add a server in Cursor, forget Claude. Fix a path in Claude, break Cursor. Repeat weekly.
-Proxy tools mean running a service and pointing each agent at it.
+The instruction sheets stay on disk in `~/.mcptoon/config.json`; your agent never
+reads one unless it asks for it. That is the whole trick, and it is why this is not
+compression: a compressor ships the full payload into the window and unpacks it
+later, so the cost still lands there. mcptoon never sends it. `--json` is always
+there when you want the complete schemas back.
 
-mcptoon needs neither. It is a program your agent already knows how to run:
+**Need the real instruction sheets and still want them cheap?** `mcptoon serve`
+returns *simplified but valid* JSON Schemas — `type`, `properties`, `required` and a
+one-line description survive, so any MCP client can still call the tool correctly;
+`examples`, `$ref`, `format`, `pattern` and the 500-word descriptions are stripped,
+and argument validation against the **full** schema happens in mcptoon before the
+call is routed. How much that saves depends on how verbose your servers' descriptions
+are — measure it on your own config rather than trusting a number.
 
-```text
-You:    "What tools do we have? Then fetch https://example.com and summarize."
-Agent:  $ mcptoon manifest --compact        ← gets a name index, not schemas
-Agent:  $ mcptoon call fetch fetch '{"url":"https://example.com"}'
-```
+> **On the numbers.** Earlier releases of this README advertised 97%, then 99.8% at
+> 123 tokens. Both were wrong: the 123 was a 30-entry truncation artifact in our own
+> benchmark harness, not a full name index. The figures above are the corrected,
+> reproducible ones, and they came from our own audit (commit `9760bbc`), not from a
+> reader — which is why the fix ships with tests that go red if a retired figure
+> reappears. If you find one we missed,
+> [open an issue](https://github.com/activeing123/mcptoon/issues).
 
-No `mcpServers` entry. No plugin API. Nothing to register, nothing to restart. Want it
-automatic? One line in your agent's instruction file (CLAUDE.md / AGENTS.md / system
-prompt) is enough — that is prompting, not configuration.
+---
 
-This is also why mcptoon reaches where MCP cannot: shell scripts, CI pipelines,
-cron jobs, aider, terminal-only environments — anything that can execute a command.
+## The three moves
 
-### The three moves
+**1 · `sync` — configure once**
 
-**1 · Configure once — `sync`**
 ```bash
 mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
-mcptoon sync                # writes native config to every detected agent
+mcptoon sync                 # writes native config to every detected agent
+mcptoon sync --watch         # keeps them aligned as you edit
+mcptoon sync --dry           # preview the writes
 ```
-Merges instead of overwriting — servers you configured manually stay put. One command
-gives you cross-agent tool management: a single source of truth for MCP servers across
-every agent on the machine, no copy-pasting JSON between Cursor, Claude and friends.
 
-```bash
-mcptoon sync --watch        # polls config files, keeps every agent aligned
-mcptoon sync --dry          # preview the writes
-mcptoon sync --agent cursor # target one agent
-```
-Drift detection catches external edits; merge/strict modes.
+Merges rather than overwrites: servers you configured by hand stay put. Drift
+detection catches edits made outside mcptoon.
 
-**2 · Pay for names, not schemas — `manifest`**
-
-Your agent asks "what tools exist?" mcptoon answers with a name index. Schemas stay on
-disk in `~/.mcptoon/config.json` and never enter the context.
+**2 · `manifest` — a list of names, not a stack of manuals**
 
 ```bash
 $ mcptoon manifest --compact
-fetch: fetch · github: search_repos, get_file, create_issue · sqlite: query, execute
+bsk-tools: resolve, map_list, map_get · echo: echo, add, delete_item
 ```
 
-![Token savings measured: 255 tools drop from 71,929 tokens to 581](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings-en.svg)
+Real output, real config. Your agent gets the list of what exists; the definitions
+stay on disk until it asks for one.
 
-| Tool listing (tiktoken cl100k_base) | tokens | vs raw JSON |
-|-------------------------------------|-------:|------------:|
-| Raw JSON schemas, 255 tools         | 71,929 | — |
-| `--slim` (names + parameter types)  |  8,282 | −88.5% |
-| `--compact` (names only)            |    581 | **−99.2%** |
-
-<sub>Measured with tiktoken cl100k_base over a real-world 255-tool config (50 MCP servers).
-Your mix will differ: `python scripts/bench_tokens.py` measures your own config the same way. It lives in this repository rather than in the wheel, so run it from a clone.
-71,929 tokens is roughly a 300-page book; 581 tokens is a paragraph.</sub>
-
-<sub>Not sure what your own mix costs? <a href="https://activeing123.github.io/mcptoon/tools/token-tax/">The context-tax calculator</a> estimates it in 30 seconds, entirely in your browser — nothing is uploaded.</sub>
-
-It is a dial, not a switch: `--json` is always available for zero ambiguity, and `call`
-results default to plain text, security-checked. Choosing between approaches?
-[docs/comparison.md](https://github.com/activeing123/mcptoon/blob/main/docs/comparison.md) breaks down setup cost, token cost and safety.
-
-**3 · One door in front of every server — `serve`**
-
-Point your agent at a single entry instead of N servers:
-
-```json
-"mcptoon": { "command": "mcptoon", "args": ["serve"] }
-```
+**3 · `serve` — one door in front of every server**
 
 ```bash
-mcptoon serve                  # stdio — one agent
-mcptoon serve --listen :8080   # HTTP — multiple agents, remote machines
+mcptoon serve                  # stdio, one agent
+mcptoon serve --listen :8080   # HTTP, many agents or remote
 ```
 
-### Concurrency & stability
+Every configured server appears as one MCP endpoint, with connection pooling and
+per-agent API-key isolation.
 
-- **Parallel discovery**: 20 workers load the manifest; 100 servers in ≈5s (serial: 500s)
-- **5-minute schema cache**: repeated discovery costs nothing
-- **30s timeout per call** (`MCPTOON_CALL_TIMEOUT`): one hung server cannot stall your session
-- **Multiple agents at once**: HTTP mode isolates concurrent requests per thread
-- **Concurrency-safe accounting**: usage log uses thread locks + atomic writes
+**And the part nobody else has: agents need zero setup.** Native MCP means editing
+a JSON file per agent, in a different shape each time — `claude_desktop_config.json`,
+`.claude.json`, `.cursor/mcp.json`, and so on. mcptoon is a program your agent already
+knows how to run:
+
+```text
+You:    "What tools do we have? Then fetch https://example.com and summarize."
+Agent:  $ mcptoon manifest --compact
+Agent:  $ mcptoon call fetch fetch '{"url":"https://example.com"}'
+```
+
+No `mcpServers` entry, no plugin API, nothing to restart. That is also why mcptoon
+reaches where MCP cannot: shell scripts, CI pipelines, cron jobs, aider, and
+terminal-only environments — anything that can execute a command.
+
+---
+
+## Why a CLI, not a library or a proxy
+
+MCP assumes every capability is a *server* your agent must be configured to reach.
+That single assumption is why adding one tool means editing one JSON file per agent,
+in a different shape each time, and restarting all of them — and why every agent
+re-pays the full schema cost before it does anything.
+
+A command line is the one interface every agent already has. Models are trained on
+billions of CLI examples; they don't need to be taught how to run `mcptoon`. And the
+form factor is measurably cheaper, independent of anything mcptoon does:
+
+- Firecrawl's benchmark: the same task cost **1,365 tokens via CLI vs 44,026 via MCP — 32×** ([source](https://www.firecrawl.dev/blog/mcp-vs-cli))
+- Scalekit's benchmark: CLI **10–32× cheaper, 100% reliable vs MCP's 72%** ([source](https://www.scalekit.com/blog/mcp-vs-cli-use))
+
+**Why not a library?** A library needs a host process that imports it, in a language
+that host speaks. A CLI needs a shell — which is the one thing every agent, CI runner
+and cron job already has.
+
+**Why not a proxy?** A proxy is another service to run and point agents at. mcptoon is
+zero-install-to-try and stays out of the way; when you *do* want the proxy shape,
+`mcptoon serve` is that mode.
+
+---
+
+## Why this is a real problem (not our own claim)
+
+Independent sources, each verified against the page it comes from:
+
+| Source | What it actually says |
+|---|---|
+| [Anthropic — Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) | "reduces the token usage from 150,000 tokens to 2,000 tokens — a time and cost saving of 98.7%" |
+| [Firecrawl — MCP vs CLI](https://www.firecrawl.dev/blog/mcp-vs-cli) | "~200 tokens per command" via CLI vs "~44K tokens (full schema loaded upfront)" via MCP |
+| [Scalekit](https://www.scalekit.com/blog/mcp-vs-cli-use) | "CLI won on every efficiency metric — 10 to 32× cheaper, 100% reliable versus MCP's 72%" |
+| [MCP-Zero (arXiv:2506.01056)](https://arxiv.org/abs/2506.01056) | On-demand tool retrieval achieves near-constant cost regardless of tool count |
+| [ProMCP — ACL 2026 Findings](https://doi.org/10.18653/v1/2026.findings-acl.1967) | Peer-reviewed profiling of token flows and latency costs in MCP-based agents |
+| [SEP-1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | An open MCP proposal to reduce schema redundancy — the problem is acknowledged upstream |
+
+We are not the only ones who measured this, and the protocol's own working group is
+now proposing fixes for it. mcptoon is available today, in every agent at once,
+without waiting for that proposal to land.
+
+---
 
 ## MCP spec compatibility (2026-07-28)
 
-mcptoon 0.7.0 speaks the **latest MCP specification, [2026-07-28](https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28)** —
-the stateless revision — while staying fully compatible with every older server:
+| Spec feature | Status |
+|---|---|
+| Stateless auto-negotiation | ✅ |
+| Structured tool output | ✅ parsed natively |
+| MRTR multi round-trip results | ✅ |
+| `server/discover` probing | ✅ |
+| Long-polling SSE responses | ✅ |
+| Backward compatibility (2024-10-07 → 2025-11-25) | ✅ |
 
-| MCP revision | mcptoon support |
-|------------------|-----------------|
-| **2026-07-28** (latest — stateless) | ✅ `server/discover` auto-negotiation · per-request `_meta` protocol annotation · `Mcp-Method`/`Mcp-Name` HTTP headers · MRTR multi round-trip (`resultType: "input_required"` → answer and retry with `--input-responses`) |
-| 2025-11-25 / 2025-06-18 | ✅ classic `initialize` handshake · structured output (`structuredContent`) parsed natively · `--envelope` passthrough |
-| 2025-03-26 / 2024-11-05 (old servers) | ✅ unchanged behavior, full backward compatibility |
+Spec releases are treated as a compatibility matrix, not a changelog: each one lands
+with wire-level tests against a real server. See
+[DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-Version selection is automatic (`spec="auto"`): the client probes with
-`server/discover` and silently falls back to the legacy handshake when the
-server predates it. Pin a mode per server with `spec: "legacy"` or
-`spec: "2026-07-28"` in `~/.mcptoon/config.json`.
+## Agent Plugins 1.0.0
 
-```bash
-mcptoon call db query '{"sql":"SELECT 1"}' --envelope   # complete MCP result envelope as JSON
-mcptoon call deploy run '{}' --input-responses '{"env":"prod"}'   # MRTR retry (2026-07-28)
-```
+Scan, install and sync the cross-vendor plugin standard (Amazon / Cursor / Microsoft /
+OpenAI / Vercel) into every agent with `mcptoon plugin install <dir>` — including
+agents with no native plugin loader.
 
-No flags needed for everyday use: when a new-spec server returns structured output,
-mcptoon picks it up automatically. `--envelope` is there when an agent needs the raw
-protocol payload (audit, debugging, `_meta` inspection).
+## Security, applied to every call
 
-## Agent Plugins support (1.0.0)
-
-The [Agent Plugins Specification](https://agent-plugins.org/specification) v1.0.0
-(vendor-backed by Amazon, Cursor, Microsoft, OpenAI and Vercel) defines how an AI
-agent plugin is **packaged** — a folder with `plugin.json` + `skills/` + `mcp.json`.
-It deliberately does **not** define installation, distribution or cross-agent sync.
-That is mcptoon's home turf:
-
-```bash
-mcptoon plugin scan <dir>        # validate a plugin package (read-only)
-mcptoon plugin install <dir>     # install into mcptoon + every synced agent
-mcptoon plugin list              # what is installed
-mcptoon plugin remove <name>     # remove everywhere (data dir is kept)
-```
-
-- **Strict spec validation** — closed manifest schema, single-token commands,
-  HTTPS-only non-loopback URLs, no credentials in headers, path-escape checks.
-- **`${PLUGIN_ROOT}` / `${PLUGIN_DATA}` pre-expanded** — mcptoon is the installer,
-  so it writes absolute paths into every agent's native config itself; agents need
-  no plugin-loader support at all.
-- **Namespaced servers** — `plugin:server` keys keep plugins collision-free, and
-  removal cleans every agent config it reached.
-- **Persistent data** — `~/.mcptoon/plugins-data/<name>/` survives upgrades (spec
-  §PLUGIN_DATA), so caches and state never vanish on `--force`.
-- Plugins land in the same `~/.mcptoon/config.json` as every other server, so
-  `manifest`, `call`, `serve`, `health` and the 99.2% token savings apply to them
-  automatically.
-
-### Everything else in the box
-
-| Command | What it does |
-|---------|--------------|
-| `mcptoon sync --watch` | Poll configs, re-sync MCP servers across agents continuously |
-| `mcptoon call <server> <tool> '{…}'` | Call any tool on any server |
-| `mcptoon call <server> <tool> --envelope` | Return the complete MCP result envelope (structuredContent, _meta) |
-| `mcptoon call --auto <tool> '{…}'` | Route by tool name, server found for you |
-| `mcptoon plugin install <dir>` | Install an Agent Plugin into every agent (spec 1.0.0) |
-| `mcptoon health` | Which servers are alive, dead, and how fast — exits 1 in CI if anything is dead |
-| `mcptoon install <name> --npm <pkg>` | Install a server, auto-discover tools |
-| `mcptoon search <query>` | Fuzzy search across every tool you have |
-| `mcptoon doctor` | Self-diagnose Python, config, connectivity |
-
-Why `health` matters: a 2026 community audit found
-[52% of published MCP servers unreachable](https://www.163.com/dy/article/KSSN2L5E05561FZP.html).
-Configured ≠ alive.
-
-```text
-── mcptoon health: 3/5 alive ──────────────
-  ✓ fetch     [stdio]  1 tool     120ms  ok
-  ✗ brave     [stdio]  0 tools  10002ms  timeout → Timed out after 10s
-  ✓ github    [http]  12 tools    340ms  ok
-```
-
-**Under the hood**
-
-- **Errors that agents can act on** — every failure returns a structured envelope with a
-  fix suggestion ("server `fetchh` not found — did you mean `fetch`?"), so your agent
-  self-corrects instead of stalling until you rescue it
-- **Continuous sync (`--watch`)** — drift detection with merge/strict modes
-- **Cross-server fuzzy search** — relevance scoring across every configured server
-- **Shell completions** — bash, zsh, fish and PowerShell
-- **JSON or TOML config** — both live in `~/.mcptoon/`
-- **Local usage log** — which tools were called when; the record never leaves your machine
-
-### Security, applied to every call
-
-Supply-chain safety comes free with zero dependencies: no npm subtree, no postinstall
-scripts, nothing to audit but ~6,800 lines of readable Python.
-
-MCP servers run code on your machine and return arbitrary text into your agent's context.
-mcptoon inspects every result before it gets there:
+MCP servers run code on your machine and return arbitrary text into your agent's
+context. mcptoon inspects every result before it gets there:
 
 | Check | Blocks |
-|-------|--------|
+|---|---|
 | Prompt injection | `"ignore previous instructions"` buried in tool output |
 | Credential leak | `sk-…`, `AKIA…`, `ghp_…` patterns in tool output |
-| Dangerous operations | `delete` / `drop` / `purge` tool names unless you pass `--destructive` |
+| Dangerous operations | `delete` / `drop` / `purge` tools unless you pass `--destructive` |
 
-No telemetry. No analytics. No phone-home. API keys pass through from your config or
-environment and are never stored by mcptoon.
+Zero dependencies is part of the security story: no npm subtree, no postinstall
+scripts, nothing to audit but 11,400 lines of readable Python. No telemetry, no
+analytics, no phone-home. API keys pass through from your config or environment and
+are never stored by mcptoon.
 
-### Academic & Industry Validation
+## Works with
 
-These independent sources validate the problem mcptoon solves:
+**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex ·
+Gemini CLI · OpenCode** — plus aider, shell scripts, CI jobs and anything else that
+executes commands, including environments with no MCP support at all.
 
-| Citation | Source | What it says |
-|----------|--------|--------------|
-| SEP-1576 | [modelcontextprotocol issue #1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) | Official MCP proposal for schema redundancy reduction + smarter tool selection |
-| Firecrawl Benchmark (2026) | [firecrawl.dev/blog/mcp-vs-cli](https://firecrawl.dev/blog/mcp-vs-cli) | Same tasks cost ~200 tokens via CLI vs ~44K via MCP — 4–32× more expensive |
-| Anthropic code-execution | [anthropic.com/engineering/code-execution-with-mcp](https://www.anthropic.com/engineering/code-execution-with-mcp) | Cuts context overhead up to 98.7% (150K→~2K tokens) |
-| MCP-Zero (Xiamen Univ. + USTC) | [arXiv:2506.01056](https://arxiv.org/abs/2506.01056) | On-demand tool retrieval achieves constant cost regardless of tool count |
-| ProMCP (ACL ARR 2026) | arXiv | Profiling token flows and latency of MCP agents |
-| Microsoft dynamic-tool-discovery | [Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery) | Dynamic tool discovery as the token-efficiency pattern |
-| Scalekit (2026) | [scalekit.com/blog/mcp-vs-cli-use](https://scalekit.com/blog/mcp-vs-cli-use) | Confirms 32× token cost difference between MCP and CLI |
-
-### Works with
-
-**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot ·
-Codex · Gemini CLI · OpenCode** — plus aider, shell scripts, CI jobs and anything
-else that executes commands, including environments with no MCP support at all.
-That is what being a CLI first means.
+That last clause is the point: being a CLI first is what lets mcptoon work where an
+MCP client cannot.
 
 <details markdown="1">
-<summary><strong>How is this different from raw configs or tool-search proxies?</strong></summary>
+<summary><strong>How is this different from per-agent configs or a tool-search proxy?</strong></summary>
 
 | | Per-agent configs | Tool-search proxies | mcptoon |
 |---|---|---|---|
 | Agent-side setup | edit JSON per agent + restart | run a service, point agents at it | **none — it is just a command** |
 | Files to maintain | one per agent | one per agent | **one, synced everywhere** |
-| Discovery cost | full schemas | search first, load on demand | **name index, schemas never leave disk** |
+| Discovery cost | full schemas | search first, load on demand | **name index; schemas never leave disk** |
 | Dead-server detection | — | varies | built-in, CI-friendly exit codes |
 | Output inspection | — | varies | injection + leak checks on every call |
 | To adopt | native support | run a service | `pip install mcptoon` |
@@ -374,39 +288,49 @@ They also compose: `serve` mode gives you the proxy shape when you want it.
 
 </details>
 
----
+## Questions worth asking
 
-## ❓ FAQ
+### Isn't this just compression?
+No. Compression ships the full payload into the context and unpacks it later, so the
+cost still lands in the window. mcptoon never sends the schemas: they stay on disk, and
+`--json` returns any one of them on demand.
+
+### Doesn't Claude Code already defer tool loading?
+Yes, and the two stack. Deferred loading decides *when* a definition loads, in one
+agent. mcptoon decides how much a listing *costs*, in every agent at once, and adds
+sync, health checks and output inspection on top.
+
+### Is the 99.2% a formatting trick?
+No `null` → `∅` substitutions. That misconception came from earlier TOON-style
+experiments, and those substitutions were removed in v0.3.0 after tiktoken proved two
+of them cost more than they saved. Optional `--toon` encoding of tool *results* saves a
+further ~34% and is off by default.
+
+### Why not just use fewer MCP servers?
+That is the trade MCP users make today: uninstall one to buy back room, reinstall it
+the week you need it. It works, and it is why the 50-tool column above matters more
+than the 255 one. mcptoon is what lets you keep all of them and still have a window
+left to work in.
+
+### Do I have to give it my API keys?
+No account, no telemetry, no phone-home. Keys pass through from your own config or
+environment and mcptoon never stores them. There is also very little to hide in: 11,400
+lines of stdlib Python, and zero third-party imports enforced at review.
+
+### What do I actually give up?
+At `--compact`, everything except tool names — your agent asks for a schema before it
+builds an argument. At `--slim`, descriptions and constraints. Both are per-call flags
+on one command, so this is a dial you set per agent, not a migration.
 
 <details markdown="1">
-<summary><strong>Frequently asked questions</strong></summary>
-
-**What is a cross-agent MCP management tool?**
-A tool that manages MCP server configuration across multiple AI agents. mcptoon is one open-source implementation: one config synced to every agent, no per-agent JSON editing, no resident proxy service.
-
-**How does mcptoon save tokens?**
-When an agent asks "what tools exist?" it gets a name index (581 tokens for 255 tools); full schemas stay on disk and never enter the context. 255 tools drop from 71,929 to 581 — a 99.2% saving.
-
-**Isn't this just compression?**
-No. Compression ships the full payload into context and unpacks it later — the cost still lands in the window eventually. mcptoon keeps schemas on disk; they never enter the context at all.
-
-**Claude Code already defers MCP tool loading — isn't this redundant?**
-No. Deferred loading decides *when* definitions load. mcptoon decides how much a listing *costs*, in every agent at once, and adds sync, health, and security on top. They stack fine together.
-
-**Why a CLI instead of a library or proxy?**
-Because the shell is the one interface every agent already speaks. No plugin API, no SDK, no per-agent config file, no service to keep alive — and agents that don't support MCP at all can still drive every MCP server through it. Prefer long-lived connections? `mcptoon serve` is the same tool in proxy form.
-
-**Are the savings from tricks like replacing `null` with symbols?**
-No — that misconception comes from earlier TOON-style experiments. The headline number comes from architecture: full schemas simply aren't sent. Optional `--toon` encoding of tool *results* saves a further ~30–40%, and it is off by default.
-
-</details>
-
-<details markdown="1">
-<a id="honest-limitations"></a>
 <summary><strong>Honest limitations</strong></summary>
 
-- `--compact` lists tool **names only** — no descriptions or parameter details. Use `--slim` for signatures, `--json` for everything.
-- Token counts were measured with tiktoken `cl100k_base`. Other tokenizers differ (±10–25%); the main saving — schemas not entering context — is tokenizer-independent.
+- `--compact` lists tool **names only** — no descriptions or parameter details. Use
+  `--slim` for signatures, `--json` for everything.
+- Token counts were measured with tiktoken `cl100k_base`. Other tokenizers differ
+  (±10–25%); the main saving — schemas not entering context — is tokenizer-independent.
+- Percentages depend on your toolset — small configs amortise worse. On a 12-tool
+  config we measure −96.1%, not −99.2%.
 - Each stdio call spawns a process (~300 ms cold). Hot paths should use `serve` mode.
 - Terminal-first. There is no GUI.
 
@@ -414,9 +338,7 @@ No — that misconception comes from earlier TOON-style experiments. The headlin
 
 ---
 
-<a id="for-developers"></a>
-
-## 👨‍💻 For developers
+## For developers
 
 ```python
 from mcptoon.client import MCPClient
@@ -429,21 +351,24 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 703 tests, green expected
-docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
+python -m pytest tests/ -v          # 738 passed, 1 skipped
 ```
 
-Zero third-party imports is a hard rule enforced in review. New features need tests.
-~6,800 lines of Python across 14 modules — see [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md).
+Zero third-party imports is a hard rule enforced in review; new behavior ships with
+tests. 11,400 lines of Python across 21 modules — see
+[CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md).
 
 ## License
 
-Apache 2.0 — see [LICENSE](https://github.com/activeing123/mcptoon/blob/main/LICENSE) and [NOTICE](https://github.com/activeing123/mcptoon/blob/main/NOTICE).
+Apache 2.0 — see [LICENSE](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
+and [NOTICE](https://github.com/activeing123/mcptoon/blob/main/NOTICE).
 
 <div align="center" markdown="1">
 
 *Independent third-party client for the Model Context Protocol. Not affiliated with Anthropic, Cursor, or Microsoft.*
 
-**If mcptoon saved you tokens today, a ⭐ helps other people find it.**
+**Skeptical? Good. `pip install mcptoon && mcptoon demo` takes 30 seconds and runs on your machine.**
+
+<sub>A ⭐ is how the next person finds this README.</sub>
 
 </div>
