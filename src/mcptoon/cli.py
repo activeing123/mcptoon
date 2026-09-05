@@ -81,12 +81,50 @@ from .router import call_tool
 from .errors import is_error
 
 
+# Every long option this CLI implements, global or per-subcommand.
+# tests/test_cli_flags.py fails if one appears in this file but is missing from
+# the set, so the list cannot silently drift from reality.
+KNOWN_FLAGS = frozenset(
+    {
+        "--agent", "--auto", "--compact", "--destructive", "--dry", "--dry-run",
+        "--envelope", "--fallback-json", "--force", "--format", "--full", "--head",
+        "--header", "--health", "--help", "--http", "--input-responses", "--interval",
+        "--json", "--list", "--listen", "--max-chars", "--mcptoon", "--no-configs",
+        "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
+        "--quiet", "--raw", "--remove", "--request-state", "--search", "--slim",
+        "--stdin", "--stdio", "--timeout", "--toon", "--url", "--version", "--watch",
+        "--watch-mode", "--write",
+    }
+)
+
+
+def unknown_flag_warnings(args):
+    """Return the long options in args that mcptoon does not implement.
+
+    Unknown options used to be dropped silently, which let a flag that never
+    existed ("--tokens") sit in the README as the documented way to reproduce
+    the token numbers. Callers print a warning; the token is still passed
+    through so subcommand behaviour does not change.
+    """
+    found = []
+    for a in args:
+        if a.startswith("--"):
+            base = a.split("=", 1)[0]
+            if base not in KNOWN_FLAGS:
+                found.append(base)
+    return found
+
+
 def main():
     args = sys.argv[1:]
 
     if not args:
         _print_help()
         sys.exit(0)
+
+    if args[0] in ("--version", "-V"):
+        print(f"mcptoon {__import__('mcptoon').__version__}")
+        return
 
     # ─── Parse global output flags ───
     fmt = "auto"
@@ -147,6 +185,11 @@ def main():
         elif a.startswith("--format="):
             export_format = a.split("=", 1)[1]
         else:
+            for bad in unknown_flag_warnings([a]):
+                print(
+                    f"mcptoon: unknown option '{bad}' ignored - see 'mcptoon --help'",
+                    file=sys.stderr,
+                )
             cmd_args.append(a)
         i += 1
 
@@ -1767,6 +1810,7 @@ Usage:
 
     mcptoon serve                        Run as MCP server (stdio bridge for agents)
     mcptoon demo                         Zero-config one-command demo
+    mcptoon --version                    Print the installed version and exit
     mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
     mcptoon sync --dry                   Preview without writing
     mcptoon sync --agent <id>            Sync to one agent only
