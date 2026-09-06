@@ -4,7 +4,7 @@
 
 **Full name:** Token-Oriented Object Notation
 
-**Purpose:** A token-efficient serialization format for LLM contexts. 30-60% fewer tokens than JSON (tiktoken-verified, cl100k_base).
+**Purpose:** A token-efficient serialization format for LLM contexts. ~34% fewer tokens than JSON (measured with tiktoken, cl100k_base; see `assets/benchmark_tiktoken.json`).
 
 ---
 
@@ -166,16 +166,16 @@ Strings that don't contain structural characters are emitted unquoted — this i
 
 ## 8. Token Comparison (tiktoken cl100k_base)
 
-255 MCP tool schemas, 5 real servers:
+Canonical measurement — 255 MCP tool schemas (Sample B, `assets/benchmark_tiktoken.json`):
 
 | Format | Tokens | Savings vs JSON |
 |--------|--------|-----------------|
-| JSON (full schemas) | 39,964 | — |
-| TOON (this spec) | ~20,000 | ~50% |
-| SLIM (mcptoon-specific) | 3,511 | 91% |
-| Compact (names only) | 581 | 98.5% |
+| JSON (full schemas) | 71,929 | — |
+| TOON (this spec) | 47,438 | −34.1% |
+| SLIM (mcptoon-specific) | 8,282 | −88.5% |
+| Compact (names only) | 581 | −99.2% |
 
-Reproduce: `python _benchmark.py` → `assets/benchmark_data.json`
+Reproduce: `python scripts/bench_tokens.py` → `assets/benchmark_tiktoken.json`
 
 ---
 

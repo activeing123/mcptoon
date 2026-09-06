@@ -22,7 +22,7 @@ not 100 individual servers.
   Agent  ←→  mcptoon serve (stdio)  ←→  MCP server 1, 2, ... N
 
 Key behaviors:
-  - tools/list: returns simplified schemas (80-90% fewer tokens, ADR 0006)
+  - tools/list: returns simplified schemas (fewer tokens, ADR 0006)
   - tools/call: routes to underlying server, validates args with full schema,
     applies safety checks, compresses output
   - Tool names: {server}_{tool} namespaced (ADR 0007)
@@ -457,7 +457,7 @@ class MCPServerBridge:
         """Return simplified tool list (ADR 0006 — layered schema return).
 
         Each tool name is namespaced: {server}_{tool} (ADR 0007).
-        Schemas are simplified to 80-90% fewer tokens.
+        Schemas are simplified to fewer tokens (measured per-setup; see schema_simplifier).
         Thread-safe: reads from _tool_index under RLock.
         """
         self._ensure_initialized()

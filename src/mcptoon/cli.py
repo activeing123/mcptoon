@@ -57,7 +57,7 @@ Usage:
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags (global):
-    --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
+    --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens, round-trip safe)
     --slim         Ultra-compact tool manifests (88.5% savings, tiktoken-measured)
     --json         JSON output
@@ -1818,7 +1818,7 @@ Usage:
     mcptoon health --json                JSON output for CI/CD (exit 1 if dead)
 
 Output flags:
-    --toon         Standard TOON (toon-format/toon spec, saves 30-60% tokens)
+    --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
     --slim         Ultra-compact tool manifests (saves 88.5% tokens, measured)
     --json         JSON output

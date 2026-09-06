@@ -48,7 +48,7 @@ Standard TOON Format (toon-format/toon spec):
   Null: null
   Strings: no quotes needed (commas in values → quoted)
 
-  Token savings: 30-60% vs JSON (structural compression).
+  Token savings: ~34% vs JSON (measured, assets/benchmark_tiktoken.json).
   Round-trip safe: decode(encode(x)) == x.
 
   Example:
@@ -192,7 +192,7 @@ def toon_encode(obj) -> str:
 
     Uses vendored python-toon v0.1.1 encoder (MIT License, Xavi Vinaixa).
     Spec-compliant: passes official toon-format/toon test suite.
-    Token-efficient for LLMs: 30-60% fewer tokens than JSON.
+    Token-efficient for LLMs: ~34% fewer tokens than JSON (measured).
     Round-trip safe: decode(encode(x)) == x.
 
     >>> toon_encode({"name": "search", "count": 3})

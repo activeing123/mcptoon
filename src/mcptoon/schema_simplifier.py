@@ -16,7 +16,7 @@
 mcptoon schema_simplifier — Reduce MCP tool JSON schemas to compact form.
 
 Used by serve mode (ADR 0006): tools/list returns simplified schemas
-(80-90% fewer tokens) while call_tool validates with the full schema.
+(fewer tokens in tools/list) while call_tool validates with the full schema.
 
 Strategy:
   - Keep standard JSON Schema structure (type, properties, required)
@@ -114,7 +114,7 @@ def simplify_schema(full_schema: dict | None) -> dict:
         full_schema: The original JSON Schema from MCP server's tools/list
 
     Returns:
-        A simplified schema with 80-90% fewer tokens, but still valid
+        A simplified schema with fewer tokens, but still valid
         JSON Schema that agents (Claude Code, Cursor) can understand.
 
     Example:

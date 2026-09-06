@@ -58,7 +58,7 @@ Tool manifests can be huge. When calling mcptoon from a terminal, keep output
 small on purpose:
 
 ```bash
-mcptoon manifest --toon        # standard TOON format (30-60% saved)
+mcptoon manifest --toon        # standard TOON format (~34% saved)
 mcptoon manifest --slim        # ultra-compact schemas (93% saved)
 mcptoon manifest --compact     # names only (99.2% saved)
 mcptoon search <query>         # find a tool without dumping the whole manifest

@@ -1,41 +1,33 @@
 [
   {
     "tools": 5,
-    "json": 1897,
-    "toon": 1167,
-    "slim": 111,
-    "compact": 16,
-    "toon_save": 38.5,
-    "slim_save": 94.1,
-    "compact_save": 99.2,
-    "json_chars": 7591,
-    "toon_chars": 4670,
-    "slim_chars": 447
+    "json": 1519,
+    "toon": 1003,
+    "slim": 147,
+    "compact": 11,
+    "toon_save": 34.0,
+    "slim_save": 90.3,
+    "compact_save": 99.3,
+    "note": "Superseded legacy snapshot replaced 2026-09-06 with the canonical Sample B data (tiktoken cl100k_base). See assets/benchmark_tiktoken.json."
   },
   {
     "tools": 50,
-    "json": 17790,
-    "toon": 10688,
-    "slim": 1203,
-    "compact": 117,
-    "toon_save": 39.9,
-    "slim_save": 93.2,
-    "compact_save": 99.3,
-    "json_chars": 71162,
-    "toon_chars": 42755,
-    "slim_chars": 4814
+    "json": 14113,
+    "toon": 9287,
+    "slim": 1624,
+    "compact": 114,
+    "toon_save": 34.2,
+    "slim_save": 88.5,
+    "compact_save": 99.2
   },
   {
     "tools": 255,
-    "json": 90804,
-    "toon": 54649,
-    "slim": 6174,
-    "compact": 117,
-    "toon_save": 39.8,
-    "slim_save": 93.2,
-    "compact_save": 99.9,
-    "json_chars": 363216,
-    "toon_chars": 218597,
-    "slim_chars": 24697
+    "json": 71929,
+    "toon": 47438,
+    "slim": 8282,
+    "compact": 581,
+    "toon_save": 34.1,
+    "slim_save": 88.5,
+    "compact_save": 99.2
   }
 ]

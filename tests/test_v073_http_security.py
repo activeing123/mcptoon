@@ -100,7 +100,7 @@ class _HTTPServerMixin:
         )
 
     @staticmethod
-    def _do(req, attempts=4):
+    def _do(req, attempts=6):
         """Send a request, tolerating Winsock's early-abort of the connection.
 
         The auth tests deliberately talk to a server that answers 401 *before*
@@ -129,7 +129,7 @@ class _HTTPServerMixin:
                     raise
                 if attempt + 1 == attempts:
                     raise
-                time.sleep(0.05 * (attempt + 1))
+                time.sleep(0.1 * (attempt + 1))
 
 
 class TestBindDefaults(unittest.TestCase):

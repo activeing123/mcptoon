@@ -19,7 +19,7 @@ description: Search the web using MCP tools
 ## Execution
 
 ```bash
-# Discover available tools (97% smaller than JSON)
+# Discover available tools (99.2% smaller than native JSON schemas)
 mcptoon manifest --compact
 
 # Call a search tool
