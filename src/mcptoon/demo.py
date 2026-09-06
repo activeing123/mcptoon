@@ -118,6 +118,9 @@ def run_demo(args: list[str]):
     print()
     print("  📖 Docs: https://github.com/activeing123/mcptoon")
     print()
+    print("  ⭐ Found this useful? Star mcptoon on GitHub:")
+    print("     https://github.com/activeing123/mcptoon")
+    print()
 
 
 def _print_banner():

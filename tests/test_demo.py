@@ -188,5 +188,28 @@ class TestDemoCLIIntegration(unittest.TestCase):
         self.assertIn("Zero-config", result.stdout)
 
 
+class TestDemoStarCTA(unittest.TestCase):
+    """The demo should ask impressed users for a star (conversion loop)."""
+
+    def _run_captured(self) -> str:
+        with mock.patch("mcptoon.demo._check_prerequisites", return_value=True), \
+                mock.patch("mcptoon.demo._demo_call", return_value="Echo: hi"), \
+                mock.patch("mcptoon.demo._cleanup_demo"), \
+                mock.patch("sys.stdout", StringIO()) as out:
+            run_demo([])
+        return out.getvalue()
+
+    def test_star_cta_present(self):
+        """Successful demo output must include the star call-to-action."""
+        self.assertIn("Star mcptoon", self._run_captured())
+
+    def test_repo_url_in_cta(self):
+        """The star CTA must point at the canonical repo URL."""
+        self.assertIn(
+            "https://github.com/activeing123/mcptoon",
+            self._run_captured(),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
