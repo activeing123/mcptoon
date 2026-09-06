@@ -155,6 +155,23 @@ mcptoon manifest    # usable immediately
 
 ---
 
+## Prefer a GUI? ToonDeck
+
+Don't want to hand-edit configs? **[ToonDeck](https://github.com/activeing123/toondeck)**
+is a local console for mcptoon: every MCP server and tool in one place with a
+real health check, one skill folder synced to all your agents, agent launching
+with live logs, and API keys stored in your OS keychain — never in a plaintext
+file.
+
+```bash
+pip install toondeck    # ships the web UI inside the wheel — no node, no build
+```
+
+Pre-alpha; free (Apache-2.0). ToonDeck drives the engine — mcptoon stays the
+single source of truth underneath.
+
+---
+
 ## Works with every AI agent
 
 mcptoon is a CLI. **If your agent can run a shell command, it can use mcptoon.** No

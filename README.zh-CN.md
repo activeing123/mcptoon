@@ -135,6 +135,21 @@ mcptoon manifest    # 直接就能用
 
 ---
 
+## 想要图形界面？——ToonDeck
+
+不想手写配置？**[ToonDeck](https://github.com/activeing123/toondeck)**
+是 mcptoon 的本地控制台：所有 MCP 服务器和工具集中一屏，带真实健康检查；
+一套技能目录同步到你所有的 Agent；启动 Agent 并实时看日志；
+API 密钥存进系统钥匙串——绝不落明文文件。
+
+```bash
+pip install toondeck    # Web UI 直接打进 wheel——不需要 node，不需要构建
+```
+
+Pre-alpha；免费（Apache-2.0）。ToonDeck 负责驱动——mcptoon 始终是底下的唯一事实源。
+
+---
+
 ## 所有 AI Agent 都能用
 
 mcptoon 是 CLI 工具。**你的 Agent 能跑 shell 命令，就能用 mcptoon。** 不需要插件、
