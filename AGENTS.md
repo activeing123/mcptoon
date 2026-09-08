@@ -39,14 +39,13 @@ Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritu
   printing 0.7.5 because the last one was missed — caught only by the
   post-release smoke test. `tests/test_registry_sync.py` now pins all of
   them together; update every one on every bump.
-- **The publish workflows race each other.** `publish.yml` and
+- **The publish workflows used to race each other.** `publish.yml` and
   `publish-mcp.yml` start on the same release event; the registry run
-  validates the PyPI version while the wheel is still uploading and fails
-  with 400. This happened on both 0.7.6 and 0.7.7. It is expected: once
-  the PyPI run is green, retry the registry with
-  `gh workflow run publish-mcp.yml -f reason=...` and confirm it goes
-  green. (Root cause — making the registry workflow wait — is tracked for
-  a later release.)
+  validated the PyPI version while the wheel was still uploading and failed
+  with 400. This happened on both 0.7.6 and 0.7.7. Root cause fixed in
+  `publish-mcp.yml`: a wait step now polls PyPI's JSON API for the released
+  version (up to 5 minutes) before pushing the registry record. If the wait
+  step ever times out, retry with `gh workflow run publish-mcp.yml -f reason=...`.
 - **Pushing a tag does not publish.** `publish.yml` triggers on `release: [published]`,
   so a GitHub Release must be created (`gh release create vX.Y.Z --notes-file …`).
 - **Verify against the real index.** This machine's pip points at a mirror that lags —

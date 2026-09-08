@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `mcptoon demo` next-steps now push `mcptoon sync` (push the config into the
+  agents you already run) before the star ask — the trial→adoption move from
+  the conversion playbook. Pinned by `tests/test_demo.py`.
 - **Per-tool compression policy** (`mcptoon policy`): pin how each tool's
   results are compressed — `raw`/`json` protects results that must never be
   compressed (images, base64, binary), `toon`/`compact`/`slim` forces a shape

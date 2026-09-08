@@ -155,7 +155,7 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --slim
 
 MCP is a good protocol. JSON schema injection is its Achilles' heel. mcptoon doesn't "solve" it — it makes it hurt less: schemas stay out of your context until you actually need them.
 
-SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 128KB wheel, zero dependencies — 11,749 lines of stdlib Python across 21 modules.
+SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 128KB wheel, zero dependencies — 11,750 lines of stdlib Python across 21 modules.
 
 That's it.
 

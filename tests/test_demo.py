@@ -210,6 +210,18 @@ class TestDemoStarCTA(unittest.TestCase):
             self._run_captured(),
         )
 
+    def test_sync_is_the_first_next_step(self):
+        """Impressed users must see the adoption step before the star ask.
+
+        Conversion playbook 2.2: the demo's next-steps block should push
+        `mcptoon sync` (write the config into the agents the user already
+        runs) — that is the trial→adoption move, not just a polite star ask.
+        """
+        out = self._run_captured()
+        self.assertIn("mcptoon sync", out)
+        # Order matters: adoption CTA before the star ask.
+        self.assertLess(out.index("mcptoon sync"), out.index("Star mcptoon"))
+
 
 if __name__ == "__main__":
     unittest.main()

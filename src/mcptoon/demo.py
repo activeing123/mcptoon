@@ -112,6 +112,7 @@ def run_demo(args: list[str]):
     print("─" * 60)
     print()
     print("    mcptoon quickstart     # Discover your existing MCP servers")
+    print("    mcptoon sync            # Push this config to all your agents (Claude Desktop, Cursor, ...)")
     print("    mcptoon serve           # Run as agent-connected MCP server")
     print("    mcptoon manifest --slim  # See all tools (88.5% smaller than JSON)")
     print("    mcptoon call <server> <tool> '{...}' --toon  # Call a tool")
