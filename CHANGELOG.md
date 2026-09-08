@@ -5,6 +5,21 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.7] — 2026-09-08
+
+### Fixed — the 0.7.6 wheel reported the wrong version
+
+`pip install mcptoon==0.7.6` produced a wheel whose metadata said 0.7.6 but
+whose `mcptoon --version` printed 0.7.5: the release bumped
+`pyproject.toml` and `server.json` but missed the hardcoded `__version__`
+in `src/mcptoon/__init__.py`. Caught by the post-release smoke test (fresh
+venv against the official index) — which is now part of the written
+release checklist, not just habit.
+
+- `__version__` is 0.7.7 and matches the packaged metadata.
+- `tests/test_registry_sync.py` now pins `mcptoon.__version__` against
+  pyproject, so the next bump updates all of them or fails CI.
+
 ## [0.7.6] — 2026-09-08
 
 ### Added — stateless-first serve bridge + SEP-2549 CacheableResult (2026-07-28 GA server surface)

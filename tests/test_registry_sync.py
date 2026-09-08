@@ -44,6 +44,19 @@ class TestServerJsonMatchesRelease(unittest.TestCase):
                 "verifies this against PyPI, so a stale value publishes a stale record",
             )
 
+    def test_runtime_version_matches_the_release(self):
+        # 0.7.6 shipped with pyproject saying 0.7.6 but `mcptoon --version`
+        # printing 0.7.5: the hardcoded __version__ in src/mcptoon/__init__.py
+        # was missed by the bump. The defect only surfaced in a post-release
+        # smoke install, so it is pinned here instead of trusted to memory.
+        import mcptoon
+
+        self.assertEqual(
+            mcptoon.__version__, project_field("version"),
+            "src/mcptoon/__init__.py __version__ != pyproject - the wheel "
+            "metadata and the CLI would disagree",
+        )
+
     def test_package_identity_matches_the_distribution(self):
         pkg = SERVER["packages"][0]
         self.assertEqual(pkg["registryType"], "pypi")
