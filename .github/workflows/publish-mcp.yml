@@ -43,5 +43,25 @@ jobs:
       - name: Authenticate to the MCP Registry
         run: ./mcp-publisher login github-oidc
 
+      # publish.yml fires on the same release event and uploads the wheel in
+      # parallel; the registry validates packages[].version against PyPI, so
+      # without this wait the first run 400s ("version not found"). Bit us on
+      # 0.7.6 and 0.7.7 - both needed a manual workflow_dispatch retry.
+      - name: Wait for PyPI to list the released version
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import json;print(json.load(open('server.json'))['packages'][0]['version'])")
+          echo "waiting for PyPI to list mcptoon ${VERSION}"
+          for i in $(seq 1 30); do
+            if curl -fsSL https://pypi.org/pypi/mcptoon/json \
+              | python3 -c "import json,sys;sys.exit(0 if json.load(sys.stdin)['info']['version']=='${VERSION}' else 1)"; then
+              echo "PyPI lists ${VERSION} (checked $((i*10))s)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "PyPI did not list ${VERSION} within 5 minutes"
+          exit 1
+
       - name: Publish server record
         run: ./mcp-publisher publish

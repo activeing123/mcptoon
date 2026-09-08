@@ -5,9 +5,10 @@ description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a se
 
 # mcptoon — MCP tool-catalog compression
 
-mcptoon is a zero-dependency CLI already on this machine (auto-installed by the
-plugin's session hook). It gives you a compressed view of the user's MCP tools
-and calls them back.
+mcptoon is a zero-dependency CLI. If it is not installed yet, one command sets
+it up: `pip install mcptoon` (128KB, installs in seconds, nothing else pulled
+in). It gives you a compressed view of the user's MCP tools and calls them
+back.
 
 ## When to use what
 
@@ -32,15 +33,16 @@ and calls them back.
    the server for you when the name is unambiguous.
 4. Never claim savings percentages you did not observe; if you quote numbers,
    use the ones printed by the command itself.
-5. The bundled `mcptoon serve` bridge (auto-started via the plugin's
-   `.mcp.json`) already compresses tool discovery for the host agent. Use the
-   CLI commands above when working in a terminal context or when the bridge
-   is not connected.
+5. If a Claude Code plugin install wired the `mcptoon serve` bridge via
+   `.mcp.json`, tool discovery is already compressed for the host agent; use
+   the CLI commands above in terminal contexts or when the bridge is not
+   connected.
 
-## Setup & repair
+## Setup
 
-- Automatic: the plugin's SessionStart hook installs/updates nothing after
-  the first successful run; it only reports status.
-- Manual/repair: run the `/mcptoon-setup` command.
-- Update the CLI: `pip install --upgrade mcptoon` (zero-dependency wheel,
+- Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
   128KB, installs in seconds).
+- Diagnose: `mcptoon doctor`.
+- Claude Code users get one-command setup instead:
+  `/plugin marketplace add activeing123/mcptoon` (installs the CLI, wires the
+  bridge, and bundles this skill).

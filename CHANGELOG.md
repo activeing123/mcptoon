@@ -5,6 +5,28 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Per-tool compression policy** (`mcptoon policy`): pin how each tool's
+  results are compressed — `raw`/`json` protects results that must never be
+  compressed (images, base64, binary), `toon`/`compact`/`slim` forces a shape
+  for one chatty tool, `server:*` sets a server-wide default. Applies to
+  explicit `mcptoon call` runs and to the `mcptoon serve` bridge; explicit
+  format flags always win. Stored in `~/.mcptoon/compression.json`
+  (`MCPTOON_COMPRESSION_FILE` redirects it).
+- README (EN+zh): "The industry converged on the same answer" — Anthropic's
+  advanced-tool-use numbers (TST -85% definitions, PTC -37% orchestration) and
+  MuleSoft's gateway adopting TOON as external validation, with source links.
+- `skills/mcptoon/SKILL.md` at the repo root: the cross-agent distribution
+  copy of the plugin skill (skills.sh-compatible layout), guarded to stay in
+  sync with the plugin's trigger surface.
+
+### Fixed
+- publish-mcp.yml now waits for PyPI to list the released version before
+  publishing the registry record — kills the race that needed manual
+  workflow_dispatch retries on 0.7.6 and 0.7.7.
+
 ## [0.7.7] — 2026-09-08
 
 ### Fixed — the 0.7.6 wheel reported the wrong version

@@ -25,7 +25,7 @@ Codex、脚本、CI——都不用额外配置，直接拿到你全部工具。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-770%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-789%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -112,6 +112,27 @@ token（50 工具 114，−99.2%）。
 `assets/benchmark_tiktoken.json`）。你的组合会不同——
 [在浏览器里算你自己的数](https://activeing123.github.io/mcptoon/tools/token-tax/)，
 30 秒，不上传任何东西。*
+
+---
+
+## 行业已经收敛到同一个答案
+
+工具上下文太重，不再是小众抱怨——它已经是官方盖章的工程问题：
+
+- **Anthropic 的高级工具调用**：[Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+  把工具定义改为按需搜索加载（58 个工具：5.5 万 → 首载约 500 token，-85%）；
+  [Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+  把编排挪进代码，中间结果不进模型（官方基准 -37%）。但两者都是 Claude
+  平台的 beta，管的是工具*定义*和编排——在其他所有 agent 上，工具的最终
+  *结果*仍是一个 token 一个 token 进上下文。
+- **MuleSoft 企业网关**：[MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
+  把同一条管线（清洗 → 蒸馏 → 压缩）产品化，其中压缩环节用的正是 TOON——
+  mcptoon 从第一天就在用的 token 友好格式。该网关目前支持到 MCP
+  2025-06-18；mcptoon 的桥已经无状态优先地说上了 2026-07-28 GA 规范。
+
+方向已定，差距在覆盖面：TST/PTC 住在 Claude 平台里，网关压缩住在 MuleSoft
+后面。mcptoon 把「结果侧」的纪律装进一个 128KB 的轮子——任何 agent、任何
+机器都能跑，不要模型、不要密钥、不要代理进程。
 
 ---
 
@@ -406,13 +427,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 770 passed, 1 skipped
+python -m pytest tests/ -v   # 789 passed, 1 skipped
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)、
 [DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：11,400 行 Python、21 个模块，零第三方依赖。
+项目本体：11,749 行 Python、21 个模块，零第三方依赖。
 
 ---
 

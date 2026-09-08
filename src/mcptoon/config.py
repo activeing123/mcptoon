@@ -297,6 +297,91 @@ def list_disabled_tools() -> list[str]:
     return [k for k, v in toggles.items() if not v]
 
 
+# ─── Per-tool compression policy ───
+# Same granularity as toggles ("server:tool"), stored in its own file so a
+# compression decision never fights an on/off toggle. Policies answer one
+# question MuleSoft's gateway made table stakes: *this* tool's results must
+# not be compressed (raw) or must always arrive as a specific shape.
+
+VALID_POLICIES = ("raw", "json", "auto", "toon", "compact", "slim")
+POLICY_FILE = CONFIG_DIR / "compression.json"
+
+
+def _policy_file() -> Path:
+    # Env override lets CI/tests redirect policy I/O without touching the
+    # real ~/.mcptoon (same isolation pattern as MCPTOON_CONFIG_FILE).
+    return Path(os.environ.get("MCPTOON_COMPRESSION_FILE", str(POLICY_FILE)))
+
+
+def load_policies() -> dict:
+    """Load per-tool compression policies. Format: {"server:tool": "<policy>"}."""
+    if not _policy_file().exists():
+        return {}
+    try:
+        data = json.loads(_policy_file().read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if isinstance(data, dict):
+        policies = data.get("policies", data)
+        return policies if isinstance(policies, dict) else {}
+    return {}
+
+
+def save_policies(policies: dict):
+    f = _policy_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(
+        json.dumps({"policies": policies}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def get_compression_policy(server: str, tool: str) -> str | None:
+    """Resolve the compression policy for a tool.
+
+    Exact `server:tool` wins over the server-wide `server:*` wildcard.
+    Returns None when no valid policy is configured.
+    """
+    policies = load_policies()
+    value = policies.get(f"{server}:{tool}")
+    if value is None:
+        value = policies.get(f"{server}:*")
+    if value in VALID_POLICIES:
+        return value
+    return None
+
+
+def resolve_output_format(server: str, tool: str, base_fmt: str) -> str:
+    """Effective output format: the tool's policy if configured, else base_fmt.
+
+    A policy of "auto" means "default behaviour" — identical to no policy.
+    """
+    policy = get_compression_policy(server, tool)
+    if policy is None or policy == "auto":
+        return base_fmt
+    return policy
+
+
+def set_compression_policy(server: str, tool: str, policy: str | None) -> bool:
+    """Set a policy; None or "auto" clears it. Returns False on unknown policy."""
+    policies = load_policies()
+    key = f"{server}:{tool}"
+    if policy is None or policy == "auto":
+        policies.pop(key, None)
+        save_policies(policies)
+        return True
+    if policy not in VALID_POLICIES:
+        return False
+    policies[key] = policy
+    save_policies(policies)
+    return True
+
+
+def list_policies() -> dict:
+    """All configured policies, sorted for stable output."""
+    return dict(sorted(load_policies().items()))
+
+
 # ─── Sample config for first-time users ───
 
 SAMPLE_CONFIG = {

@@ -18,6 +18,7 @@ mcptoon cli — Command-line entry point
 Usage:
     mcptoon list                         List configured servers
     mcptoon manifest                     List all tools (compact)
+    mcptoon policy                       Per-tool compression policy (raw/toon/slim)
     mcptoon manifest --full              List all tools with params
     mcptoon manifest --format openai    Export as OpenAI function calling
     mcptoon manifest --format openapi   Export as OpenAPI 3.0 spec
@@ -40,6 +41,7 @@ Usage:
     mcptoon stats                        Token savings dashboard (detailed)
     mcptoon toggle <server> <tool>       Toggle a tool on/off
     mcptoon toggle --list                List all toggled tools
+    mcptoon policy                       Per-tool compression policy (raw/toon/slim)
     mcptoon install <name> --npm <pkg>    Install MCP server from npm
     mcptoon install <name> --pip <pkg>    Install MCP server from pip
     mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
@@ -225,6 +227,8 @@ def main():
         _cmd_stats(rest, fmt)
     elif command == "toggle":
         _cmd_toggle(rest, fmt)
+    elif command == "policy":
+        _cmd_policy(rest, fmt)
     elif command == "discover":
         if "--health" in rest:
             # Legacy health-check mode
@@ -548,7 +552,8 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
             print(f"  Fix: {fix}", file=sys.stderr)
         sys.exit(1)
 
-    _render_result(result, fmt, head_n, max_chars, full, fallback_json)
+    _render_result(result, _effective_fmt(server, tool, fmt),
+                   head_n, max_chars, full, fallback_json)
 
 
 def _render_result(result, fmt, head_n, max_chars, full, fallback_json=False):
@@ -571,6 +576,79 @@ def _render_result(result, fmt, head_n, max_chars, full, fallback_json=False):
     except (ValueError, TypeError, KeyError) as e:
         print(f"# fallback-json: {fmt} encoding failed ({e}), falling back to JSON", file=sys.stderr)
         print(output.render(result, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
+
+
+# ═══════════════════════════════════════════════════
+# Policy command — per-tool compression overrides
+# ═══════════════════════════════════════════════════
+
+def _effective_fmt(server, tool, fmt):
+    """Per-tool compression policy applies only when no format flag was given.
+
+    Explicit flags (--json/--toon/...) always win; the policy is the
+    *default* for tools whose results need special handling.
+    """
+    if fmt != "auto":
+        return fmt
+    try:
+        return cfg.resolve_output_format(server, tool, fmt)
+    except Exception:
+        return fmt
+
+
+def _cmd_policy(rest, fmt):
+    """Per-tool compression policy: pin how a tool's results are compressed.
+
+    Usage:
+        mcptoon policy                                list configured policies
+        mcptoon policy set <server> <tool> <policy>   pin one tool's format
+        mcptoon policy set <server> * <policy>        server-wide default
+        mcptoon policy clear <server> <tool>          remove a policy
+
+    Policies:
+        raw|json              never compress (images, base64, binary)
+        toon|compact|slim     force this format regardless of the default
+        auto                  remove the policy (back to default)
+    """
+    if not rest or rest[0] in ("--list", "list"):
+        policies = cfg.list_policies()
+        if not policies:
+            print("No compression policies configured - default behaviour applies everywhere.")
+            print("")
+            print("Set one:")
+            print("  mcptoon policy set <server> <tool> raw   # never compress (images, base64)")
+            print("  mcptoon policy set <server> <tool> toon  # always render as TOON")
+            return
+        print("Per-tool compression policies:")
+        for key, policy in policies.items():
+            print(f"  {key:40s} -> {policy}")
+        return
+
+    sub = rest[0]
+    if sub == "set":
+        if len(rest) < 4:
+            print("Usage: mcptoon policy set <server> <tool-or-*> <raw|json|auto|toon|compact|slim>")
+            sys.exit(1)
+        server, tool, policy = rest[1], rest[2], rest[3]
+        if cfg.set_compression_policy(server, tool, policy):
+            if policy == "auto":
+                print(f"Cleared: {server}:{tool} uses the default behaviour again.")
+            else:
+                meaning = ("never compressed" if policy in ("raw", "json")
+                           else f"always rendered as {policy}")
+                print(f"Policy set: {server}:{tool} -> {policy} ({meaning})")
+        else:
+            print(f"Unknown policy '{policy}'. Valid: {', '.join(cfg.VALID_POLICIES)}")
+            sys.exit(1)
+    elif sub == "clear":
+        if len(rest) < 3:
+            print("Usage: mcptoon policy clear <server> <tool-or-*>")
+            sys.exit(1)
+        cfg.set_compression_policy(rest[1], rest[2], None)
+        print(f"Cleared: {rest[1]}:{rest[2]} uses the default behaviour.")
+    else:
+        print(f"Unknown subcommand '{sub}'. Use: list | set | clear")
+        sys.exit(1)
 
 
 # ═══════════════════════════════════════════════════
@@ -1480,7 +1558,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init quickstart list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search"
+    commands="init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -1508,7 +1586,7 @@ _ZSH_COMPLETION = r'''
 #compdef mcptoon
 
 _mcptoon() {
-    local commands=(init list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search)
+    local commands=(init list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search)
     local formats=(openai openapi mcp json human)
 
     if (( CURRENT == 1 )); then
@@ -1532,7 +1610,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor completion help sync health serve demo install search'
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -1795,6 +1873,7 @@ Usage:
     mcptoon add <name> [options]          Add a server
     mcptoon remove <name>                 Remove a server
     mcptoon usage                         Show usage stats
+    mcptoon policy                        Per-tool compression policy (raw/toon/slim)
     mcptoon doctor                        Self-diagnose config + connectivity
     mcptoon completion <shell>            Generate shell completion (bash|zsh|fish|ps)
     mcptoon install <name> --npm <pkg>    Install MCP server from npm

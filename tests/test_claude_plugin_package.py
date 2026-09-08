@@ -133,3 +133,47 @@ class TestCanonicalClaimsOnly:
         plugin_json = _load(PLUGIN / ".claude-plugin" / "plugin.json")
         description = plugin_json["description"]
         assert "71,929" in description and "581" in description
+
+
+class TestRootSkillsMirror:
+    """skills/mcptoon/SKILL.md is the cross-agent distribution copy (skills.sh
+    and friends read skills/<name>/SKILL.md at the repo root). It must stay a
+    mirror of the plugin's trigger surface, not a second opinion."""
+
+    def _root_text(self):
+        path = ROOT / "skills" / "mcptoon" / "SKILL.md"
+        assert path.exists(), "root skills/mcptoon/SKILL.md is missing - " \
+            "the cross-agent distribution channel depends on it"
+        return path.read_text(encoding="utf-8")
+
+    def _frontmatter(self, text):
+        return text.split("---", 2)[1]
+
+    def test_frontmatter_matches_the_plugin_copy(self):
+        plugin_text = (PLUGIN / "skills" / "mcptoon" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        root_fm = self._frontmatter(self._root_text())
+        plugin_fm = self._frontmatter(plugin_text)
+        for key in ("name:", "description:"):
+            root_value = [line for line in root_fm.splitlines()
+                          if line.startswith(key)]
+            plugin_value = [line for line in plugin_fm.splitlines()
+                            if line.startswith(key)]
+            assert root_value == plugin_value, (
+                f"root skills copy {key} line drifted from the plugin copy"
+            )
+
+    def test_root_copy_is_agent_neutral_and_self_sufficient(self):
+        text = self._root_text()
+        # Cross-agent readers may not have the plugin: setup must be pip-first.
+        assert "pip install" in text
+        for command in ("mcptoon manifest", "mcptoon call", "mcptoon doctor"):
+            assert command in text
+        # Canonical numbers, same discipline as the plugin copy.
+        assert "71,929" in text and "581" in text
+
+    def test_root_copy_has_no_banned_claims(self):
+        text = self._root_text()
+        for banned in BANNED_STRINGS:
+            assert banned not in text, f"root skills copy contains banned claim: {banned}"

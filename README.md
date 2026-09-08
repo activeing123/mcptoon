@@ -31,7 +31,7 @@ scripts, CI — gets your full toolkit with no extra setup.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-770%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-789%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -131,6 +131,31 @@ With mcptoon:    255 tools → 581 tokens. 99.2% saved.
 `cl100k_base`, `assets/benchmark_tiktoken.json`). Your mix will differ —
 [compute your own numbers in the browser](https://activeing123.github.io/mcptoon/tools/token-tax/),
 30 seconds, nothing uploaded.*
+
+---
+
+## The industry converged on the same answer
+
+Token-heavy tool context is no longer a niche complaint — it is now an official
+engineering problem:
+
+- **Anthropic's advanced tool use**: the [Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+  defers tool definitions and searches them on demand (58 tools: 55K → ~500
+  tokens on first load, -85%), and [Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+  moves orchestration into code so intermediate results never enter the model
+  (-37% on their benchmark). Both are Claude-platform betas aimed at tool
+  *definitions* and orchestration — the final tool *results* still enter
+  context token by token everywhere else.
+- **MuleSoft's enterprise gateway**: [MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
+  formalizes the same pipeline (clean → distill → compress), and its
+  compression stage is TOON — the token-oriented format mcptoon is built on.
+  The gateway today supports MCP up to 2025-06-18; mcptoon's bridge already
+  speaks the 2026-07-28 GA spec stateless-first.
+
+The direction is settled. What is still missing is reach: TST/PTC live on
+Claude platforms, gateway compression lives behind MuleSoft. mcptoon puts the
+results-side discipline into a 128KB wheel any agent on any machine can run —
+no model, no key, no proxy.
 
 ---
 
@@ -441,13 +466,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 770 passed, 1 skipped
+python -m pytest tests/ -v   # 789 passed, 1 skipped
 ```
 
 Zero dependencies is a hard rule. New features need tests. See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: 11,400 lines of Python across 21 modules, zero third-party dependencies.
+The codebase: 11,749 lines of Python across 21 modules, zero third-party dependencies.
 
 ---
 

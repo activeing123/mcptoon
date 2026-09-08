@@ -731,13 +731,26 @@ class MCPServerBridge:
     # ═══════════════════════════════════════════════════
 
     def _compress_result(self, result: Any, server: str, tool: str) -> Any:
-        """Compress tool call result based on output format."""
-        if self._output_format in ("raw", "json", "auto"):
+        """Compress tool call result based on output format.
+
+        A per-tool compression policy (mcptoon policy) wins over the
+        bridge-wide format: "raw"/"json" protects results that must not be
+        compressed (images, base64 payloads), a specific format forces a
+        shape for one chatty tool without touching the rest.
+        """
+        effective = self._output_format
+        try:
+            from . import config as _cfg
+            effective = _cfg.resolve_output_format(server, tool, effective)
+        except Exception:
+            pass
+
+        if effective in ("raw", "json", "auto"):
             return result
 
         try:
             from . import output as output_mod
-            compressed = output_mod.render(result, fmt=self._output_format)
+            compressed = output_mod.render(result, fmt=effective)
             if compressed is not None:
                 return compressed
         except Exception:
