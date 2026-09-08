@@ -136,6 +136,11 @@ v0.8.0  手册页 + 一键安装正式化 + SEP 新规范落地（如有）     
 ## 📝 更新日志
 
 ### 2026-09-08
+- ✅ 0.7.7 热修发版：0.7.6 轮子元数据 0.7.6 但 `mcptoon --version` 打 0.7.5
+  （`__init__.py` 硬编码漏改，venv 冒烟测试抓的）；新守卫把四处版本钉在一起。
+  发布链踩坑两连：publish/publish-mcp 竞态（两个版本都撞，按预案补推全绿）、
+  本机 ALL_PROXY=socks5 弄坏干净 venv（写进 AGENTS.md 仪式）。
+- ✅ 0.7.6 双首发：GA 服务端面桥 + 官方 Claude Code 插件（下方两条）。
 - ✅ 2026-07-28 GA 服务端面补齐（B2 承诺兑现）：serve 桥无状态优先（initialize 不再必需、
   `_meta` 自描述请求、不支持版本 -32022 拒绝）、`server/discover` RPC、SEP-2549
   CacheableResult（ttlMs/cacheScope，env 可调）、全部普通结果 `resultType: "complete"`；
