@@ -135,6 +135,12 @@ v0.8.0  手册页 + 一键安装正式化 + SEP 新规范落地（如有）     
 
 ## 📝 更新日志
 
+### 2026-09-08
+- ✅ 2026-07-28 GA 服务端面补齐（B2 承诺兑现）：serve 桥无状态优先（initialize 不再必需、
+  `_meta` 自描述请求、不支持版本 -32022 拒绝）、`server/discover` RPC、SEP-2549
+  CacheableResult（ttlMs/cacheScope，env 可调）、全部普通结果 `resultType: "complete"`；
+  19 个新测试，759 passed 全绿。本地已提交，push/发版待用户批准。
+
 ### 2026-09-02
 - ✅ Product Hunt 产品页发布 + 首条讨论型评论（config drift 话题切入）
 - ✅ Dev.to 第 6 篇：v0.7.2 一行安装 + quickstart 庆祝 + 官方 skills 插件（ID 4551846）

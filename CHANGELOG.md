@@ -5,6 +5,38 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — stateless-first serve bridge + SEP-2549 CacheableResult (2026-07-28 GA server surface)
+
+v0.7.0 brought the client side of the 2026-07-28 revision (spec negotiation,
+`_meta` requests, `Mcp-Method`/`Mcp-Name` headers, MRTR). The GA spec's
+server-side surface is now covered by the bridge (`mcptoon serve`):
+
+- **Stateless-first**: the initialize handshake is no longer required. A
+  modern client may call `tools/list` without ever sending `initialize`
+  (the handshake still works for legacy clients, unchanged). Requests are
+  self-describing: `_meta` with `io.modelcontextprotocol/protocolVersion`
+  (or the pre-GA draft `protocolVersion` key) is honored on any request,
+  and an unsupported version there is rejected with `-32022`
+  (UnsupportedProtocolVersionError).
+- **`server/discover` RPC** (SEP-2575): advertises `protocolVersions`,
+  `capabilities` (with the GA `extensions` field) and `serverInfo`. No
+  config load, no server startup — safe to probe up front.
+- **CacheableResult (SEP-2549)**: `tools/list`, `prompts/list`,
+  `resources/list` and `resources/read` results carry `ttlMs` and
+  `cacheScope`. Defaults: 300000 ms / `public`; override via
+  `MCPTOON_LIST_TTL_MS` and `MCPTOON_LIST_CACHE_SCOPE` (invalid values fall
+  back safely). Clients can cache tool catalogs across reconnects, keeping
+  upstream prompt caches stable.
+- **`resultType: "complete"`** on every ordinary result (initialize,
+  discover, ping, health, tools/list, prompts/list, resources/list,
+  resources/read, tool call results and tool errors) per the GA results
+  taxonomy. `input_required` (MRTR) behavior is a client-side concern and
+  unchanged.
+- 19 new tests (`tests/test_v076_stateless_serve.py`); README badges and
+  counts updated.
+
 ## [0.7.5] — 2026-09-05
 
 ### Fixed — the documented way to reproduce the numbers did not exist

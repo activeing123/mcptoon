@@ -61,7 +61,13 @@ from http.server import BaseHTTPRequestHandler
 
 from . import __version__
 from .config import load_config, resolve_server_name
-from .client import MCPClientPool, MCPError
+from .client import (
+    MCPClientPool,
+    MCPError,
+    SUPPORTED_PROTOCOL_VERSIONS,
+    ERR_UNSUPPORTED_PROTOCOL_VERSION,
+    _META_PROTOCOL_KEY,
+)
 from . import manifest as manifest_mod
 from . import router as router_mod
 from . import usage
@@ -75,6 +81,41 @@ from .schema_simplifier import (
 # MCP protocol version we speak as a server
 PROTOCOL_VERSION = "2024-11-05"
 _SERVER_INFO = {"name": "mcptoon", "version": __version__}
+
+# _meta key for server identity on results (2026-07-28 _meta world)
+_META_SERVERINFO_KEY = "io.modelcontextprotocol/serverInfo"
+
+# CacheableResult defaults (SEP-2549) for list/read results. Env-tunable:
+# MCPTOON_LIST_TTL_MS / MCPTOON_LIST_CACHE_SCOPE.
+_LIST_TTL_DEFAULT_MS = 300_000
+_LIST_SCOPE_DEFAULT = "public"
+
+
+def _list_cache_fields() -> dict:
+    """CacheableResult hints (SEP-2549) for list/read results.
+
+    Returns {"ttlMs": int >= 1, "cacheScope": "public" | "private"}. Invalid
+    env values fall back to the defaults instead of breaking the bridge.
+    """
+    ttl = _LIST_TTL_DEFAULT_MS
+    raw = (os.environ.get("MCPTOON_LIST_TTL_MS") or "").strip()
+    if raw:
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = -1
+        if parsed >= 1:
+            ttl = parsed
+        else:
+            _log(f"invalid MCPTOON_LIST_TTL_MS={raw!r}, "
+                 f"using default {_LIST_TTL_DEFAULT_MS}")
+    scope = (os.environ.get("MCPTOON_LIST_CACHE_SCOPE") or "").strip().lower()
+    if scope not in ("public", "private"):
+        if scope:
+            _log(f"invalid MCPTOON_LIST_CACHE_SCOPE={scope!r}, "
+                 f"using default {_LIST_SCOPE_DEFAULT}")
+        scope = _LIST_SCOPE_DEFAULT
+    return {"ttlMs": ttl, "cacheScope": scope}
 
 # Default timeout per tool call (seconds)
 _DEFAULT_CALL_TIMEOUT = 30
@@ -108,6 +149,9 @@ class MCPServerBridge:
         self._initialized = False
         self._lock = threading.Lock()
         self._shutdown = False
+        # Last JSON-RPC response built by handle_request (in-process read-back
+        # hook; the response is still delivered via _send_response as before).
+        self._last_response: dict | None = None
 
     # ═══════════════════════════════════════════════════
     # Lifecycle
@@ -278,11 +322,28 @@ class MCPServerBridge:
             self.close()
             _log("mcptoon serve stopped")
 
+    def _respond(self, response: dict):
+        """Send a response and remember it for in-process callers/tests."""
+        self._last_response = response
+        _send_response(response)
+
+    def handle_request(self, request: dict) -> dict | None:
+        """Process one JSON-RPC request; return its response (None = no reply).
+
+        Delivery is unchanged (_send_response still runs), so stdio and HTTP
+        modes behave exactly as before. Returns the response for convenience.
+        """
+        self._last_response = None
+        self._handle_request(request)
+        return self._last_response
+
     def _handle_request(self, request: dict):
         """Dispatch a single JSON-RPC request."""
         method = request.get("method", "")
         req_id = request.get("id")
         params = request.get("params", {})
+        if not isinstance(params, dict):
+            params = {}
 
         # Notification (no id) — don't respond
         if req_id is None:
@@ -290,43 +351,65 @@ class MCPServerBridge:
                 _log("Client initialized notification received")
             return
 
+        # 2026-07-28 GA: requests are self-describing. A _meta protocolVersion
+        # we cannot speak is rejected up front (UnsupportedProtocolVersionError).
+        meta = params.get("_meta")
+        if isinstance(meta, dict):
+            meta_version = meta.get(_META_PROTOCOL_KEY) or meta.get("protocolVersion")
+            if meta_version and meta_version not in SUPPORTED_PROTOCOL_VERSIONS:
+                self._respond(_make_error_response(
+                    req_id,
+                    ERR_UNSUPPORTED_PROTOCOL_VERSION,
+                    f"Unsupported protocol version: {meta_version}",
+                ))
+                return
+
         try:
             if method == "initialize":
                 result = self._handle_initialize(params)
-                _send_response(_make_success(req_id, result))
+                self._respond(_make_success(req_id, result))
+            elif method == "server/discover":
+                result = self._handle_discover()
+                self._respond(_make_success(req_id, result))
             elif method == "tools/list":
                 result = self._handle_list_tools(params)
-                _send_response(_make_success(req_id, result))
+                self._respond(_make_success(req_id, result))
             elif method == "tools/call":
                 result = self._handle_call_tool(params)
-                _send_response(_make_success(req_id, result))
+                self._respond(_make_success(req_id, result))
             elif method == "ping":
-                _send_response(_make_success(req_id, {}))
+                self._respond(_make_success(req_id, {"resultType": "complete"}))
             elif method == "resources/list":
-                _send_response(_make_success(req_id, {"resources": []}))
+                result = self._handle_list_resources()
+                self._respond(_make_success(req_id, result))
             elif method == "resources/read":
-                _send_response(_make_success(req_id, {"contents": []}))
+                self._respond(_make_success(
+                    req_id,
+                    {"contents": [], **_list_cache_fields()},
+                ))
             elif method == "prompts/list":
                 result = self._handle_list_prompts()
-                _send_response(_make_success(req_id, result))
+                self._respond(_make_success(req_id, result))
             elif method == "prompts/get":
                 result = self._handle_get_prompt(params)
                 if result is None:
-                    _send_response(_make_error_response(
+                    self._respond(_make_error_response(
                         req_id, -32602, "Unknown prompt"))
                 else:
-                    _send_response(_make_success(req_id, result))
+                    self._respond(_make_success(req_id, result))
             elif method == "logging/setLevel":
                 _log(f"Client set logging level: {params.get('level', 'info')}")
-                _send_response(_make_success(req_id, {}))
+                self._respond(_make_success(req_id, {}))
             elif method == "health":
-                _send_response(_make_success(req_id, self._handle_health()))
+                result = self._handle_health()
+                result["resultType"] = "complete"
+                self._respond(_make_success(req_id, result))
             else:
-                _send_response(_make_error_response(req_id, -32601, f"Method not found: {method}"))
+                self._respond(_make_error_response(req_id, -32601, f"Method not found: {method}"))
         except MCPError as e:
-            _send_response(_make_error_response(req_id, -32603, f"[{e.code}] {e.message}"))
+            self._respond(_make_error_response(req_id, -32603, f"[{e.code}] {e.message}"))
         except Exception as e:
-            _send_response(_make_error_response(req_id, -32603, str(e)[:200]))
+            self._respond(_make_error_response(req_id, -32603, str(e)[:200]))
 
         if method == "shutdown":
             self._shutdown = True
@@ -336,17 +419,57 @@ class MCPServerBridge:
     # ═══════════════════════════════════════════════════
 
     def _handle_initialize(self, params: dict) -> dict:
-        """Respond to MCP initialize handshake."""
+        """Respond to the (legacy) initialize handshake.
+
+        2026-07-28 removed the handshake from the protocol — the bridge no
+        longer requires it — but pre-GA clients still send it, so it keeps
+        working. A requested version we support is echoed back; anything
+        else gets the legacy default.
+        """
         _log(f"Initialize from client: {params.get('clientInfo', {})}")
+        client_version = params.get("protocolVersion", PROTOCOL_VERSION)
+        version = (
+            client_version
+            if client_version in SUPPORTED_PROTOCOL_VERSIONS
+            else PROTOCOL_VERSION
+        )
         return {
-            "protocolVersion": PROTOCOL_VERSION,
+            "protocolVersion": version,
             "capabilities": {
                 "tools": {},
                 "resources": {},
                 "prompts": {},
+                # 2026-07-28: capabilities carry an extensions field
+                "extensions": {},
             },
             "serverInfo": _SERVER_INFO,
+            "resultType": "complete",
         }
+
+    def _handle_discover(self) -> dict:
+        """server/discover (2026-07-28): advertise versions/capabilities/identity.
+
+        Clients MAY call this before any other request for up-front version
+        selection. Cheap by design: no config load, no server startup.
+        """
+        return {
+            "protocolVersions": list(SUPPORTED_PROTOCOL_VERSIONS),
+            "capabilities": {
+                "tools": {},
+                "resources": {},
+                "prompts": {},
+                "extensions": {},
+            },
+            "serverInfo": dict(_SERVER_INFO),
+            "resultType": "complete",
+        }
+
+    def _handle_list_resources(self) -> dict:
+        """resources/list: the bridge exposes no resources (empty, cached)."""
+        result = {"resources": []}
+        result.update(_list_cache_fields())
+        result["resultType"] = "complete"
+        return result
 
     def _handle_health(self) -> dict:
         """Health check endpoint — honestly reports status."""
@@ -420,7 +543,10 @@ class MCPServerBridge:
             for name, info in sorted(self._prompts_index.items())
         ]
         _log(f"prompts/list: returning {len(prompts)} plugin skill prompts")
-        return {"prompts": prompts}
+        result = {"prompts": prompts}
+        result.update(_list_cache_fields())
+        result["resultType"] = "complete"
+        return result
 
     def _handle_get_prompt(self, params: dict) -> dict | None:
         """prompts/get: return the skill's markdown as one user message."""
@@ -475,7 +601,11 @@ class MCPServerBridge:
                 tools.append(simplified)
 
         _log(f"tools/list: returning {len(tools)} tools (simplified schemas)")
-        return {"tools": tools}
+        # SEP-2549 CacheableResult + GA resultType on list results
+        result = {"tools": tools}
+        result.update(_list_cache_fields())
+        result["resultType"] = "complete"
+        return result
 
     def _handle_call_tool(self, params: dict) -> dict:
         """Route a tool call to the underlying server (ADR 0004).
@@ -642,7 +772,7 @@ def _make_tool_result(content: Any) -> dict:
         text = content
     elif isinstance(content, list):
         # Already MCP content array format
-        return {"content": content, "isError": False}
+        return {"content": content, "isError": False, "resultType": "complete"}
     elif isinstance(content, dict) and "content" in content:
         # Already wrapped
         return content
@@ -652,6 +782,7 @@ def _make_tool_result(content: Any) -> dict:
     return {
         "content": [{"type": "text", "text": text}],
         "isError": False,
+        "resultType": "complete",
     }
 
 
@@ -660,6 +791,7 @@ def _make_tool_error(message: str) -> dict:
     return {
         "content": [{"type": "text", "text": f"Error: {message}"}],
         "isError": True,
+        "resultType": "complete",
     }
 
 
@@ -1206,4 +1338,14 @@ Environment:
   MCPTOON_CACHE_TTL       Manifest cache TTL in seconds (default: 300)
   MCPTOON_AUTH_TOKEN      HTTP mode bearer token (same as --auth)
   MCPTOON_ALLOWED_HOSTS   Extra hostnames accepted in Origin/Host checks
+  MCPTOON_LIST_TTL_MS     CacheableResult ttlMs on list/read results (default: 300000)
+  MCPTOON_LIST_CACHE_SCOPE  cacheScope on list/read results: public|private (default: public)
+
+Protocol (2026-07-28):
+  - Stateless-first: no initialize handshake required; every request is
+    self-describing (_meta io.modelcontextprotocol/* keys honored)
+  - server/discover advertises protocolVersions/capabilities/serverInfo
+  - List/read results carry ttlMs + cacheScope (SEP-2549 CacheableResult)
+  - Ordinary results carry resultType: "complete"
+  - Legacy initialize-handshake clients remain fully supported
 """

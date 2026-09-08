@@ -25,7 +25,7 @@ Codex、脚本、CI——都不用额外配置，直接拿到你全部工具。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-738%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-760%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -281,7 +281,7 @@ mcptoon install --list          # 列出已安装
 mcptoon install --remove <name> # 卸载
 mcptoon sync                    # 同步原生配置到每个检测到的 Agent
 mcptoon plugin install <dir>    # 安装 Agent Plugins 1.0.0 插件
-mcptoon serve                   # 以 MCP server 形态运行（stdio/HTTP）
+mcptoon serve                   # 以 MCP server 形态运行（stdio/HTTP）——MCP 2026-07-28：无状态优先、server/discover、列表结果可缓存
 mcptoon demo                    # 一条命令，本机现场演示
 mcptoon doctor                  # 自检：Python、配置、连通性
 mcptoon usage                   # 本地调用统计
@@ -330,8 +330,9 @@ mcptoon completion ps           # Shell 补全（bash/zsh/fish/powershell）
 "自研格式 = 兼容炸弹"是合理的警惕，但这里不成立，原因有三层：
 
 **1 · 协议层永远是标准 JSON-RPC，格式只在展示层。**
-mcptoon 与 MCP 服务器之间永远说标准 MCP 协议（`initialize` / `tools/list` /
-`tools/call`）。compact/slim/toon 只作用于"mcptoon → Agent"的输出渲染，不进入
+mcptoon 与 MCP 服务器之间永远说标准 MCP 协议（initialize / tools/list /
+tools/call——2026-07-28 GA 桥升级后还支持 server/discover 与无状态请求；
+旧客户端的 initialize 握手照常保留）。compact/slim/toon 只作用于"mcptoon → Agent"的输出渲染，不进入
 与服务器的任何字节。服务器看到的永远是标准 JSON——它甚至不知道这些格式存在。
 
 **2 · --toon 本身不是自研，是开源标准。**
@@ -395,7 +396,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 738 passed, 1 skipped
+python -m pytest tests/ -v   # 760 passed, 1 skipped
 ```
 
 零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)、

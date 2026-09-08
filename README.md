@@ -31,7 +31,7 @@ scripts, CI — gets your full toolkit with no extra setup.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-738%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-760%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -309,7 +309,7 @@ mcptoon install --list          # list installed
 mcptoon install --remove <name> # uninstall
 mcptoon sync                    # sync native config to every detected agent
 mcptoon plugin install <dir>    # install an Agent Plugins 1.0.0 plugin
-mcptoon serve                   # run as an MCP server (stdio/HTTP)
+mcptoon serve                   # run as an MCP server (stdio/HTTP) — MCP 2026-07-28: stateless-first, server/discover, cacheable list results
 mcptoon demo                    # one command, live demo on your machine
 mcptoon doctor                  # self-check: Python, config, connectivity
 mcptoon usage                   # local call statistics
@@ -360,7 +360,9 @@ back.
 
 **1 · The protocol layer is always standard JSON-RPC; formats live only in the
 presentation layer.**
-mcptoon speaks standard MCP to servers (`initialize` / `tools/list` / `tools/call`).
+mcptoon speaks standard MCP to servers (initialize / tools/list / tools/call —
+and since the 2026-07-28 GA bridge, `server/discover` and stateless requests
+too; the initialize handshake remains for legacy clients).
 compact/slim/toon only affect the "mcptoon → agent" output rendering — not a single
 byte toward the server. Servers always see standard JSON; they don't even know these
 formats exist.
@@ -429,7 +431,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 738 passed, 1 skipped
+python -m pytest tests/ -v   # 760 passed, 1 skipped
 ```
 
 Zero dependencies is a hard rule. New features need tests. See
