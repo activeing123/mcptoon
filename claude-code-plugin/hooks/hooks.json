@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/scripts/session_setup.py\"",
+            "commandWindows": "python \"%CLAUDE_PLUGIN_ROOT%\\scripts\\session_setup.py\"",
+            "statusMessage": "Checking mcptoon CLI availability",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

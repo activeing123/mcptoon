@@ -1,0 +1,8 @@
+{
+  "name": "mcptoon",
+  "description": "MCP tool-catalog compression for Claude Code. Compresses the tool discovery payload from 71,929 to 581 tokens (-99.2%). Auto-installs the zero-dependency mcptoon CLI (/mcptoon-setup), wires the serve bridge, and teaches the agent when to compress. MCP 2026-07-28 stateless-first bridge included.",
+  "author": {
+    "name": "activeing123"
+  },
+  "homepage": "https://github.com/activeing123/mcptoon"
+}

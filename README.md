@@ -31,7 +31,7 @@ scripts, CI — gets your full toolkit with no extra setup.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-760%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-769%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -81,6 +81,16 @@ mcptoon manifest
 # Call a tool (JSON output by default; add --toon to save more):
 mcptoon call fetch fetch '{"url":"https://example.com"}'
 ```
+
+Claude Code user? Skip the terminal entirely:
+
+```bash
+/plugin marketplace add activeing123/mcptoon
+```
+
+The plugin auto-installs the CLI (SessionStart hook), wires the `mcptoon
+serve` bridge via `.mcp.json`, and ships a skill that teaches the agent when
+to compress. `/mcptoon-setup` is the manual fallback.
 
 **Or let mcptoon auto-discover servers already on your machine:**
 
@@ -431,7 +441,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 760 passed, 1 skipped
+python -m pytest tests/ -v   # 769 passed, 1 skipped
 ```
 
 Zero dependencies is a hard rule. New features need tests. See

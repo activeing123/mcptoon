@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcptoon": {
+      "command": "mcptoon",
+      "args": ["serve"]
+    }
+  }
+}

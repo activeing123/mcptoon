@@ -5,7 +5,7 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.6] — 2026-09-08
 
 ### Added — stateless-first serve bridge + SEP-2549 CacheableResult (2026-07-28 GA server surface)
 
@@ -36,6 +36,36 @@ server-side surface is now covered by the bridge (`mcptoon serve`):
   unchanged.
 - 19 new tests (`tests/test_v076_stateless_serve.py`); README badges and
   counts updated.
+
+### Added — official Claude Code plugin (`claude-code-plugin/`)
+
+The whole mcptoon experience, installable inside Claude Code in one line:
+
+```
+/plugin marketplace add activeing123/mcptoon
+```
+
+- **SessionStart hook** (`scripts/session_setup.py`): reports CLI status on
+  every session start; on the very first session auto-installs the
+  zero-dependency wheel via pip (seconds, nothing else pulled in) and
+  writes a one-time marker. Never raises - a broken environment cannot
+  break the session. Cross-platform: `commandWindows` ships in
+  `hooks/hooks.json` for native Windows sessions.
+- **`.mcp.json`** wires the `mcptoon serve` bridge into the host session,
+  so tool discovery arrives pre-compressed.
+- **`skills/mcptoon/SKILL.md`** teaches the agent when and how to use the
+  CLI (`manifest` / `inspect` / `search` / `call --auto` / `doctor`),
+  including the rule to never quote savings numbers it did not observe.
+- **`/mcptoon-setup`** command for guided manual setup and repair.
+- Root `.claude-plugin/marketplace.json` turns this repository into a
+  one-command marketplace. Guarded by `tests/test_claude_plugin_package.py`
+  (10 tests): JSON validity, Windows hook variant mandatory, frontmatter
+  trigger words, canonical-claims-only (banned-number blacklist shared
+  with `test_footprint_claims.py`).
+
+### Changed — 0.7.5 compatibility layer rollout to 0.7.6
+
+Nothing to roll back; see the entries above. Test count grew 759 → 769.
 
 ## [0.7.5] — 2026-09-05
 
