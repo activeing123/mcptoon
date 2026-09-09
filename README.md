@@ -21,8 +21,6 @@ and every agent on your machine shares the same toolkit.
 
 ![Benchmark: 255 tools, 71,929 → 581 tokens](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/benchmark.svg)
 
-![Token savings at a glance](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings-en.svg)
-
 </div>
 
 ```bash

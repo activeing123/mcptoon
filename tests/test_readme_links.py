@@ -56,4 +56,7 @@ def test_assets_referenced_by_english_readme_are_not_chinese():
             "use a dedicated -en asset instead"
         )
         checked += 1
-    assert checked >= 2, f"expected to inspect several text assets, inspected {checked}"
+    # The hero now embeds a single text asset (assets/benchmark.svg); the
+    # token-savings chart was dropped on purpose. Keep the CJK scan alive for
+    # whatever remains instead of pinning the old asset count.
+    assert checked >= 1, f"expected to inspect the embedded text assets, inspected {checked}"
