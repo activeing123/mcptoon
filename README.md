@@ -5,29 +5,10 @@
 
 **Add 1,000 MCP tools locally — your token context never feels it.**
 
-mcptoon is a CLI tool that sits between your AI agent and your MCP servers. Hook up as
-many servers as you want — the agent's context window stays clean. Token savings happen
-in two separate places; don't mix them up:
-
-- **Tool discovery (saves by default, zero action)**: `mcptoon manifest` sends only the
-  name list; schemas stay on disk — 255 tools drop from 71,929 to 581 tokens, −99.2%.
-- **Call results (optional)**: `mcptoon call` returns JSON by default; add `--toon` to
-  shrink results by ~34% vs JSON (measured).
-
-**Mcptoon is the native decoupling layer for MCP tools.** It fixes the twin pain of
-MCP tool listings eating tokens and every AI agent re-configuring tools on its own.
-Built on agents' native CLI-calling ability: zero config, out of the box, it
-auto-scans and unifies the MCP tools of every agent on this machine, shares tool
-instances globally, and slashes token overhead.
-
-**Your tools stay yours.** mcptoon bundles nothing — it's a 128KB CLI, like a remote
-control. The MCP servers you want, you install yourself, one command each
-(npm/pip/a URL). Delete mcptoon someday? Your MCP servers keep running on their own —
-not one goes missing.
-
-Savings start the moment you use it: 99.2% off tool discovery (measured), and every
-agent on this machine that can run a shell command — Claude Code, Cursor, Codex,
-scripts, CI — gets your full toolkit with no extra setup.
+mcptoon is a 128KB CLI that keeps MCP tool schemas out of your agent's context.
+Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**; call
+results shrink another ~34% with `--toon`. One command per server, zero config,
+and every agent on your machine shares the same toolkit.
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
@@ -35,11 +16,34 @@ scripts, CI — gets your full toolkit with no extra setup.
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
-**👉 `pip install mcptoon`** · [中文](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Issues](https://github.com/activeing123/mcptoon/issues)
+**👉 [中文](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Issues](https://github.com/activeing123/mcptoon/issues)**
 
 ![Benchmark: 255 tools, 71,929 → 581 tokens](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/benchmark.svg)
 
 ![Token savings at a glance](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/token-savings-en.svg)
+
+</div>
+
+```bash
+pip install mcptoon
+
+# Add any MCP server — one command:
+mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+
+# What your agent actually reads (names only — 581 tokens, not 71,929):
+mcptoon manifest
+```
+
+**Your tools stay yours.** mcptoon bundles nothing — it's a remote control, not a
+runtime. The MCP servers you want, you install yourself, one command each
+(npm/pip/a URL). Delete mcptoon someday? Your MCP servers keep running on their own —
+not one goes missing.
+
+**Mcptoon is the native decoupling layer for MCP tools.** It fixes the twin pain of
+MCP tool listings eating tokens and every AI agent re-configuring tools on its own.
+Zero config, out of the box: it auto-scans and unifies the MCP tools of every agent
+on this machine — Claude Code, Cursor, Codex, scripts, CI — shares tool instances
+globally, and slashes token overhead.
 
 </div>
 
@@ -99,7 +103,8 @@ mcptoon quickstart     # discover + configure + list tools — one command
 ```
 
 That's it. No hand-written JSON config. No MCP protocol debugging. No polluted context
-window.
+window. The wheel is 128KB with zero dependencies, and mcptoon itself needs no API
+key and phones nothing home — $0 in service fees, everything runs on your machine.
 
 ---
 
@@ -134,28 +139,27 @@ With mcptoon:    255 tools → 581 tokens. 99.2% saved.
 
 ---
 
-## The industry converged on the same answer
+## The industry validated the problem — then gated the fix
 
 Token-heavy tool context is no longer a niche complaint — it is now an official
-engineering problem:
+engineering problem, and the same answer keeps appearing on every roadmap:
 
-- **Anthropic's advanced tool use**: the [Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
-  defers tool definitions and searches them on demand (58 tools: 55K → ~500
-  tokens on first load, -85%), and [Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
-  moves orchestration into code so intermediate results never enter the model
-  (-37% on their benchmark). Both are Claude-platform betas aimed at tool
-  *definitions* and orchestration — the final tool *results* still enter
-  context token by token everywhere else.
-- **MuleSoft's enterprise gateway**: [MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
-  formalizes the same pipeline (clean → distill → compress), and its
-  compression stage is TOON — the token-oriented format mcptoon is built on.
-  The gateway today supports MCP up to 2025-06-18; mcptoon's bridge already
-  speaks the 2026-07-28 GA spec stateless-first.
+- **Anthropic**: [Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+  defers tool definitions until needed; [Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+  moves orchestration into code. Both are Claude-platform betas.
+- **MuleSoft**: [MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
+  productizes clean → distill → compress (its compression stage is TOON).
+  Enterprise gateway only, MCP up to 2025-06-18.
 
-The direction is settled. What is still missing is reach: TST/PTC live on
-Claude platforms, gateway compression lives behind MuleSoft. mcptoon puts the
-results-side discipline into a 128KB wheel any agent on any machine can run —
-no model, no key, no proxy.
+| The fix | Where it runs | The catch |
+|---|---|---|
+| Tool Search Tool / PTC | Claude-platform betas | tool *results* still enter context token by token on every other agent |
+| MuleSoft gateway | enterprise gateway | behind MuleSoft; MCP spec one generation behind |
+| **mcptoon** | **any agent that can run a shell command** | none — 128KB, no key, no proxy, MCP 2026-07-28 GA |
+
+The direction is settled. mcptoon is the version of this answer you can run
+**today, on every agent at once** — the results-side discipline without the
+platform or gateway toll.
 
 ---
 
@@ -179,7 +183,9 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon connects, discovers tools, generates the handler, registers it. No restart
-needed.
+needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 128KB with zero
+dependencies, because servers are external processes your machine runs directly, not
+code bundled into mcptoon. Four steps, one command, no agent restart.
 
 **Any MCP server works:**
 
@@ -243,7 +249,12 @@ mcptoon call github search_repos '{"query":"mcp"}'
 ## The numbers
 
 mcptoon's token savings are two separate bills — know which one you're reading before
-comparing numbers.
+comparing numbers. The short version: at 255 tools, native discovery costs 71,929
+tokens — over half of a 128K context — while the same toolset reads back at 581
+tokens through the name index, a 99.2% cut. On the results side, `--toon` saves
+34.0–34.2% versus JSON across the measured set. Both rows are measured
+configurations (tiktoken `cl100k_base`, `assets/benchmark_tiktoken.json`), not
+scaled estimates.
 
 ### Bill 1 · Tool discovery (`manifest`): 99.2% saved by default
 
@@ -262,7 +273,7 @@ Zero action, on by default: `mcptoon manifest` with no flags is this tier.
 Want to give the agent more? `--full` (names + parameter types) saves 88.5%;
 `--json` (full schema) is the baseline.
 
-*Both rows are measured configurations, not one number scaled up and down (tiktoken
+*We measured both rows ourselves — not one number scaled up and down (tiktoken
 `cl100k_base`, `assets/benchmark_tiktoken.json`). Your mix will differ —
 [compute your own numbers in the browser](https://activeing123.github.io/mcptoon/tools/token-tax/),
 30 seconds, nothing uploaded.*
@@ -285,6 +296,10 @@ Leaner:   mcptoon call fetch fetch '{"url":"https://example.com"}' --toon   → 
 you can further save on results.**
 
 ### Side-by-side (Bill 1, made visible)
+
+One tool's schema costs **37 tokens** as native JSON but only **2 tokens** as an
+mcptoon name-index entry — a 95% cut on a single tool. We measured it with tiktoken
+(`cl100k_base`).
 
 **Without mcptoon** (what every MCP client stuffs into context — 37 tokens, measured
 with tiktoken):
@@ -469,7 +484,8 @@ pip install pytest pytest-cov
 python -m pytest tests/ -v   # 790 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule. New features need tests. See
+Zero dependencies is a hard rule — our test suite gates every change (790 tests
+green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
 The codebase: 11,750 lines of Python across 21 modules, zero third-party dependencies.

@@ -4,24 +4,9 @@
 
 **本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
 
-mcptoon 是一个 CLI 工具，站在你的 AI Agent 和 MCP 服务器之间。加多少服务器都行——
-Agent 的上下文窗口始终保持干净。省 token 分两个阶段，别混为一谈：
-
-- **发现工具（默认就省，零操作）**：`mcptoon manifest` 只发名字清单，schema 留在磁盘
-  ——255 个工具从 71,929 降到 581 token，省 99.2%。
-- **调用结果（可选项）**：`mcptoon call` 默认返回 JSON；想更省就加 `--toon`，
-  比 JSON 小约 34%（实测）。
-
-**Mcptoon 是 MCP 工具的原生解耦层**，解决 MCP 协议工具列表大量消耗 token、多 AI Agent
-重复配置工具的痛点。依托 Agent 原生 CLI 调用能力，0 配置开箱即用，自动扫描接管本机
-所有 Agent 的 MCP 工具，工具实例全局共享，大幅削减 token 开销。
-
-**工具是你自己的。** mcptoon 不预装任何工具——它只是一个 128KB 的小命令，像遥控器。
-你想用的 MCP 服务器，用一条命令自己装（npm/pip/网址都行），装哪个、装多少都是你的事。
-哪天不用 mcptoon 了，直接删掉它——你的 MCP 服务器是独立的，照常工作，一个都不会少。
-
-用起来 token 立省 99.2%（实测），本机任何能跑 shell 命令的 Agent——Claude Code、Cursor、
-Codex、脚本、CI——都不用额外配置，直接拿到你全部工具。
+mcptoon 是一个 128KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下文之外。
+发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加
+`--toon` 再省约 34%。每条命令装一个服务器，零配置，本机所有 Agent 共享同一套工具。
 
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
@@ -29,9 +14,29 @@ Codex、脚本、CI——都不用额外配置，直接拿到你全部工具。
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
-**👉 `pip install mcptoon`** · [English](README.md) · [开发者文档](DEVELOPERS.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)
+**👉 [English](README.md) · [开发者文档](DEVELOPERS.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)**
 
 ![Benchmark: 255 tools, 71,929 → 581 tokens](assets/benchmark.svg)
+
+</div>
+
+```bash
+pip install mcptoon
+
+# 加任何 MCP 服务器——一条命令：
+mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+
+# 你的 Agent 实际读到的（只有名字——581 token，而不是 71,929）：
+mcptoon manifest
+```
+
+**工具是你自己的。** mcptoon 不预装任何工具——它只是遥控器，不是运行时。
+你想用的 MCP 服务器，用一条命令自己装（npm/pip/网址都行），装哪个、装多少都是你的事。
+哪天不用 mcptoon 了，直接删掉它——你的 MCP 服务器是独立的，照常工作，一个都不会少。
+
+**Mcptoon 是 MCP 工具的原生解耦层**，解决 MCP 协议工具列表大量消耗 token、多 AI Agent
+重复配置工具的痛点。0 配置开箱即用：自动扫描接管本机所有 Agent——Claude Code、Cursor、
+Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削减 token 开销。
 
 </div>
 
@@ -82,7 +87,9 @@ serve` 桥，并自带一份技能说明书让 Agent 知道什么时候压缩。
 mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令搞定
 ```
 
-就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。
+就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 128KB、
+零依赖；mcptoon 本体不需要任何 API key，也不向任何云端打电话——服务费 $0，一切都在
+你自己的机器上跑。
 
 ---
 
@@ -115,24 +122,25 @@ token（50 工具 114，−99.2%）。
 
 ---
 
-## 行业已经收敛到同一个答案
+## 行业验证了问题——但把解法锁在了门后
 
-工具上下文太重，不再是小众抱怨——它已经是官方盖章的工程问题：
+工具上下文太重，不再是小众抱怨——它已经是官方盖章的工程问题，同一个答案反复出现：
 
-- **Anthropic 的高级工具调用**：[Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
-  把工具定义改为按需搜索加载（58 个工具：5.5 万 → 首载约 500 token，-85%）；
-  [Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
-  把编排挪进代码，中间结果不进模型（官方基准 -37%）。但两者都是 Claude
-  平台的 beta，管的是工具*定义*和编排——在其他所有 agent 上，工具的最终
-  *结果*仍是一个 token 一个 token 进上下文。
-- **MuleSoft 企业网关**：[MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
-  把同一条管线（清洗 → 蒸馏 → 压缩）产品化，其中压缩环节用的正是 TOON——
-  mcptoon 从第一天就在用的 token 友好格式。该网关目前支持到 MCP
-  2025-06-18；mcptoon 的桥已经无状态优先地说上了 2026-07-28 GA 规范。
+- **Anthropic**：[Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+  把工具定义改为按需加载；[Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+  把编排挪进代码。两者都是 Claude 平台 beta。
+- **MuleSoft**：[MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
+  把「清洗 → 蒸馏 → 压缩」产品化（压缩环节是 TOON）。只在企业网关里，
+  支持到 MCP 2025-06-18。
 
-方向已定，差距在覆盖面：TST/PTC 住在 Claude 平台里，网关压缩住在 MuleSoft
-后面。mcptoon 把「结果侧」的纪律装进一个 128KB 的轮子——任何 agent、任何
-机器都能跑，不要模型、不要密钥、不要代理进程。
+| 解法 | 跑在哪 | 门槛 |
+|---|---|---|
+| Tool Search Tool / PTC | Claude 平台 beta | 只管*定义*和编排；其他所有 agent 上，工具*结果*仍逐 token 进上下文 |
+| MuleSoft 网关 | 企业网关 | 要过 MuleSoft；MCP 规范落后一代 |
+| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——128KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
+
+方向已定。mcptoon 是这个答案里**今天就能跑、每个 agent 一次到位**的版本——
+「结果侧」的纪律，不收平台税，不收网关税。
 
 ---
 
@@ -156,6 +164,8 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
+每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 128KB、零依赖，因为服务器是你的
+机器直接运行的外部进程，不是打包进 mcptoon 的代码。四个步骤、一条命令、不用重启 Agent。
 
 **支持任何 MCP 服务器：**
 
@@ -215,7 +225,10 @@ mcptoon call github search_repos '{"query":"mcp"}'
 
 ## 数据
 
-mcptoon 省 token 分两笔账，先分清是哪一段再对数字。
+mcptoon 省 token 分两笔账，先分清是哪一段再对数字。先说短版：255 个工具的原生发现
+要吃掉 71,929 token——128K 窗口的一半以上——同一套工具走名称索引只要 581 token，
+省 99.2%；结果这一侧，`--toon` 在实测集上比 JSON 小 34.0–34.2%。两行都是我们的实测配置
+（tiktoken `cl100k_base`，`assets/benchmark_tiktoken.json`），不是按比例放大的估算。
 
 ### 账 1 · 发现工具（`manifest`）：默认就省 99.2%
 
@@ -255,6 +268,9 @@ schema 塞进上下文（50 工具 14,113 token、255 工具 71,929 token），m
 
 ### 对比实例（账 1 的直观版）
 
+一个工具的 schema 用原生 JSON 是 **37 token**，进 mcptoon 名称索引只要 **2 token**
+——单工具直降 95%（我们的 tiktoken 实测，`cl100k_base`）。
+
 **不用 mcptoon**（所有 MCP 客户端都会往上下文里塞的——37 token，tiktoken 实测）：
 
 ```json
@@ -290,6 +306,9 @@ search_web|query:s*
 - **不存凭证。** API key 从你的配置或环境变量直接传递。
 - **没有依赖。** 纯 Python 标准库。没有供应链要审计。
 - **没有守护进程。** 纯 CLI 不常驻、不监听端口、没有可被攻破的入口。
+
+四个零：0 个遥测端点、0 个存储凭证、0 个第三方依赖、0 个监听端口——攻击面就是
+一条 stdin 管道。
 
 ---
 
@@ -430,10 +449,10 @@ pip install pytest pytest-cov
 python -m pytest tests/ -v   # 790 passed, 1 skipped
 ```
 
-零依赖是硬规则。新功能需要测试。见 [CONTRIBUTING.md](CONTRIBUTING.md)、
-[DEVELOPERS.md](DEVELOPERS.md)。
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 790 个测试。见
+[CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：11,750 行 Python、21 个模块，零第三方依赖。
+项目本体：11,750 行 Python、21 个模块，零第三方依赖——供应链里 0 个要审计的环节。
 
 ---
 
