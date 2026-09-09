@@ -10,6 +10,7 @@ Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**
 results shrink another ~34% with `--toon`. One command per server, zero config,
 and every agent on your machine shares the same toolkit.
 
+[![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/Tests-790%20passed-brightgreen)](#contributing)
@@ -496,6 +497,6 @@ The codebase: 11,750 lines of Python across 21 modules, zero third-party depende
 
 *mcptoon is an independent third-party MCP client, not affiliated with Anthropic.*
 
-**If this helps you, star it so more people can find it.**
+**If mcptoon cut your context bill, star it — that's how other builders find small tools.**
 
 </div>

@@ -8,6 +8,7 @@ mcptoon 是一个 128KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加
 `--toon` 再省约 34%。每条命令装一个服务器，零配置，本机所有 Agent 共享同一套工具。
 
+[![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/Tests-790%20passed-brightgreen)](#贡献)
@@ -460,6 +461,6 @@ python -m pytest tests/ -v   # 790 passed, 1 skipped
 
 *mcptoon 是独立的第三方 MCP 客户端，不隶属于 Anthropic。*
 
-**觉得有用？点个 star 帮更多人发现它。**
+**省下的是你自己的 token。点个 star——小工具就是靠这个被更多人找到的。**
 
 </div>
