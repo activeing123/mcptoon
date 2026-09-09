@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] — 2026-09-09
+
 ### Added
 - `mcptoon demo` next-steps now push `mcptoon sync` (push the config into the
   agents you already run) before the star ask — the trial→adoption move from
