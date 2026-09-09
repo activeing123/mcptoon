@@ -177,6 +177,17 @@ mcptoon manifest    # 直接就能用
 
 ---
 
+## 作为 Agent 技能安装（支持 80+ Agent）
+
+通过开放 Agent 技能生态，教会你的 Agent *使用* mcptoon——技能会被
+Claude Code、Cursor、Codex、Cline、Windsurf 等 75+ Agent 自动识别：
+
+```bash
+npx skills add https://github.com/activeing123/mcptoon --skill mcptoon
+```
+
+---
+
 ## 想要图形界面？——ToonDeck
 
 不想手写配置？**[ToonDeck](https://github.com/activeing123/toondeck)**

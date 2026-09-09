@@ -197,6 +197,17 @@ mcptoon manifest    # usable immediately
 
 ---
 
+## Install as an agent skill (works with 80+ agents)
+
+Teach your agent to *use* mcptoon through the open agent-skills ecosystem — the
+skill is picked up by Claude Code, Cursor, Codex, Cline, Windsurf and 75 more:
+
+```bash
+npx skills add https://github.com/activeing123/mcptoon --skill mcptoon
+```
+
+---
+
 ## Prefer a GUI? ToonDeck
 
 Don't want to hand-edit configs? **[ToonDeck](https://github.com/activeing123/toondeck)**
