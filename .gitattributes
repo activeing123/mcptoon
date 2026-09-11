@@ -1,0 +1,2 @@
+# Treat all files under docs/ as documentation so GitHub Linguist does not count HTML/JS toward the repo language stats
+docs/** linguist-documentation
