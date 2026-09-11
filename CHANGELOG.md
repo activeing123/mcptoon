@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9] — 2026-09-11
+
+### Fixed
+- `mcptoon health` no longer crashes on HTTP-transport servers: health passed
+  `http_url=` to `MCPClient`, which only accepts `http=`, so every HTTP server
+  check died with `TypeError` instead of reporting a status (#18, reported by
+  @examosa). Regression tests now construct a real `MCPClient` with the exact
+  kwargs health passes — the old suite stubbed the whole class, which is how
+  this slipped past 792 green tests.
+
+### Added
+- `mcptoon doctor` prints a one-time GitHub star hint after a fully healthy
+  run. Human output only: at most once per machine (cache marker), never in
+  CI, suppressible via `MCPTOON_NO_STAR_HINT=1`; failing runs and structured
+  outputs stay untouched.
+
 ## [0.7.8] — 2026-09-09
 
 ### Added
