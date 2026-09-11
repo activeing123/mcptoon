@@ -1,7 +1,7 @@
 # Tests for mcptoon health — batch health check
 from unittest.mock import patch, MagicMock
 
-
+from mcptoon.client import MCPClient
 from mcptoon.health import check_server, check_all, format_health_report
 
 
@@ -50,6 +50,36 @@ class TestCheckServer:
                     result = check_server("remote")
                     assert result["status"] == "ok"
                     assert result["tools"] == 2
+
+    def test_http_client_kwargs_issue18(self):
+        """Regression for issue #18: health must pass ``http=`` to MCPClient.
+
+        The kwargs path used ``http_url=``, which the real MCPClient does not
+        accept, so every HTTP-transport health check crashed with a TypeError.
+        """
+        mock_config = {"servers": {"remote": {"transport": "http", "url": "http://localhost:8080/mcp"}}}
+        mock_server_cfg = {"transport": "http", "url": "http://localhost:8080/mcp", "headers": {}}
+
+        mock_client = MagicMock()
+        mock_client.list_tools.return_value = []
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+
+        with patch("mcptoon.health.load_config", return_value=mock_config):
+            with patch("mcptoon.health.get_server_config", return_value=mock_server_cfg):
+                with patch("mcptoon.health.MCPClient", return_value=mock_client) as mock_cls:
+                    check_server("remote")
+        kwargs = mock_cls.call_args.kwargs
+        assert "http_url" not in kwargs
+        assert kwargs.get("http") == "http://localhost:8080/mcp"
+
+    def test_http_kwargs_construct_real_client_issue18(self):
+        """Regression for issue #18: the kwargs health passes must satisfy the
+        real MCPClient signature. The constructor stores state only (no
+        connection happens until __enter__), so this is network-free."""
+        client = MCPClient(http="http://localhost:8080/mcp", headers={}, timeout=5)
+        assert client._http_url == "http://localhost:8080/mcp"
+        assert client._transport == "http"
 
     def test_timeout(self):
         """Server that times out returns timeout status."""

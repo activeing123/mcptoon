@@ -72,7 +72,7 @@ def check_server(name: str, timeout: float = 10.0, config: dict | None = None) -
         if transport == "http":
             url = server_cfg.get("url", "")
             headers = server_cfg.get("headers", {})
-            with MCPClient(http_url=url, headers=headers, timeout=timeout) as client:
+            with MCPClient(http=url, headers=headers, timeout=timeout) as client:
                 tools = client.list_tools()
                 elapsed = (time.time() - start) * 1000
                 return {
