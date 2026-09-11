@@ -468,6 +468,12 @@ python -m pytest tests/ -v   # 798 passed, 1 skipped
 
 ---
 
+## 生态
+
+- **[ToonDeck](https://github.com/activeing123/toondeck)** — mcptoon 的 GUI 控制台（pre-alpha）：MCP server、工具、模型、API key 一桌管理，引擎就是 mcptoon。不想敲命令？用图形界面的它。
+
+---
+
 <div align="center">
 
 *mcptoon 是独立的第三方 MCP 客户端，不隶属于 Anthropic。*

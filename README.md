@@ -502,6 +502,12 @@ The codebase: 11,750 lines of Python across 21 modules, zero third-party depende
 
 ---
 
+## Ecosystem
+
+- **[ToonDeck](https://github.com/activeing123/toondeck)** — GUI console for mcptoon (pre-alpha): every MCP server, tool, model and API key in one desktop deck, with mcptoon as its engine. Prefer pointing and clicking over typing commands? Same engine, graphical.
+
+---
+
 <div align="center">
 
 *mcptoon is an independent third-party MCP client, not affiliated with Anthropic.*
