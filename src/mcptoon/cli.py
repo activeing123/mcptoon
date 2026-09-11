@@ -1367,6 +1367,37 @@ def _cmd_doctor(_rest):
     # ─── Smart tips ───
     _doctor_smart_tips(servers)
 
+    # Star hint: once per machine, only on a fully healthy doctor run, and
+    # never in CI or when suppressed (MCPTOON_NO_STAR_HINT=1). Terminal-only:
+    # the structured outputs other commands serve to scripts are untouched.
+    if issues == 0 and _should_show_star_hint():
+        print()
+        print("  Found this useful? A GitHub star helps others find mcptoon:")
+        print("  https://github.com/activeing123/mcptoon")
+        _mark_star_hint_shown()
+
+
+def _star_hint_marker():
+    return cfg.CACHE_DIR / "star-hint-shown"
+
+
+def _should_show_star_hint() -> bool:
+    """Show the star hint at most once per machine, never in CI."""
+    if os.environ.get("CI") or os.environ.get("MCPTOON_NO_STAR_HINT"):
+        return False
+    try:
+        return not _star_hint_marker().exists()
+    except OSError:
+        return False  # fail quiet: never nag on odd filesystems
+
+
+def _mark_star_hint_shown():
+    try:
+        cfg.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        _star_hint_marker().write_text("shown", encoding="utf-8")
+    except OSError:
+        pass
+
 
 def _doctor_smart_tips(servers: dict):
     """Print smart tips based on current configuration.
