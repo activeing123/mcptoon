@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `manifest --full` now surfaces each parameter's `enum` and `default`
+  (`{url|back|forward|reload}`, `=png`). Before, the human-readable full view
+  dropped them, so an agent could emit a syntactically-valid but *semantically
+  inert* call — e.g. `navigate_page` without `type=url`, a silent no-op. Costs
+  +87 tokens on `--full` (still ~68% under native); the default compact/`--slim`
+  tiers are unchanged.
+
+### Added
+- `validate_args` now rejects a scalar value that is not in the property's
+  `enum` (previously required + type only), closing a serve-mode gateway blind
+  spot where a wrong discriminator (`colorScheme:"PINK"`) was forwarded verbatim.
+- Schema cache now stores a **content fingerprint** (sha256 of tool names +
+  required-arg lists). `set_cached_tools` reports whether the callable surface
+  actually changed, and `note_revalidated(server)` lets a cheap watcher refresh
+  the timestamp without disturbing tools, so long-running tasks stop seeing a
+  5-minute-stale manifest between real changes. (`cache.py`, `tests/test_cache.py`)
+
+
 ## [0.7.9] — 2026-09-11
 
 ### Fixed

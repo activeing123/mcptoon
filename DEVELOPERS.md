@@ -70,7 +70,12 @@ mcptoon serve --http           # 等价 --listen :8080
 ```
 
 - 并行 manifest 加载（20 并发，100 服务器 ≈ 5s）
-- 5 分钟 schema 缓存
+- 5 分钟 schema 缓存（`MCPTOON_CACHE_TTL` 可配）+ **内容指纹**：每条缓存存一个由
+  "工具名 + 各工具 required 列表" 算出的 sha256 短指纹。`set_cached_tools` 在写回时
+  比对指纹，**只有可调用面真变了才算变更**（返回 True），供 `--watch`/外部轮询做漂移
+  检测；`note_revalidated(server)` 让"已廉价确认工具集没变"的轮询只刷新时间戳、不动
+  工具，长任务因此不会在两次真实变更之间吃到 5 分钟陈旧地图。指纹/心跳实现见
+  `cache.py`，测试见 `tests/test_cache.py`。
 - 单次调用 30s 超时（`MCPTOON_CALL_TIMEOUT` 可配），一台服务器卡死不拖垮会话
 - HTTP `/mcp` 端点 + `/health` 健康检查，兼容 MCP HTTP transport
 

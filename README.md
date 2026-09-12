@@ -13,7 +13,7 @@ and every agent on your machine shares the same toolkit.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-804%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-815%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -394,6 +394,17 @@ is already the leanest tier:
 via `inspect` or `manifest --full`. Defaulting to full schemas hands the 99.2% right
 back.
 
+**The recommended loop (and why it's load-bearing).** Compact names are a *catalog*,
+not a *calling contract*. Measured on 41 live tools (full-schema gold standard, one
+inference model per condition): an agent that guesses arguments from names alone lands
+**4/41 ≈ 10%** valid calls — the killers are non-guessable names like `account` and
+`pageId` — while an agent that runs `inspect <server> <tool>` once for the 2–3 tools a
+turn actually uses hits **41/41 ≈ 100%**, identical to injecting every schema. A turn
+touches a handful of tools, so a few on-demand `inspect` calls stay far below the cost
+of a full-schema dump: you keep ~99% of the token savings *and* full call accuracy. The
+rule for agents: **use `manifest` to choose, `inspect` before you call.**
+
+
 **call (results): JSON by default, --toon to save**
 
 | Tier | Output | vs JSON | Origin |
@@ -491,10 +502,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 803 passed, 1 skipped
+python -m pytest tests/ -v   # 814 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (803 tests
+Zero dependencies is a hard rule — our test suite gates every change (814 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
