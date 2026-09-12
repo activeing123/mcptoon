@@ -1,0 +1,12 @@
+{
+  "name": "mcptoon",
+  "version": "0.7.9",
+  "description": "Zero-dependency CLI to discover and call MCP servers with compact manifests and TOON-compressed results; doubles as a single stdio bridge.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "mcptoon": {
+      "command": "mcptoon",
+      "args": ["serve"]
+    }
+  }
+}
