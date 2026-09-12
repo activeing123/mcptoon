@@ -20,6 +20,7 @@ TTL: 5 minutes (configurable via MCPTOON_CACHE_TTL env var)
 
 Thread-safe: uses file locking for multi-process safety.
 """
+import hashlib
 import json
 import os
 import time
@@ -40,6 +41,20 @@ def _get_ttl() -> int:
         return int(os.environ.get("MCPTOON_CACHE_TTL", _DEFAULT_TTL))
     except ValueError:
         return _DEFAULT_TTL
+
+
+def tools_fingerprint(tools: list[dict]) -> str:
+    """Content signature for a server's tool set: sorted names + each tool's
+    required-param list. Cheap and stable; changes exactly when the callable
+    surface changes (tool added/removed, or a tool's required args change),
+    which is precisely when a cached manifest becomes unsafe to trust.
+    """
+    names = sorted(
+        (t.get("name", "?"), sorted(t.get("inputSchema", {}).get("required", [])))
+        for t in tools
+    )
+    blob = json.dumps(names, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:16]
 
 
 def _load_cache() -> dict:
@@ -79,12 +94,47 @@ def get_cached_tools(server: str) -> list[dict] | None:
     return entry.get("tools", [])
 
 
-def set_cached_tools(server: str, tools: list[dict]):
-    """Cache tools for a server (thread-safe, atomic write)."""
+def set_cached_tools(server: str, tools: list[dict]) -> bool:
+    """Cache tools for a server (thread-safe, atomic write).
+
+    Stores a content fingerprint alongside the tools and returns True when the
+    server's *callable surface* (tool names + required args) actually changed
+    versus what was cached, False when it is identical. Callers such as the
+    watch loop use that signal to detect MCP drift without diffing payloads.
+    """
+    fp = tools_fingerprint(tools)
     with _process_lock:
         cache = _load_cache()
-        cache[server] = {"tools": tools, "ts": time.time()}
+        old_fp = cache.get(server, {}).get("fp")
+        cache[server] = {"tools": tools, "ts": time.time(), "fp": fp}
         _save_cache(cache)
+    return old_fp != fp
+
+
+def cached_fingerprint(server: str) -> str | None:
+    """Last cached content fingerprint for a server, or None if not cached."""
+    with _process_lock:
+        cache = _load_cache()
+    return cache.get(server, {}).get("fp")
+
+
+def note_revalidated(server: str) -> bool:
+    """Refresh a cached server's timestamp without touching its tools.
+
+    Used by a background watcher that cheaply confirmed (e.g. via a fast
+    list_tools whose fingerprint matched) that the cached manifest is still
+    accurate: this keeps long-running tasks from seeing a 5-minute-stale
+    manifest when the tool set has in fact not changed. Returns True if an
+    entry existed and was refreshed, False otherwise.
+    """
+    with _process_lock:
+        cache = _load_cache()
+        entry = cache.get(server)
+        if not entry:
+            return False
+        entry["ts"] = time.time()
+        _save_cache(cache)
+    return True
 
 
 def clear_cache():
