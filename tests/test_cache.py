@@ -13,7 +13,6 @@
 
 """Tests for schema cache content fingerprinting and staleness handling."""
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -58,28 +57,24 @@ class TestFingerprint(CacheIsolated):
         self.assertTrue(c.set_cached_tools("s", _tools([("add", ["a", "b"]), ("del", ["id"])])),
                         "adding a tool -> changed")
 
-    def test_cached_fingerprint_matches_last_set(self):
+    def test_fingerprint_stored_on_entry(self):
+        # serve's drift logging depends on the fp field persisting in the cache.
         tools = _tools([("add", ["a"])])
         c.set_cached_tools("s", tools)
-        self.assertEqual(c.cached_fingerprint("s"), c.tools_fingerprint(tools))
-        self.assertIsNone(c.cached_fingerprint("missing"))
+        entry = c._load_cache()["s"]
+        self.assertEqual(entry["fp"], c.tools_fingerprint(tools))
+        self.assertIn("tools", entry)
+        self.assertIn("ts", entry)
 
-
-class TestRevalidate(CacheIsolated):
-    def test_note_revalidated_keeps_tools_and_clears_age(self):
-        c.set_cached_tools("s", _tools([("add", ["a"])]))
-        # age the entry past the default TTL
-        data = c._load_cache()
-        data["s"]["ts"] = time.time() - 99999
-        c._save_cache(data)
-        self.assertIsNone(c.get_cached_tools("s"), "expired -> not served")
-        self.assertTrue(c.note_revalidated("s"), "watcher can refresh a live entry")
-        self.assertIsNotNone(c.get_cached_tools("s"), "refresh -> fresh again")
-        # tools content preserved by the heartbeat
-        self.assertEqual([t["name"] for t in c.get_cached_tools("s")], ["add"])
-
-    def test_note_revalidated_missing_entry_returns_false(self):
-        self.assertFalse(c.note_revalidated("never-cached"))
+    def test_fingerprint_survives_malformed_tools(self):
+        # Real servers sometimes emit null inputSchema / junk entries; the
+        # fingerprint must not raise.
+        self.assertIsInstance(c.tools_fingerprint([
+            {"name": "ok", "inputSchema": None},
+            {"name": "no_schema"},
+            "not-a-dict",
+            {"inputSchema": {"required": None}},
+        ]), str)
 
 
 if __name__ == "__main__":

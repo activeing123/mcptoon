@@ -20,10 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `enum` (previously required + type only), closing a serve-mode gateway blind
   spot where a wrong discriminator (`colorScheme:"PINK"`) was forwarded verbatim.
 - Schema cache now stores a **content fingerprint** (sha256 of tool names +
-  required-arg lists). `set_cached_tools` reports whether the callable surface
-  actually changed, and `note_revalidated(server)` lets a cheap watcher refresh
-  the timestamp without disturbing tools, so long-running tasks stop seeing a
-  5-minute-stale manifest between real changes. (`cache.py`, `tests/test_cache.py`)
+  required-arg lists, hardened against malformed/`null` schemas).
+  `set_cached_tools` reports whether the callable surface actually changed, and
+  `serve`'s parallel manifest refresh logs tool-set drift from that signal — no
+  payload diffing. (`cache.py`, `serve.py`, `tests/test_cache.py`)
 
 
 ## [0.7.9] — 2026-09-11

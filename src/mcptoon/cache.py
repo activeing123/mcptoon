@@ -48,12 +48,16 @@ def tools_fingerprint(tools: list[dict]) -> str:
     required-param list. Cheap and stable; changes exactly when the callable
     surface changes (tool added/removed, or a tool's required args change),
     which is precisely when a cached manifest becomes unsafe to trust.
+    Defensive against malformed servers (null inputSchema, non-dict entries).
     """
-    names = sorted(
-        (t.get("name", "?"), sorted(t.get("inputSchema", {}).get("required", [])))
-        for t in tools
-    )
-    blob = json.dumps(names, ensure_ascii=False).encode("utf-8")
+    surface = []
+    for t in tools:
+        if not isinstance(t, dict):
+            continue
+        req = (t.get("inputSchema") or {}).get("required") or []
+        surface.append((t.get("name", "?"), sorted(req)))
+    surface.sort()
+    blob = json.dumps(surface, ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()[:16]
 
 
@@ -99,8 +103,9 @@ def set_cached_tools(server: str, tools: list[dict]) -> bool:
 
     Stores a content fingerprint alongside the tools and returns True when the
     server's *callable surface* (tool names + required args) actually changed
-    versus what was cached, False when it is identical. Callers such as the
-    watch loop use that signal to detect MCP drift without diffing payloads.
+    versus what was cached, False when it is identical. `serve` uses that
+    signal to log MCP tool drift across manifest refreshes without diffing
+    payloads itself.
     """
     fp = tools_fingerprint(tools)
     with _process_lock:
@@ -109,32 +114,6 @@ def set_cached_tools(server: str, tools: list[dict]) -> bool:
         cache[server] = {"tools": tools, "ts": time.time(), "fp": fp}
         _save_cache(cache)
     return old_fp != fp
-
-
-def cached_fingerprint(server: str) -> str | None:
-    """Last cached content fingerprint for a server, or None if not cached."""
-    with _process_lock:
-        cache = _load_cache()
-    return cache.get(server, {}).get("fp")
-
-
-def note_revalidated(server: str) -> bool:
-    """Refresh a cached server's timestamp without touching its tools.
-
-    Used by a background watcher that cheaply confirmed (e.g. via a fast
-    list_tools whose fingerprint matched) that the cached manifest is still
-    accurate: this keeps long-running tasks from seeing a 5-minute-stale
-    manifest when the tool set has in fact not changed. Returns True if an
-    entry existed and was refreshed, False otherwise.
-    """
-    with _process_lock:
-        cache = _load_cache()
-        entry = cache.get(server)
-        if not entry:
-            return False
-        entry["ts"] = time.time()
-        _save_cache(cache)
-    return True
 
 
 def clear_cache():

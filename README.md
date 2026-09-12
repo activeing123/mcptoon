@@ -13,7 +13,7 @@ and every agent on your machine shares the same toolkit.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-815%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-814%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 
@@ -502,10 +502,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 814 passed, 1 skipped
+python -m pytest tests/ -v   # 813 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (814 tests
+Zero dependencies is a hard rule — our test suite gates every change (813 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 

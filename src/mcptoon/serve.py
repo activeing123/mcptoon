@@ -232,10 +232,13 @@ class MCPServerBridge:
         def _fetch_one(srv: str) -> tuple[str, list[dict]]:
             try:
                 tools = self._pool.list_tools(srv)
-                # Cache the result
+                # Cache the result; the fingerprint tells us whether this
+                # server's callable surface drifted since the last refresh.
                 try:
                     from .cache import set_cached_tools
-                    set_cached_tools(srv, tools)
+                    if set_cached_tools(srv, tools):
+                        _log(f"  [{srv}] tool set changed on refresh "
+                             f"({len(tools)} tools) - index updated")
                 except Exception:
                     pass
                 return srv, tools
