@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.10] — 2026-09-12
+
 ### Fixed
 - `manifest --full` now surfaces each parameter's `enum` and `default`
   (`{url|back|forward|reload}`, `=png`). Before, the human-readable full view

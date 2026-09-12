@@ -33,12 +33,13 @@ Breaking changes must land as deprecation warnings one minor version before remo
 
 Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritual:
 
-- **The version lives in four places.** `pyproject.toml`, `server.json`
-  (twice: top level and `packages[]`), and the hardcoded `__version__` in
-  `src/mcptoon/__init__.py`. 0.7.6 shipped with `mcptoon --version`
-  printing 0.7.5 because the last one was missed — caught only by the
-  post-release smoke test. `tests/test_registry_sync.py` now pins all of
-  them together; update every one on every bump.
+- **The version lives in five places.** `pyproject.toml`, `server.json`
+  (twice: top level and `packages[]`), the hardcoded `__version__` in
+  `src/mcptoon/__init__.py`, and `gemini-extension.json`. 0.7.6 shipped with
+  `mcptoon --version` printing 0.7.5 because the last one was missed — caught
+  only by the post-release smoke test. `tests/test_registry_sync.py` pins the
+  registry set and `tests/test_gemini_manifest.py` pins the extension; update
+  every one on every bump and run both suites green.
 - **The publish workflows used to race each other.** `publish.yml` and
   `publish-mcp.yml` start on the same release event; the registry run
   validated the PyPI version while the wheel was still uploading and failed
