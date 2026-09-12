@@ -253,6 +253,65 @@ class TestValidateArgs:
         assert len(errors) == 1
         assert "Missing required" in errors[0]
 
+    def test_validate_enum_member_pass(self):
+        """Scalar value inside an enum -> no error."""
+        schema = {"type": "object", "properties": {
+            "colorScheme": {"type": "string", "enum": ["dark", "light", "auto"]}}}
+        assert validate_args({"colorScheme": "dark"}, schema) == []
+
+    def test_validate_enum_member_reject(self):
+        """Scalar value NOT in enum -> error (guards silent no-op discriminators)."""
+        schema = {"type": "object", "properties": {
+            "type": {"type": "string", "enum": ["url", "back", "forward", "reload"]}}}
+        errors = validate_args({"type": "go"}, schema)
+        assert len(errors) == 1
+        assert "not one of" in errors[0]
+
+    def test_validate_enum_skips_non_scalar(self):
+        """Enum check only applies to scalars; arrays/objects are not rejected."""
+        schema = {"type": "object", "properties": {
+            "opts": {"type": "object", "enum": [{"a": 1}]}}}
+        assert validate_args({"opts": {"a": 1}}, schema) == []
+
+
+class TestManifestFullKeepsDiscriminators:
+    """`manifest --full` must surface enum/default: dropping them makes an
+    agent emit syntactically-valid but semantically-inert calls."""
+
+    def test_full_output_includes_enum(self):
+        from mcptoon.manifest import format_manifest
+        tools = [{
+            "name": "navigate_page",
+            "description": "Go to a URL or navigate history",
+            "inputSchema": {"type": "object", "properties": {
+                "pageId": {"type": "number"},
+                "type": {"type": "string", "enum": ["url", "back", "forward", "reload"]},
+            }, "required": ["pageId"]},
+        }]
+        out = format_manifest({"chrome": tools}, full=True)
+        assert "url|back|forward|reload" in out, out
+
+    def test_full_output_includes_default(self):
+        from mcptoon.manifest import format_manifest
+        tools = [{
+            "name": "shot",
+            "description": "screenshot",
+            "inputSchema": {"type": "object", "properties": {
+                "format": {"type": "string", "enum": ["png", "jpeg"], "default": "png"},
+            }},
+        }]
+        out = format_manifest({"c": tools}, full=True)
+        assert "{png|jpeg}" in out
+        assert "=png" in out
+
+    def test_full_output_list_type_rendered(self):
+        from mcptoon.manifest import format_manifest
+        tools = [{"name": "x", "description": "d",
+                  "inputSchema": {"type": "object", "properties": {
+                      "v": {"type": ["string", "null"]}}}}]
+        out = format_manifest({"s": tools}, full=True)
+        assert "string|null" in out
+
 
 class TestNamespacing:
     def test_namespaced_tool_name(self):

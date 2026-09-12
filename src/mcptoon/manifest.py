@@ -146,6 +146,29 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
+def _prop_hints(pv: dict) -> str:
+    """Render compact enum/default hints for a property line in --full output.
+
+    These are the fields whose omission makes an agent emit valid-but-wrong
+    calls, so `manifest --full` must surface them. Keeps it terse:
+      enum    -> ` {a|b|c}` (capped at 8 values, `|+N` if more)
+      default -> ` =<val>`
+    """
+    if not isinstance(pv, dict):
+        return ""
+    parts = []
+    enum_val = pv.get("enum")
+    if isinstance(enum_val, list) and enum_val:
+        cap = 8
+        shown = enum_val[:cap]
+        tail = "|+" + str(len(enum_val) - cap) if len(enum_val) > cap else ""
+        joined = "|".join(str(v) for v in shown)
+        parts.append(f" {{{joined}{tail}}}")
+    if "default" in pv:
+        parts.append(f" ={pv['default']}")
+    return "".join(parts)
+
+
 def format_manifest(manifest: dict, full: bool = False) -> str:
     """Format manifest as human-readable text."""
     lines = []
@@ -168,9 +191,16 @@ def format_manifest(manifest: dict, full: bool = False) -> str:
                 if props:
                     for pk, pv in props.items():
                         ptype = pv.get("type", "?")
+                        if isinstance(ptype, list):
+                            ptype = "|".join(str(x) for x in ptype)
                         pdesc = pv.get("description", "")[:60]
                         req = " (required)" if pk in schema.get("required", []) else ""
-                        lines.append(f"      {pk}: {ptype}{req} — {pdesc}")
+                        # Enum and default are load-bearing discriminators: an
+                        # agent that cannot see them emits syntactically-valid
+                        # but semantically-inert calls (e.g. navigate_page
+                        # without type=url silently does nothing). Keep them.
+                        hints = _prop_hints(pv)
+                        lines.append(f"      {pk}: {ptype}{req} — {pdesc}{hints}")
         else:
             names = " ".join(t.get("name", "?") for t in tools)
             lines.append(f"  {server} ({len(tools)}): {names}")

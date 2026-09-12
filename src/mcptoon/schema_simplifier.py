@@ -203,7 +203,8 @@ def validate_args(args: dict | None, full_schema: dict | None) -> list[str]:
     It checks:
       - Required fields are present
       - Type matches (string, number, boolean, array, object)
-      - Does NOT check: pattern, format, enum, additionalProperties
+      - Enum membership for scalar values (when the schema lists an enum)
+      - Does NOT check: pattern, format, additionalProperties
     """
     errors: list[str] = []
 
@@ -248,6 +249,21 @@ def validate_args(args: dict | None, full_schema: dict | None) -> list[str]:
             errors.append(
                 f"Parameter '{key}': expected {expected_type}, "
                 f"got {type(val).__name__}"
+            )
+            continue
+        # Enum membership: a wrong discriminator (e.g. colorScheme="PINK",
+        # type="go") passes type checks but is a silent no-op or server error.
+        # Only enforce for scalar values so nested objects/arrays are skipped.
+        enum_val = properties.get(key, {}).get("enum")
+        if (
+            isinstance(enum_val, list)
+            and enum_val
+            and isinstance(val, (str, int, float, bool))
+            and val not in enum_val
+        ):
+            errors.append(
+                f"Parameter '{key}': {val!r} is not one of "
+                f"{enum_val}"
             )
 
     return errors
