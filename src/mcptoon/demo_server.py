@@ -364,7 +364,7 @@ def _tool(name: str, title: str, description: str, properties: dict,
     schema = {"type": "object", "properties": properties, "required": required}
     if required:
         schema["additionalProperties"] = False
-    return {
+    definition = {
         "name": name,
         "title": title,
         "description": description,
@@ -377,10 +377,222 @@ def _tool(name: str, title: str, description: str, properties: dict,
             "openWorldHint": False,
         },
     }
+    # Attached by name so the return contract sits with the code that produces it.
+    # test_every_tool_declares_its_output_schema fails if a tool is missing here.
+    output_schema = OUTPUT_SCHEMAS.get(name)
+    if output_schema is not None:
+        definition["outputSchema"] = output_schema
+    return definition
 
 
 def _prop(description: str) -> dict:
     return {"type": "string", "description": description}
+
+
+def _f(kind: str | None, note: str) -> dict:
+    """One documented field of a return value; `kind` is None when a field's type
+    follows its input, because a wrong claim is worse than no claim."""
+    field = {} if kind is None else {"type": kind}
+    field["description"] = note
+    return field
+
+
+# Every tool here answers with a JSON object, so the return shape belongs in the
+# definition rather than in the prose: a client reads it off `outputSchema` and the
+# description is then free to carry only what a schema cannot — what the tool is for,
+# when not to reach for it, and what it will not tell you.
+#
+# Field notes are one short sentence each on purpose: mcptoon's own compactor keeps a
+# first sentence and trims the rest, so anything longer would be cut in transit.
+# The keys below are asserted against the handlers in tests/test_demo_server.py, which
+# fails if a tool starts or stops returning a field.
+OUTPUT_SCHEMAS = {
+    "echo_message": {
+        "type": "object",
+        "properties": {
+            "echo": _f("string", "The message text, returned byte-for-byte as submitted."),
+            "chars": _f("integer", "Character length of the echoed text."),
+            "estimated_tokens": _f("integer", "Characters divided by four, floored at one."),
+            "transformed": _f("boolean", "Always false: this tool alters nothing."),
+        },
+        "required": ["echo", "chars", "estimated_tokens", "transformed"],
+    },
+    "compare_formats": {
+        "type": "object",
+        "properties": {
+            "formats": {
+                "type": "object",
+                "description": "One entry per rendering: json, toon and compact.",
+                "properties": {
+                    kind: {
+                        "type": "object",
+                        "description": f"The {kind} rendering and what it cost.",
+                        "properties": {
+                            "chars": _f("integer", "Full length of the rendering, preview or not."),
+                            "estimated_tokens": _f("integer", "Token estimate for that rendering."),
+                            "char_savings_pct": _f("number", "Percentage saved against the JSON form."),
+                            "preview": _f("string", "The rendering, truncated past 500 characters."),
+                        },
+                        "required": ["chars", "estimated_tokens", "char_savings_pct", "preview"],
+                    }
+                    for kind in ("json", "toon", "compact")
+                },
+                "required": ["json", "toon", "compact"],
+            },
+            "slim_note": _f("string", "Why the SLIM format is absent from this comparison."),
+        },
+        "required": ["formats", "slim_note"],
+    },
+    "encode_toon": {
+        "type": "object",
+        "properties": {
+            "toon": _f("string", "The TOON encoding, previewed past 500 characters."),
+            "chars": _f("integer", "Length of the full encoding, preview or not."),
+            "truncated": _f("boolean", "Whether the text above was cut for transport."),
+        },
+        "required": ["toon", "chars", "truncated"],
+    },
+    "decode_toon": {
+        "type": "object",
+        "properties": {
+            "decoded": _f(None, "The parsed value: a JSON document of any type."),
+            "round_trip": _f("string", "That value re-serialised as JSON, keys sorted."),
+        },
+        "required": ["decoded", "round_trip"],
+    },
+    "estimate_tokens": {
+        "type": "object",
+        "properties": {
+            "chars": _f("integer", "Character length of the submitted text."),
+            "estimated_tokens": _f("integer", "The figure itself: characters divided by four."),
+            "method": _f("string", "How the number was produced, stated plainly."),
+            "bias": _f("string", "Where this estimate is wrong, and by how much."),
+        },
+        "required": ["chars", "estimated_tokens", "method", "bias"],
+    },
+    "simplify_tool_schema": {
+        "type": "object",
+        "properties": {
+            "slim_tool": _f("object", "The compacted tool definition, in tools/list shape."),
+            "full_tokens": _f("integer", "Tokens of the definition as submitted."),
+            "simplified_tokens": _f("integer", "Tokens of the compacted definition."),
+            "reduction_pct": _f("number", "Percentage saved by compaction."),
+            "rules_applied": {
+                "type": "object",
+                "description": "Which compaction rules fired on this definition.",
+                "properties": {
+                    "description": _f("string", "How the tool description was shortened."),
+                    "enum_values_kept": _f("integer", "Maximum enum values retained."),
+                    "schema_keys_dropped": _f("array", "Schema keys removed as non-essential."),
+                },
+                "required": ["description", "enum_values_kept", "schema_keys_dropped"],
+            },
+        },
+        "required": ["slim_tool", "full_tokens", "simplified_tokens", "reduction_pct",
+                     "rules_applied"],
+    },
+    "build_tool_manifest": {
+        "type": "object",
+        "properties": {
+            "name_index": _f("string", "The compact index: server, then its tool names."),
+            "tool_count": _f("integer", "Names indexed across every server."),
+            "skipped_entries": _f("array", "Positions of entries carrying no usable name."),
+            "empty_servers": _f("array", "Servers that contributed no names at all."),
+            "full_tokens": _f("integer", "Tokens the submitted manifest would have cost."),
+            "simplified_tokens": _f("integer", "Tokens the name index costs instead."),
+            "reduction_pct": _f("number", "Percentage saved, zero when nothing was indexed."),
+            "slim_tools": _f("array", "Compacted definitions; present only when asked for."),
+        },
+        "required": ["name_index", "tool_count", "skipped_entries", "empty_servers",
+                     "full_tokens", "simplified_tokens", "reduction_pct"],
+    },
+    "report_benchmark_rows": {
+        "type": "object",
+        "properties": {
+            "encoding": _f("string", "Tokenizer behind the figures: tiktoken cl100k_base."),
+            "source": _f("string", "Where the measurements came from."),
+            "measured_at_build_time": _f("boolean", "True: these are archived runs, not live calls."),
+            "rows": {
+                "type": "array",
+                "description": "One row per tool-set size, smallest first.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "tools": _f("integer", "Tools in the measured set."),
+                        "json": _f("integer", "Tokens of the native full-schema listing."),
+                        "toon": _f("integer", "Tokens when served as TOON."),
+                        "slim": _f("integer", "Tokens when served as a compact manifest."),
+                        "compact": _f("integer", "Tokens of the name index alone."),
+                        "toon_save_pct": _f("number", "Saving of TOON against JSON."),
+                        "slim_save_pct": _f("number", "Saving of the manifest against JSON."),
+                        "compact_save_pct": _f("number", "Saving of the name index against JSON."),
+                    },
+                    "required": ["tools", "json", "toon", "slim", "compact", "toon_save_pct",
+                                 "slim_save_pct", "compact_save_pct"],
+                },
+            },
+        },
+        "required": ["encoding", "source", "measured_at_build_time", "rows"],
+    },
+    "list_supported_agents": {
+        "type": "object",
+        "properties": {
+            "platform": _f("string", "sys.platform of the machine answering the call."),
+            "agents": {
+                "type": "array",
+                "description": "One entry per agent mcptoon sync can write to.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": _f("string", "Agent identifier accepted by `mcptoon sync`."),
+                        "config_paths": _f("array", "Config file paths resolved for that agent."),
+                    },
+                    "required": ["id", "config_paths"],
+                },
+            },
+            "installed_check": _f("string", "\"not performed\": paths are derived, never stat'd."),
+        },
+        "required": ["platform", "agents", "installed_check"],
+    },
+    "validate_config_draft": {
+        "type": "object",
+        "properties": {
+            "entry_count": _f("integer", "Server entries examined in the draft."),
+            "entries": {
+                "type": "array",
+                "description": "One verdict per server entry, in submitted order.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": _f("string", "The entry's key in the submitted config."),
+                        "transport": _f("string", "stdio, http, or none when nothing is usable."),
+                        "problems": _f("array", "Every defect found; empty means clean."),
+                    },
+                    "required": ["name", "transport", "problems"],
+                },
+            },
+            "not_checked": _f("array", "What a clean report still does not prove."),
+        },
+        "required": ["entry_count", "entries", "not_checked"],
+    },
+    "describe_runtime": {
+        "type": "object",
+        "properties": {
+            "mcptoon_version": _f("string", "Version of the running package."),
+            "server_name": _f("string", "MCP serverInfo name this server reports."),
+            "tool_count": _f("integer", "Tools this server answers tools/list with."),
+            "supported_protocol_versions": _f("array", "MCP protocol versions it will negotiate."),
+            "python": _f("string", "Python interpreter version in this container."),
+            "platform": _f("string", "Platform triple of the machine answering the call."),
+            "third_party_runtime_dependencies": _f(
+                None, "List of install requires, or a sentence when running from source."),
+        },
+        "required": ["mcptoon_version", "server_name", "tool_count",
+                     "supported_protocol_versions", "python", "platform",
+                     "third_party_runtime_dependencies"],
+    },
+}
+
 
 
 TOOLS = [
@@ -685,7 +897,13 @@ class DemoServer:
         except Exception as exc:
             _log(f"{name} raised {type(exc).__name__}: {exc}")
             return _make_tool_error(f"{name} failed: {type(exc).__name__}: {exc}")
-        return _make_tool_result(payload)
+        result = _make_tool_result(payload)
+        # MCP pairs an `outputSchema` with `structuredContent`: the schema is the
+        # promise, this is the delivery. Sent only for a payload that is the object
+        # shape the schema describes; the text block above stays for old clients.
+        if "outputSchema" in definition and isinstance(payload, dict):
+            result["structuredContent"] = payload
+        return result
 
     # -- loop ----------------------------------------------------------------
     def run(self):

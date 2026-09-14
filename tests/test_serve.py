@@ -198,6 +198,57 @@ class TestSimplifyToolDef:
         assert simplified["annotations"] is not None
         assert simplified["annotations"].get("destructiveHint") is True
 
+    def test_simplify_tool_def_keeps_title_and_output_schema(self):
+        """The compactor shortens schemas; it does not delete declared metadata.
+
+        An MCP client that asked for `tools/list` gets the return contract from
+        `outputSchema` and the human label from `title`; dropping either leaves the
+        description to carry a shape the server already published.
+        """
+        full = {
+            "name": "get_item",
+            "title": "Get one item",
+            "description": "Fetch one item by id. Returns the item record.",
+            "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}},
+                            "required": ["id"]},
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "item": {"type": "object", "description": "The record that was fetched."},
+                    "found": {"type": "boolean", "description": "False when the id is unknown."},
+                },
+                "required": ["item", "found"],
+            },
+            "annotations": {"readOnlyHint": True, "openWorldHint": True},
+        }
+        slim = simplify_tool_def(full)
+        assert slim["title"] == "Get one item"
+        assert slim["annotations"]["openWorldHint"] is True
+        out = slim["outputSchema"]
+        assert out["type"] == "object"
+        assert out["properties"]["found"]["description"] == "False when the id is unknown."
+        assert out["required"] == ["item", "found"]
+
+    def test_simplify_tool_def_invents_nothing(self):
+        """A server that declares no title or output schema must not gain one."""
+        slim = simplify_tool_def({
+            "name": "plain",
+            "description": "Do a thing.",
+            "inputSchema": {"type": "object", "properties": {}},
+        })
+        assert "title" not in slim
+        assert "outputSchema" not in slim
+
+    def test_simplify_tool_def_drops_a_hollow_output_schema(self):
+        """`{}` is not a contract; passing it through would advertise an empty shape."""
+        slim = simplify_tool_def({
+            "name": "hollow",
+            "description": "Do a thing.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "outputSchema": {},
+        })
+        assert "outputSchema" not in slim
+
 
 class TestValidateArgs:
     def test_validate_required_pass(self):

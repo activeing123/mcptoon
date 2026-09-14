@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`serve` stops erasing declared MCP fields from `tools/list`.** The compactor
+  rebuilt every definition from three fields, so a server's `title`, its
+  `outputSchema` and the `openWorldHint` annotation vanished in transit: the client
+  asked for the contract and got a shorter version of it instead, with the return
+  shape left to guesswork. Those fields now pass through (the schema inside
+  `outputSchema` is still compacted, and a server that declares nothing gains
+  nothing).
+
+### Added
+- **The demo server's eleven tools declare what they return.** Each carries an
+  `outputSchema` whose fields are documented one sentence at a time, and answers
+  `tools/call` with `structuredContent` beside the text block, as MCP pairs them. The
+  notes are short on purpose: mcptoon's own compactor keeps a first sentence and trims
+  the rest, so anything longer is cut before a client sees it. Tests assert the schema
+  against the handlers, so a field that stops being returned fails the suite rather
+  than shipping as a lie.
+
 ## [0.7.12] — 2026-09-14
 
 ### Added

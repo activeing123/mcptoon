@@ -169,10 +169,24 @@ def simplify_tool_def(tool_def: dict) -> dict:
         "inputSchema": simplify_schema(tool_def.get("inputSchema")),
     }
 
+    # `title` and `outputSchema` are MCP-spec fields a client reads off tools/list.
+    # This function compacts schemas; it has no business deleting declared metadata.
+    # Dropping them cost something real: the return contract vanished from the agent's
+    # view, leaving the prose as the only place a tool's output was explained — so the
+    # description had to spend tokens re-stating a shape the server already published.
+    title = tool_def.get("title")
+    if isinstance(title, str) and title.strip():
+        result["title"] = title.strip()
+
+    output_schema = tool_def.get("outputSchema")
+    if isinstance(output_schema, dict) and output_schema:
+        result["outputSchema"] = simplify_schema(output_schema)
+
     # Keep annotations if present (MCP spec optional field)
     if "annotations" in tool_def and isinstance(tool_def["annotations"], dict):
         annotations = {}
-        for key in ("title", "destructiveHint", "readOnlyHint", "idempotentHint"):
+        for key in ("title", "destructiveHint", "readOnlyHint", "idempotentHint",
+                    "openWorldHint"):
             if key in tool_def["annotations"]:
                 annotations[key] = tool_def["annotations"][key]
         if annotations:

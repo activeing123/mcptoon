@@ -193,6 +193,96 @@ class TestToolList(unittest.TestCase):
         self.assertEqual(len(hits), 1, "an unhedged 'writes' must be caught")
 
 
+def _walk_fields(properties: dict, path: str = ""):
+    """Yield (path, field) for every property declaration, nested ones included."""
+    for key, field in properties.items():
+        here = f"{path}.{key}" if path else key
+        yield here, field
+        if isinstance(field, dict):
+            nested = field.get("properties")
+            if isinstance(nested, dict):
+                yield from _walk_fields(nested, here)
+            items = field.get("items")
+            if isinstance(items, dict) and isinstance(items.get("properties"), dict):
+                yield from _walk_fields(items["properties"], f"{here}[]")
+
+
+class TestReturnContract(unittest.TestCase):
+    """The output half of a definition: the `outputSchema` and the `structuredContent`
+    that has to back it.
+
+    Glama's TDQS v1.3 reads the output schema itself and grades it by *what it
+    documents* — a bare `{"type": "object"}` relieves a description of nothing — so
+    the shapes below are scored, not decorative. Which also makes them a promise: a
+    field named here that a handler stopped returning would be a lie on the wire.
+    """
+
+    def test_every_tool_declares_its_output_schema(self):
+        for tool in ds.TOOLS:
+            with self.subTest(tool=tool["name"]):
+                schema = tool.get("outputSchema")
+                self.assertIsInstance(schema, dict, "the return shape must be declared")
+                self.assertEqual(schema["type"], "object")
+                self.assertTrue(schema["properties"], "an empty schema documents nothing")
+                for key in schema["required"]:
+                    self.assertIn(key, schema["properties"], f"'{key}' is not a field")
+
+    def test_every_returned_field_is_documented(self):
+        for tool in ds.TOOLS:
+            with self.subTest(tool=tool["name"]):
+                for where, field in _walk_fields(tool["outputSchema"]["properties"]):
+                    self.assertIsInstance(field, dict)
+                    self.assertTrue(field.get("description"), f"{where} is undocumented")
+
+    def test_field_notes_survive_compaction_untouched(self):
+        """mcptoon's own compactor keeps a first sentence and trims the rest, so a long
+        note is exactly what an agent downstream never sees. Anything cut here is cut
+        in transit to every client."""
+        for tool in ds.TOOLS:
+            for where, field in _walk_fields(tool["outputSchema"]["properties"]):
+                note = field["description"]
+                with self.subTest(tool=tool["name"], field=where):
+                    self.assertEqual(note, schema_simplifier._truncate_desc(note),
+                                     "the compactor rewrote this note — front-load it")
+
+    def test_handlers_return_what_the_schema_promises(self):
+        for tool in ds.TOOLS:
+            name = tool["name"]
+            with self.subTest(tool=name):
+                result = call(name, VALID_CALLS[name])
+                payload = result.get("structuredContent")
+                self.assertIsInstance(
+                    payload, dict,
+                    "a declared outputSchema must be backed by structuredContent")
+                declared = set(tool["outputSchema"]["properties"])
+                for key in tool["outputSchema"]["required"]:
+                    self.assertIn(key, payload, f"promised '{key}', did not return it")
+                undeclared = set(payload) - declared
+                self.assertFalse(undeclared, f"returns undeclared fields {sorted(undeclared)}")
+
+    def test_structured_content_agrees_with_the_text_block(self):
+        """The legacy text block and the structured one must not disagree."""
+        for name, arguments in VALID_CALLS.items():
+            with self.subTest(tool=name):
+                result = call(name, arguments)
+                self.assertEqual(json.loads(result["content"][0]["text"]),
+                                 result["structuredContent"])
+
+    def test_the_contract_survives_the_gateway_compactor(self):
+        """`serve` relays these definitions through `simplify_tool_def`, and an agent
+        — or a registry scoring the hosted instance — reads the relayed copy. If the
+        compactor dropped title, outputSchema or its field notes, the published
+        promise would be invisible exactly where it counts."""
+        for tool in ds.TOOLS:
+            slim = schema_simplifier.simplify_tool_def(tool)
+            with self.subTest(tool=tool["name"]):
+                self.assertEqual(slim["title"], tool["title"])
+                self.assertIn("outputSchema", slim)
+                self.assertEqual(slim["annotations"]["openWorldHint"], False)
+                for where, field in _walk_fields(slim["outputSchema"]["properties"]):
+                    self.assertTrue(field.get("description"), f"{where} lost its note")
+
+
 class TestDefinitionsAreGradeable(unittest.TestCase):
     """Mechanical mirrors of the published TDQS gates and heavy-weight dimensions."""
 
