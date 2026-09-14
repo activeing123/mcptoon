@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.14] - 2026-09-14
+
 ### Added
+
+- **`serve` now publishes three tools of its own.** `mcptoon_manifest`, `mcptoon_servers`
+  and `mcptoon_health` answer from state the bridge already holds: no upstream servers, no
+  API keys, no subprocesses, all three declared `readOnlyHint`. Until now `tools/list`
+  carried only what configured servers exposed, so a gateway started with an empty config
+  - every first run, and every registry that introspects us - looked like a tool-less
+  server. An upstream tool that claims one of these names still wins.
 - **The demo server's eleven tools declare what they return.** Each carries an
   `outputSchema` whose fields are documented one sentence at a time, and answers
   `tools/call` with `structuredContent` beside the text block, as MCP pairs them. The
