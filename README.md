@@ -13,7 +13,7 @@ and every agent on your machine shares the same toolkit.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-814%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-825%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -27,8 +27,11 @@ and every agent on your machine shares the same toolkit.
 ```bash
 pip install mcptoon
 
+# 30-second proof, on your machine — none of your servers, no API key:
+mcptoon demo --quick
+
 # Add any MCP server — one command:
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 
 # What your agent actually reads (names only — 581 tokens, not 71,929):
 mcptoon manifest
@@ -77,14 +80,57 @@ covering every agent at once.
 pip install mcptoon                          # pure stdlib, 128KB, zero dependencies
 
 # Add any MCP server — one command:
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 
 # See every tool available (names-only by default; 255 tools cost 581 tokens):
 mcptoon manifest
 
 # Call a tool (JSON output by default; add --toon to save more):
-mcptoon call fetch fetch '{"url":"https://example.com"}'
+mcptoon call everything echo '{"message":"hi"}'
 ```
+
+### What `mcptoon demo` actually prints
+
+No API key, no MCP server of yours, nothing to configure: it boots the official
+"everything" reference server, calls one tool, and shows the token math on your
+screen. This is that output, verbatim from v0.7.11 (Windows, Python 3.12) — only the
+ASCII banner and the closing star-ask are cut:
+
+```text
+$ mcptoon demo --quick
+
+  Starting demo server...
+  ✓ Demo server ready
+
+  📊  SAME data, 19% fewer tokens:
+              21  →          17   (SLIM)
+
+  Format         Tokens    Savings
+  ────────── ────────── ──────────
+  JSON               21          -
+  TOON               17        19%
+  SLIM               17        19%
+
+  Official benchmark: 255 tools, 50 servers, tiktoken cl100k_base:
+
+  Format           Tokens    Savings
+  ──────────── ────────── ──────────
+  JSON             71,929          -
+  TOON             47,438        34%
+  SLIM              8,282      88.5%
+  Compact             581      99.2%
+
+  Now you can:
+  ✓ connect every agent with ONE config   →  mcptoon sync
+  ✓ expose ALL servers as ONE stdio server →  mcptoon serve
+  ✓ never paste tool schemas again         →  mcptoon manifest --slim
+
+  Schemas in context with mcptoon: 0 tokens (always)
+```
+
+Column padding follows your terminal width; the numbers do not. The first table is one
+live tool call measured on your machine; the second is the repo's committed 255-tool
+benchmark (`docs/tiktoken-benchmarks.md`), reproduced identically on every run.
 
 Claude Code user? Skip the terminal entirely:
 
@@ -503,7 +549,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 813 passed, 1 skipped
+python -m pytest tests/ -v   # 825 passed, 1 skipped
 ```
 
 Zero dependencies is a hard rule — our test suite gates every change (813 tests

@@ -133,10 +133,10 @@ The community is already contributing: [Dockerfile](https://github.com/activeing
 ```bash
 pip install mcptoon          # 128KB wheel, zero deps
 mcptoon init                 # Sample config
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 mcptoon manifest --slim      # Compact schemas for LLM discovery
 mcptoon manifest --compact   # Tool names for human scanning
-mcptoon call fetch fetch '{"url":"https://example.com"}' --toon
+mcptoon call everything echo '{"message":"hi"}' --toon
 ```
 
 Docker works too:

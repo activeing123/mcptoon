@@ -11,7 +11,7 @@ mcptoon 是一个 128KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-814%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-825%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -25,8 +25,11 @@ mcptoon 是一个 128KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 ```bash
 pip install mcptoon
 
+# 30 秒自证，跑在你自己机器上——不动你的服务器，不要 API key：
+mcptoon demo --quick
+
 # 加任何 MCP 服务器——一条命令：
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 
 # 你的 Agent 实际读到的（只有名字——581 token，而不是 71,929）：
 mcptoon manifest
@@ -64,14 +67,55 @@ Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削�
 pip install mcptoon                          # 纯标准库，128KB，零依赖
 
 # 添加任意 MCP 服务器——一条命令：
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 
 # 查看所有可用工具（默认就是名字索引，255 个工具只需 581 token）：
 mcptoon manifest
 
 # 调用工具（默认输出 JSON；想更省加 --toon）：
-mcptoon call fetch fetch '{"url":"https://example.com"}'
+mcptoon call everything echo '{"message":"hi"}'
 ```
+
+### `mcptoon demo` 真跑出来是什么样子
+
+不要 API key、不碰你自己的服务器、不用配置：它拉起官方 "everything" 参考服务器，
+调一个工具，然后把 token 账算给你看。下面这段是 v0.7.11 的真身输出，一字未改
+（Windows + Python 3.12；只剪掉了开头的字符画横幅和结尾那句求 star）：
+
+```text
+$ mcptoon demo --quick
+
+  Starting demo server...
+  ✓ Demo server ready
+
+  📊  SAME data, 19% fewer tokens:
+              21  →          17   (SLIM)
+
+  Format         Tokens    Savings
+  ────────── ────────── ──────────
+  JSON               21          -
+  TOON               17        19%
+  SLIM               17        19%
+
+  Official benchmark: 255 tools, 50 servers, tiktoken cl100k_base:
+
+  Format           Tokens    Savings
+  ──────────── ────────── ──────────
+  JSON             71,929          -
+  TOON             47,438        34%
+  SLIM              8,282      88.5%
+  Compact             581      99.2%
+
+  Now you can:
+  ✓ connect every agent with ONE config   →  mcptoon sync
+  ✓ expose ALL servers as ONE stdio server →  mcptoon serve
+  ✓ never paste tool schemas again         →  mcptoon manifest --slim
+
+  Schemas in context with mcptoon: 0 tokens (always)
+```
+
+表格边距会跟着你的终端宽度变，数字不会。第一张表是这次真调用的实测，第二张是仓库里
+存档的 255 工具基准（`docs/tiktoken-benchmarks.md`），每次跑都一模一样。
 
 用 Claude Code？连终端都可以跳过：
 
@@ -468,7 +512,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 813 passed, 1 skipped
+python -m pytest tests/ -v   # 825 passed, 1 skipped
 ```
 
 零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 813 个测试。见

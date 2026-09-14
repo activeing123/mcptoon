@@ -29,6 +29,7 @@ These tests pin the fix:
 """
 
 import os
+import pathlib
 import sys
 import unittest
 import contextlib
@@ -120,6 +121,50 @@ class TestDemoEchoFlow(unittest.TestCase):
         self.assertIsNone(text)
         fake.close.assert_called_once()
         self.assertIn("npm error 404", buf.getvalue())
+
+
+class TestCopySurfacesDoNotNameTheDeadPackage(unittest.TestCase):
+    """Nothing a human reads and pastes may tell them to install it.
+
+    The code path was fixed in September 2026; the prose was not. Found
+    2026-09-14: both READMEs, docs/tiktoken-benchmarks.md, DEVELOPERS.md and the
+    two onboarding hints `mcptoon quickstart`/`doctor` print for a user with no
+    servers still said `mcptoon add fetch --stdio npx -y
+    @modelcontextprotocol/server-fetch`.
+
+    Scope is deliberately the copy a reader acts on. config.py's sample, the
+    discovery candidate and test fixtures may still name it as inert data — that
+    is a different decision (what `mcptoon init` should ship), not a dead link in
+    front of a newcomer.
+    """
+
+    _DEAD = "@modelcontextprotocol/server-fetch"
+
+    def _copy_files(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        files = [root / "README.md", root / "README.zh-CN.md", root / "DEVELOPERS.md",
+                 root / "ROADMAP.md", root / "src" / "mcptoon" / "cli.py"]
+        files += sorted((root / "docs").glob("*.md"))
+        return [f for f in files if f.exists()]
+
+    def test_every_copy_surface_is_clean(self):
+        offenders = []
+        for path in self._copy_files():
+            for lineno, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), start=1):
+                if self._DEAD in line and "npm error" not in line and "E404" not in line:
+                    offenders.append(f"{path.name}:{lineno}")
+        self.assertFalse(
+            offenders,
+            f"dead npm package offered as a runnable example in: {offenders}",
+        )
+
+    def test_guard_is_not_vacuous(self):
+        """Prove the scanner can see the string at all, and that docs are scanned."""
+        files = self._copy_files()
+        self.assertGreaterEqual(len(files), 6)
+        probe = files[0].read_text(encoding="utf-8") + f"\n# {self._DEAD}\n"
+        self.assertIn(self._DEAD, probe)
 
 
 class TestBenchmarkOfficialNumbers(unittest.TestCase):

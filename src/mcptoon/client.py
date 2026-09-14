@@ -20,11 +20,11 @@ Supports both transport modes defined by the Model Context Protocol:
   - http:   POST JSON-RPC to HTTP endpoint, handle SSE responses
 
 Usage:
-    # stdio (most common — any npx @anthropic/mcp-xxx works out of box)
-    client = MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"])
+    # stdio (most common — any npx @modelcontextprotocol/server-* works out of box)
+    client = MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-everything"])
     client.initialize()
     tools = client.list_tools()
-    result = client.call_tool("fetch", {"url": "https://example.com"})
+    result = client.call_tool("echo", {"message": "hi"})
     client.close()
 
     # http

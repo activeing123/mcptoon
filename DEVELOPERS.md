@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.7.5 · 730 tests · 0 依赖 · ~11,750 行 Python（21 模块）· Apache 2.0
+- 版本：v0.7.11 · 825 passed + 1 skipped · 0 依赖 · 128KB wheel · 21 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -34,7 +34,7 @@ mcptoon 站在 MCP 之上，做**调用端/管理端**——跨 Agent 免配置 
 ### 1 · Configure once — `sync`
 
 ```bash
-mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch
+mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 mcptoon sync               # 一份配置 → 所有检测到的 Agent
 mcptoon sync --watch       # 持续同步，配置一变所有 Agent 自动跟上
 mcptoon sync --dry         # 预览将写入什么，不动真格
@@ -118,9 +118,9 @@ mcptoon serve --http           # 等价 --listen :8080
 ```python
 from mcptoon.client import MCPClient
 
-with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-fetch"]) as c:
+with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-everything"]) as c:
     tools = c.list_tools()
-    result = c.call_tool("fetch", {"url": "https://example.com"})
+    result = c.call_tool("echo", {"message": "hi"})
 ```
 
 ```bash
