@@ -549,9 +549,26 @@ TOOLS = [
 # ─── the server ──────────────────────────────────────────────────────────────
 
 def _log(msg: str):
-    """Log to stderr; stdout belongs to the JSON-RPC stream."""
-    sys.stderr.write(f"[mcptoon {SERVER_NAME}] {msg}\n")
-    sys.stderr.flush()
+    """Log to stderr; stdout belongs to the JSON-RPC stream.
+
+    Diagnostic text follows the console's own encoding, and a log line must never be
+    the reason the server stops answering — so anything the console cannot encode
+    degrades to a replacement, and a stderr we cannot even write to is ignored.
+    """
+    line = f"[mcptoon {SERVER_NAME}] {msg}\n"
+    try:
+        sys.stderr.write(line)
+    except UnicodeEncodeError:
+        try:
+            sys.stderr.buffer.write(line.encode("utf-8", "replace"))
+        except Exception:
+            return
+    except Exception:
+        return
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
 
 
 class DemoServer:
@@ -682,7 +699,7 @@ class DemoServer:
                     reconfigure(encoding="utf-8")
                 except (OSError, ValueError):
                     pass
-        _log(f"started — {len(TOOLS)} tools, stdio, format-agnostic")
+        _log(f"started: {len(TOOLS)} tools, stdio, format-agnostic")
         try:
             for line in sys.stdin:
                 line = line.strip()

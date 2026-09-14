@@ -428,42 +428,69 @@ class TestNothingIsTouched(unittest.TestCase):
                                  f"{module} must not import the demo server")
 
 
+class TestLogResilience(unittest.TestCase):
+    """A diagnostic must never be the reason the server stops answering."""
+
+    def test_log_survives_a_console_that_cannot_encode_it(self):
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="ascii")
+        with mock.patch.object(sys, "stderr", stream):
+            ds._log("started — 11 tools, 世界")
+        self.assertIn(b"started", stream.buffer.getvalue())
+
+    def test_log_texts_are_pure_ascii(self):
+        """Python can be left with an ASCII stderr in a bare container; the startup
+        line in particular runs before anything is served."""
+        with open(SOURCE, encoding="utf-8") as handle:
+            source = handle.read()
+        literals = re.findall(r'_log\(f?"([^"]*)"', source)
+        self.assertGreaterEqual(len(literals), 3, "pattern should find the log call sites")
+        for literal in literals:
+            self.assertTrue(literal.isascii(), f"log text {literal!r} is not ASCII")
+
+
 class TestRealProcess(unittest.TestCase):
     """End to end through the CLI, the way a hosted sandbox drives it."""
 
     def _drive(self, requests, stdin_text=None, timeout=120):
         payload = stdin_text if stdin_text is not None else \
             "".join(json.dumps(m) + "\n" for m in requests)
-        return subprocess.run(
+        proc = subprocess.run(
             [sys.executable, "-m", "mcptoon", "demo-server"],
-            input=payload, capture_output=True, text=True, timeout=timeout,
+            input=payload.encode("utf-8"), capture_output=True, timeout=timeout,
             env={**os.environ, "PYTHONIOENCODING": "cp1252"},
         )
+        # stdout is the protocol stream: UTF-8 by contract, so it is decoded strictly —
+        # a console that claims cp1252 must not leak into the wire. stderr carries
+        # diagnostics in whatever the console encoding is, so that one is lenient.
+        return (proc.returncode,
+                proc.stdout.decode("utf-8"),
+                proc.stderr.decode("cp1252", errors="replace"))
 
     def test_stdio_session_lists_eleven_tools(self):
-        proc = self._drive([
+        code, out, err = self._drive([
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
         ])
-        self.assertEqual(proc.returncode, 0)
-        responses = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+        self.assertEqual(code, 0)
+        responses = [json.loads(line) for line in out.splitlines() if line.strip()]
         listing = next(r for r in responses if r.get("id") == 2)
         self.assertEqual(len(listing["result"]["tools"]), 11)
-        self.assertEqual(proc.stderr.count("[mcptoon mcptoon-demo] started"), 1)
+        self.assertEqual(err.count("[mcptoon mcptoon-demo] started"), 1)
 
     def test_non_ascii_survives_a_cp1252_console(self):
-        proc = self._drive([{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+        code, out, err = self._drive([{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
             "name": "echo_message", "arguments": {"message": "世界 ✓"}}}])
-        self.assertEqual(proc.returncode, 0)
-        self.assertIn("世界", proc.stdout, "the wire is UTF-8 whatever the code page claims")
+        self.assertEqual(code, 0)
+        self.assertIn("世界", out, "the wire is UTF-8 whatever the code page claims")
 
     def test_garbage_line_is_answered_and_the_loop_survives(self):
-        proc = self._drive([], stdin_text="this is not json\n"
-                          + json.dumps({"jsonrpc": "2.0", "id": 3, "method": "ping",
-                                        "params": {}}) + "\n")
-        self.assertIn("-32700", proc.stdout)
-        self.assertIn('"id": 3', proc.stdout)
+        code, out, err = self._drive([], stdin_text="this is not json\n"
+                                     + json.dumps({"jsonrpc": "2.0", "id": 3, "method": "ping",
+                                                   "params": {}}) + "\n")
+        self.assertEqual(code, 0)
+        self.assertIn("-32700", out)
+        self.assertIn('"id": 3', out)
 
     def test_help_does_not_start_the_server(self):
         """Would hang on stdin and time out if --help were ignored (the 0.7.11 bug)."""
