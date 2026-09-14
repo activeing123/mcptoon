@@ -32,9 +32,9 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 
 # Sizes once written down that are wrong now. A doc may not resurrect them.
 RETIRED_KB = ("50KB", "200KB", "250KB")
-# What `pip install mcptoon` downloads: mcptoon-0.7.5-py3-none-any.whl is 131,052 bytes,
+# What `pip install mcptoon` downloads: mcptoon-0.7.11-py3-none-any.whl is 149,008 bytes,
 # measured from PyPI on 2026-09-05. Re-measure at each release.
-WHEEL_KB = "128KB"
+WHEEL_KB = "146KB"
 
 
 def modules() -> list[Path]:

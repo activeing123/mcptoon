@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.7.11 · 825 passed + 1 skipped · 0 依赖 · 128KB wheel · 21 模块 · Apache 2.0
+- 版本：v0.7.12 · 868 passed + 1 skipped · 0 依赖 · 146KB wheel · 22 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -92,6 +92,25 @@ mcptoon serve --http           # 等价 --listen :8080
 | `mcptoon doctor` | 自检 Python、配置、连通性 |
 | `mcptoon quickstart` | 检测并导入已有配置，列出全部工具 |
 | `mcptoon demo` | 现场前后对比 token 数字 |
+| `mcptoon demo-server` | 跑一个内置的零依赖 MCP server（11 个纯标准库工具，stdio） |
+
+### · 内置演示服务 — `demo-server`
+
+`demo_server.py` 是包内自带的一个真 MCP server：11 个工具全部只做纯计算（TOON 编解码、
+格式对比、token 估算、schema 瘦身、manifest 索引、配置校验……），**不联网、不落盘、
+不起子进程、不碰用户配置**，`tests/test_demo_server.py` 从源码层面把这几条钉死。
+
+存在的理由只有一个：外部质量评分（Glama/TDQS）的容器是纯 Python 镜像，旧的演示种子
+`npx -y @modelcontextprotocol/server-everything` 在里面**列不出任何工具**（tools/list = 0），
+等于交了白卷。同一无 Node 沙箱里 A/B 实测：旧种子 0 个工具，`demo-server` 11 个。
+
+```bash
+mcptoon add demo --stdio python -m mcptoon demo-server   # 显式添加才会生效
+```
+
+它不改变"遥控器不是运行时"的定位：不会自动注册任何东西，`mcptoon serve` 在空配置下
+仍然返回 0 个工具（proxy 语义未变）。工具描述是按 TDQS 六维评分表写的，其中可机械判定的
+硬闸（空描述/同义反复描述/描述与 `readOnlyHint` 矛盾/优先级操纵话术）已进 CI。
 
 ---
 
@@ -132,7 +151,7 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
 零第三方导入是 review 阶段硬性规则。新功能必须带测试。
-11,750 行 Python（物理行）、21 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+12,634 行 Python（物理行）、22 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 

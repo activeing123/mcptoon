@@ -10,7 +10,7 @@ the user to run commands) and reporting the real outputs:
 1. Check Python: `python --version` (needs >= 3.10). If missing, tell the
    user to install Python from python.org and stop there.
 2. Install/upgrade: `python -m pip install --upgrade mcptoon`. It is a
-   zero-dependency 128KB wheel — if it pulls in third-party packages,
+   zero-dependency 146KB wheel — if it pulls in third-party packages,
    something is wrong; report it.
 3. Verify: `mcptoon --version`, then `mcptoon doctor` for config and
    connectivity status. Paste a short summary of the doctor output.
