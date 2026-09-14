@@ -110,7 +110,7 @@ KNOWN_FLAGS = frozenset(
 # here without a help handler in its own module silently loses that help — see
 # tests/test_serve.py and tests/test_serve_perf.py, which pin serve's, and
 # tests/test_help_shortcircuit.py, which pins this set's purpose.
-_COMMANDS_WITH_OWN_HELP = frozenset({"demo", "serve"})
+_COMMANDS_WITH_OWN_HELP = frozenset({"demo", "demo-server", "serve"})
 
 
 def unknown_flag_warnings(args):
@@ -266,6 +266,8 @@ def main():
         _cmd_serve(rest)
     elif command == "demo":
         _cmd_demo(rest)
+    elif command == "demo-server":
+        _cmd_demo_server(rest)
     elif command == "sync":
         _cmd_sync(rest, fmt)
     elif command == "health":
@@ -1609,7 +1611,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search"
+    commands="init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -1637,7 +1639,7 @@ _ZSH_COMPLETION = r'''
 #compdef mcptoon
 
 _mcptoon() {
-    local commands=(init list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search)
+    local commands=(init list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search)
     local formats=(openai openapi mcp json human)
 
     if (( CURRENT == 1 )); then
@@ -1661,7 +1663,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo install search'
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -1669,7 +1671,7 @@ complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi
 _PS_COMPLETION = '''
 $scriptBlock = {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help','sync','health','serve','demo','install','search'
+    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help','sync','health','serve','demo','demo-server','install','search'
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
@@ -1943,6 +1945,8 @@ Usage:
     mcptoon demo                         Zero-config one-command demo
     mcptoon demo --quick                 Results only, skip the step-by-step narration
     mcptoon demo --keep                  Leave the demo server in config afterwards
+    mcptoon demo-server                  Self-contained MCP demo server (11 tools, no network)
+    mcptoon add demo --stdio python -m mcptoon demo-server
     mcptoon --version                    Print the installed version and exit
     mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
     mcptoon sync --dry                   Preview without writing
@@ -1995,6 +1999,12 @@ def _cmd_demo(rest):
     """Zero-config one-command demo."""
     from .demo import run_demo
     run_demo(rest)
+
+
+def _cmd_demo_server(rest):
+    """Run the built-in, self-contained demo MCP server over stdio."""
+    from .demo_server import run_demo_server
+    run_demo_server(rest)
 
 
 def _cmd_sync(rest, fmt):
