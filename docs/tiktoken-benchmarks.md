@@ -4,7 +4,7 @@ When you connect 5 MCP servers to your agent, something invisible happens before
 
 This isn't hypothetical. Anthropic says [context window is a scarce resource](https://docs.anthropic.com/en/docs/build-with-claude/context-windows). Cursor says [the difference between good and bad agents is context management](https://cursor.com/blog/context-engineering). Latent Space's MCP analysis identifies "a scaling cliff around 20-30 tools."
 
-I built [mcptoon](https://github.com/activeing123/mcptoon) — a 146KB wheel, zero dependencies, that keeps MCP servers configured but their schemas out of your context. This post shows real tiktoken data (OpenAI's official tokenizer) on how much it actually saves.
+I built [mcptoon](https://github.com/activeing123/mcptoon) — a 155KB wheel, zero dependencies, that keeps MCP servers configured but their schemas out of your context. This post shows real tiktoken data (OpenAI's official tokenizer) on how much it actually saves.
 
 ## The 5 problems
 
@@ -114,7 +114,7 @@ Two-layer decoupled design:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 1: mcptoon CLI (~146KB, zero deps)│
+│  Layer 1: mcptoon CLI (~155KB, zero deps)│
 │  Runs in agent's shell, optimizes tokens │
 ├─────────────────────────────────────────┤
 │  Layer 2: MCP Servers (your existing)    │
@@ -122,7 +122,7 @@ Two-layer decoupled design:
 └─────────────────────────────────────────┘
 ```
 
-Each layer is independent. Swap agents without touching servers. Swap servers without touching agents. mcptoon is the glue — a 146KB wheel, zero dependencies, pure Python stdlib.
+Each layer is independent. Swap agents without touching servers. Swap servers without touching agents. mcptoon is the glue — a 155KB wheel, zero dependencies, pure Python stdlib.
 
 ## Community
 
@@ -131,7 +131,7 @@ The community is already contributing: [Dockerfile](https://github.com/activeing
 ## Try it
 
 ```bash
-pip install mcptoon          # 146KB wheel, zero deps
+pip install mcptoon          # 155KB wheel, zero deps
 mcptoon init                 # Sample config
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
 mcptoon manifest --slim      # Compact schemas for LLM discovery
@@ -155,7 +155,7 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --slim
 
 MCP is a good protocol. JSON schema injection is its Achilles' heel. mcptoon doesn't "solve" it — it makes it hurt less: schemas stay out of your context until you actually need them.
 
-SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 146KB wheel, zero dependencies — 12,987 lines of stdlib Python across 22 modules.
+SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 155KB wheel, zero dependencies — 13,415 lines of stdlib Python across 23 modules.
 
 That's it.
 

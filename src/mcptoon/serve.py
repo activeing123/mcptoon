@@ -69,6 +69,7 @@ from .client import (
     _META_PROTOCOL_KEY,
 )
 from . import manifest as manifest_mod
+from . import native_tools
 from . import router as router_mod
 from . import usage
 from .schema_simplifier import (
@@ -603,12 +604,34 @@ class MCPServerBridge:
                 simplified["name"] = ns_name  # Override with namespaced name
                 tools.append(simplified)
 
+            # First-party tools: published even with zero upstream servers, so a
+            # gateway launched in a clean environment never reports an empty catalog
+            # (a directory crawler or client that just started us would otherwise see
+            # a tool-less server and have nothing to evaluate). An upstream tool that
+            # happens to claim the same namespaced name wins — we skip ours.
+            for defn in native_tools.native_tools():
+                if defn["name"] in self._tool_index:
+                    continue
+                tools.append(simplify_tool_def(defn))
+
         _log(f"tools/list: returning {len(tools)} tools (simplified schemas)")
         # SEP-2549 CacheableResult + GA resultType on list results
         result = {"tools": tools}
         result.update(_list_cache_fields())
         result["resultType"] = "complete"
         return result
+
+    def _native_state(self) -> dict:
+        """Read-only snapshot of bridge state for the first-party tools."""
+        with self._tool_index_lock:
+            index = dict(self._tool_index)
+        return {
+            "servers": self._servers or {},
+            "tool_index": index,
+            "output_format": self._output_format,
+            "initialized": self._initialized,
+            "uptime": time.time() - getattr(self, "_start_time", time.time()),
+        }
 
     def _handle_call_tool(self, params: dict) -> dict:
         """Route a tool call to the underlying server (ADR 0004).
@@ -620,6 +643,27 @@ class MCPServerBridge:
 
         name = params.get("name", "")
         arguments = params.get("arguments", {})
+
+        # First-party tools are answered by the gateway itself, no upstream needed.
+        # Skipped if an upstream tool owns that name (upstream always wins).
+        if native_tools.is_native(name):
+            with self._tool_index_lock:
+                owned_upstream = name in self._tool_index
+            if not owned_upstream:
+                return native_tools.call_native(name, arguments, self._native_state())
+        elif name.startswith("mcptoon_"):
+            # Reserved prefix, but not one of ours: say so plainly instead of
+            # letting split_namespaced misread "mcptoon" as a server name.
+            with self._tool_index_lock:
+                owned = name in self._tool_index or any(
+                    i.get("tool") == name for i in self._tool_index.values())
+            if not owned:
+                return _make_tool_error(
+                    f"Unknown tool: '{name}'. The 'mcptoon_' prefix is reserved for the "
+                    f"gateway's own tools: {', '.join(native_tools.NATIVE_NAMES)}. "
+                    f"Upstream tools look like <server>_<tool> (e.g. fetch_fetch); "
+                    f"call mcptoon_manifest to list what is loaded."
+                )
 
         # Split namespaced name
         known_servers = list(self._servers.keys()) if self._servers else []

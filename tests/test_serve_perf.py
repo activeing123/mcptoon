@@ -60,10 +60,13 @@ class TestParallelManifestLoading:
                 }
         bridge._initialized = True
 
-        # tools/list should return 300 tools
+        # tools/list should return 300 upstream + the gateway's own 3 (v0.7.13)
         result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
-        assert len(tools) == 300
+        assert len(tools) == 303
+        upstream = [t["name"] for t in tools if not t["name"].startswith("mcptoon_")]
+        assert len(upstream) == 300
+        assert len(set(upstream)) == 300
         assert tools[0]["name"].startswith("server")
         assert "_tool" in tools[0]["name"]
 
@@ -84,7 +87,7 @@ class TestParallelManifestLoading:
 
         result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
-        assert len(tools) == 5
+        assert len(tools) == 5 + 3  # 5 upstream, no duplicates, plus our 3
         names = [t["name"] for t in tools]
         assert len(names) == len(set(names))  # All unique
         assert "srv0_echo" in names
@@ -148,8 +151,8 @@ class TestConcurrency:
         for th in threads:
             th.join()
 
-        # All readers should see 100 tools
-        assert all(r == 100 for r in results)
+        # All readers should see the same catalog: 100 upstream + 3 native
+        assert all(r == 103 for r in results)
 
 
 # ═══════════════════════════════════════════════════
@@ -210,7 +213,7 @@ class TestRemoteMCP:
         config = {
             "remote": {
                 "transport": "http",
-                "url": "http://10.0.0.1:3001/mcp",
+                "url": "http://192.0.2.1:3001/mcp",
                 "headers": {"Authorization": "Bearer test-token"},
             }
         }
@@ -228,7 +231,7 @@ class TestRemoteMCP:
             },
             "remote": {
                 "transport": "http",
-                "url": "http://10.0.0.1:3001/mcp",
+                "url": "http://192.0.2.1:3001/mcp",
             },
         }
         pool = MCPClientPool(config)

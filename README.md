@@ -5,7 +5,7 @@
 
 **Add 1,000 MCP tools locally — your token context never feels it.**
 
-mcptoon is a 146KB CLI that keeps MCP tool schemas out of your agent's context.
+mcptoon is a 155KB CLI that keeps MCP tool schemas out of your agent's context.
 Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**; call
 results shrink another ~34% with `--toon`. One command per server, zero config,
 and every agent on your machine shares the same toolkit.
@@ -13,7 +13,7 @@ and every agent on your machine shares the same toolkit.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-894%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-915%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -79,7 +79,7 @@ covering every agent at once.
 ## Up and running in 30 seconds
 
 ```bash
-pip install mcptoon                          # pure stdlib, 146KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 155KB, zero dependencies
 
 # Add any MCP server — one command:
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
@@ -154,7 +154,7 @@ mcptoon quickstart     # discover + configure + list tools — one command
 ```
 
 That's it. No hand-written JSON config. No MCP protocol debugging. No polluted context
-window. The wheel is 146KB with zero dependencies, and mcptoon itself needs no API
+window. The wheel is 155KB with zero dependencies, and mcptoon itself needs no API
 key and phones nothing home — $0 in service fees, everything runs on your machine.
 
 ---
@@ -206,7 +206,7 @@ engineering problem, and the same answer keeps appearing on every roadmap:
 |---|---|---|
 | Tool Search Tool / PTC | Claude-platform betas | tool *results* still enter context token by token on every other agent |
 | MuleSoft gateway | enterprise gateway | behind MuleSoft; MCP spec one generation behind |
-| **mcptoon** | **any agent that can run a shell command** | none — 146KB, no key, no proxy, MCP 2026-07-28 GA |
+| **mcptoon** | **any agent that can run a shell command** | none — 155KB, no key, no proxy, MCP 2026-07-28 GA |
 
 The direction is settled. mcptoon is the version of this answer you can run
 **today, on every agent at once** — the results-side discipline without the
@@ -234,7 +234,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon connects, discovers tools, generates the handler, registers it. No restart
-needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 146KB with zero
+needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 155KB with zero
 dependencies, because servers are external processes your machine runs directly, not
 code bundled into mcptoon. Four steps, one command, no agent restart.
 
@@ -516,7 +516,7 @@ MCP servers — it runs `mcptoon` commands. Schemas live on disk in
 **Two-layer decoupling:**
 
 ```
-Layer 1: mcptoon CLI (146KB, zero deps)
+Layer 1: mcptoon CLI (155KB, zero deps)
          runs in the agent's shell. schemas stay out of context by default.
                     │
 Layer 2: the actual MCP servers (npm/pip packages)
@@ -555,14 +555,14 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 894 passed, 1 skipped
+python -m pytest tests/ -v   # 915 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (813 tests
+Zero dependencies is a hard rule — our test suite gates every change (915 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: 12,987 lines of Python across 22 modules, zero third-party dependencies.
+The codebase: 13,415 lines of Python across 23 modules, zero third-party dependencies.
 
 ---
 

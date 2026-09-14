@@ -34,7 +34,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "200KB", "250KB")
 # What `pip install mcptoon` downloads: mcptoon-0.7.11-py3-none-any.whl is 149,008 bytes,
 # measured from PyPI on 2026-09-05. Re-measure at each release.
-WHEEL_KB = "146KB"
+WHEEL_KB = "155KB"
 
 
 def modules() -> list[Path]:
