@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.11] — 2026-09-14
+
+### Fixed
+- **`--help` no longer runs the command you asked about.** `mcptoon quickstart --help`
+  executed the entire onboarding flow and wrote what it discovered straight into
+  `~/.mcptoon/config.json` (measured on this machine: 4 servers in, 13 out);
+  `mcptoon manifest --help` ignored the flag too and went out to every configured
+  server, still running two minutes later. A newcomer probing the CLI was mutating
+  their machine, or waiting on a network round trip, before reading a single line of
+  help. Any `-h`/`--help` after a command now prints help and returns; `demo` and
+  `serve` keep their own, richer help pages. (`cli.py`, `tests/test_help_shortcircuit.py`)
+- **Real flags stopped being warned about.** `demo --quick`, `demo --keep` and
+  `serve --auth` are implemented inside their own modules but were absent from the
+  central registry, so `mcptoon demo --quick` — the exact line the demo prints as its
+  own usage — opened with `mcptoon: unknown option '--quick' ignored`. `KNOWN_FLAGS`
+  is now pinned against flag literals across the whole package, not just `cli.py`.
+- **The copy-paste example on the front page installed a package that no longer
+  exists.** `@modelcontextprotocol/server-fetch` is gone from npm (E404 confirmed
+  against registry.npmjs.org on 2026-09-14), yet it was still the "add any MCP
+  server — one command" line in both READMEs, in `docs/tiktoken-benchmarks.md`, in
+  `DEVELOPERS.md`, and in the two places the CLI itself tells a server-less user what
+  to run next. `demo.py` has carried a comment forbidding it since 2026-09-05; nothing
+  kept the *prose* honest. Examples now use `@modelcontextprotocol/server-everything`
+  (npm 2026.8.31), each one re-run end to end before it was written down.
+- `serve`'s non-loopback refusal named a `--host` flag that has never existed; it
+  names `--listen`, which is what it gates.
+
+### Added
+- README (EN + zh-CN) prints the **verbatim output of `mcptoon demo --quick`** — the
+  30-second proof can now be read before it has to be trusted.
+
+### Documentation
+- `DEVELOPERS.md` (stuck on v0.7.5 / 730 tests) and `ROADMAP.md` (stuck on v0.7.2)
+  headers refreshed; test-count badges follow the suite.
+
 ## [0.7.10] — 2026-09-12
 
 ### Fixed
