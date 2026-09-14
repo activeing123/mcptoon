@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.12] — 2026-09-14
+
+### Added
+- **`mcptoon demo-server` — a built-in MCP server that needs nothing but Python.**
+  Eleven tools, standard library only, speaking MCP over stdio: echo, TOON
+  encode/decode, format comparison, token estimation, tool-schema slimming, manifest
+  indexing, benchmark rows, agent config targets, config validation, runtime
+  description. Add it with
+  `mcptoon add demo --stdio python -m mcptoon demo-server`.
+
+  Why it is in the package at all: hosted quality scores are computed by a sandbox
+  that starts your server and calls `tools/list`. Ours was seeded with
+  `npx -y @modelcontextprotocol/server-everything`, and the Python-only image has no
+  Node in it — the seed resolved to **zero tools**, so the exam was handed a blank
+  sheet (measured 2026-09-14). The same sandbox, same PATH, same empty home directory:
+  the old seed lists 0 tools, `demo-server` lists 11.
+
+  It changes nothing about the architecture. It registers no server, writes no
+  config, opens no file, spawns no process, and touches no network; `mcptoon serve`
+  with an empty config still lists zero tools, because the bridge is still a proxy and
+  not a runtime. Both properties are pinned by tests, not by promises. The tool
+  descriptions were written against the published TDQS rubric (verb first, a named
+  sibling as the boundary, parameters described, limits disclosed) and the mechanical
+  part of that rubric is now asserted in CI.
+
+### Changed
+- Footprint claims refreshed to measured values: 146KB wheel (was 128KB), 22 modules
+  (was 21), 12,634 physical lines (was 11,750). Both READMEs, `DEVELOPERS.md`,
+  `docs/`, the skill files and `tests/test_footprint_claims.py` move together.
+- Both READMEs state the one exception to "mcptoon bundles nothing": the package ships
+  a self-demo, and it reaches your context only if you add it deliberately.
+
+### Testing
+- `tests/test_demo_server.py` — 43 cases, 104 subtests: handshake, protocol fallback,
+  notifications, stateless `tools/list`, every tool called in-process, the error paths,
+  a real subprocess over stdio (including non-ASCII under a cp1252 console), the TDQS
+  hard gates with a negative control proving the guard fires, the inlined benchmark
+  rows compared against `assets/benchmark_tiktoken.json`, and a source-level check that
+  the module imports no I/O, process or config machinery.
+
 ## [0.7.11] — 2026-09-14
 
 ### Fixed
