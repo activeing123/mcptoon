@@ -1042,7 +1042,7 @@ def _validate_http_bind(host: str, auth_token: str | None) -> str | None:
             f"Refusing to bind {host} without authentication.\n"
             f"  A network-exposed, unauthenticated MCP gateway would let anyone\n"
             f"  on the network call your tools. Either:\n"
-            f"    - drop --host / --listen address to stay on 127.0.0.1 (default), or\n"
+            f"    - drop --listen (or keep it on 127.0.0.1) to stay on loopback, or\n"
             f"    - pass --auth <token> (or bare --auth to auto-generate one)"
         )
     return None

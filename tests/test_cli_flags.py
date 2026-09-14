@@ -22,9 +22,19 @@ from mcptoon import cli
 from mcptoon.cli import KNOWN_FLAGS, unknown_flag_warnings
 
 CLI_SOURCE = Path(__file__).resolve().parents[1] / "src" / "mcptoon" / "cli.py"
+SRC_PKG = Path(__file__).resolve().parents[1] / "src" / "mcptoon"
 
 # Names that appear in cli.py only to be cited as examples of what does NOT exist.
 DOCUMENTED_AS_ABSENT = {"--tokens"}
+
+
+def package_flag_literals():
+    """Every --flag written anywhere in the package, mapped to its source files."""
+    hits = {}
+    for path in sorted(SRC_PKG.glob("*.py")):
+        for flag in re.findall(r"--[a-z][a-z0-9-]*", path.read_text(encoding="utf-8")):
+            hits.setdefault(flag, set()).add(path.name)
+    return hits
 
 
 class TestUnknownFlagWarnings(unittest.TestCase):
@@ -64,23 +74,37 @@ class TestUnknownFlagWarnings(unittest.TestCase):
             unknown_flag_warnings(["--nope", "list", "--nada"]), ["--nope", "--nada"]
         )
 
+    def test_subcommand_local_flags_are_not_warned_about(self):
+        """demo.py / serve.py parse these themselves; they are real, not phantoms."""
+        argv = ["demo", "--quick", "--keep", "serve", "--http", "--auth", "tok"]
+        self.assertEqual(unknown_flag_warnings(argv), [])
+
 
 class TestKnownFlagRegistry(unittest.TestCase):
-    def test_registry_covers_every_flag_literal_in_the_cli(self):
-        """A new --flag in cli.py must be added to KNOWN_FLAGS or this fails."""
-        source = CLI_SOURCE.read_text(encoding="utf-8")
-        literals = set(re.findall(r"--[a-z][a-z0-9-]*", source))
-        unregistered = literals - set(KNOWN_FLAGS) - DOCUMENTED_AS_ABSENT
+    def test_registry_covers_every_flag_literal_in_the_package(self):
+        """A new --flag anywhere in src/mcptoon must land in KNOWN_FLAGS.
+
+        The scope is the whole package, not just cli.py: demo.py and serve.py parse
+        their own flags (--quick, --keep, --auth), and while they were unregistered
+        the central parser warned "unknown option ... ignored" on the very command a
+        newcomer tries first.
+        """
+        offenders = {
+            flag: sorted(sources)
+            for flag, sources in package_flag_literals().items()
+            if flag not in KNOWN_FLAGS and flag not in DOCUMENTED_AS_ABSENT
+        }
         self.assertFalse(
-            unregistered,
-            f"flags used in cli.py but missing from KNOWN_FLAGS: {sorted(unregistered)}",
+            offenders,
+            f"flags the package uses but KNOWN_FLAGS lacks: {offenders}",
         )
 
     def test_registry_has_no_dead_entries(self):
         """A flag removed from the CLI must leave KNOWN_FLAGS too."""
         source = CLI_SOURCE.read_text(encoding="utf-8")
         literals = set(re.findall(r"--[a-z][a-z0-9-]*", source))
-        dead = set(KNOWN_FLAGS) - literals
+        literals |= set(package_flag_literals())
+        dead = set(KNOWN_FLAGS) - literals - DOCUMENTED_AS_ABSENT
         self.assertFalse(dead, f"KNOWN_FLAGS lists flags the CLI never mentions: {sorted(dead)}")
 
 

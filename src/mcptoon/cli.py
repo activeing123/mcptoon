@@ -83,21 +83,34 @@ from .router import call_tool
 from .errors import is_error
 
 
-# Every long option this CLI implements, global or per-subcommand.
-# tests/test_cli_flags.py fails if one appears in this file but is missing from
-# the set, so the list cannot silently drift from reality.
+# Every long option this CLI implements, global or per-subcommand — including the
+# ones parsed inside demo.py / serve.py, which the central parser passes through
+# untouched. tests/test_cli_flags.py scans the whole package for flag literals, so
+# the list cannot drift from reality in either direction: forget one and a real
+# flag gets warned as unknown; add a phantom and the dead-entry test fails.
 KNOWN_FLAGS = frozenset(
     {
-        "--agent", "--auto", "--compact", "--destructive", "--dry", "--dry-run",
-        "--envelope", "--fallback-json", "--force", "--format", "--full", "--head",
+        "--agent", "--auth", "--auto", "--compact", "--destructive", "--dry",
+        "--dry-run", "--envelope", "--fallback-json", "--force", "--format",
+        "--full", "--head",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
-        "--json", "--list", "--listen", "--max-chars", "--mcptoon", "--no-configs",
+        "--json", "--keep", "--list", "--listen", "--max-chars", "--mcptoon",
+        "--no-configs",
         "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
-        "--quiet", "--raw", "--remove", "--request-state", "--search", "--slim",
+        "--quiet", "--quick", "--raw", "--remove", "--request-state", "--search",
+        "--slim",
         "--stdin", "--stdio", "--timeout", "--toon", "--url", "--version", "--watch",
         "--watch-mode", "--write",
     }
 )
+
+
+# Subcommands that print their own help text and therefore handle -h/--help
+# themselves; every other command falls back to the general help. Adding a command
+# here without a help handler in its own module silently loses that help — see
+# tests/test_serve.py and tests/test_serve_perf.py, which pin serve's, and
+# tests/test_help_shortcircuit.py, which pins this set's purpose.
+_COMMANDS_WITH_OWN_HELP = frozenset({"demo", "serve"})
 
 
 def unknown_flag_warnings(args):
@@ -201,6 +214,13 @@ def main():
 
     command = cmd_args[0]
     rest = cmd_args[1:]
+
+    # Asking for help must never run the command you asked about: `mcptoon
+    # quickstart --help` used to discover servers and write them into config, and
+    # `mcptoon serve --help` used to open a stdio bridge and hang until timeout.
+    if command not in _COMMANDS_WITH_OWN_HELP and any(a in ("-h", "--help") for a in rest):
+        _print_help()
+        return
 
     # ─── Dispatch ───
     if command in ("list", "servers"):
@@ -766,7 +786,7 @@ def _cmd_quickstart(rest, fmt="auto"):
         print("  Don't worry — here's how to get started:")
         print("")
         print("    # Add a zero-config server (no API key needed):")
-        print("    mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch")
+        print("    mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything")
         print("")
         print("    # Then see your tools:")
         print("    mcptoon manifest --slim")
@@ -1421,7 +1441,7 @@ def _doctor_smart_tips(servers: dict):
     if total <= 2:
         tips.append(
             "Tip: Add zero-config servers (no API key needed):\n"
-            "  mcptoon add fetch --stdio npx -y @modelcontextprotocol/server-fetch\n"
+            "  mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything\n"
             "  mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory\n"
             "  Or run: mcptoon init --auto"
         )
@@ -1919,7 +1939,10 @@ Usage:
     mcptoon plugin remove <name>         Remove a plugin
 
     mcptoon serve                        Run as MCP server (stdio bridge for agents)
+    mcptoon serve --http --auth          HTTP mode; bare --auth auto-generates a token
     mcptoon demo                         Zero-config one-command demo
+    mcptoon demo --quick                 Results only, skip the step-by-step narration
+    mcptoon demo --keep                  Leave the demo server in config afterwards
     mcptoon --version                    Print the installed version and exit
     mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
     mcptoon sync --dry                   Preview without writing
