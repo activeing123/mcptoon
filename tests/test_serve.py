@@ -38,7 +38,13 @@ from mcptoon.schema_simplifier import (
     namespaced_tool_name,
     split_namespaced,
     compute_token_stats,
+    _MAX_DESC_LEN,
+    _MAX_PARAM_DESC_LEN,
+    _MAX_PARAM_DESC_SENTENCES,
+    _split_sentences,
+    _truncate_desc,
 )
+
 
 
 # ═══════════════════════════════════════════════════
@@ -155,6 +161,111 @@ class TestSimplifySchema:
         assert "pattern" not in simplified["properties"]["items"]["items"]
 
 
+class TestDescriptionBudget:
+    """What an agent gets to read about a tool, and what it therefore decides with.
+
+    The rule these pin down used to be "keep the first sentence, hard-cut at 120
+    characters". It deleted the guidance an agent actually selects tools with — when to
+    reach for a tool, when not to, what the result will not tell you — because those
+    sentences are never the first one. And the character cut ignored word boundaries, so
+    a surviving fragment could stop mid-word and read as a claim it never was.
+    """
+
+    def test_short_description_passes_through_byte_identical(self):
+        text = "Returns the message unchanged."
+        assert _truncate_desc(text) == text
+
+    def test_applying_it_twice_changes_nothing(self):
+        """Idempotence: a listing that passes through two gateways must not shrink twice."""
+        long = "Fetches a page. It caches nothing. Use search for a site. " * 8
+        once = _truncate_desc(long)
+        assert _truncate_desc(once) == once
+
+    def test_keeps_more_than_the_first_sentence(self):
+        """The regression itself: guidance lives in the later sentences."""
+        text = ("Fetches one page and returns its text. "
+                "Use it when you already have the exact URL; to crawl a site use crawl_site. "
+                "It does not run JavaScript, so dynamic pages come back nearly empty. "
+                "Nothing is cached and nothing is written to disk.")
+        out = _truncate_desc(text)
+        assert "crawl_site" in out, "the sibling boundary was deleted"
+        assert "JavaScript" in out, "the honest limitation was deleted"
+
+    def test_never_exceeds_the_stated_budget(self):
+        long = ("A long sentence that keeps on going with many words inside it. " * 40)
+        assert len(_truncate_desc(long)) <= _MAX_DESC_LEN
+        assert len(_truncate_desc(long, budget=60)) <= 60
+
+    def test_cuts_on_word_boundaries_only(self):
+        vocabulary = {"alpha", "beta", "gamma", "delta", "epsilon"}
+        long = " ".join("alpha beta gamma delta epsilon." for _ in range(60))
+        out = _truncate_desc(long, budget=40)
+        tokens = {t.rstrip(".") for t in out.replace("...", "").split()}
+        assert tokens, "nothing survived"
+        assert tokens <= vocabulary, f"half a word got through: {tokens - vocabulary}"
+
+    def test_marks_dropped_text(self):
+        out = _truncate_desc("One. Two. Three. Four. Five. Six. " * 20)
+        assert out.endswith("..."), "silent deletion reads as the whole description"
+
+    def test_keeps_a_prefix_in_the_server_s_own_order(self):
+        text = "First is purpose. Second is guidance. Third is limit."
+        assert _truncate_desc(text, budget=200, max_sentences=3) == text
+
+    def test_sentence_cap_binds_before_the_budget(self):
+        text = "One sentence here. Another one here. Third one here. Fourth one here."
+        assert _truncate_desc(text, budget=200, max_sentences=2) == \
+            "One sentence here. Another one here. ..."
+
+    def test_drops_nothing_when_the_first_sentence_alone_is_the_shortest_fit(self):
+        """A first sentence longer than the budget still must not cut mid-word."""
+        text = "alpha " * 30 + "beta. Trailing guidance that has to go."
+        out = _truncate_desc(text, budget=80)
+        assert not out.split(" ")[-1].startswith("alph"), out
+        assert out.endswith("...")
+
+    def test_parameter_tier_is_the_smaller_allowance(self):
+        """A schema repeats a description once per property, so its budget is tighter."""
+        assert _MAX_PARAM_DESC_LEN < _MAX_DESC_LEN
+        long = ("Sentence one here. Sentence two here. Sentence three here. " * 12)
+        tool = _truncate_desc(long)
+        param = _truncate_desc(long, _MAX_PARAM_DESC_LEN, _MAX_PARAM_DESC_SENTENCES)
+
+        assert len(param) < len(tool)
+
+    def test_abbreviations_do_not_end_a_sentence(self):
+        text = "Supports units, e.g. metric or imperial. It never converts silently."
+        assert _split_sentences(text) == [
+            "Supports units, e.g. metric or imperial.",
+            "It never converts silently.",
+        ]
+
+    def test_decimals_and_domains_do_not_end_a_sentence(self):
+        text = "Costs 3.5 tokens per field on mcptoon.io listings. Nothing is stored."
+        assert len(_split_sentences(text)) == 2
+
+    def test_lines_are_sentences(self):
+        """Server descriptions are often written as short lines or bullets."""
+        text = "Purpose line\nGuidance line\n- Limit line"
+        assert _split_sentences(text) == ["Purpose line", "Guidance line", "Limit line"]
+
+    def test_empty_and_missing_descriptions_stay_absent(self):
+        assert _truncate_desc(None) is None
+        assert _truncate_desc("") is None
+        assert _truncate_desc("   ") is None
+
+    def test_property_descriptions_use_the_tighter_tier(self):
+        """Reachable through the public path, not only the private helper."""
+        slim = simplify_schema({
+            "type": "object",
+            "properties": {"q": {"type": "string", "description":
+                                 "Query text. " + "Extra guidance sentence here. " * 20}},
+        })
+        kept = slim["properties"]["q"]["description"]
+        assert len(kept) <= _MAX_PARAM_DESC_LEN
+        assert kept.endswith("...")
+
+
 class TestSimplifyToolDef:
     def test_simplify_tool_def(self):
         """Full tool definition is simplified."""
@@ -178,7 +289,8 @@ class TestSimplifyToolDef:
         simplified = simplify_tool_def(full)
         assert simplified["name"] == "fetch"
         assert simplified["description"]  # Truncated but present
-        assert len(simplified["description"]) <= 120
+        assert len(simplified["description"]) <= _MAX_DESC_LEN
+
         assert simplified["inputSchema"]["properties"]["url"]["type"] == "string"
         assert "pattern" not in simplified["inputSchema"]["properties"]["url"]
 

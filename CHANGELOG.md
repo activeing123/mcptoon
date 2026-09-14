@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The demo server's eleven tools declare what they return.** Each carries an
+  `outputSchema` whose fields are documented one sentence at a time, and answers
+  `tools/call` with `structuredContent` beside the text block, as MCP pairs them. The
+  notes are short so that they pass the gateway's budget whole and reach a client
+  unchanged. Tests assert the schema against the handlers, so a field that stops being
+  returned fails the suite rather than shipping as a lie.
+
+### Changed
+- **`tools/list` descriptions are no longer cut to their first sentence.** The old rule
+  kept one sentence and hard-cut at 120 characters, which deleted the guidance an agent
+  selects tools with — "when to use it", "call the other tool instead", "this will not
+  tell you X" are never the first sentence — and could stop mid-word, leaving a fragment
+  that was no longer a claim. The budget is now two tiers: 360 characters / up to 3
+  sentences for a tool, 200 / up to 2 for a parameter (a schema repeats that allowance
+  once per property). Sentences are taken in the server's own order and only whole ones,
+  short text passes through byte-identical, and no keyword ranking is used, because
+  scoring on English words would quietly rank non-English descriptions lower. Measured
+  on this repo's demo corpus (tiktoken `cl100k_base`): `tools/list` costs 83.9% of the
+  native listing instead of 76.7% — 7.2 points of savings traded for more than double
+  the surviving description text. Schema keys are still stripped, `call_tool` still
+  validates against the full schema, and the `--slim` / `--compact` CLI figures are
+  untouched (`slim_toon` never carried descriptions). ADR 0006 carries the amendment.
+
 ### Fixed
 - **`serve` stops erasing declared MCP fields from `tools/list`.** The compactor
   rebuilt every definition from three fields, so a server's `title`, its
@@ -15,15 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shape left to guesswork. Those fields now pass through (the schema inside
   `outputSchema` is still compacted, and a server that declares nothing gains
   nothing).
-
-### Added
-- **The demo server's eleven tools declare what they return.** Each carries an
-  `outputSchema` whose fields are documented one sentence at a time, and answers
-  `tools/call` with `structuredContent` beside the text block, as MCP pairs them. The
-  notes are short on purpose: mcptoon's own compactor keeps a first sentence and trims
-  the rest, so anything longer is cut before a client sees it. Tests assert the schema
-  against the handlers, so a field that stops being returned fails the suite rather
-  than shipping as a lie.
 
 ## [0.7.12] — 2026-09-14
 

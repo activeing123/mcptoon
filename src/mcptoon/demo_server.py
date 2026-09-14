@@ -196,7 +196,13 @@ def _t_simplify_tool_schema(args):
         "slim_tool": slim,
         **schema_simplifier.compute_token_stats(full_json, slim_json),
         "rules_applied": {
-            "description": f"first sentence, max {schema_simplifier._MAX_DESC_LEN} chars",
+            "description": (
+                f"up to {schema_simplifier._MAX_DESC_SENTENCES} sentences / "
+                f"{schema_simplifier._MAX_DESC_LEN} chars for a tool, "
+                f"{schema_simplifier._MAX_PARAM_DESC_SENTENCES} sentences / "
+                f"{schema_simplifier._MAX_PARAM_DESC_LEN} chars for a parameter, "
+                f"whole sentences only"),
+
             "enum_values_kept": schema_simplifier._MAX_ENUM_KEEP,
             "schema_keys_dropped": sorted(schema_simplifier._STRIP_TOP_KEYS),
         },
@@ -402,8 +408,10 @@ def _f(kind: str | None, note: str) -> dict:
 # description is then free to carry only what a schema cannot — what the tool is for,
 # when not to reach for it, and what it will not tell you.
 #
-# Field notes are one short sentence each on purpose: mcptoon's own compactor keeps a
-# first sentence and trims the rest, so anything longer would be cut in transit.
+# Field notes are one short sentence each on purpose: mcptoon's gateway puts a budget
+# on a parameter's description (two sentences, 200 characters) and reflows anything
+# longer, so a note that fits stays byte-identical on the way to the client.
+
 # The keys below are asserted against the handlers in tests/test_demo_server.py, which
 # fails if a tool starts or stops returning a field.
 OUTPUT_SCHEMAS = {
@@ -672,8 +680,10 @@ TOOLS = [
         "the slim definition with the character and estimated-token delta against what you sent. Use it "
         "on one tool you are about to put in front of a model; to price a whole set at once use "
         "build_tool_manifest, and for the archived measurements on 255 real tools use "
-        "report_benchmark_rows. The result lists the rules it applied: descriptions are cut to their "
-        "first sentence at 120 characters, enums longer than five values are dropped, and $ref, title, "
+        "report_benchmark_rows. The result lists the rules it applied: a tool keeps up to "
+        "three sentences of its description and a parameter up to two, whole sentences only, "
+        "while enums longer than five values are dropped and $ref, title, "
+
         "format, pattern and examples are removed — so the slim form is a summary, not a schema you can "
         "validate arguments against, and the input is never stored.",
         {"tool": _prop("One MCP tool definition as a JSON object serialised to text, with a non-empty "

@@ -11,7 +11,7 @@ mcptoon 是一个 146KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-879%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-894%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -517,13 +517,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 879 passed, 1 skipped
+python -m pytest tests/ -v   # 894 passed, 1 skipped
 ```
 
 零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 813 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：12,634 行 Python、22 个模块，零第三方依赖——供应链里 0 个要审计的环节。
+项目本体：12,987 行 Python、22 个模块，零第三方依赖——供应链里 0 个要审计的环节。
 
 ---
 

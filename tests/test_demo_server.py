@@ -235,9 +235,10 @@ class TestReturnContract(unittest.TestCase):
                     self.assertTrue(field.get("description"), f"{where} is undocumented")
 
     def test_field_notes_survive_compaction_untouched(self):
-        """mcptoon's own compactor keeps a first sentence and trims the rest, so a long
-        note is exactly what an agent downstream never sees. Anything cut here is cut
-        in transit to every client."""
+        """The gateway budgets a parameter's description at two sentences / 200
+        characters and reflows anything longer, so a note that overruns it is exactly
+        what a client downstream never sees. Anything cut here is cut in transit."""
+
         for tool in ds.TOOLS:
             for where, field in _walk_fields(tool["outputSchema"]["properties"]):
                 note = field["description"]
@@ -386,8 +387,13 @@ class TestToolBehaviour(unittest.TestCase):
         out = payload_of(call("simplify_tool_schema", VALID_CALLS["simplify_tool_schema"]))
         self.assertLess(out["simplified_tokens"], out["full_tokens"])
         rules = out["rules_applied"]
-        self.assertEqual(rules["description"],
-                         f"first sentence, max {schema_simplifier._MAX_DESC_LEN} chars")
+        # Pinned by content, not by repeating the sentence: the numbers are the
+        # contract, the wording around them is allowed to improve.
+        self.assertIn(str(schema_simplifier._MAX_DESC_LEN), rules["description"])
+        self.assertIn(str(schema_simplifier._MAX_PARAM_DESC_LEN), rules["description"])
+        self.assertIn("sentences", rules["description"])
+
+
         self.assertEqual(rules["enum_values_kept"], schema_simplifier._MAX_ENUM_KEEP)
         self.assertIn("title", rules["schema_keys_dropped"])
         self.assertNotIn("title", out["slim_tool"]["inputSchema"])

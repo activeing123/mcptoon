@@ -20,7 +20,8 @@ Used by serve mode (ADR 0006): tools/list returns simplified schemas
 
 Strategy:
   - Keep standard JSON Schema structure (type, properties, required)
-  - Truncate long descriptions to 1 sentence (< 100 chars)
+  - Keep as much description as the budget allows, whole sentences only
+    (3 sentences / 360 chars for a tool, 2 / 200 for a parameter)
   - Remove: examples, $ref, $schema, additionalProperties, pattern, format,
     default, enum (unless < 5 items), title, $comment, deprecated, readOnly, writeOnly
   - Flatten one level of nested properties
@@ -28,6 +29,7 @@ Strategy:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 # Fields to strip from individual property definitions
@@ -45,27 +47,116 @@ _STRIP_TOP_KEYS = {
     "examples", "example",
 }
 
-# Max description length (characters)
-_MAX_DESC_LEN = 120
+# Description budget, in two tiers.
+#
+# A tool has one description; a schema has one per property. Applying the same budget
+# to both multiplies a modest allowance into noise, so the tiers are separate. Both
+# exist because the previous rule — keep the first sentence, hard-cut at 120 chars —
+# deleted the part that agents select tools with. "Use this when you need X", "it will
+# not tell you Y", "call Z instead" are never the first sentence, and on a description
+# over 120 characters the cut landed mid-word, so the surviving text was not even a
+# complete claim. Measured on this repo's own demo server: 6764 characters of tool
+# description reached clients as 1320, and the public scorer's description mark fell
+# from 4.8 to 3.1 on exactly that text (2026-09-14).
+_MAX_DESC_LEN = 360
+_MAX_DESC_SENTENCES = 3
+_MAX_PARAM_DESC_LEN = 200
+_MAX_PARAM_DESC_SENTENCES = 2
+
+# Marks that text was dropped. The budget below is reduced by its width first, so a
+# compacted description never exceeds its stated limit — the number is a promise.
+_TRUNCATION_MARK = "..."
 
 # Max enum items to keep (larger enums are removed to save tokens)
 _MAX_ENUM_KEEP = 5
 
+# A sentence end: terminal punctuation plus any closing quote/bracket.
+_SENTENCE_END = re.compile(r"[.!?]+[\"')\]]*")
 
-def _truncate_desc(desc: str | None) -> str | None:
-    """Truncate a description string to one sentence, max _MAX_DESC_LEN chars."""
+# Things that look like sentence ends and are not.
+_ABBREVIATIONS = frozenset({"e.g", "i.e", "etc", "vs", "cf", "approx", "al"})
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split a description into sentences, terminators included.
+
+    No keyword scoring, no "importance" ranking: the server's own order is the only
+    signal trusted about what it wrote first, and scoring on English words would
+    quietly rank non-English descriptions below it. Line breaks end sentences too,
+    because server descriptions are often written as short lines.
+    """
+    parts: list[str] = []
+    for line in text.splitlines():
+        line = line.strip().lstrip("#*>- \t")
+        if not line:
+            continue
+        start = 0
+        for match in _SENTENCE_END.finditer(line):
+            end = match.end()
+            if end < len(line) and not line[end].isspace():
+                continue  # "3.5", "mcptoon.io" — a decimal or a domain, not an end
+            head = line[start:end].strip()
+            if not head:
+                continue
+            last = head.split()[-1].rstrip(".!?").lower()
+            if last in _ABBREVIATIONS or (len(last) == 1 and last.isalpha()):
+                continue  # "e.g." and single-letter initials do not end a sentence
+            parts.append(head)
+            start = end
+        tail = line[start:].strip()
+        if tail:
+            parts.append(tail)
+    return parts
+
+
+def _truncate_desc(desc: str | None, budget: int = _MAX_DESC_LEN,
+                   max_sentences: int = _MAX_DESC_SENTENCES) -> str | None:
+    """Keep as much of a description as the budget allows, whole sentences only.
+
+    Two limits, whichever binds first: a character budget and a sentence cap. The cap
+    earns its place with descriptions written as many short lines — those fit the
+    budget and still turn a listing into a wall of text.
+
+    Sentences are taken in the order the server wrote them. The first one that does not
+    fit stops the run; nothing is skipped over to grab a shorter later sentence, so the
+    result is always a prefix of the original. A first sentence too long for the budget
+    on its own is cut at a word boundary, never mid-word. Text that stays within both
+    limits passes through byte-identical, which makes this safe to apply twice.
+    """
     if not desc:
         return None
-    desc = desc.strip()
-    # Take first sentence (up to period, question mark, or newline)
-    for sep in (". ", ".\n", "? ", "!\n", "\n"):
-        idx = desc.find(sep)
-        if idx > 0:
-            desc = desc[:idx + 1]
+    original = desc.strip()
+    if not original:
+        return None
+
+    sentences = _split_sentences(original) or [original]
+    if len(original) <= budget and len(sentences) <= max_sentences:
+        return original
+
+    limit = budget - len(_TRUNCATION_MARK) - 1
+    kept: list[str] = []
+    used = 0
+    for sentence in sentences:
+        if len(kept) >= max_sentences:
             break
-    if len(desc) > _MAX_DESC_LEN:
-        desc = desc[:_MAX_DESC_LEN - 3] + "..."
-    return desc
+        cost = len(sentence) + (1 if kept else 0)
+        if used + cost > limit:
+            break
+        kept.append(sentence)
+        used += cost
+
+    if not kept:
+        # Even the first sentence is over budget: cut at whitespace, not mid-word.
+        head = original[:limit]
+        if " " in head:
+            head = head.rsplit(" ", 1)[0]
+        return f"{head.rstrip(' ,;:')} {_TRUNCATION_MARK}"
+
+    result = " ".join(kept)
+    if len(kept) < len(sentences):
+        result = f"{result} {_TRUNCATION_MARK}"
+    return result
+
 
 
 def _simplify_property(prop: dict) -> dict:
@@ -79,8 +170,11 @@ def _simplify_property(prop: dict) -> dict:
     if "type" in prop:
         result["type"] = prop["type"]
 
-    # Keep description (truncated)
-    desc = _truncate_desc(prop.get("description"))
+    # Keep description (truncated to the parameter-tier budget: a schema repeats this
+    # once per property, so its allowance is deliberately smaller than a tool's)
+    desc = _truncate_desc(prop.get("description"), _MAX_PARAM_DESC_LEN,
+                          _MAX_PARAM_DESC_SENTENCES)
+
     if desc:
         result["description"] = desc
 
