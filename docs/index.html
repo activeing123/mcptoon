@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1117" media="(prefers-color-scheme: dark)">
+<title>mcptoon — Two agent problems, one fix. Cut MCP token waste.</title>
+<meta name="description" content="Zero-dependency Python CLI that scans and unifies MCP tool configs across your AI clients. Manifest ships names-only by default: 71,929 → 581 tokens on the 255-tool reference fixture. Your own numbers: mcptoon stats.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="mcptoon — Two agent problems, one fix. Cut MCP token waste.">
+<meta property="og:description" content="Tool lists eat your context. Every agent wants its own config. mcptoon fixes both: 255-tool manifest 71,929 → 581 tokens (about $129/mo → $1/mo on calculator defaults), quickstart wires every installed agent in one go. Zero-dependency Python CLI. Your numbers: mcptoon stats.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="mcptoon — Two agent problems, one fix. Cut MCP token waste.">
+<meta name="twitter:description" content="Scans and unifies MCP configs across Claude Desktop, Cursor, Cline, Windsurf, Copilot, Codex. Names-only manifest by default. Your numbers: mcptoon stats — zero deps, Apache-2.0.">
+<meta name="twitter:image" content="assets/og-image.png">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/pwa-icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/pwa-icon-512.png">
+<style>
+  :root{
+    --bg:#F7F5F0;
+    --panel:#FFFFFF;
+    --ink:#0F3A57;
+    --teal:#2FB3AB;
+    --teal-wm:#1C938A;
+    --muted:#4C6478;
+    --line:rgba(15,58,87,.16);
+    --line-soft:rgba(15,58,87,.09);
+    --code-bg:#FFFFFF;
+    --r:14px;
+    --mono:Consolas,"SF Mono","Cascadia Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  .logo-dark{display:none}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0D1117;
+      --panel:#161B22;
+      --ink:#E8F4F8;
+      --teal:#43C8BF;
+      --teal-wm:#43C8BF;
+      --muted:#9AB4BF;
+      --line:rgba(232,244,248,.16);
+      --line-soft:rgba(232,244,248,.08);
+      --code-bg:#10151C;
+    }
+    .logo-light{display:none}
+    .logo-dark{display:block}
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:var(--ink)}
+  ::selection{background:rgba(47,179,171,.28)}
+
+  /* ---------- shared bits ---------- */
+  .diag{position:absolute;top:0;right:0;width:46px;height:46px;
+    clip-path:polygon(0 0,100% 0,100% 100%);
+    background:linear-gradient(135deg,var(--teal) 0 50%,var(--ink) 50% 100%);
+    opacity:.9;pointer-events:none}
+  .kicker{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big-num{font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.02em;line-height:1}
+  .mono{font-family:var(--mono)}
+  .cmdline{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);
+    border-radius:var(--r);background:var(--code-bg);overflow:hidden;max-width:100%}
+  .cmdline code{flex:1 1 auto;min-width:0;font-family:var(--mono);font-size:15px;
+    padding:13px 16px;white-space:pre;overflow-x:auto;color:var(--ink)}
+  .cmdline code .p{color:var(--muted);font-weight:700}
+  .cmdline button{flex:0 0 auto;border:none;border-left:1px solid var(--line);
+    background:transparent;color:var(--muted);font-family:var(--sans);font-size:12.5px;
+    font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:0 16px;cursor:pointer}
+  .cmdline button:hover{color:var(--ink)}
+  .btn{display:inline-block;text-decoration:none;font-weight:700;font-size:15px;
+    padding:12px 22px;border-radius:var(--r);border:1px solid var(--line);color:var(--ink)}
+  .btn.primary{background:var(--teal);border-color:var(--teal);color:#0F3A57}
+  .btn.ghost{background:transparent}
+  section{padding:72px 0}
+  h2{font-size:clamp(24px,3.4vw,34px);font-weight:800;letter-spacing:-.015em;line-height:1.2}
+  .lead{color:var(--muted);max-width:640px;margin-top:10px}
+  .note{font-size:13px;color:var(--muted)}
+  .note code{font-family:var(--mono);font-size:12px}
+
+  /* ---------- nav ---------- */
+  nav{border-bottom:1px solid var(--line-soft);background:var(--bg);position:sticky;top:0;z-index:10}
+  .nav-in{display:flex;align-items:center;justify-content:space-between;gap:16px;height:64px}
+  .nav-in img{height:30px;width:auto}
+  .nav-links{display:flex;align-items:center;gap:22px;font-size:14.5px;font-weight:600}
+  .nav-links a.plain{text-decoration:none;color:var(--muted)}
+  .nav-links a.plain:hover{color:var(--ink)}
+  .nav-links a.gh{text-decoration:none;border:1px solid var(--line);border-radius:var(--r);padding:8px 14px}
+  .nav-links a.gh:hover{border-color:var(--teal)}
+
+  /* ---------- hero ---------- */
+  .hero{padding:64px 0 60px;position:relative}
+  .hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:44px;align-items:start}
+  @media(min-width:1024px){.hero-grid{grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:56px}}
+  .hero .hook{font-size:clamp(27px,3.9vw,42px);font-weight:800;line-height:1.22;letter-spacing:-.02em}
+  .hero .hook .teal{color:var(--teal-wm)}
+  .hero .sub{margin-top:18px;color:var(--muted);max-width:560px}
+  .hero .numline{display:flex;align-items:baseline;gap:16px;margin-top:30px;flex-wrap:wrap}
+  .hero .numline .big-num{font-size:clamp(52px,8vw,84px);color:var(--teal-wm)}
+  .num-visual{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);
+    padding:26px 26px 22px;position:relative;overflow:hidden}
+  .num-visual .mrow{margin-bottom:18px}
+  .num-visual .mrow:last-child{margin-bottom:0}
+  .num-visual .mlabel{display:flex;justify-content:space-between;font-size:12.5px;
+    font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+  .num-visual .mlabel .v{font-family:var(--mono);letter-spacing:0;text-transform:none;font-size:13.5px}
+  .track{height:14px;border-radius:7px;background:var(--line-soft);overflow:hidden}
+  .bar{height:100%;border-radius:7px}
+  .bar.old{background:var(--ink);width:100%}
+  .bar.new{background:var(--teal);width:1.1%;min-width:6px}
+  .pair{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line)}
+  .nv-foot{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .nv-foot img{height:44px;width:44px}
+  .nv-foot .d-big{font-family:var(--mono);font-weight:700;font-size:22px;color:var(--teal-wm)}
+  .cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+  .cta-stack{margin-top:26px;display:flex;flex-direction:column;gap:10px}
+  .hero-grid>*,.step>*,.panels>*,.math>*,.cta-stack,.cmdline,.numline{min-width:0}
+
+  /* ---------- steps (numbered rows, not card trio) ---------- */
+  .step{display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;padding:28px 0;border-top:1px solid var(--line-soft)}
+  .step:last-of-type{border-bottom:1px solid var(--line-soft)}
+  .step .n{font-size:clamp(38px,5vw,54px);font-weight:800;color:var(--teal-wm);line-height:1;
+    font-variant-numeric:tabular-nums}
+  .step h3{font-size:19px;font-weight:800;margin-bottom:4px}
+  .step p{color:var(--muted);font-size:15px;margin-bottom:12px;max-width:600px}
+  .step .cmdline code{font-size:14px;padding:11px 14px}
+
+  /* ---------- pain / gain panels ---------- */
+  .panels{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:34px}
+  @media(min-width:1024px){.panels{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}}
+  .panel{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);
+    padding:24px 24px 20px;position:relative;overflow:hidden}
+  .panel h3{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+  .panel.before h3{color:var(--muted)}
+  .panel.after h3{color:var(--ink)}
+  .panel ul{list-style:none}
+  .panel li{padding:9px 0 9px 18px;border-top:1px solid var(--line-soft);font-size:15px;position:relative}
+  .panel li:first-child{border-top:none}
+  .panel li::before{content:"";position:absolute;left:0;top:17px;width:8px;height:8px;
+    clip-path:polygon(0 0,100% 0,100% 100%);background:var(--muted)}
+  .panel.after li::before{background:var(--teal)}
+  .panel li em{font-style:normal;font-family:var(--mono);font-size:13px;color:var(--ink)}
+
+  /* ---------- token math ---------- */
+  .math{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:34px}
+  @media(min-width:1024px){.math{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:22px}}
+  .math .panel .row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+    padding:14px 0;border-top:1px solid var(--line-soft)}
+  .math .panel .row:first-of-type{border-top:none}
+  .math .lhs{font-size:14.5px;color:var(--muted);max-width:230px}
+  .math .rhs{font-family:var(--mono);font-weight:700;font-size:19px;text-align:right;white-space:nowrap}
+  .math .rhs .old{color:var(--muted);font-weight:400}
+  .math .rhs .arr{color:var(--muted);font-weight:400;padding:0 6px}
+  .math .rhs .new{color:var(--teal-wm)}
+  .math .pct{font-size:clamp(40px,6vw,60px);color:var(--teal-wm)}
+
+  /* ---------- proof & spec receipt lists ---------- */
+  .plist{margin-top:34px}
+  .plist .row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+    padding:14px 0;border-top:1px solid var(--line-soft)}
+  .plist .row:first-of-type{border-top:none}
+  .plist .lhs{font-size:14.5px;color:var(--muted);max-width:60%}
+  .plist .lhs b{color:var(--ink)}
+  .plist .lhs a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+  .plist .lhs a:hover{text-decoration-color:var(--teal)}
+  .plist .rhs{font-family:var(--mono);font-weight:700;font-size:14px;text-align:right;
+    white-space:nowrap;color:var(--ink)}
+  .plist .rhs .old{color:var(--muted);font-weight:400}
+
+  /* ---------- hero live-output terminal mock ---------- */
+  .term{border:1px solid var(--line);border-radius:var(--r);background:var(--code-bg);
+    overflow:hidden;max-width:100%}
+  .term-bar{display:flex;align-items:center;gap:7px;padding:10px 14px;
+    border-bottom:1px solid var(--line-soft);font-size:11.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .term-bar span:last-child{margin-left:6px}
+  .tdot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:0 0 auto}
+  .tdot-teal{background:var(--teal)}
+  .term pre{margin:0;overflow-x:auto}
+  .term code{font-family:var(--mono);font-size:13.5px;line-height:1.8;
+    color:var(--ink);white-space:pre;padding:14px 18px;display:block}
+  .term .hl{color:var(--teal-wm);font-weight:700}
+
+  /* ---------- compat strip ---------- */
+  .compat{border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);padding:30px 0}
+  .compat .in{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;justify-content:space-between}
+  .compat .agents{font-family:var(--mono);font-size:clamp(16px,2vw,20px);font-weight:700;min-width:0;line-height:1.9;overflow-wrap:anywhere}
+  .compat .agents .dot{color:var(--teal-wm);padding:0 6px}
+
+  /* ---------- faq ---------- */
+  .faq{max-width:760px;margin-top:30px}
+  details{border-bottom:1px solid var(--line-soft);padding:18px 0}
+  details:first-of-type{border-top:1px solid var(--line-soft)}
+  summary{cursor:pointer;font-weight:700;font-size:16.5px;list-style:none;position:relative;padding-right:30px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";position:absolute;right:2px;top:0;font-weight:400;color:var(--muted);font-size:20px}
+  details[open] summary::after{content:"\2212"}
+  details p{margin-top:8px;color:var(--muted);font-size:15px;max-width:640px}
+  details p code, .panel li code, .faq code{font-family:var(--mono);font-size:13px;color:var(--ink);
+    background:var(--code-bg);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px}
+
+  /* ---------- footer ---------- */
+  footer{margin-top:24px;background:#0D1117;color:#E8F4F8;position:relative;overflow:hidden}
+  footer::before{content:"";position:absolute;top:0;left:0;right:0;height:8px;
+    background:linear-gradient(100deg,#43C8BF 0 50%,#0F3A57 50% 100%)}
+  .foot-in{padding:72px 24px 56px;max-width:1080px;margin:0 auto}
+  footer img.logo{height:40px;width:auto;margin-bottom:26px}
+  .foot-h{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.015em;color:#E8F4F8}
+  .foot-h .t{color:#43C8BF}
+  .foot-cmd{margin-top:24px;max-width:560px;border-color:rgba(232,244,248,.22);background:#161B22}
+  .foot-cmd code{color:#E8F4F8}
+  .foot-cmd .p{color:#43C8BF}
+  .foot-cmd button{border-left-color:rgba(232,244,248,.22);color:#9AB4BF}
+  .foot-cmd button:hover{color:#E8F4F8}
+  .foot-links{margin-top:30px;display:flex;gap:22px;flex-wrap:wrap;font-size:14.5px}
+  .foot-links a{color:#E8F4F8}
+  .foot-meta{margin-top:34px;padding-top:18px;border-top:1px solid rgba(232,244,248,.14);
+    font-size:13px;color:#9AB4BF;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .foot-colophon{margin-top:16px;font-size:12.5px;color:#9AB4BF;max-width:640px}
+  .nw{white-space:nowrap}
+  @media(max-width:639px){
+    section{padding:56px 0}
+    .nav-links a.plain{display:none}
+    .nav-links a.langsw{display:inline}
+    .step{grid-template-columns:1fr;gap:8px}
+    .step .n{font-size:32px}
+    .plist .row{flex-direction:column;align-items:flex-start;gap:2px}
+    .plist .lhs{max-width:100%}
+    .plist .rhs{white-space:normal;text-align:left;font-size:13px}
+    .math .rhs{white-space:normal;text-align:right;font-size:16px}
+    .term code{font-size:11px;padding:12px 12px;line-height:1.7}
+  }
+</style>
+<link rel="canonical" href="https://activeing123.github.io/mcptoon/">
+<link rel="alternate" hreflang="en" href="https://activeing123.github.io/mcptoon/">
+<link rel="alternate" hreflang="zh" href="https://activeing123.github.io/mcptoon/index-zh.html">
+<link rel="alternate" hreflang="x-default" href="https://activeing123.github.io/mcptoon/">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebPage",
+   "@id": "https://activeing123.github.io/mcptoon/",
+   "url": "https://activeing123.github.io/mcptoon/",
+   "inLanguage": "en",
+   "name": "mcptoon — Two agent problems, one fix. Cut MCP token waste.",
+   "description": "Zero-dependency Python CLI that scans and unifies MCP tool configs across your AI clients. Manifest ships names-only by default: 71,929 → 581 tokens on the 255-tool reference fixture. Your own numbers: mcptoon stats."
+  },
+  {
+   "@type": "SoftwareApplication",
+   "name": "mcptoon",
+   "url": "https://activeing123.github.io/mcptoon/",
+   "applicationCategory": "DeveloperApplication",
+   "operatingSystem": "Windows, macOS, Linux",
+   "softwareVersion": "0.7.14",
+   "license": "https://spdx.org/licenses/Apache-2.0.html",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "description": "Zero-dependency Python CLI that scans and unifies MCP tool configs across your AI clients. Manifest ships names-only by default: 71,929 → 581 tokens on the 255-tool reference fixture. Your own numbers: mcptoon stats.",
+   "sameAs": [
+    "https://github.com/activeing123/mcptoon",
+    "https://pypi.org/project/mcptoon/"
+   ]
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "MCP, in one sentence?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The Model Context Protocol — how AI clients attach external tools: files, search, databases, browsers. The catch: every tool you add ships its full description into the model's context before you've typed a word, and it re-ships every turn. That bill grows fast."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Will my configs get uploaded?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Scanning, merging and manifest generation all happen on your machine. Exactly one path touches the network: the demo command, which boots the official public reference server (everything) and pulls its code from npm — a public package; none of your config is in it. Want zero network requests: run mcptoon manifest --compact against your own servers (review-machine re-test on the cl100k ruler: 161 tokens of output covering all 45 tool names)."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "With names-only, what stops the model picking the wrong tool or guessing arguments?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "This tier only changes how the discovery manifest ships; calls are untouched. The default (names-only) suits models that already know what they want; before acting, mcptoon inspect <server> <tool> fetches that one tool's full arguments, and you call once you've confirmed them. Need the client itself to see arguments? Step up to names+types (8,282 on the fixture, −88.5%) or full fields — all three rungs are just flags on mcptoon manifest. How deep you cut is your dial, not ours."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What does demo need — and why Node.js?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "demo boots the official everything reference server via npx — that package doesn't live inside mcptoon, so it needs Node.js and a first-run download. The testing path (quickstart → stats → manifest) is pure Python, no Node."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is that −99.2% my machine, or a marketing number?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "It's the reference fixture's number — we'd rather you knew now than felt let down later. Your number comes from mcptoon stats: our machine read 45 tools, 8,380 → 5,635 (−32.8%, as of page build) — far from 99.2%, because that line tests the trimmed-schema tier with a rough ruler. Same machine, cl100k ruler, cut to the floor: the review machine read 7,793 → 161. Both numbers are real; they answer different questions — one is the ceiling the ladder reaches on the fixture, the other is one machine's current state. The raw data rows are committed in the repo, and the same test run exists at the 5- and 50-tool scales — you can see the shape of the curve, not a cherry-picked dot."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does it touch my client settings?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Scanning (quickstart) reads existing configs and writes only its own ~/.mcptoon/config.json — no edits to clients. Writing into clients is sync's job, and it only moves when you run it: it prints a report of what it wrote, supports a --dry preview, touches only the mcpServers key, and by default writes every detected client in one pass — name one with --agent <client> to go narrower. Codex is the exception — it writes the project's AGENTS.md. Scope the escape hatch honestly: deleting ~/.mcptoon/ removes mcptoon's own config and cache, but entries sync already wrote stay in your clients until you remove them — the report says where."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is it free?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Apache-2.0, open source. All the code is on GitHub, and mcptoon stats reads your own servers — so you never have to take anyone's word for your token bill. Including ours."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav aria-label="Main">
+  <div class="wrap nav-in">
+    <a href="#" aria-label="mcptoon home">
+      <img class="logo-light" src="assets/lockup-h-split-light.svg" alt="mcptoon logo">
+      <img class="logo-dark" src="assets/lockup-h-split-dark.svg" alt="mcptoon logo">
+    </a>
+    <div class="nav-links">
+      <a class="plain" href="#proof">Proof</a>
+      <a class="plain" href="#how">How it works</a>
+      <a class="plain" href="#math">Token math</a>
+      <a class="plain" href="#clients">Real wiring</a>
+      <a class="plain" href="#faq">FAQ</a>
+      <a class="plain langsw" href="index-zh.html">中文</a>
+      <a class="gh" href="https://github.com/activeing123/mcptoon">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="kicker">Zero-dependency Python CLI · scan · unify · compress</p>
+      <h1 class="hook" style="margin-top:14px">
+        Two agent problems. <span class="teal nw">mcptoon fixes both.</span>
+      </h1>
+      <p class="sub">
+        <b>Have you tested whether your context is wasting tokens?</b> Every tool you install dumps its
+        full schema straight in — of all those wasted tokens, which ones could go? mcptoon cuts
+        the tool manifest <b>99.2%</b> — no schema ever enters context — and compresses call
+        outputs <b>~34% more</b> with TOON encoding. (Real 255-tool reference fixture, full schema vs
+        names-only, cl100k ruler; lossless round-trip tests.)<br><br>
+        <b>Running several agents — Claude, Codex, Hermes, OpenClaw, and more?</b> Reconfiguring
+        each one from scratch? Isn't there a set-once, works-everywhere way? There is:
+        <b>install mcptoon once, every agent shares one config</b> — <code class="mono">quickstart</code>
+        finds the agents you've installed and the MCP servers already on your machine and writes
+        them all at once. Add tools later in one place: a single <code class="mono">sync</code>
+        rolls it out everywhere. If it can run a command, it can use mcptoon — no plugins,
+        no per-agent setup, ever.
+      </p>
+      <div class="numline">
+        <span class="big-num">71,929 &rarr; 581</span>
+        <span class="note"><b>&asymp; $129/month &rarr; &asymp; $1/month.</b> One real manifest —
+        255 tools' worth — priced on the calculator's defaults. It's a reference fixture, not your
+        machine; prices are assumptions, not quotes. Your own number is one command away.
+        Ruler &amp; provenance: <a href="#math" style="color:var(--teal-wm)">Token math &darr;</a></span>
+      </div>
+      <div class="cta-row">
+        <a class="btn primary" href="https://activeing123.github.io/mcptoon/tools/token-tax/">Run the numbers on your setup — local in your browser, nothing uploaded</a>
+        <a class="btn ghost" href="https://github.com/activeing123/mcptoon">See it on GitHub</a>
+      </div>
+      <p class="note" style="margin-top:22px"><b>Testing your own machine needs zero Node. This is live output from our dev box:</b></p>
+      <div class="term" style="margin-top:10px">
+        <div class="term-bar"><span class="tdot"></span><span class="tdot"></span><span class="tdot tdot-teal"></span><span>mcptoon stats</span></div>
+        <pre><code>$ pip install mcptoon &amp;&amp; mcptoon stats
+
+  Tools discovered:     69
+  Full JSON tokens:     15,859
+  Slim manifest tokens: 11,724
+  ─────────────────────────────────
+  Tokens SAVED:         <span class="hl">4,135 (26.1%)</span>
+  Usage: 976 calls, 881/976 success
+  Per-server token savings:
+    sequential-thinking  1,206 →    436  (-64%)
+    filesystem           3,404 →  2,343  (-31%)
+    bsk-tools              761 →    544  (-29%)</code></pre>
+      </div>
+      <p class="note" style="margin-top:10px">Verbatim except the three servers shown; full list on yours.
+      <code class="mono">stats</code> counts with a rough 4-chars&asymp;1-token estimate — our machine's numbers,
+      not a promise about yours. Rulers compared: <a href="#math" style="color:var(--teal-wm)">Token math</a>.</p>
+    </div>
+
+    <figure class="num-visual" aria-label="Token comparison on the 255-tool reference fixture: full JSON schemas vs the names-only default manifest">
+      <span class="diag" aria-hidden="true"></span>
+      <div class="mrow">
+        <div class="mlabel"><span>Full JSON (native) · <span class="nw">255 tools</span></span><span class="v">71,929</span></div>
+        <div class="track"><div class="bar old"></div></div>
+      </div>
+      <div class="mrow">
+        <div class="mlabel"><span>Names-only (default) · <span class="nw">same 255</span></span><span class="v">581</span></div>
+        <div class="track"><div class="bar new"></div></div>
+      </div>
+      <div class="pair">
+        <div class="mrow">
+          <div class="mlabel"><span>Full JSON (native) · <span class="nw">50 tools</span></span><span class="v">14,113</span></div>
+          <div class="track"><div class="bar old"></div></div>
+        </div>
+        <div class="mrow">
+          <div class="mlabel"><span>Names-only (default) · <span class="nw">same 50</span></span><span class="v">114</span></div>
+          <div class="track"><div class="bar new"></div></div>
+        </div>
+      </div>
+      <div class="nv-foot">
+        <img src="assets/mascot-split-light.svg" class="logo-light" alt="" width="44" height="44">
+        <img src="assets/mascot-split-dark.svg" class="logo-dark" alt="" width="44" height="44">
+        <span><span class="d-big">&minus;99.2%</span><br>
+        <span class="note">Reference fixture, not your machine (as of page build) &mdash; <span class="nw">255 tools</span> / <span class="nw">50 servers</span>, tiktoken cl100k_base. Arguments come back on demand with <code class="mono">mcptoon inspect</code>. Your own numbers: <code class="mono">mcptoon stats</code>.</span></span>
+      </div>
+    </figure>
+  </div>
+</header>
+
+<!-- ============ PROOF (right after hero: catch the "is that real?" reflex) ============ -->
+<section id="proof" style="padding-bottom:52px">
+  <div class="wrap">
+    <h2>This isn't just us talking.</h2>
+    <p class="lead">Skeptical of that number above? So were we — until we found the problem
+    tested by parties with nothing to sell you. Every line below is a third party's own
+    published test results, linked at its source:</p>
+    <div class="panel plist">
+      <div class="row"><div class="lhs"><a href="https://www.anthropic.com/engineering/code-execution-with-mcp"><b>Anthropic</b> — official engineering post, code execution with MCP</a></div><div class="rhs">150,000 &rarr; 2,000 <span class="old">(−98.7%)</span></div></div>
+      <div class="row"><div class="lhs"><a href="https://www.firecrawl.dev/blog/mcp-vs-cli"><b>Firecrawl</b> — MCP vs CLI benchmark, same task, full schemas shipped upfront</a></div><div class="rhs">1,365 vs 44,026 <span class="old">(32×)</span></div></div>
+      <div class="row"><div class="lhs"><a href="https://www.scalekit.com/blog/mcp-vs-cli-use"><b>Scalekit</b> — MCP vs CLI: cost and reliability</a></div><div class="rhs">10&ndash;32× cheaper <span class="old">· 100% vs 72%</span></div></div>
+      <div class="row"><div class="lhs"><a href="https://arxiv.org/abs/2506.01056"><b>MCP-Zero</b> — arXiv:2506.01056; fetch tools on demand instead</a></div><div class="rhs">cost &asymp; flat <span class="old">in tool count</span></div></div>
+      <div class="row"><div class="lhs"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576"><b>SEP-1576</b> — open proposal upstream in MCP itself: cut schema redundancy</a></div><div class="rhs">acknowledged <span class="old">upstream</span></div></div>
+    </div>
+    <p class="note" style="margin-top:18px">Every figure in that table is the source's own published
+    test results — they corroborate that the problem is real. The &minus;99.2% is ours. Neither side
+    borrows the other's authority.</p>
+  </div>
+</section>
+
+<!-- ============ FOUR STEPS ============ -->
+<section id="how">
+  <div class="wrap">
+    <h2>Four steps: test first, then cut.</h2>
+    <p class="lead">No wiring, no rewriting configs. Step 1 puts the package down, step 2 scans what
+    you already have, step 3 tests your own machine, step 4 picks a tier and cuts.</p>
+
+    <div style="margin-top:30px">
+      <div class="step">
+        <div class="n">01</div>
+        <div>
+          <h3>Install</h3>
+          <p>One command. Pure standard library, zero third-party dependencies, no daemon, no account.</p>
+          <div class="cmdline">
+            <code>pip install mcptoon</code>
+            <button type="button" data-copy="pip install mcptoon">Copy</button>
+          </div>
+          <p class="note">The repo also ships one-line scripts, <code class="mono">install.sh</code> /
+          <code class="mono">install.ps1</code>. To be upfront: their last step runs quickstart right
+          away — install, and config is written in the same breath. If you'd rather set your own pace,
+          use pip and go one step at a time.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <div>
+          <h3>Scan &amp; unify</h3>
+          <p>Reads the MCP configs already on this machine — Claude Desktop, Cursor, Cline, Windsurf:
+          four client families, their candidate config files — and unifies them into one
+          <code class="mono">~/.mcptoon/config.json</code>. This step writes mcptoon's own file; writing
+          into your clients is <code class="mono">sync</code>'s job, and sync only goes where you
+          explicitly send it.</p>
+          <div class="cmdline">
+            <code>mcptoon quickstart</code>
+            <button type="button" data-copy="mcptoon quickstart">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <div>
+          <h3>Test: your numbers</h3>
+          <p>Reads your manifest and reports what it costs per turn — the number actually happening on
+          your machine. Ours read 45 tools as of page build: 8,380 &rarr; 5,635 (saving 32.8%). Two
+          disclaimers: the second line is the <b>trimmed schema</b> tier (descriptions truncated, types
+          kept); and its ruler is a rough 4-chars&asymp;1-token estimate — not the tiktoken yard the
+          fixture is tested with. The two number-sets answer different questions; cross-multiplying
+          them miscalculates.</p>
+          <div class="cmdline">
+            <code>mcptoon stats</code>
+            <button type="button" data-copy="mcptoon stats">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <div>
+          <h3>Cut: two routes — know which one you're on</h3>
+          <p><b>CLI route (deepest cut):</b> the manifest ships names-only by default; before calling,
+          <code class="mono">mcptoon inspect &lt;server&gt; &lt;tool&gt;</code> fetches that one tool's
+          full arguments back; once you accept it, <code class="mono">mcptoon sync</code> writes into
+          the client. <b>Bridge route (for clients that must see an MCP server):</b> <code class="mono">mcptoon
+          serve</code> stands in front of your client and publishes the trimmed schema — what's saved is
+          the fields layer. The OpenClaw pair below (&minus;798 tokens) tests exactly this tier. The
+          two routes keep separate books; the numbers don't transfer.</p>
+          <div class="cmdline">
+            <code>mcptoon manifest</code>
+            <button type="button" data-copy="mcptoon manifest">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAIN / GAIN PANELS ============ -->
+<section id="before-after" style="padding-top:8px">
+  <div class="wrap">
+    <h2>What this replaces</h2>
+    <div class="panels">
+      <div class="panel before">
+        <h3>Plain MCP setup</h3>
+        <ul>
+          <li>One JSON file per client, typed by hand; change one, forget three — configs fork</li>
+          <li>Every turn re-sends every tool's full schema into the model's context, before you've typed anything</li>
+        </ul>
+      </div>
+      <div class="panel after">
+        <span class="diag" aria-hidden="true"></span>
+        <h3>With mcptoon</h3>
+        <ul>
+          <li>Scans and unifies what you already have — you hand-write nothing</li>
+          <li>One manifest covers the machine; per-client copies are the old way</li>
+          <li>Discovery ships one tiny manifest (names-only by default); the context stays near-empty until you actually call</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note" style="margin-top:18px">Some tools unify configs; others curate the tool list.
+    Curation only cuts the count: whatever survives still ships all its fields. What we change is
+    whether fields ship at all.</p>
+  </div>
+</section>
+
+<!-- ============ TOKEN MATH ============ -->
+<section id="math" style="padding-top:8px">
+  <div class="wrap">
+    <h2>Token math: a three-rung ladder, and where the numbers come from</h2>
+    <p class="lead">Two levers: a public benchmark whose raw data you can read, and one command that
+    tests your own machine.</p>
+    <div class="math">
+      <div class="panel">
+        <span class="diag" aria-hidden="true"></span>
+        <h3>Tool discovery &nbsp;<span class="pct big-num">&minus;99.2%</span></h3>
+        <div class="row">
+          <div class="lhs">255 tools · full JSON schemas (native) — baseline</div>
+          <div class="rhs">71,929</div>
+        </div>
+        <div class="row">
+          <div class="lhs">255 tools · names + types (names and parameter types only)</div>
+          <div class="rhs"><span class="old">71,929</span><span class="arr">&rarr;</span><span class="new">8,282</span></div>
+        </div>
+        <div class="row">
+          <div class="lhs">255 tools · names-only (default: <code class="mono">manifest</code> with no flags)</div>
+          <div class="rhs"><span class="old">71,929</span><span class="arr">&rarr;</span><span class="new">581</span></div>
+        </div>
+        <div class="row">
+          <div class="lhs">Same curve, 50-tool scale</div>
+          <div class="rhs"><span class="old">14,113</span><span class="arr">&rarr;</span><span class="new">114</span></div>
+        </div>
+        <p class="note" style="margin-top:14px"><b>One more layer: change the notation, don't cut fields.</b>
+        The same manifest can be TOON-encoded: <code class="mono">47,438</code> (&minus;34%) — every field
+        kept, only the representation changes; it's an encoding variant, it doesn't stand on the ladder.
+        The names+types tier looks roughly like <code class="mono">search|query:s*|limit:n</code> — star
+        marks required, s is string, n is number. Compression tracks the rung: at the 50-tool scale it's
+        still &minus;99.2%; the tool count barely matters. Pick your rung by what your client needs to see.</p>
+        <p class="note" style="margin-top:10px"><b>Where these numbers come from.</b> A 255-tool /
+        50-server reference fixture, counted with tiktoken <code class="mono">cl100k_base</code>; raw data
+        is public in <a href="https://github.com/activeing123/mcptoon/blob/main/assets/benchmark_data.json">benchmark_data.json</a>,
+        method in <a href="https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md">tiktoken-benchmarks.md</a>
+        — re-runnable. Also disclosed: an earlier <b>91%</b> figure came from a shorter-descriptions
+        fixture and is retired from this page. <code class="mono">mcptoon demo</code> prints this table;
+        it tests the fixture, not your machine — your machine belongs to <code class="mono">mcptoon stats</code>.</p>
+        <p class="note" style="margin-top:10px"><b>Three number-sets, three rulers, kept apart on purpose.</b>
+        ① <b>Reference fixture</b>: the public 255-tool / 50-server manifest, cl100k ruler. ② <b>Our
+        machine</b>: the one that built this page — stats' rough ruler: 8,380 → 5,635 (as of page build);
+        a review-machine re-test (cl100k ruler, same 45-tool cache): full 7,793 → names+types 711 →
+        names-only 161. ③ <b>Your machine</b>: <code class="mono">mcptoon stats</code>, tested yourself.</p>
+      </div>
+      <div class="panel">
+        <h3>Call results · optional</h3>
+        <div class="row">
+          <div class="lhs">Call a tool with <code class="mono">--toon</code> and the result is re-encoded in TOON</div>
+          <div class="rhs"><span class="new">per call, off by default</span></div>
+        </div>
+        <div class="row">
+          <div class="lhs">…same returned data, denser notation (lossless round-trip)</div>
+          <div class="rhs"><span class="new">varies with payload</span></div>
+        </div>
+        <div class="row">
+          <div class="lhs">Default output</div>
+          <div class="rhs">plain JSON</div>
+        </div>
+        <p class="note" style="margin-top:14px">It stacks under the manifest savings and only fires when
+        you ask: <code class="mono">mcptoon call &lt;server&gt; &lt;tool&gt; --toon</code>. Default output
+        is JSON — ask for nothing and you save nothing; how much it saves varies with the shape of the
+        returned data, so test it. One example the demo prints for its own call: same payload, 21 &rarr;
+        17 tokens — 19% fewer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REAL CLIENTS ============ -->
+<section id="clients" style="padding-top:8px">
+  <div class="wrap">
+    <h2>Not a compatibility list. A wiring diagram.</h2>
+    <p class="lead">Two real agents on the machine that built this page are pointed at
+    <code class="mono">mcptoon serve</code>. Their config, verbatim, and what actually happened.</p>
+    <div class="panels">
+      <div class="panel after">
+        <span class="diag" aria-hidden="true"></span>
+        <h3>OpenClaw — a tested A/B</h3>
+        <p class="note">In <code class="mono">~/.openclaw/openclaw.json</code>, key <code class="mono">mcp.servers.mcptoon</code>:</p>
+        <div class="cmdline"><code>{ "command": ".../mcptoon.exe", "args": ["serve"] }</code>
+        </div>
+        <p>Same session, same model, two calls six minutes apart, both returned the right payload:</p>
+        <ul>
+          <li><code class="mono">echo</code> server registered directly — input <b>43,448</b> tokens</li>
+          <li>Same <code class="mono">echo</code> server, bridged through <code class="mono">mcptoon serve</code> — input <b>42,650</b> tokens</li>
+        </ul>
+        <p class="note"><b><span class="nw">798 fewer input tokens on the turn</span></b> (as of page build) —
+        for one trivial <code class="mono">echo</code> tool. This is the serve-bridge tier (lighter
+        manifest fields), a different ledger from the &minus;99.2% names-only rung; the saving grows with
+        the number of tools you register. One pair, one model: a direction we tested, not a guarantee.</p>
+      </div>
+      <div class="panel">
+        <h3>Hermes Agent — handshake log</h3>
+        <p class="note">In <code class="mono">%LOCALAPPDATA%/hermes/config.yaml</code>:</p>
+        <div class="cmdline"><code>mcptoon:
+  command: mcptoon</code>
+        </div>
+        <p>Its MCP stderr log holds the whole lifecycle:</p>
+        <div class="cmdline"><code>starting MCP server 'mcptoon'
+serve started — stdio bridge mode
+Initialize from client: {'name': 'mcp'}
+Client initialized notification received</code>
+        </div>
+        <p class="note">Today that entry reads <code class="mono">disabled</code> in
+        <code class="mono">hermes mcp list</code>. So the claim is narrow and true: it handshook there,
+        and it is registered there — not that it is running there now.</p>
+      </div>
+    </div>
+    <p class="note" style="margin-top:18px"><b><span class="nw">What mcptoon writes to directly</span></b>
+    (<code class="mono">mcptoon sync</code>): Claude Desktop · Cursor · Cline · Windsurf · VS Code
+    Copilot — Cursor gets the global <code class="mono">~/.cursor/mcp.json</code>. One project-level
+    exception: Codex, written into the project's <code class="mono">AGENTS.md</code>. Everything else
+    that can launch a stdio MCP server — OpenClaw and Hermes included — connects through
+    <code class="mono">mcptoon serve</code>: one entry, zero hand-written per-agent config.</p>
+  </div>
+</section>
+
+<!-- ============ COMPAT ============ -->
+<div class="compat">
+  <div class="wrap in">
+    <div class="agents">Claude Desktop<span class="dot">·</span> Cursor<span class="dot">·</span> Cline<span class="dot">·</span> Windsurf<span class="dot">·</span> Copilot<span class="dot">·</span> Codex<span class="dot">·</span> any stdio MCP client</div>
+    <span class="note">Windows · macOS · Linux</span>
+  </div>
+</div>
+
+<!-- ============ SPEC SHEET ============ -->
+<section id="spec" style="padding-top:8px">
+  <div class="wrap">
+    <h2>The spec sheet — small print, written large.</h2>
+    <p class="lead">Every row below is CI-enforced or pinned in the public record. No marketing math.</p>
+    <div class="panel plist">
+      <div class="row"><div class="lhs"><b>Test suite</b> — re-counted on the machine that built this page (v0.7.14, 2026-09-14)</div><div class="rhs">915 passed · 1 skipped</div></div>
+      <div class="row"><div class="lhs"><b>Third-party dependencies</b> — CI turns the build red if one ever appears</div><div class="rhs">zero</div></div>
+      <div class="row"><div class="lhs"><b>Platforms</b> — Windows is a first-class citizen; CI matrix runs Windows / Linux / macOS</div><div class="rhs">win · mac · linux</div></div>
+      <div class="row"><div class="lhs"><b>Protocol</b> — spec version implemented</div><div class="rhs">MCP 2026-07-28</div></div>
+      <div class="row"><div class="lhs"><b>MCP Registry</b> — auto-published on every release</div><div class="rhs">io.github.activeing123/mcptoon</div></div>
+      <div class="row"><div class="lhs"><b>Nix</b> — packaged by numtide; its bot follows every release automatically</div><div class="rhs">llm-agents.nix</div></div>
+      <div class="row"><div class="lhs"><b>Third-party surfaces</b> — comparison table and benchmark harness</div><div class="rhs">apify/mcpc · striki18</div></div>
+      <div class="row"><div class="lhs"><b>License</b></div><div class="rhs">Apache-2.0</div></div>
+    </div>
+    <p class="note" style="margin-top:18px">Badges drift. Before re-publishing this page, refresh this
+    block against the CI of the day.</p>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions, answered shortly</h2>
+    <div class="faq">
+      <details open>
+        <summary>MCP, in one sentence?</summary>
+        <p>The Model Context Protocol — how AI clients attach external tools: files, search, databases,
+        browsers. The catch: every tool you add ships its full description into the model's context
+        before you've typed a word, and it re-ships every turn. That bill grows fast.</p>
+      </details>
+      <details>
+        <summary>Will my configs get uploaded?</summary>
+        <p>Scanning, merging and manifest generation all happen on your machine. Exactly one path touches
+        the network: the <code>demo</code> command, which boots the official public reference server
+        (everything) and pulls its code from npm — a public package; none of your config is in it. Want
+        zero network requests: run <code>mcptoon manifest --compact</code> against your own servers
+        (review-machine re-test on the cl100k ruler: 161 tokens of output covering all 45 tool
+        names).</p>
+      </details>
+      <details>
+        <summary>With names-only, what stops the model picking the wrong tool or guessing arguments?</summary>
+        <p>This tier only changes how the discovery manifest ships; calls are untouched. The default
+        (names-only) suits models that already know what they want; before acting,
+        <code class="mono">mcptoon inspect &lt;server&gt; &lt;tool&gt;</code> fetches that one tool's full
+        arguments, and you call once you've confirmed them. Need the client itself to see arguments?
+        Step up to names+types (8,282 on the fixture, −88.5%) or full fields — all three rungs are just
+        flags on <code class="mono">mcptoon manifest</code>. How deep you cut is your dial, not ours.</p>
+      </details>
+      <details>
+        <summary>What does demo need — and why Node.js?</summary>
+        <p><code>demo</code> boots the official <code>everything</code> reference server via
+        <code class="mono">npx</code> — that package doesn't live inside mcptoon, so it needs Node.js
+        and a first-run download. The testing path (<code class="mono">quickstart</code> →
+        <code class="mono">stats</code> → <code class="mono">manifest</code>) is pure Python, no Node.</p>
+      </details>
+      <details>
+        <summary>Is that −99.2% my machine, or a marketing number?</summary>
+        <p>It's the reference fixture's number — we'd rather you knew now than felt let down later. Your
+        number comes from <code class="mono">mcptoon stats</code>: our machine read <span class="nw">45 tools</span>,
+        <span class="nw">8,380 → 5,635</span> (−32.8%, as of page build) — far from 99.2%, because that line
+        tests the trimmed-schema tier with a rough ruler. Same machine, cl100k ruler, cut to the floor:
+        the review machine read <span class="nw">7,793 → 161</span>. Both numbers are real; they answer
+        different questions — one is the ceiling the ladder reaches on the fixture, the other is one
+        machine's current state. The raw data rows are committed in the repo, and the same test run
+        exists at the <span class="nw">5- and 50-tool</span> scales — you can see the shape of the curve,
+        not a cherry-picked dot.</p>
+      </details>
+      <details>
+        <summary>Does it touch my client settings?</summary>
+        <p>Scanning (<code>quickstart</code>) reads existing configs and writes only its own
+        <code class="mono">~/.mcptoon/config.json</code> — no edits to clients. Writing into clients is
+        <code>sync</code>'s job, and it only moves when you run it: it prints a report of what it wrote,
+        supports a <code class="mono">--dry</code> preview, touches only the <code class="mono">mcpServers</code>
+        key, and by default writes every detected client in one pass — name one with
+        <code class="mono">--agent &lt;client&gt;</code> to go narrower. Codex is the exception — it writes
+        the project's <code class="mono">AGENTS.md</code>. Scope the escape hatch honestly: deleting
+        <code class="mono">~/.mcptoon/</code> removes mcptoon's own config and cache, but entries
+        <code>sync</code> already wrote stay in your clients until you remove them — the report says where.</p>
+      </details>
+      <details>
+        <summary>Is it free?</summary>
+        <p>Yes. Apache-2.0, open source. All the code is on GitHub, and <code class="mono">mcptoon stats</code>
+        reads your own servers — so you never have to take anyone's word for your token bill. Including ours.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER CTA ============ -->
+<footer>
+  <div class="foot-in">
+    <img class="logo" src="assets/lockup-h-split-dark.svg" alt="mcptoon logo">
+    <div class="foot-h">Two agent problems.<br><span class="t">mcptoon fixes both.</span></div>
+    <div class="cmdline foot-cmd">
+      <code><span class="p">$</span> pip install mcptoon &amp;&amp; mcptoon quickstart &amp;&amp; mcptoon stats</code>
+      <button type="button" data-copy="pip install mcptoon && mcptoon quickstart && mcptoon stats">Copy</button>
+    </div>
+    <div class="cmdline foot-cmd" style="margin-top:8px">
+      <code><span class="p">$</span> pip install mcptoon &amp;&amp; mcptoon demo</code>
+      <button type="button" data-copy="pip install mcptoon && mcptoon demo">Copy</button>
+    </div>
+    <p class="note" style="margin-top:8px;text-align:center">First line tests your own machine (pure Python). Second line watches the public benchmark run once — demo additionally needs Node.js, for that reference server only.</p>
+    <div class="foot-links">
+      <a href="https://github.com/activeing123/mcptoon">GitHub — activeing123/mcptoon</a>
+      <a href="https://pypi.org/project/mcptoon/">PyPI</a>
+      <a href="https://activeing123.github.io/mcptoon/tools/token-tax/">Token calculator</a>
+      <a href="#how">Four steps</a>
+    </div>
+    <div class="foot-meta">
+      <span>mcptoon — the CLI that tests and cuts your MCP token bill</span>
+      <span>Apache-2.0 · zero deps · pip install mcptoon</span>
+    </div>
+    <p class="foot-colophon">Every token figure on this page carries whose machine and which ruler;
+    dollar figures carry their assumptions. Nothing here asks to be believed.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  function markCopied(btn){
+    var old = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(function(){ btn.textContent = old; }, 1200);
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly','');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.querySelectorAll('[data-copy]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var text = btn.getAttribute('data-copy');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function(){ markCopied(btn); },
+                                                 function(){ if (fallbackCopy(text)) markCopied(btn); });
+      } else if (fallbackCopy(text)) {
+        markCopied(btn);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

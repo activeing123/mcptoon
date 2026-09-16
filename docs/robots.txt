@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://activeing123.github.io/mcptoon/sitemap.xml
