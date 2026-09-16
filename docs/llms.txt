@@ -1,0 +1,66 @@
+# mcptoon
+
+> Zero-dependency Python CLI that finds, unifies and serves MCP servers for every AI client on one machine.
+> Measured, not advertised: listing 255 tools across 50 servers costs **581 tokens instead of 71,929**
+> (−99.2%, tiktoken `cl100k_base`, source of truth `assets/benchmark_tiktoken.json` in the repo).
+> Runtime dependencies: none (Python standard library only). Windows, macOS and Linux are first-class.
+
+Start here: `pip install mcptoon && mcptoon demo` — a 30-second, zero-config self-check that prints the
+real numbers on your own machine (it needs Node.js only because it boots a demo MCP server with `npx`).
+
+## Commands
+
+- `mcptoon demo` — zero-config demo: boots a throwaway server and shows the token math live.
+- `mcptoon quickstart` — one-command setup: discover + write config + show what your agents get.
+- `mcptoon discover` — scan this machine for MCP server configs others left behind (`--write` to keep, `--health` to probe).
+- `mcptoon list` / `mcptoon add` / `mcptoon remove` / `mcptoon install` — manage configured servers (npm, pip or HTTP/SSE).
+- `mcptoon manifest` — every tool in one listing; this is the names-only tier from the table below.
+- `mcptoon manifest --slim` — same listing plus parameter types; `mcptoon manifest --full` adds descriptions and per-parameter hints.
+- `mcptoon call <server> <tool> '{...}' --toon` — call a tool; `--toon` renders the result in TOON (about a third smaller than JSON on measured payloads).
+- `mcptoon search <query>` / `mcptoon inspect <server> <tool>` — find a tool, then read one schema.
+- `mcptoon policy` — per-tool compression policy (`raw` / `toon` / `slim`).
+- `mcptoon serve` — expose every configured server as one stdio MCP server for your agent; `--http --auth` for HTTP mode.
+- `mcptoon sync` — push one config to all your agents (Claude Desktop, Cursor, Codex, opencode, …).
+- `mcptoon plugin scan|install|list|remove` — validate and distribute Agent Plugins packages.
+- `mcptoon doctor` / `mcptoon usage` / `mcptoon completion <shell>` — self-diagnose, stats, shell completion.
+
+## Token tiers (the same 255-tool corpus, so they are directly comparable)
+
+| Tier | What it carries | Tokens | Saving |
+|---|---|---:|---:|
+| JSON | native `tools/list` schemas | 71,929 | — |
+| TOON | same fields, TOON encoding | 47,438 | −34% |
+| `--slim` | names + parameter types | 8,282 | −88.5% |
+| `--compact` / default `manifest` | names only | 581 | −99.2% |
+
+Schemas are fetched, not injected: an agent pays for one listing when it needs to discover tools,
+not for every turn it runs.
+
+## Reference
+
+- [Token benchmarks](https://activeing123.github.io/mcptoon/tiktoken-benchmarks.md) — how each figure was measured, including the tokeniser and fixture.
+- [TOON specification](https://activeing123.github.io/mcptoon/TOON_SPEC.md) — the text format behind the compression, with the full tier table.
+- [Comparison with other MCP managers](https://activeing123.github.io/mcptoon/comparison.md) — feature and token-cost matrix.
+- [Calculate your own bill (EN)](https://activeing123.github.io/mcptoon/tools/token-tax/) · [中文](https://activeing123.github.io/mcptoon/tools/token-tax/zh/) — runs in the browser, uploads nothing.
+- [Landing page (EN)](https://activeing123.github.io/mcptoon/) · [落地页（中文）](https://activeing123.github.io/mcptoon/index-zh.html)
+
+## Integrations
+
+- [Claude Code / Claude Desktop](https://activeing123.github.io/mcptoon/integrations/claude-code.md)
+- [Codex CLI](https://activeing123.github.io/mcptoon/integrations/codex.md)
+- [Cursor](https://activeing123.github.io/mcptoon/integrations/cursor.md)
+- [opencode](https://activeing123.github.io/mcptoon/integrations/opencode.md)
+
+## Source of truth
+
+- [Repository](https://github.com/activeing123/mcptoon) — code, issues, releases; [CHANGELOG](https://github.com/activeing123/mcptoon/blob/main/CHANGELOG.md).
+- [PyPI](https://pypi.org/project/mcptoon/) — `pip install mcptoon`, published by GitHub Actions on every release.
+- [`server.json`](https://github.com/activeing123/mcptoon/blob/main/server.json) — the record published to the official MCP Registry on every release.
+- [Homebrew tap](https://github.com/activeing123/homebrew-mcptoon) · [llm-agents.nix package](https://github.com/numtide/llm-agents.nix).
+
+## 中文
+
+零依赖 Python 命令行：发现、统一、并替你本机所有 AI 客户端托管 MCP server。
+实测口径：50 个 server / 255 个工具的工具发现，原生 schema 要 71,929 token，mcptoon 只要 **581 token（−99.2%）**；
+出处为仓内 `assets/benchmark_tiktoken.json`（tiktoken `cl100k_base`）。上手一行：`pip install mcptoon && mcptoon demo`。
+中文落地页见上「Reference」一节，安装与集成文档在仓库 `README.zh-CN.md` 与 `docs/integrations/`。
