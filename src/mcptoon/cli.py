@@ -823,7 +823,7 @@ def _cmd_quickstart(rest, fmt="auto"):
     tool_count = None
     if not is_dry:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("  Your tools (--slim format, 88.5% smaller than JSON):")
+        print("  Your tools (names only \u2014 the default manifest tier):")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         try:
             manifest = manifest_mod.get_manifest(use_cache=False)

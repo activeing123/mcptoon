@@ -175,7 +175,12 @@ class _A2DemoOutput(unittest.TestCase):
         self.assertIn("Now you can:", out)
         self.assertIn("mcptoon sync", out)
         self.assertIn("mcptoon serve", out)
-        self.assertIn("0 tokens", out)
+        # 这句曾经钉的是 "0 tokens (always)"——与同屏的 581 正面冲突（外部评测挑的
+        # 就是这类"宣称≠实测"）。09-16 改成"按需取列表，不为每一轮付费"，
+        # 断言跟着换成可核实的措辞 + 那个实测数本身。
+        self.assertIn("fetched, not injected", out)
+        self.assertIn("581 tokens", out)
+        self.assertNotIn("0 tokens", out)
 
 
 class _A3Installers(unittest.TestCase):

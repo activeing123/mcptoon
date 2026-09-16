@@ -11,7 +11,7 @@ mcptoon 是一个 155KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-915%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-919%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -114,7 +114,8 @@ $ mcptoon demo --quick
   ✓ expose ALL servers as ONE stdio server →  mcptoon serve
   ✓ never paste tool schemas again         →  mcptoon manifest --slim
 
-  Schemas in context with mcptoon: 0 tokens (always)
+  Schemas are fetched, not injected — you pay for a listing, not for every turn
+  255 tools listed once: 581 tokens (71,929 → 581, −99.2%, measured)
 ```
 
 表格边距会跟着你的终端宽度变，数字不会。第一张表是这次真调用的实测，第二张是仓库里
@@ -306,8 +307,8 @@ schema 塞进上下文（50 工具 14,113 token、255 工具 71,929 token），m
 | 255 | 71,929 | **581** | **−99.2%** |
 
 零操作、默认开启：`mcptoon manifest` 不加任何 flag 就是这一档。
-想多给 Agent 一点信息？`--full`（名字+参数类型）省 88.5%，`--json`（完整 schema）
-是基准线。
+想多给 Agent 一点信息？`--slim`（名字+参数类型）是 8,282 tokens（−88.5%）；
+`--full` 在此之上再加描述；`--json`（完整 schema）是基准线。
 
 *两行都是实测配置，不是拿一个数上下缩放（tiktoken `cl100k_base`，
 `assets/benchmark_tiktoken.json`）。你的组合会不同——
@@ -381,7 +382,8 @@ search_web|query:s*
 mcptoon quickstart              # 一键上手（发现 + 配置 + 展示工具）
 mcptoon list                    # 查看已配置服务器
 mcptoon manifest                # 所有工具名（默认即紧凑档，255 个工具只需 581 token）
-mcptoon manifest --full         # 工具 schema 带参数（比原生 schema 省 88.5%）
+mcptoon manifest --slim         # 名字+参数类型（8,282 对 71,929 = −88.5%）
+mcptoon manifest --compact      # 只有名字（581 对 71,929 = −99.2%，实测）
 mcptoon inspect <server> <tool> # 查看某个工具的 schema
 mcptoon search <query>          # 跨服务器搜索工具
 mcptoon call <server> <tool> '{"args":"here"}'   # 调用工具
@@ -518,7 +520,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 915 passed, 1 skipped
+python -m pytest tests/ -v   # 919 passed, 1 skipped
 ```
 
 零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 915 个测试。见

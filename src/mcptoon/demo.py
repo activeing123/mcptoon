@@ -92,7 +92,7 @@ def run_demo(args: list[str]):
     print()
     if not quick_mode:
         print("─" * 60)
-        print("  Step 3/3: The big picture — 255 tools, 0 tokens")
+        print("  Step 3/3: The big picture — 255 tools, 581-token listing")
         print("─" * 60)
 
     _show_benchmark()
@@ -114,7 +114,8 @@ def run_demo(args: list[str]):
     print("    mcptoon quickstart     # Discover your existing MCP servers")
     print("    mcptoon sync            # Push this config to all your agents (Claude Desktop, Cursor, ...)")
     print("    mcptoon serve           # Run as agent-connected MCP server")
-    print("    mcptoon manifest --slim  # See all tools (88.5% smaller than JSON)")
+    print("    mcptoon manifest --slim     # names + params (8,282 vs 71,929 = -88.5%)")
+    print("    mcptoon manifest --compact  # names only  (581 vs 71,929 = -99.2%, measured)")
     print("    mcptoon call <server> <tool> '{...}' --toon  # Call a tool")
     print()
     print("  📖 Docs: https://github.com/activeing123/mcptoon")
@@ -128,8 +129,8 @@ def _print_banner():
     """Print the mcptoon demo banner."""
     print()
     print("╔══════════════════════════════════════════════╗")
-    print("║         mcptoon — Zero-config demo          ║")
-    print("║    Install 1,000 MCP tools, 0 token schemas ║")
+    print("║         mcptoon — Zero-config demo           ║")
+    print("║  255 tools listed in 581 tokens, not 71,929  ║")
     print("╚══════════════════════════════════════════════╝")
     print()
 
@@ -277,7 +278,8 @@ def _show_benchmark():
     print("  ✓ expose ALL servers as ONE stdio server →  mcptoon serve")
     print("  ✓ never paste tool schemas again         →  mcptoon manifest --slim")
     print()
-    print("  Schemas in context with mcptoon: 0 tokens (always)")
+    print("  Schemas are fetched, not injected — you pay for a listing, not for every turn")
+    print("  255 tools listed once: 581 tokens (71,929 \u2192 581, \u221299.2%, measured)")
     print()
 
 

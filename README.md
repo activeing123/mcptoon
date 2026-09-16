@@ -13,7 +13,7 @@ and every agent on your machine shares the same toolkit.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-915%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-919%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -128,7 +128,8 @@ $ mcptoon demo --quick
   ✓ expose ALL servers as ONE stdio server →  mcptoon serve
   ✓ never paste tool schemas again         →  mcptoon manifest --slim
 
-  Schemas in context with mcptoon: 0 tokens (always)
+  Schemas are fetched, not injected — you pay for a listing, not for every turn
+  255 tools listed once: 581 tokens (71,929 → 581, −99.2%, measured)
 ```
 
 Column padding follows your terminal width; the numbers do not. The first table is one
@@ -333,8 +334,8 @@ comes from.
 | 255 | 71,929 | **581** | **−99.2%** |
 
 Zero action, on by default: `mcptoon manifest` with no flags is this tier.
-Want to give the agent more? `--full` (names + parameter types) saves 88.5%;
-`--json` (full schema) is the baseline.
+Want more per tool? `--slim` (names + parameter types) costs 8,282 tokens (−88.5%);
+`--full` adds descriptions on top; `--json` (full schema) is the baseline.
 
 *We measured both rows ourselves — not one number scaled up and down (tiktoken
 `cl100k_base`, `assets/benchmark_tiktoken.json`). Your mix will differ —
@@ -409,7 +410,8 @@ Three layers, all built in:
 mcptoon quickstart              # one-shot start (discover + configure + list tools)
 mcptoon list                    # show configured servers
 mcptoon manifest                # all tool names (compact by default; 255 tools = 581 tokens)
-mcptoon manifest --full         # tool schemas with params (88.5% smaller than native)
+mcptoon manifest --slim         # names + param types (8,282 vs 71,929 = −88.5%)
+mcptoon manifest --compact      # names only (581 vs 71,929 = −99.2%, measured)
 mcptoon inspect <server> <tool> # inspect one tool's schema
 mcptoon search <query>          # search tools across servers
 mcptoon call <server> <tool> '{"args":"here"}'   # call a tool
@@ -556,7 +558,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 915 passed, 1 skipped
+python -m pytest tests/ -v   # 919 passed, 1 skipped
 ```
 
 Zero dependencies is a hard rule — our test suite gates every change (915 tests
