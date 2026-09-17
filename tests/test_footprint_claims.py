@@ -156,14 +156,20 @@ class TestFootprintClaims(unittest.TestCase):
 
     def test_no_retired_version_in_the_live_claim(self):
         """ROADMAP's header still said v0.7.12 when 0.7.14 was current. The version in
-        the same one-line claim must be the one in pyproject."""
-        import tomllib
-        version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+        the same one-line claim must be the one in pyproject.
+
+        pyproject is parsed with a regex, not tomllib, for the same reason
+        test_registry_sync.py does it: the package supports 3.10 and tomllib arrived
+        in 3.11. Using tomllib here turned CI red on 3.10 the first time round."""
+        m = re.search(r'^version\s*=\s*"([^"]+)"', (ROOT / "pyproject.toml").read_text(
+            encoding="utf-8"), re.M)
+        self.assertTrue(m, "version not found in pyproject.toml")
+        version = m.group(1)
         for rel in ("DEVELOPERS.md", "ROADMAP.md"):
             text = (ROOT / rel).read_text(encoding="utf-8")
-            for m in re.finditer(r"v(\d+\.\d+\.\d+)[ ·|]+(\d+) passed", text):
-                self.assertEqual(m.group(1), version,
-                                 f"{rel} claims v{m.group(1)}; pyproject says {version}")
+            for claim in re.finditer(r"v(\d+\.\d+\.\d+)[ ·|]+(\d+) passed", text):
+                self.assertEqual(claim.group(1), version,
+                                 f"{rel} claims v{claim.group(1)}; pyproject says {version}")
 
 
 if __name__ == "__main__":
