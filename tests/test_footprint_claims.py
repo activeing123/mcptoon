@@ -107,14 +107,14 @@ class TestFootprintClaims(unittest.TestCase):
         """`Tests-<n> passed` drifted 694 -> 703 -> 713 unnoticed, and this guard's own
         author then wrote 736 when the truth was 737. A stale badge is a stale claim, so
         the number is compared against collection rather than against someone's memory.
-        The gap allows only what skipped tests can explain."""
+        The gap allows only what skipped tests can explain (at most one)."""
         proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
                               capture_output=True, text=True, cwd=ROOT)
         collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
         self.assertGreater(collected, 500, "collection failed - the badge cannot be judged")
         for rel in ("README.md", "README.zh-CN.md"):
             for n in re.findall(r"Tests-(\d+)%20passed", self.texts[rel]):
-                self.assertTrue(collected - 5 <= int(n) <= collected,
+                self.assertTrue(collected - 1 <= int(n) <= collected,
                                 f"{rel} badge says {n} but {collected} tests are collected")
 
     def test_no_page_links_a_file_that_does_not_exist(self):
@@ -140,7 +140,12 @@ class TestFootprintClaims(unittest.TestCase):
         moved on, because nothing compared them against collection.
 
         Only the live claim (total + skipped, one line) is judged: ROADMAP's older
-        entries and the CHANGELOG record what was true then and must not be edited."""
+        entries and the CHANGELOG record what was true then and must not be edited.
+
+        2026-09-17: the first cut allowed a gap of 5, and the guard's own two new
+        tests pushed the suite past the badge while every surface still said 925.
+        The gap is now the number of tests the tree actually skips (at most one:
+        the bash test on a Windows box without WSL), so a stale total cannot hide."""
         proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
                               capture_output=True, text=True, cwd=ROOT)
         collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
@@ -150,7 +155,7 @@ class TestFootprintClaims(unittest.TestCase):
             text = (ROOT / rel).read_text(encoding="utf-8")
             for n in TEST_CLAIM.findall(text):
                 seen += 1
-                self.assertTrue(collected - 5 <= int(n) <= collected,
+                self.assertTrue(collected - 1 <= int(n) <= collected,
                                 f"{rel} advertises {n} passed but {collected} tests are collected")
         self.assertGreater(seen, 0, "no live suite-total claim found - did the wording change?")
 
