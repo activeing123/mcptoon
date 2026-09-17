@@ -5,10 +5,13 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.15] - 2026-09-17
 
 ### Added
 
+- **`docs/llms.txt` is published on the Pages site.** Agents that look for the
+  llms.txt convention can now discover the project, the measured numbers and the
+  canonical entry points without scraping the landing page.
 - **`server.json` now carries `title` and `websiteUrl`.** The MCP Registry record had
   only the five required-ish keys; the schema also defines `title` (display name) and
   `websiteUrl` (homepage), and the landing page now exists to point at. Note for the
@@ -18,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Both READMEs carry the mcpservers.org badge.** The directory approved the listing
   on 2026-09-15 and asks listed projects to show the badge; it was deliberately held
   back until a release so the README was not touched outside one.
+
+### Changed
+
+- **Both READMEs lead with the two things a reader is deciding on.** The hero now
+  states the two pain points — tool schemas eating the context window, and the same
+  MCP servers being configured once per agent — before the badges, and the install
+  line sits directly under them. Everything below is unchanged in substance.
+- **The demo no longer contradicts itself.** One screen used to promise "Install
+  1,000 MCP tools, 0 token schemas" while the table below it measured 255 tools at
+  581 tokens. The banner now carries the measured pair, each tier keeps its own
+  number, and a guard fails if the retired claim comes back.
 
 ### Fixed
 
@@ -31,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tighter bound caught a second drift while this change was being written. Both the
   README badge guard and the all-surfaces guard were tightened. The number they judge
   is the collection count, so it does not vary with which tests a given OS skips.
+- **A version guard no longer breaks Python 3.10.** The check added on 2026-09-17 read
+  `pyproject.toml` with `tomllib`, which only exists on 3.11+, so CI went red on the
+  two 3.10 jobs the moment it landed. It now parses the version with a regex, the way
+  `test_registry_sync.py` already did for exactly this reason.
 
 ## [0.7.14] - 2026-09-14
 
