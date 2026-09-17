@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`server.json` now carries `title` and `websiteUrl`.** The MCP Registry record had
+  only the five required-ish keys; the schema also defines `title` (display name) and
+  `websiteUrl` (homepage), and the landing page now exists to point at. Note for the
+  next teardown: the schema has **no `license` field** — an earlier note that said to
+  add one was reading a different registry's schema. Both new fields are pinned by
+  `tests/test_registry_sync.py` so a later edit cannot quietly drop them.
+- **Both READMEs carry the mcpservers.org badge.** The directory approved the listing
+  on 2026-09-15 and asks listed projects to show the badge; it was deliberately held
+  back until a release so the README was not touched outside one.
+
+### Fixed
+
+- **The suite total was stale on six surfaces.** `README.md`, `README.zh-CN.md`,
+  `DEVELOPERS.md`, `ROADMAP.md` and both landing pages advertised `925 passed` while
+  the suite had moved on — the guard added in the previous change brought tests of its
+  own. All six now read the current total; the two landing pages were regenerated
+  through the documented pipeline rather than hand-edited.
+- **The suite-total guards now allow only what a skip can explain (one),** down from a
+  gap of five. The wide gap was what let the stale total above pass unnoticed, and the
+  tighter bound caught a second drift while this change was being written. Both the
+  README badge guard and the all-surfaces guard were tightened. The number they judge
+  is the collection count, so it does not vary with which tests a given OS skips.
+
 ## [0.7.14] - 2026-09-14
 
 ### Added

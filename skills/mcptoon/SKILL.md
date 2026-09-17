@@ -41,8 +41,17 @@ back.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  155KB, installs in seconds).
+  155KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  version here would only go stale, but a bare `--upgrade` should be your call,
+  not an automatic one.
+- Source: this package is published to PyPI by GitHub Actions from
+  `github.com/activeing123/mcptoon`. If an install prompt shows any other
+  publisher or index, stop and check before continuing.
 - Diagnose: `mcptoon doctor`.
+- Undo: `pip uninstall mcptoon` removes the CLI. Its config lives in
+  `~/.mcptoon/config.json` (plus an optional per-project `./.mcptoon.json`); remove
+  those files, or drop a single server with `mcptoon remove <name>`. Nothing outside
+  them is touched.
 - Claude Code users get one-command setup instead:
   `/plugin marketplace add activeing123/mcptoon` (installs the CLI, wires the
   bridge, and bundles this skill).

@@ -14,12 +14,13 @@ mcptoon is a 155KB CLI that saves you two bills.
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-927%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-928%20passed-brightgreen)](#contributing)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
 [![MCPVault: verified](https://mcpvault.io/badge/mcptoon.svg)](https://mcpvault.io/servers/mcptoon/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
 [![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/activeing123/mcptoon)
 
 **👉 Prove it first: `uvx mcptoon demo --quick` (zero install, 30s) · or `pip install mcptoon`**
 
@@ -560,10 +561,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 927 passed, 1 skipped
+python -m pytest tests/ -v   # 928 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (927 tests
+Zero dependencies is a hard rule — our test suite gates every change (928 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 

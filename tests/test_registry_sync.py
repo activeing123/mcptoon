@@ -85,6 +85,16 @@ class TestServerJsonMatchesRelease(unittest.TestCase):
         self.assertIn("581", text, "the description must carry the measured name-index figure")
         self.assertIn("71,929", text, "the description must carry the raw-JSON baseline")
 
+    def test_record_carries_the_discovery_fields(self):
+        # The registry schema (2025-12-11) has no license field - the teardown note
+        # that said to add one was wrong about the schema. title and websiteUrl are
+        # the fields it does define that carry real information for a reader, so
+        # they are pinned here rather than left to drift out in a later edit.
+        self.assertEqual(SERVER["title"], "mcptoon")
+        self.assertEqual(SERVER["websiteUrl"], "https://activeing123.github.io/mcptoon/")
+        self.assertTrue(SERVER["websiteUrl"].startswith("https://"),
+                        "the registry validates websiteUrl as a uri")
+
 
 class TestOwnershipMarker(unittest.TestCase):
     """The registry proves PyPI ownership by finding `mcp-name:` in the package
