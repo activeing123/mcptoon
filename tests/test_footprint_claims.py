@@ -42,9 +42,9 @@ TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP
 # A live claim always pairs the total with the skipped count, which is what
 # separates it from a historical "N passed" (ROADMAP's older entries, CHANGELOG).
 TEST_CLAIM = re.compile(r"(\d+) passed (?:·|\+|,) 1 skipped")
-# What `pip install mcptoon` downloads: mcptoon-0.7.15-py3-none-any.whl is 158,701 bytes
-# (155.0 KB), measured from PyPI on 2026-09-17. Re-measure at each release.
-WHEEL_KB = "155KB"
+# What `pip install mcptoon` downloads: mcptoon-0.7.16-py3-none-any.whl is 159,942 bytes
+# (156.2 KB), built locally on 2026-09-17. Re-measure at each release.
+WHEEL_KB = "156KB"
 
 
 def modules() -> list[Path]:

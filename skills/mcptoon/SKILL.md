@@ -6,7 +6,7 @@ description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a se
 # mcptoon — MCP tool-catalog compression
 
 mcptoon is a zero-dependency CLI. If it is not installed yet, one command sets
-it up: `pip install mcptoon` (155KB, installs in seconds, nothing else pulled
+it up: `pip install mcptoon` (156KB, installs in seconds, nothing else pulled
 in). It gives you a compressed view of the user's MCP tools and calls them
 back.
 
@@ -41,7 +41,7 @@ back.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  155KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  156KB, installs in seconds). Confirm the upgrade before running it — pinning a
   version here would only go stale, but a bare `--upgrade` should be your call,
   not an automatic one.
 - Source: this package is published to PyPI by GitHub Actions from
