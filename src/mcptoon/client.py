@@ -174,6 +174,34 @@ class MCPInputRequired(MCPError):
         self.request_state = request_state
 
 
+# Node/npm emit this boilerplate on nearly every spawn; it explains nothing
+# about why a server died and, being printed first, it used to bury the real
+# diagnostic in every head-slice of stderr.
+_STDERR_NOISE = (
+    "NODE_TLS_REJECT_UNAUTHORIZED",
+    "trace-warnings",
+)
+
+
+def _salient_stderr(raw: str, limit: int = 500) -> str:
+    """Return the part of a dead server's stderr that explains the death.
+
+    A failing `npx` prints a wall of Node warnings first and the actionable
+    line last (``npm error 404 Not Found ...``). Slicing from the head keeps
+    only noise, so prefer the diagnostic lines and fall back to the tail —
+    process errors are printed last, not first.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    salient = [ln for ln in lines
+               if not any(marker in ln for marker in _STDERR_NOISE)]
+    if salient:
+        text = " | ".join(salient)
+    return text[-limit:] if len(text) > limit else text
+
+
 class MCPClient:
     """Universal MCP client — HTTP or stdio transport.
 
@@ -507,8 +535,11 @@ class MCPClient:
         # return immediately, and a live server never blocks the caller.
         def _drain() -> None:
             try:
+                # Keep the END of stderr: a failing npx prints its
+                # actionable line (npm error 404 ...) last, after a wall of
+                # Node warnings. A head slice showed only the warnings.
                 tail = self._proc.stderr.read().decode(  # type: ignore[union-attr]
-                    "utf-8", errors="replace")[:500]
+                    "utf-8", errors="replace")[-2000:]
             except Exception:
                 tail = ""  # stderr diagnostics are best-effort
             self._stderr_cache = tail
@@ -555,10 +586,10 @@ class MCPClient:
             # A write failure almost always means the process already
             # exited (e.g. npx E404 on a missing package). Surface the
             # stderr tail so users see the real cause, not just Errno 22.
-            stderr = self._stderr_tail()
+            stderr = _salient_stderr(self._stderr_tail())
             detail = f"failed writing to MCP server: {e}"
-            if stderr.strip():
-                detail += f" | server stderr: {stderr.strip()}"
+            if stderr:
+                detail += f" | server stderr: {stderr}"
             raise MCPError("PROCESS_DIED", detail) from e
 
         deadline = timeout if timeout is not None else self._timeout
@@ -577,7 +608,7 @@ class MCPClient:
         if msg is None:
             # Pump EOF sentinel — process died. Surface stderr tail
             # (one-shot cached; later error paths reuse it).
-            stderr = self._stderr_tail()
+            stderr = _salient_stderr(self._stderr_tail())
             raise MCPError(
                 "PROCESS_DIED",
                 f"MCP server process exited. stderr: {stderr}")
@@ -994,7 +1025,7 @@ class MCPClientPool:
             try:
                 result[name] = self.list_tools(name)
             except Exception as e:
-                result[name] = [{"error": str(e)[:100]}]
+                result[name] = [{"error": str(e)[:300]}]
         return result
 
     def close(self):

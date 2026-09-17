@@ -49,7 +49,7 @@ def get_manifest(use_cache: bool = True) -> dict[str, list[dict]]:
             cache_mod.set_cached_tools(name, tools)
             pool.close()
         except (MCPError, Exception) as e:
-            result[name] = [{"error": str(e)[:100]}]
+            result[name] = [{"error": str(e)[:300]}]
 
     return result
 
@@ -177,7 +177,7 @@ def format_manifest(manifest: dict, full: bool = False) -> str:
             continue
         has_error = any("error" in t for t in tools)
         if has_error:
-            lines.append(f"  {server}: [error: {tools[0].get('error', '?')[:60]}]")
+            lines.append(f"  {server}: [error: {tools[0].get('error', '?')[:200]}]")
             continue
 
         if full:

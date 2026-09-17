@@ -5,6 +5,23 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A dead server now reports why it died.** When a configured server's command
+  fails at startup — the common case being `npx` on a package that no longer
+  exists on npm (E404) — the write to its dead stdin raised `[Errno 22]` on
+  Windows, and the real cause was sliced away by three stacked truncations: the
+  stderr reader kept the *first* 500 bytes, the error cell capped at 100 chars,
+  and the manifest printer at 60. A failing `npx` prints a wall of Node
+  `NODE_TLS_REJECT_UNAUTHORIZED` warnings first and its `npm error 404` last, so
+  users saw the warning and never the diagnostic. `client._salient_stderr()`
+  now drops that boilerplate and keeps the end of stderr (where process errors
+  are printed), and the caps are widened to 300/200. Found 2026-09-17 during the
+  Windows first-install field test, where 3 of 13 configured servers died this
+  way. Pinned by `tests/test_dead_server_diagnostics.py`.
+
 ## [0.7.15] - 2026-09-17
 
 ### Added

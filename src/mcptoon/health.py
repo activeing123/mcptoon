@@ -27,7 +27,7 @@ import concurrent.futures
 import time
 
 from .config import load_config, list_servers, get_server_config
-from .client import MCPClient, MCPError
+from .client import MCPClient, MCPError, _salient_stderr
 
 
 # ─── Single server check ───
@@ -117,7 +117,7 @@ def check_server(name: str, timeout: float = 10.0, config: dict | None = None) -
             "status": "timeout" if is_timeout else "error",
             "tools": 0,
             "latency_ms": int(elapsed),
-            "error": f"[{e.code}] {e.message}"[:100],
+            "error": _salient_stderr(f"[{e.code}] {e.message}", 300),
         }
     except TimeoutError:
         elapsed = (time.time() - start) * 1000
@@ -137,7 +137,7 @@ def check_server(name: str, timeout: float = 10.0, config: dict | None = None) -
             "status": "error",
             "tools": 0,
             "latency_ms": int(elapsed),
-            "error": str(e)[:100],
+            "error": _salient_stderr(str(e), 300),
         }
 
 
@@ -181,7 +181,7 @@ def check_all(timeout: float = 10.0, config: dict | None = None, max_workers: in
                     "status": "error",
                     "tools": 0,
                     "latency_ms": 0,
-                    "error": str(e)[:100],
+                    "error": _salient_stderr(str(e), 300),
                 })
 
     # Sort: errors/timeouts first, then by server name
