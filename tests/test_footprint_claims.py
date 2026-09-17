@@ -32,6 +32,16 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 
 # Sizes once written down that are wrong now. A doc may not resurrect them.
 RETIRED_KB = ("50KB", "200KB", "250KB")
+
+# Surfaces that state the suite total but were outside the badge guard.
+# 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
+# 915 / 894 / v0.7.12 after the suite had moved on. A number a visitor reads is a
+# claim wherever it lives, so these are compared against collection too.
+TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP.md",
+                       "docs/index.html", "docs/index-zh.html")
+# A live claim always pairs the total with the skipped count, which is what
+# separates it from a historical "N passed" (ROADMAP's older entries, CHANGELOG).
+TEST_CLAIM = re.compile(r"(\d+) passed (?:·|\+|,) 1 skipped")
 # What `pip install mcptoon` downloads: mcptoon-0.7.11-py3-none-any.whl is 149,008 bytes,
 # measured from PyPI on 2026-09-05. Re-measure at each release.
 WHEEL_KB = "155KB"
@@ -123,6 +133,37 @@ class TestFootprintClaims(unittest.TestCase):
         icon = ROOT / "docs" / "favicon.ico"
         self.assertTrue(icon.is_file(), "docs/favicon.ico is missing - every page 404s on it")
         self.assertEqual(icon.read_bytes()[:4], b"\x00\x00\x01\x00", "not an ICO file")
+
+    def test_suite_total_is_the_same_on_every_surface(self):
+        """The badge guard only saw the two READMEs. The landing pages, DEVELOPERS.md
+        and ROADMAP.md kept advertising 915 / 894 / v0.7.12 for days after the suite
+        moved on, because nothing compared them against collection.
+
+        Only the live claim (total + skipped, one line) is judged: ROADMAP's older
+        entries and the CHANGELOG record what was true then and must not be edited."""
+        proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
+                              capture_output=True, text=True, cwd=ROOT)
+        collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
+        self.assertGreater(collected, 500, "collection failed - the claims cannot be judged")
+        seen = 0
+        for rel in TEST_CLAIM_SURFACES:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            for n in TEST_CLAIM.findall(text):
+                seen += 1
+                self.assertTrue(collected - 5 <= int(n) <= collected,
+                                f"{rel} advertises {n} passed but {collected} tests are collected")
+        self.assertGreater(seen, 0, "no live suite-total claim found - did the wording change?")
+
+    def test_no_retired_version_in_the_live_claim(self):
+        """ROADMAP's header still said v0.7.12 when 0.7.14 was current. The version in
+        the same one-line claim must be the one in pyproject."""
+        import tomllib
+        version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+        for rel in ("DEVELOPERS.md", "ROADMAP.md"):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            for m in re.finditer(r"v(\d+\.\d+\.\d+)[ ·|]+(\d+) passed", text):
+                self.assertEqual(m.group(1), version,
+                                 f"{rel} claims v{m.group(1)}; pyproject says {version}")
 
 
 if __name__ == "__main__":
