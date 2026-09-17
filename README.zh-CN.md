@@ -4,9 +4,11 @@
 
 **本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
 
-mcptoon 是一个 155KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下文之外。
-发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加
-`--toon` 再省约 34%。每条命令装一个服务器，零配置，本机所有 Agent 共享同一套工具。
+mcptoon 是一个 155KB 的小命令，帮你省下两笔开销。
+
+**① 省 token** —— 它把 MCP 工具 schema 挡在 Agent 上下文之外。发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加 `--toon` 再省约 34%。
+
+**② 省配置** —— **装一次 mcptoon，你电脑上所有 AI 都能用上全部 MCP 工具。** 以后新装 MCP 工具立刻生效，无需重启 Agent。
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -17,6 +19,8 @@ mcptoon 是一个 155KB 的小命令，把 MCP 工具 schema 挡在 Agent 上下
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
 [![MCPVault: verified](https://mcpvault.io/badge/mcptoon.svg)](https://mcpvault.io/servers/mcptoon/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
 [![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
+
+**👉 先自证：`uvx mcptoon demo --quick`（零安装，30 秒）· 或 `pip install mcptoon`**
 
 **👉 [English](README.md) · [开发者文档](DEVELOPERS.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)**
 
@@ -46,8 +50,6 @@ mcptoon manifest
 **Mcptoon 是 MCP 工具的原生解耦层**，解决 MCP 协议工具列表大量消耗 token、多 AI Agent
 重复配置工具的痛点。0 配置开箱即用：自动扫描接管本机所有 Agent——Claude Code、Cursor、
 Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削减 token 开销。
-
-</div>
 
 ---
 
@@ -83,7 +85,7 @@ mcptoon call everything echo '{"message":"hi"}'
 ### `mcptoon demo` 真跑出来是什么样子
 
 不要 API key、不碰你自己的服务器、不用配置：它拉起官方 "everything" 参考服务器，
-调一个工具，然后把 token 账算给你看。下面这段是 v0.7.11 的真身输出，一字未改
+调一个工具，然后把 token 账算给你看。下面这段是真身输出，一字未改
 （Windows + Python 3.12；只剪掉了开头的字符画横幅和结尾那句求 star）：
 
 ```text
@@ -233,7 +235,7 @@ mcptoon manifest    # 直接就能用
 ## 作为 Agent 技能安装（支持 80+ Agent）
 
 通过开放 Agent 技能生态，教会你的 Agent *使用* mcptoon——技能会被
-Claude Code、Cursor、Codex、Cline、Windsurf 等 75+ Agent 自动识别：
+Claude Code、Cursor、Codex、Cline、Windsurf 以及另外 75 个 Agent 自动识别：
 
 ```bash
 npx skills add https://github.com/activeing123/mcptoon --skill mcptoon
@@ -349,7 +351,7 @@ schema 塞进上下文（50 工具 14,113 token、255 工具 71,929 token），m
 search_web
 ```
 
-**用 mcptoon --full**（6 token，包含参数信息）：
+**用 mcptoon --slim**（6 token，名字+参数类型）：
 
 ```
 search_web|query:s*
@@ -524,7 +526,7 @@ pip install pytest pytest-cov
 python -m pytest tests/ -v   # 925 passed, 1 skipped
 ```
 
-零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 915 个测试。见
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 925 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
 项目本体：13,415 行 Python、23 个模块，零第三方依赖——供应链里 0 个要审计的环节。
@@ -542,5 +544,7 @@ python -m pytest tests/ -v   # 925 passed, 1 skipped
 *mcptoon 是独立的第三方 MCP 客户端，不隶属于 Anthropic。*
 
 **省下的是你自己的 token。点个 star——小工具就是靠这个被更多人找到的。**
+
+[![Star History Chart](https://api.star-history.com/svg?repos=activeing123/mcptoon&type=Date)](https://star-history.com/#activeing123/mcptoon&Date)
 
 </div>

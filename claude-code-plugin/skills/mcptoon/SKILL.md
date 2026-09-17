@@ -43,4 +43,4 @@ and calls them back.
   the first successful run; it only reports status.
 - Manual/repair: run the `/mcptoon-setup` command.
 - Update the CLI: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  146KB, installs in seconds).
+  155KB, installs in seconds).

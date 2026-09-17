@@ -5,10 +5,11 @@
 
 **Add 1,000 MCP tools locally — your token context never feels it.**
 
-mcptoon is a 155KB CLI that keeps MCP tool schemas out of your agent's context.
-Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**; call
-results shrink another ~34% with `--toon`. One command per server, zero config,
-and every agent on your machine shares the same toolkit.
+mcptoon is a 155KB CLI that saves you two bills.
+
+**① Token** — it keeps MCP tool schemas out of your agent's context. Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**; call results shrink another ~34% with `--toon`.
+
+**② Setup** — **install mcptoon once, and every AI on your machine gets all your MCP tools.** Add a new MCP tool later and it goes live immediately — no agent restart.
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -19,6 +20,8 @@ and every agent on your machine shares the same toolkit.
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
 [![MCPVault: verified](https://mcpvault.io/badge/mcptoon.svg)](https://mcpvault.io/servers/mcptoon/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
 [![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
+
+**👉 Prove it first: `uvx mcptoon demo --quick` (zero install, 30s) · or `pip install mcptoon`**
 
 **👉 [中文](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Issues](https://github.com/activeing123/mcptoon/issues)**
 
@@ -51,8 +54,6 @@ MCP tool listings eating tokens and every AI agent re-configuring tools on its o
 Zero config, out of the box: it auto-scans and unifies the MCP tools of every agent
 on this machine — Claude Code, Cursor, Codex, scripts, CI — shares tool instances
 globally, and slashes token overhead.
-
-</div>
 
 ---
 
@@ -97,7 +98,7 @@ mcptoon call everything echo '{"message":"hi"}'
 
 No API key, no MCP server of yours, nothing to configure: it boots the official
 "everything" reference server, calls one tool, and shows the token math on your
-screen. This is that output, verbatim from v0.7.11 (Windows, Python 3.12) — only the
+screen. This is that output, verbatim (Windows, Python 3.12) — only the
 ASCII banner and the closing star-ask are cut:
 
 ```text
@@ -380,7 +381,7 @@ with tiktoken):
 search_web
 ```
 
-**With mcptoon --full** (6 tokens, parameter info included):
+**With mcptoon --slim** (6 tokens, names + parameter types):
 
 ```
 search_web|query:s*
@@ -562,7 +563,7 @@ pip install pytest pytest-cov
 python -m pytest tests/ -v   # 925 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (915 tests
+Zero dependencies is a hard rule — our test suite gates every change (925 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
@@ -581,5 +582,7 @@ The codebase: 13,415 lines of Python across 23 modules, zero third-party depende
 *mcptoon is an independent third-party MCP client, not affiliated with Anthropic.*
 
 **If mcptoon cut your context bill, star it — that's how other builders find small tools.**
+
+[![Star History Chart](https://api.star-history.com/svg?repos=activeing123/mcptoon&type=Date)](https://star-history.com/#activeing123/mcptoon&Date)
 
 </div>
