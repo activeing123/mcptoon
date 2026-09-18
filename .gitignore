@@ -49,6 +49,12 @@ preview.html
 readme-v*.md
 readme-preview*.html
 
+# Unfinished README rewrites (marketing drafts, not for the public repo).
+# 2026-09-18: four full README rewrites sat untracked in the working tree and
+# kept `git status` noisy. A rewrite is not a shipping artifact until it is
+# applied to README.md itself; until then it is scratch, like readme-v*.md above.
+README.*-draft*.md
+
 # Internal docs (not for public repo)
 docs/new-docs-overview.html
 PROJECT_STATUS.md
