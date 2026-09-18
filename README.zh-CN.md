@@ -4,7 +4,7 @@
 
 **本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
 
-mcptoon 是一个 179KB 的小命令，帮你省下两笔开销。
+mcptoon 是一个 180KB 的小命令，帮你省下两笔开销。
 
 **① 省 token** —— 它把 MCP 工具 schema 挡在 Agent 上下文之外。发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加 `--toon` 再省约 34%。
 
@@ -13,7 +13,7 @@ mcptoon 是一个 179KB 的小命令，帮你省下两笔开销。
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1031%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1035%20passed-brightgreen)](#贡献)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -71,7 +71,7 @@ Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削�
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，179KB，零依赖
+pip install mcptoon                          # 纯标准库，180KB，零依赖
 
 # 添加任意 MCP 服务器——一条命令：
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
@@ -144,7 +144,7 @@ serve` 桥，并自带一份技能说明书让 Agent 知道什么时候压缩。
 mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令搞定
 ```
 
-就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 179KB、
+就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 180KB、
 零依赖；mcptoon 本体不需要任何 API key，也不向任何云端打电话——服务费 $0，一切都在
 你自己的机器上跑。
 
@@ -194,7 +194,7 @@ token（50 工具 114，−99.2%）。
 |---|---|---|
 | Tool Search Tool / PTC | Claude 平台 beta | 只管*定义*和编排；其他所有 agent 上，工具*结果*仍逐 token 进上下文 |
 | MuleSoft 网关 | 企业网关 | 要过 MuleSoft；MCP 规范落后一代 |
-| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——179KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
+| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——180KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
 
 方向已定。mcptoon 是这个答案里**今天就能跑、每个 agent 一次到位**的版本——
 「结果侧」的纪律，不收平台税，不收网关税。
@@ -221,7 +221,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
-每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 179KB、零依赖，因为服务器是你的
+每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 180KB、零依赖，因为服务器是你的
 机器直接运行的外部进程，不是打包进 mcptoon 的代码。四个步骤、一条命令、不用重启 Agent。
 
 **支持任何 MCP 服务器：**
@@ -241,6 +241,32 @@ Claude Code、Cursor、Codex、Cline、Windsurf 以及另外 75 个 Agent 自动
 ```bash
 npx skills add https://github.com/activeing123/mcptoon --skill mcptoon
 ```
+
+---
+
+## 管理你的技能目录——一个真源，喂给所有 Agent
+
+技能和 MCP 服务器是同一种形状：一个真源，多份 Agent 视图。所以 `mcptoon skills`
+同时管住一个会话工具箱的两半。指向一个真源目录，它就替你把每个 Agent 的技能目录保持同步，
+不存在第二份副本会漂移：
+
+```bash
+mcptoon skills list                      # 目录里有什么（--usage 附带命中次数）
+mcptoon skills resolve "做个 PDF"        # BM25 短名单——离线、不调 LLM、不烧 token
+mcptoon skills sync ~/skills             # 分发到每个 Agent 的技能目录
+mcptoon skills sync ~/skills --dry       # 只预览计划，一个字节都不写
+mcptoon skills add my-skill --desc "…"   # 在真源里新建技能
+mcptoon skills remove my-skill           # 退役——移进带日期的墓地
+```
+
+视图默认是**链接**（Windows 上用 junction，不需要管理员权限），所以改一次真源，
+处处即时生效，也没有第二份副本会走样。三条安全规则兜底：本该是链接的位置上如果是真实目录，
+**只归档、绝不删除**；视图本身就是指向真源的链接时，**完全不碰**；`remove` 是把技能
+**移进**墓地，删错了是一条 `mv` 搬回来，而不是重新克隆。需要时再加生命周期开关——
+`--version-gate` 拦下"内容变了但 `version` 没跟着改"的技能，
+`--derived roo|opencode|all` 重生成部分 Agent 读的扁平 `.md` 视图，
+`--archive DIR` 把漂移停进你指定的墓地，`remove --tombstone` 把删除提交成 git 墓碑
+（按路径限定），让双向 git 同步无法把它复活。
 
 ---
 
@@ -384,6 +410,8 @@ search_web|query:s*
 
 ```bash
 mcptoon quickstart              # 一键上手（发现 + 配置 + 展示工具）
+mcptoon discover                # 扫描本机遗留的 MCP 服务器（--write 保留，--health 探活）
+mcptoon init                    # 生成示例配置（--auto 自动发现并填好）
 mcptoon list                    # 查看已配置服务器
 mcptoon manifest                # 所有工具名（默认即紧凑档，255 个工具只需 581 token）
 mcptoon manifest --slim         # 名字+参数类型（8,282 对 71,929 = −88.5%）
@@ -399,6 +427,12 @@ mcptoon install <name> --npm|--pip|--url <pkg>  # 安装 + 自动生成 handler
 mcptoon install --list          # 列出已安装
 mcptoon install --remove <name> # 卸载
 mcptoon sync                    # 同步原生配置到每个检测到的 Agent
+mcptoon health                  # 健康检查所有 MCP 服务器（--json 任一死掉即退出码 1）
+mcptoon policy                  # 逐工具压缩策略（raw / toon / slim）
+mcptoon skills list             # 列出技能目录（--usage 附带命中次数）
+mcptoon skills resolve "<任务>" # 技能 BM25 短名单（离线、不调 LLM）
+mcptoon skills sync <src>       # 把技能目录分发到每个 Agent 的目录
+mcptoon skills add|remove <name> # 在真源新建技能 / 退役进墓地
 mcptoon plugin install <dir>    # 安装 Agent Plugins 1.0.0 插件
 mcptoon serve                   # 以 MCP server 形态运行（stdio/HTTP）——MCP 2026-07-28：无状态优先、server/discover、列表结果可缓存
 mcptoon demo                    # 一条命令，本机现场演示
@@ -487,7 +521,7 @@ mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不连接 MC
 **两层解耦：**
 
 ```
-第 1 层: mcptoon CLI (179KB, 零依赖)
+第 1 层: mcptoon CLI (180KB, 零依赖)
          在 Agent 的 shell 里运行。schema 默认不进上下文。
                     │
 第 2 层: 实际 MCP 服务器 (npm/pip 包)
@@ -524,13 +558,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1031 passed, 1 skipped
+python -m pytest tests/ -v   # 1035 passed, 1 skipped
 ```
 
 零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 931 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：15,315 行 Python、24 个模块，零第三方依赖——供应链里 0 个要审计的环节。
+项目本体：15,320 行 Python、24 个模块，零第三方依赖——供应链里 0 个要审计的环节。
 
 ---
 

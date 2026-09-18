@@ -21,6 +21,7 @@ real numbers on your own machine (it needs Node.js only because it boots a demo 
 - `mcptoon policy` — per-tool compression policy (`raw` / `toon` / `slim`).
 - `mcptoon serve` — expose every configured server as one stdio MCP server for your agent; `--http --auth` for HTTP mode.
 - `mcptoon sync` — push one config to all your agents (Claude Desktop, Cursor, Codex, opencode, …).
+- `mcptoon skills` — manage an agent skill catalog the same way: `list` / `resolve "<task>"` (offline BM25 shortlist, no LLM) / `sync <src>` (one source, every agent's skill folder, linked not copied) / `add` / `remove`. Lifecycle flags: `--version-gate`, `--derived`, `--archive`, `remove --tombstone`.
 - `mcptoon plugin scan|install|list|remove` — validate and distribute Agent Plugins packages.
 - `mcptoon doctor` / `mcptoon usage` / `mcptoon completion <shell>` — self-diagnose, stats, shell completion.
 

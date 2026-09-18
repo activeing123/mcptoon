@@ -3,7 +3,7 @@
 Goal: make ``mcptoon`` available without the user typing anything.
 Fast path  - mcptoon already installed: print a one-line status and exit.
 Slow path  - first session only: ``pip install mcptoon`` (zero-dependency,
-179KB wheel, no third-party packages pulled in) and report the result.
+180KB wheel, no third-party packages pulled in) and report the result.
 
 This script is stdlib-only, prints no secrets, never raises, and always
 exits 0 so a broken environment can never break the user's session.

@@ -70,6 +70,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`mcptoon skills` was invisible in `mcptoon help`.** The command family worked
+  and was tested, but the top-level usage block never listed it — so the headline
+  feature of this release could not be discovered from the CLI at all. The block
+  now carries the four common forms (`list`, `resolve`, `sync`, `add|remove`), and
+  `tests/test_command_coverage.py` fails the build if a command the help advertises
+  is missing from either README.
+
+- **Both READMEs never documented the skills catalog.** The `skills` family was
+  absent from the "All commands" block and had no section of its own, even though
+  it is what this release is about. `discover`, `init`, `health` and `policy` were
+  missing from the list too. All are now documented, and the new coverage guard
+  keeps the README and the CLI in step.
+
+- **The wheel size claim said 156KB; the wheel is 179KB.** This release adds
+  `src/mcptoon/skills.py`, a new ~68KB module, which grew the wheel from 155.5 KB
+  to 179.4 KB (measured with `python -m build`, identical across builds). Thirty-odd
+  surfaces still advertised the old figure — README (both languages), the landing
+  pages, `docs/comparison.md`, `docs/tiktoken-benchmarks.md`, the shipped skill card
+  and the Claude plugin scripts. All are corrected, and the footprint guard's
+  `WHEEL_KB` constant with them, so the guard stops pinning a stale number.
+
+- **The landing pages advertised v0.7.16 to crawlers.** Both `docs/index.html` and
+  `docs/index-zh.html` still carried `"softwareVersion": "0.7.16"` in their JSON-LD
+  block while the visible copy said 0.7.17.
+
 - **`_index` is no longer published as a skill.** The vault keeps its index card
   at `skills/_index/SKILL.md`; it carries a SKILL.md but is not a skill. mcptoon
   walked into it and would have written a phantom `_index.md` into every derived

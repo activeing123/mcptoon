@@ -2024,6 +2024,11 @@ Usage:
     mcptoon health                       Health check all MCP servers
     mcptoon health --json                JSON output for CI/CD (exit 1 if dead)
 
+    mcptoon skills list                  List the agent skill catalog (--usage adds hit counts)
+    mcptoon skills resolve <query>       BM25 shortlist of skills (offline, no LLM)
+    mcptoon skills sync [SRC] [VIEW...]  Distribute a skill catalog to every agent's folder
+    mcptoon skills add|remove <name>     Create a skill in the source / retire it to the archive
+
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)

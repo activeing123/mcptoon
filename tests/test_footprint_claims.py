@@ -46,11 +46,11 @@ TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP
 # 2026-09-18. Whitespace is optional on both sides of the separator now.
 TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
 # What `pip install mcptoon` downloads: measured 2026-09-18 with `python -m build` (the
-# same tool CI uses), 3 builds identical at 183,658 bytes (179.35 KB) -> 179KB. It grew
-# from 155.5 KB because v0.7.17 adds src/mcptoon/skills.py, a new ~68KB module. The wheel
-# is not byte-reproducible (zip timestamps), so quote a rounding that survives drift
-# (179.35 is far from the 179.5 boundary).
-WHEEL_KB = "179KB"
+# same tool CI uses), identical across builds at 184,683 bytes (180.35 KB) -> 180KB. It
+# grew from 155.5 KB because v0.7.17 adds src/mcptoon/skills.py, a new ~68KB module, and
+# because the README (embedded in the wheel METADATA) now documents the skills family.
+# Re-measure at each release: the README text is part of the wheel, so doc edits move it.
+WHEEL_KB = "180KB"
 
 
 def modules() -> list[Path]:
