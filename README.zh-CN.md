@@ -2,18 +2,20 @@
 
 # mcptoon
 
-**本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
+**本地添加 1,000 个 MCP 工具和 1,000 个技能，也不用担心 token 上下文。**（本人实测：255 个工具 / 371 个技能）
 
-mcptoon 是一个 180KB 的小命令，帮你省下两笔开销。
+mcptoon 是一个 188KB 的小命令，同时管住一个 Agent 工具箱的两半——MCP 工具和技能——
+并把两者都挡在上下文窗口之外。
 
-**① 省 token** —— 它把 MCP 工具 schema 挡在 Agent 上下文之外。发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加 `--toon` 再省约 34%。
+**① 省 token** —— 它把 MCP 工具 schema 和技能文件都挡在 Agent 上下文之外。工具：**71,929 → 581 token**（255 个工具，实测 −99.2%）；技能：**92.6 万 → 501 token** 就能定位到该用哪个，常驻只占 **39 token**（实测 −99.9%）；调用结果加 `--toon` 再省约 34%。
 
-**② 省配置** —— **装一次 mcptoon，你电脑上所有 AI 都能用上全部 MCP 工具。** 以后新装 MCP 工具立刻生效，无需重启 Agent。
+**② 省配置** —— **装一次 mcptoon，你电脑上所有 AI 都能用上全部 MCP 工具和技能。** 以后新增工具或者技能立刻生效，无需重启任何 Agent。
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1036%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1049%20passed-brightgreen)](#贡献)
+[![Manages](https://img.shields.io/badge/manages-MCP%20%E5%B7%A5%E5%85%B7%20%2B%20Agent%20%E6%8A%80%E8%83%BD-8250df)](#工具箱的另一半技能)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
 [![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
@@ -48,19 +50,20 @@ mcptoon manifest
 加进配置，它才会进 Agent 的上下文。
 哪天不用 mcptoon 了，直接删掉它——你的 MCP 服务器是独立的，照常工作，一个都不会少。
 
-**Mcptoon 是 MCP 工具的原生解耦层**，解决 MCP 协议工具列表大量消耗 token、多 AI Agent
-重复配置工具的痛点。0 配置开箱即用：自动扫描接管本机所有 Agent——Claude Code、Cursor、
-Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削减 token 开销。
+**Mcptoon 是一个 Agent 整个工具箱的原生解耦层——MCP 工具和技能都算。** 它同时解决
+"工具列表和技能目录都在吃 token"以及"每个 AI Agent 各自重复配置"这两个痛点。
+0 配置开箱即用：自动扫描接管本机所有 Agent——Claude Code、Cursor、Codex、脚本、CI——
+的 MCP 工具*和*技能目录，工具实例全局共享，两半都默认挡在上下文窗口之外。
 
 ---
 
 ## 这不是我们自说自话
 
-上面那些数字是我们量的，但"schema 全量进上下文很贵"这件事，不是只有我们这么说：
+上面那些数字是我们测试出来的，但"schema 全量进上下文很贵"这件事，不是只有我们这么说：
 
-- [Anthropic 官方](https://www.anthropic.com/engineering/code-execution-with-mcp)：工具 schema 全量进上下文是真实痛点，一个例子就从 150,000 token 降到 2,000（省 98.7%）
-- [Firecrawl 基准](https://www.firecrawl.dev/blog/mcp-vs-cli)：同一任务，CLI 花 1,365 token，MCP 花 44,026——差 32 倍（全量 schema 一次性加载）
-- [Scalekit 基准](https://www.scalekit.com/blog/mcp-vs-cli-use)：CLI 便宜 10–32 倍、可靠性 100%，MCP 只有 72%
+- **Anthropic 官方工程博客**：工具 schema 全量进上下文是真实痛点，一个例子就从 150,000 token 降到 2,000（省 98.7%）
+- **Firecrawl 基准**：同一任务，CLI 花 1,365 token，MCP 花 44,026——差 32 倍（全量 schema 一次性加载）
+- **Scalekit 基准**：CLI 便宜 10–32 倍、可靠性 100%，MCP 只有 72%
 - [MCP-Zero（arXiv:2506.01056）](https://arxiv.org/abs/2506.01056)：按需工具检索可实现与工具数近乎无关的常数成本
 - [SEP-1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576)：MCP 官方在途提案，正打算削减 schema 冗余——上游自己承认了这个问题
 
@@ -71,7 +74,7 @@ Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削�
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，180KB，零依赖
+pip install mcptoon                          # 纯标准库，188KB，零依赖
 
 # 添加任意 MCP 服务器——一条命令：
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
@@ -82,6 +85,46 @@ mcptoon manifest
 # 调用工具（默认输出 JSON；想更省加 --toon）：
 mcptoon call everything echo '{"message":"hi"}'
 ```
+
+### 用你自己的技能目录，30 秒自证省了多少
+
+这些是最容易被怀疑的数字——"92.6 万 token？"——所以别信我们，自己测试一遍。
+不要 API key、不碰你的服务器、不用配置、**也不用克隆仓库**——`bench` 就在安装包里：
+
+```bash
+pip install mcptoon          # bench 是内置命令，不用克隆仓库
+pip install tiktoken         # 可选：不装的话，bench 会标"estimate"而不是"实测"
+mcptoon bench
+```
+
+`mcptoon bench --roots <目录>` 可指向任意技能目录。工具那几行是**你本机缓存**的 schema，
+数字会不同；下面技能那几行是单根（`~/.claude/skills`）的数。
+
+它把**两半放进同一张表**——工具 schema 对名字索引、全部 `SKILL.md` 对常驻指针和一次
+查询——让你看清每个数字到底是什么，而不是信一句口号。在写这份 README 的机器上：
+
+```text
+  half          what the agent loads                        tokens   vs native
+  ----------------------------------------------------------------------------
+  MCP tools (1109) native: every full schema                  139,863           -
+                manifest (name index)                        5,406       96.1%
+                manifest --slim                             16,396       88.3%
+
+  Agent skills (371) native: every SKILL.md, full text          926,232           -
+                skills manifest (pointer)                       39      100.0%
+                skills resolve --k 5 (one lookup)              501       99.9%
+```
+
+*（表尾的 query / 口径 / 128K 窗口数已省略。`query` 很关键：resolve 那一行是按 `make a PDF` 测的。）*
+
+**注意它替掉了什么。** 让一个 Agent 不用 mcptoon 去找"该用哪个技能"——它没有索引，
+只能一个接一个读 `SKILL.md` 直到找到。在这台机器上全套是 926,232 token：**装不进
+128K 窗口**，于是被截断，而掉出去的那个正好是你要的。用 mcptoon，同一个问题只要
+**501 token**——`mcptoon bench` 会指向你自己的目录，让你自己验一遍。
+
+一张表里两种口径，是故意的：工具那几行是**你本机缓存**的 schema；账 1 引用的是固定的
+255 工具基准，这样那个数字不会漂。技能那几行按"只数一层、排除 `_index`、根目录按真实
+路径去重"统计——所以就算你几个 Agent 目录是指向同一份目录的软链，也不会被数成四份。
 
 ### `mcptoon demo` 真跑出来是什么样子
 
@@ -144,9 +187,39 @@ serve` 桥，并自带一份技能说明书让 Agent 知道什么时候压缩。
 mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令搞定
 ```
 
-就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 180KB、
+就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 188KB、
 零依赖；mcptoon 本体不需要任何 API key，也不向任何云端打电话——服务费 $0，一切都在
 你自己的机器上跑。
+
+---
+
+## 工具箱的另一半：技能
+
+一个 Agent 技能就是一个 `SKILL.md` 文件。Agent 加载它的方式，和加载 MCP 工具 schema
+一模一样：开工前先塞进上下文窗口。在写这份 README 的机器上，**371 个技能要 926,232 token
+——超过 7 个 128K 上下文窗口。** 装不下，所以一定会丢东西；丢掉的，正好是你那天要用的那个技能。
+
+`mcptoon skills` 补上的，是所有技能管理器都没碰的那一半。市面上有一打工具在*整理*技能——
+安装、浏览、跨 IDE 同步。它们没有一个去测试"这个目录到底花多少 token"，也没有一个把它挡在上下文外面。
+mcptoon 两件事一起做，用的是和 MCP 服务器同一套"单一真源"模型：
+
+```bash
+mcptoon skills list                      # 目录里有什么（--usage 附带命中次数）
+mcptoon skills resolve "做个 PDF"        # BM25 短名单——离线、不调 LLM、不烧 token
+mcptoon skills sync ~/skills             # 分发到每个 Agent 的技能目录
+mcptoon skills sync ~/skills --dry       # 只预览计划，一个字节都不写
+mcptoon skills add my-skill --desc "…"   # 在真源里新建技能
+mcptoon skills remove my-skill           # 退役——移进带日期的墓地
+```
+
+视图默认是**链接**（Windows 上用 junction，不需要管理员权限），所以改一次真源，
+处处即时生效，也没有第二份副本会走样。三条安全规则兜底：本该是链接的位置上如果是真实目录，
+**只归档、绝不删除**；视图本身就是指向真源的链接时，**完全不碰**；`remove` 是把技能
+**移进**墓地，删错了是一条 `mv` 搬回来，而不是重新克隆。需要时再加生命周期开关——
+`--version-gate` 拦下"内容变了但 `version` 没跟着改"的技能，
+`--derived roo|opencode|all` 重生成部分 Agent 读的扁平 `.md` 视图，
+`--archive DIR` 把漂移停进你指定的墓地，`remove --tombstone` 把删除提交成 git 墓碑
+（按路径限定），让双向 git 同步无法把它复活。
 
 ---
 
@@ -179,25 +252,26 @@ token（50 工具 114，−99.2%）。
 
 ---
 
-## 行业验证了问题——但把解法锁在了门后
+## 行业验证了问题——但把解法关进了自家围墙
 
-工具上下文太重，不再是小众抱怨——它已经是官方盖章的工程问题，同一个答案反复出现：
+工具上下文太重，不再是小众抱怨——它已经是官方盖章的工程问题。但目前每一个认真的解法，
+都**长在别人的平台里**——对你真正在用的 agent 来说，等于没出：
 
-- **Anthropic**：[Tool Search Tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
-  把工具定义改为按需加载；[Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
-  把编排挪进代码。两者都是 Claude 平台 beta。
-- **MuleSoft**：[MCP Payload Optimization](https://docs.mulesoft.com/gateway/latest/policies-included-mcp-payload-optimization)
-  把「清洗 → 蒸馏 → 压缩」产品化（压缩环节是 TOON）。只在企业网关里，
-  支持到 MCP 2025-06-18。
+- **Anthropic** 做出来了——但锁在 Claude 里。Tool Search Tool 和 Programmatic Tool
+  Calling 干的正是这件事，可两者都是 Claude 平台 beta。你跑的其他 agent 上，工具*结果*
+  仍然逐 token 进上下文。
+- **MuleSoft** 产品化了——但锁在企业网关里。MCP Payload Optimization 把
+  「清洗 → 蒸馏 → 压缩」做成了产品（压缩环节是 TOON），但只在 MuleSoft 网关内，
+  MCP 规范还落后一代。
 
 | 解法 | 跑在哪 | 门槛 |
 |---|---|---|
-| Tool Search Tool / PTC | Claude 平台 beta | 只管*定义*和编排；其他所有 agent 上，工具*结果*仍逐 token 进上下文 |
-| MuleSoft 网关 | 企业网关 | 要过 MuleSoft；MCP 规范落后一代 |
-| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——180KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
+| Anthropic 的 Tool Search Tool / PTC | Claude 平台 beta | 只有 Claude——其他 agent 仍要为结果逐 token 付费 |
+| MuleSoft 的 MCP Payload Optimization | MuleSoft 企业网关 | 要过网关；MCP 规范落后一代 |
+| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——188KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
 
-方向已定。mcptoon 是这个答案里**今天就能跑、每个 agent 一次到位**的版本——
-「结果侧」的纪律，不收平台税，不收网关税。
+上面每一条都是一堵墙。mcptoon 是同一个答案，但没有墙：**今天就能跑、每个 agent 一次
+到位**——「结果侧」的纪律，不收平台税，不收网关税。
 
 ---
 
@@ -221,7 +295,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
-每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 180KB、零依赖，因为服务器是你的
+每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 188KB、零依赖，因为服务器是你的
 机器直接运行的外部进程，不是打包进 mcptoon 的代码。四个步骤、一条命令、不用重启 Agent。
 
 **支持任何 MCP 服务器：**
@@ -241,32 +315,6 @@ Claude Code、Cursor、Codex、Cline、Windsurf 以及另外 75 个 Agent 自动
 ```bash
 npx skills add https://github.com/activeing123/mcptoon --skill mcptoon
 ```
-
----
-
-## 管理你的技能目录——一个真源，喂给所有 Agent
-
-技能和 MCP 服务器是同一种形状：一个真源，多份 Agent 视图。所以 `mcptoon skills`
-同时管住一个会话工具箱的两半。指向一个真源目录，它就替你把每个 Agent 的技能目录保持同步，
-不存在第二份副本会漂移：
-
-```bash
-mcptoon skills list                      # 目录里有什么（--usage 附带命中次数）
-mcptoon skills resolve "做个 PDF"        # BM25 短名单——离线、不调 LLM、不烧 token
-mcptoon skills sync ~/skills             # 分发到每个 Agent 的技能目录
-mcptoon skills sync ~/skills --dry       # 只预览计划，一个字节都不写
-mcptoon skills add my-skill --desc "…"   # 在真源里新建技能
-mcptoon skills remove my-skill           # 退役——移进带日期的墓地
-```
-
-视图默认是**链接**（Windows 上用 junction，不需要管理员权限），所以改一次真源，
-处处即时生效，也没有第二份副本会走样。三条安全规则兜底：本该是链接的位置上如果是真实目录，
-**只归档、绝不删除**；视图本身就是指向真源的链接时，**完全不碰**；`remove` 是把技能
-**移进**墓地，删错了是一条 `mv` 搬回来，而不是重新克隆。需要时再加生命周期开关——
-`--version-gate` 拦下"内容变了但 `version` 没跟着改"的技能，
-`--derived roo|opencode|all` 重生成部分 Agent 读的扁平 `.md` 视图，
-`--archive DIR` 把漂移停进你指定的墓地，`remove --tombstone` 把删除提交成 git 墓碑
-（按路径限定），让双向 git 同步无法把它复活。
 
 ---
 
@@ -299,7 +347,7 @@ SDK、每个 Agent 单独配。
 | **任何 Agent** | 能跑 shell 命令就能调 `mcptoon` |
 
 在 `~/.mcptoon/config.json` 配置一次，所有能跑 shell 命令的 Agent 共享同样的服务器和
-工具。不能跑的 GUI Agent？`mcptoon sync` 把原生 JSON 写进它们各自的位置。
+工具和技能。不能跑的 GUI Agent？`mcptoon sync` 把原生 JSON 写进它们各自的位置。
 
 ```bash
 export MCPTOON_AGENT_TYPE=claude   # 调用结果自动用 --toon
@@ -319,10 +367,12 @@ mcptoon call github search_repos '{"query":"mcp"}'
 
 ## 数据
 
-mcptoon 省 token 分两笔账，先分清是哪一段再对数字。先说短版：255 个工具的原生发现
-要吃掉 71,929 token——128K 窗口的一半以上——同一套工具走名称索引只要 581 token，
-省 99.2%；结果这一侧，`--toon` 在实测集上比 JSON 小 34.0–34.2%。两行都是我们的实测配置
-（tiktoken `cl100k_base`，`assets/benchmark_tiktoken.json`），不是按比例放大的估算。
+mcptoon 省 token 分三笔账，先分清是哪一段再对数字。发现工具：255 个工具的原生发现
+要吃掉 71,929 token——128K 窗口的一半以上——同一套工具走名称索引只要 581，省 99.2%。
+调用结果：`--toon` 比 JSON 小 34.0–34.2%。技能目录：926,232 token 的 `SKILL.md` 全文，
+变成 39 token 的常驻指针 + 每次查询 501 token。所有数字都是实测配置（工具侧 tiktoken
+`cl100k_base` + `assets/benchmark_tiktoken.json`，两半都可用 `mcptoon bench` 复现），
+不是按比例放大的估算。
 
 ### 账 1 · 发现工具（`manifest`）：默认就省 99.2%
 
@@ -359,6 +409,40 @@ schema 塞进上下文（50 工具 14,113 token、255 工具 71,929 token），m
 不是宣传数字。
 
 **一句话记法：99.2% 是你"看有哪些工具"省下的，34% 是你"拿到结果"能再省的。**
+
+### 账 3 · 技能目录（`skills`）：926,232 → 常驻 39 + 每次查询 501
+
+同一笔账，算在工具箱的另一半上。Agent 只要读技能目录，就得为每个 `SKILL.md` 付账。
+下面是写这份 README 那台机器上的真实数字——371 个技能文件，同样的 tiktoken `cl100k_base`。
+
+| Agent 要加载的东西 | Tokens | 对比全量 |
+|---|---:|---:|
+| 每个 `SKILL.md` 全文 | **926,232** | — |
+| 只取每个技能的 `description` | 27,292 | −97.1% |
+| 只取每个技能的名字（纯名字索引） | 1,413 | −99.85% |
+| `mcptoon skills resolve "<任务>" --k 5`（只返回最相关的 5 个） | **501** | **−99.95%** |
+| `mcptoon skills manifest`（常驻的那个指针） | **39** | **−99.996%** |
+
+再看一眼第一行：**926,232 token = 7.07 个完整的 128K 上下文窗口。** 目录根本装不进窗口，
+这就是为什么 Agent 会悄悄丢掉技能，然后"忘记"你几个月前装好的能力。解法和账 1 一样——
+按需取，绝不预加载：
+
+```bash
+mcptoon skills manifest                      # 39 token，常驻
+mcptoon skills resolve "做个 PDF" --k 5      # 501 token，只返回最相关的 5 个
+```
+
+**最后两行是两件不同的事，别混着看。** **39 token** 的 `manifest` 是个*指针*——它只告诉
+Agent 该怎么问，里面一个技能名字都没有。**501 token** 的 `resolve` 才是真干活：它返回
+你这次请求真正相关的 5 个技能。如果你想要的是"技能当工具"那种常驻名字清单，那是
+**1,413 token**——比加载全文仍然省 99.85%。不管哪种，你都不用付那 926,232。
+
+*实测，不是估算。`mcptoon bench` 用你自己的目录复现上面两行——账 1 的工具行也在同一张表里。
+完整方法、口径与"数量口径表"见
+[`docs/skill-token-benchmarks.md`](https://github.com/activeing123/mcptoon/blob/main/docs/skill-token-benchmarks.md)。你的目录不一样，比例不会变。*
+
+*规模体检：1,000 个技能的索引与路由在 0.5 秒内完成（`index` 0.49s / `list` 0.32s /
+`resolve` 0.33s，用 1,000 个真实体量的合成技能实测）。上面那 371 个只是本机的目录。*
 
 ### 对比实例（账 1 的直观版）
 
@@ -429,10 +513,15 @@ mcptoon install --remove <name> # 卸载
 mcptoon sync                    # 同步原生配置到每个检测到的 Agent
 mcptoon health                  # 健康检查所有 MCP 服务器（--json 任一死掉即退出码 1）
 mcptoon policy                  # 逐工具压缩策略（raw / toon / slim）
+mcptoon skills index [ROOT ...] # 构建磁盘索引（list/resolve 前必须先跑）
 mcptoon skills list             # 列出技能目录（--usage 附带命中次数）
 mcptoon skills resolve "<任务>" # 技能 BM25 短名单（离线、不调 LLM）
+mcptoon skills route "<任务>"   # 先短名单，再让 LLM 挑（--model、--endpoint）
+mcptoon skills stats            # 目录体检（重名、别名、缺 description）
+mcptoon skills manifest         # 常驻的一行指针（39 token）
 mcptoon skills sync <src>       # 把技能目录分发到每个 Agent 的目录
 mcptoon skills add|remove <name> # 在真源新建技能 / 退役进墓地
+mcptoon bench                   # 本机自证省了多少（工具+技能，一张表）
 mcptoon plugin install <dir>    # 安装 Agent Plugins 1.0.0 插件
 mcptoon serve                   # 以 MCP server 形态运行（stdio/HTTP）——MCP 2026-07-28：无状态优先、server/discover、列表结果可缓存
 mcptoon demo                    # 一条命令，本机现场演示
@@ -487,6 +576,59 @@ agent，调用合法率只有 **4/41 ≈ 10%**——栽就栽在 `account`、`pa
 
 ---
 
+## 技术规格
+
+下面每一条都能用 `mcptoon --version` 和它读的文件核对。工具箱的两半共用一套引擎、
+一份配置、一种索引格式。
+
+| | MCP 工具 | 技能 |
+|---|---|---|
+| **单位** | 一个工具 = 一份 JSON Schema | 一个技能 = 一个 `SKILL.md`（YAML frontmatter + 正文） |
+| **真源** | `~/.mcptoon/config.json`（服务器） | 一个技能根目录（默认 `~/.claude/skills`、`~/.agents/skills`、`~/.codex/skills`、`~/.cursor/skills`） |
+| **怎么挡在上下文外** | 纯名字 manifest（255 个工具 581 token） | BM25 索引 + 一行 39 token 的指针（每次查询 501 token） |
+| **发现** | `mcptoon manifest` · `inspect` · `search` | `mcptoon skills resolve` · `route` |
+| **分发** | `mcptoon sync`（给每个 Agent 写原生 JSON） | `mcptoon skills sync`（给每个 Agent 建链接） |
+| **增删** | `install` · `add` · `remove` | `skills add` · `skills remove --tombstone` |
+| **体检** | `mcptoon health` | `mcptoon skills stats` |
+
+**运行时。** Python ≥ 3.10（CI：3.10–3.13 × Linux、Windows、macOS）。25 个模块、
+15,656 行 Python、**188KB** wheel、**零第三方依赖**——只用标准库，由 CI 的
+`scripts/check_zero_deps.py` 强制。没有守护进程、没有监听端口、没有遥测、不存凭证。
+
+**工具格式。** `compact`（只有名字，默认）· `slim`（`name|param:type*`，mcptoon 原创）
+· `full`（原生 JSON Schema）· `toon`（开源 TOON 标准，可逆）。它们全部只活在输出层
+——线上协议永远是标准 JSON-RPC，服务器一个非标准的字节都看不到。
+
+**技能内部。**
+- **索引** —— `~/.mcptoon/skills-index.json`（`version: 1`），由 `mcptoon skills index`
+  生成；`list` / `resolve` / `route` / `stats` **必须先有它**（否则报
+  `no skills index yet. Run: mcptoon skills index`）。
+- **检索** —— 对每个技能的 slug + `description` + 触发词跑 BM25，并把所有指向它的
+  别名合并进来，所以用别名也能命中正主。全程离线：不调 LLM、不联网。`--k` 默认 **5**。
+- **指针** —— `mcptoon skills manifest` 只打一行，里面**没有任何技能名**；它是告诉
+  Agent"该怎么问"的指令，不是索引。
+- **同步** —— 视图是**链接**（Windows 上用 junction，不需要管理员）。本该是链接的位置
+  上若是真实目录，**只归档、绝不删除**；视图本身已指向真源时**完全不碰**；`remove`
+  把技能**移进**带日期的墓地，删错了是一条 `mv` 搬回来，而不是重新克隆。
+- **生命周期** —— `--version-gate` 拦下"内容变了但 `version` 没跟着改"的技能；
+  `--derived roo|opencode|all` 重生成部分 Agent 读的扁平 `.md` 视图；`--archive DIR`
+  指定漂移停放的墓地；`remove --tombstone` 把删除提交成 git 墓碑（按路径限定），
+  让双向 git 同步无法把它复活。
+
+**环境变量覆盖**（测试和"跑多套目录"时用）：
+`MCPTOON_SKILLS_ROOTS`、`MCPTOON_SKILLS_VIEWS`、`MCPTOON_SKILLS_INDEX`、
+`MCPTOON_SKILLS_USAGE`、`MCPTOON_SKILLS_ENDPOINT`、`MCPTOON_SKILLS_MODEL`、
+`MCPTOON_SKILLS_LEDGER`、`MCPTOON_SKILLS_DERIVED`、`MCPTOON_CONFIG_FILE`、
+`MCPTOON_AGENT_TYPE`。
+
+**复现这些数字。** `mcptoon bench`——两半一张表，随包发布。克隆仓库后还可用 `scripts/bench_tokens.py` 与 `scripts/bench_skills.py`（精确、需 tiktoken）。
+方法与口径见
+[`docs/tiktoken-benchmarks.md`](https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md)
+与
+[`docs/skill-token-benchmarks.md`](https://github.com/activeing123/mcptoon/blob/main/docs/skill-token-benchmarks.md)。
+
+---
+
 ## 自研格式会破坏 MCP 兼容吗？——不会，三层理由
 
 "自研格式 = 兼容炸弹"是合理的警惕，但这里不成立，原因有三层：
@@ -515,13 +657,18 @@ TOON（Token-Oriented Object Notation）是外部开放标准
 
 ## 原理
 
-mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不连接 MCP 服务器——它跑
-`mcptoon` 命令。Schema 存在磁盘上的 `~/.mcptoon/config.json` 里，默认不进上下文窗口。
+mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不直连 MCP 服务器——它跑
+`mcptoon` 命令。schema 存在磁盘上的 `~/.mcptoon/config.json`，默认不进上下文窗口。
+
+技能目录故意做成同一个形状：一个真源根目录、磁盘上一份 BM25 索引
+（`~/.mcptoon/skills-index.json`）、上下文里一行 39 token 的指针。同一套"一个真源、
+多份视图"，同一条"按需取、绝不预加载"的规则——整个工具箱之所以像一件事，因为它本来
+就是一件事。
 
 **两层解耦：**
 
 ```
-第 1 层: mcptoon CLI (180KB, 零依赖)
+第 1 层: mcptoon CLI (188KB, 零依赖)
          在 Agent 的 shell 里运行。schema 默认不进上下文。
                     │
 第 2 层: 实际 MCP 服务器 (npm/pip 包)
@@ -558,13 +705,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1036 passed, 1 skipped
+python -m pytest tests/ -v   # 1049 passed, 1 skipped
 ```
 
-零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1036 个测试。见
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1049 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：15,320 行 Python、24 个模块，零第三方依赖——供应链里 0 个要审计的环节。
+项目本体：15,656 行 Python、25 个模块，零第三方依赖——供应链里 0 个要审计的环节。
 
 ---
 

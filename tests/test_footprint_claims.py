@@ -51,11 +51,12 @@ TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # What `pip install mcptoon` downloads: measured 2026-09-18 with `python -m build` (the
-# same tool CI uses), identical across builds at 184,683 bytes (180.35 KB) -> 180KB. It
-# grew from 155.5 KB because v0.7.17 adds src/mcptoon/skills.py, a new ~68KB module, and
-# because the README (embedded in the wheel METADATA) now documents the skills family.
+# same tool CI uses), identical across builds at 192,988 bytes (188.46 KB) -> 188KB. It
+# grew from 155.5 KB because v0.7.17 adds src/mcptoon/skills.py (~68KB) and
+# src/mcptoon/bench.py (~13KB), and because the README (embedded in the wheel METADATA)
+# now documents the skills family and the `mcptoon bench` command.
 # Re-measure at each release: the README text is part of the wheel, so doc edits move it.
-WHEEL_KB = "180KB"
+WHEEL_KB = "188KB"
 
 
 def modules() -> list[Path]:

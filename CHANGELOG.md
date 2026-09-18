@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`mcptoon bench` — prove the savings on your own machine, in one command.**
+  The README's token claims had a proof, but it needed a clone: the scripts live
+  in `scripts/`, which the wheel does not ship. `bench` is inside the wheel, so
+  `pip install mcptoon && mcptoon bench` measures both halves at once — tool
+  schemas against the name index, and every `SKILL.md` against the resident
+  pointer and one lookup. tiktoken is used when present (exact numbers, the ones
+  the README quotes); without it the table says "estimate" rather than passing a
+  guess off as a measurement. It is read-only: it reads the schema cache and the
+  skill index and never writes the usage ledger.
+  - The skill half counts one level deep, excludes `_index`, and **de-duplicates
+    roots by real path**. On a machine whose agent folders are junctions onto one
+    catalog — the common multi-agent layout, and this one — a naive walk counted
+    the same catalog four times (3,710,031 tokens instead of 931,339). The skipped
+    duplicate count is printed, not hidden.
+  - `mcptoon bench --json` emits the same numbers for scripts; `--roots` points
+    it at any catalog.
+
+### Changed
+
+- **Both READMEs were rewritten around the two halves of one toolbox.** The old
+  text led with MCP and treated skills as an add-on bolted on later. The
+  subtitle, the definition, `How it works` and `Works with every AI agent` now
+  describe one gateway managing both, in the same words, and a new Technical
+  specification section pairs the two sides feature by feature.
+  - The self-proof block no longer tells a reader to `git clone`; it runs
+    `mcptoon bench`.
+  - Three evidence links (Anthropic's engineering blog, Firecrawl, Scalekit)
+    became plain-text citations: the evidence stays, the outbound clicks do not.
+    No competitor product page is linked anywhere in the README.
+
+### Fixed
+
+- **The wheel-size claim said 180KB; the wheel is 188KB.** This release adds
+  `src/mcptoon/bench.py` (~13KB) on top of `skills.py`, and the README — which is
+  embedded in the wheel METADATA — grew by ~10KB when it began documenting the
+  skills family. `python -m build` now yields 192,988 bytes (188.46 KB),
+  identical across builds. All eighteen surfaces that stated the old figure are
+  corrected, including the two shipped `SKILL.md` cards and the Claude plugin.
+- **The suite total was stale on eight surfaces** after `bench` brought tests of
+  its own: `README.md`, `README.zh-CN.md`, `DEVELOPERS.md`, `ROADMAP.md`, both
+  landing pages and `docs/tiktoken-benchmarks.md` now read 1049 passed, 1 skipped
+  (the passed count, matching the badge convention), and the module/line counts
+  moved to 25 / 15,656.
+
+
 - **Skills became a managed catalog, not just a search index.** v0.7.16 taught
   `mcptoon skills` to index and route a skill catalog. This release adds the
   other half — distribution and lifecycle — so the same one-source-of-truth
