@@ -104,7 +104,7 @@ KNOWN_FLAGS = frozenset(
         "--model",
         "--no-configs",
         "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
-        "--quiet", "--quick", "--raw", "--remove", "--request-state", "--search",
+        "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
         "--slim",
         "--stdin", "--stdio", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
         "--version", "--version-gate", "--watch",
@@ -285,6 +285,9 @@ def main():
     elif command == "skills":
         from .skills import _cmd_skills
         _cmd_skills(rest, fmt)
+    elif command == "bench":
+        from .bench import run_bench
+        run_bench(rest, fmt)
     elif command == "config":
         _cmd_config(rest, fmt)
     elif command in ("help", "-h", "--help"):
@@ -2028,6 +2031,9 @@ Usage:
     mcptoon skills resolve <query>       BM25 shortlist of skills (offline, no LLM)
     mcptoon skills sync [SRC] [VIEW...]  Distribute a skill catalog to every agent's folder
     mcptoon skills add|remove <name>     Create a skill in the source / retire it to the archive
+
+    mcptoon bench                        Prove the savings on your own machine (tools + skills)
+    mcptoon bench --json                 Machine-readable; --roots/--query/-k tune the skills half
 
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
