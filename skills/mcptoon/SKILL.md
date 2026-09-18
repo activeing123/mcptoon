@@ -1,6 +1,7 @@
 ---
 name: mcptoon
-description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
+version: 1.0.0
+description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove). mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
 ---
 
 # mcptoon — MCP tool-catalog compression
@@ -22,6 +23,46 @@ back.
 | Huge JSON argument | `mcptoon call <server> <tool> --stdin` |
 | Tool returns images/base64 that must never be compressed | `mcptoon policy set <server> <tool> raw` (one-time; applies to every later call) |
 | Diagnose connectivity/config | `mcptoon doctor` |
+
+## Managing a skill catalog (mcptoon as the skill center)
+
+Skills and MCP servers are the same shape — one source, many agent views — so
+`mcptoon skills` manages both halves of a session's toolbox.
+
+| Situation | Command |
+|---|---|
+| See what skills exist | `mcptoon skills list` (`--usage` adds per-skill hit counts) |
+| Find the right skill for a task | `mcptoon skills resolve "<task>"` (offline, instant, no LLM) |
+| Distribute one source to every agent's skill folder | `mcptoon skills sync [SRC] [VIEW ...]` (`--dry` to preview, `--copy` for real dirs) |
+| Create / retire a skill | `mcptoon skills add <name> --desc "…"` / `mcptoon skills remove <name>` |
+
+Sync views are **links** by default (a junction on Windows, no admin needed), so
+one edit at the source is live everywhere and there is no second copy to drift.
+Two safety rules hold: a real directory where a link belongs is **archived, never
+deleted**, and a view that is *itself* a whole-directory link to the source is
+left completely alone. `remove` **moves** the skill to a dated archive — a wrong
+removal is a `mv` back, not a re-clone. `--usage` counts only skills mcptoon
+routed; a skill an agent loaded directly is invisible there, and the output says
+so rather than implying full coverage.
+
+If another tool already manages the same skill folders, point mcptoon at
+sandbox views first with `MCPTOON_SKILLS_VIEWS` and run `--dry` before any real
+sync. Do not run two managers against one view directory.
+
+## Making mcptoon visible in a session
+
+`mcptoon serve` returns an `instructions` field from the MCP initialize
+handshake, so a connected client learns what mcptoon is without anyone editing
+a system prompt, and can close a turn with one honest savings line. The figures
+come from the `mcptoon_usage` tool, never from the model's estimate. Users who
+find the line noisy turn it off once:
+
+```bash
+mcptoon config set footer off   # persists; the next connection omits it entirely
+```
+
+Note this is advisory — it works only when the client honours `instructions`,
+and only when `mcptoon serve` is actually registered with that agent.
 
 ## Rules
 
