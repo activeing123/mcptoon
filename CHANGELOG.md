@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The release also re-pins the footprint claims, because the fixes moved them: the
 wheel is **189KB** (194,028 bytes) and `src/mcptoon/*.py` is **15,697** physical
-lines, and the suite total moves to **1,059 tests** (1,058 passed, 1 skipped).
+lines, and the suite total moves to **1,061 tests** (1,060 passed, 1 skipped).
 Both README badges, the landing pages, `DEVELOPERS.md`, `ROADMAP.md`,
 `docs/comparison.md`, `docs/tiktoken-benchmarks.md` and the shipped skill cards
 were updated together — the footprint guard reads all of them, so a partial
