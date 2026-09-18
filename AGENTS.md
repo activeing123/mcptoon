@@ -87,5 +87,6 @@ real adoption number — PyPI downloads (https://pypistats.org/api/packages/mcpt
 - Dev workflow, code style, project structure → [CONTRIBUTING.md](CONTRIBUTING.md)
 - Architecture, the three core commands, token benchmarks → [DEVELOPERS.md](DEVELOPERS.md)
 - What to build next and why → [ROADMAP.md](ROADMAP.md)
+- Marketing surface (landing pages + README) mission, readers, block duties, gates → [docs/homepage-framework.md](docs/homepage-framework.md)
 - Competitive landscape and positioning → [competitive-intel-mcp-manager-tools.md](competitive-intel-mcp-manager-tools.md)
 - Release history → [CHANGELOG.md](CHANGELOG.md)
