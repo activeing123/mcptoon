@@ -159,7 +159,10 @@ class TestLocalDetection:
             assert "sequential-thinking" in names
 
     def test_git_repo_detection(self):
-        # Create a temp dir with .git
+        # The git-repo bonus entry is gated on `uvx` (the runner that actually
+        # provides mcp-server-git). Assert that contract directly instead of
+        # depending on whatever the test machine happens to have installed:
+        # with uvx -> git appears from the repo scan; without uvx -> it must not.
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
             git_dir.mkdir()
@@ -167,11 +170,23 @@ class TestLocalDetection:
             original = Path.cwd()
             try:
                 os.chdir(tmpdir)
-                results = _detect_local_tools()
+
+                with patch.object(discover_mod, "_which",
+                                  side_effect=lambda c: "uvx" if c == "uvx" else None):
+                    results = _detect_local_tools()
                 git_results = [r for r in results if r["name"] == "git"]
-                assert len(git_results) >= 1
-                # git appears from both zero-config and git-repo detection
-                assert "git" in git_results[0]["reason"].lower() or "Zero-config" in git_results[0]["reason"]
+                repo_entries = [r for r in git_results
+                                if "git repository" in r["reason"].lower()]
+                assert len(repo_entries) == 1, (
+                    "the repo scan should add exactly one git entry"
+                )
+                assert repo_entries[0]["config"]["command"] == ["uvx"]
+
+                with patch.object(discover_mod, "_which", return_value=None):
+                    results = _detect_local_tools()
+                assert not [r for r in results if r["name"] == "git"], (
+                    "git must not be offered when its runner (uvx) is absent"
+                )
             finally:
                 os.chdir(original)
 
@@ -337,10 +352,17 @@ class TestAutoDiscover:
         assert isinstance(result.sources, dict)
 
     def test_auto_discover_no_network(self):
-        """With network probing disabled, should still find local/env servers."""
+        """With network probing disabled, local/env servers still show up.
+
+        The set depends on which runners are installed, so assert the contract
+        rather than a hardcoded name: npm servers iff npx exists, PyPI servers
+        iff uvx exists. (This test previously hardcoded `fetch`, which is a
+        PyPI package — it passed locally only because this machine has uvx.)
+        """
         result = auto_discover(probe_network=False)
-        # If npx is available, should find at least fetch
         if _which("npx"):
+            assert "filesystem" in result.servers
+        if _which("uvx"):
             assert "fetch" in result.servers
 
     def test_auto_discover_dedup(self):
