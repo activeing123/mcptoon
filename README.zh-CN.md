@@ -61,9 +61,9 @@ mcptoon manifest
 
 上面那些数字是我们测试出来的，但"schema 全量进上下文很贵"这件事，不是只有我们这么说：
 
-- **Anthropic 官方工程博客**：工具 schema 全量进上下文是真实痛点，一个例子就从 150,000 token 降到 2,000（省 98.7%）
-- **Firecrawl 基准**：同一任务，CLI 花 1,365 token，MCP 花 44,026——差 32 倍（全量 schema 一次性加载）
-- **Scalekit 基准**：CLI 便宜 10–32 倍、可靠性 100%，MCP 只有 72%
+- **[Anthropic 官方工程博客](https://www.anthropic.com/engineering/code-execution-with-mcp)**：工具 schema 全量进上下文是真实痛点，一个例子就从 150,000 token 降到 2,000（省 98.7%）
+- **[Firecrawl 基准](https://firecrawl.dev/blog/mcp-vs-cli)**：同一任务，CLI 花 1,365 token，MCP 花 44,026——差 32 倍（全量 schema 一次性加载）
+- **[Scalekit 基准](https://scalekit.com/blog/mcp-vs-cli-use)**：CLI 便宜 10–32 倍、可靠性 100%，MCP 只有 72%
 - [MCP-Zero（arXiv:2506.01056）](https://arxiv.org/abs/2506.01056)：按需工具检索可实现与工具数近乎无关的常数成本
 - [SEP-1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576)：MCP 官方在途提案，正打算削减 schema 冗余——上游自己承认了这个问题
 

@@ -66,11 +66,11 @@ globally, and keeps both halves out of the context window by default.
 Those numbers are ours, but "loading every tool schema into context is expensive" is
 not a claim only we make:
 
-- **Anthropic's own engineering write-up**: tool schemas flooding the context window is a
+- **[Anthropic's own engineering write-up](https://www.anthropic.com/engineering/code-execution-with-mcp)**: tool schemas flooding the context window is a
   real pain — one example drops from 150,000 tokens to 2,000 (a 98.7% saving)
-- **Firecrawl's benchmark**: the same task cost 1,365 tokens via CLI vs 44,026 via MCP —
+- **[Firecrawl's benchmark](https://firecrawl.dev/blog/mcp-vs-cli)**: the same task cost 1,365 tokens via CLI vs 44,026 via MCP —
   32× (full schema loaded upfront)
-- **Scalekit's benchmark**: CLI is 10–32× cheaper and 100% reliable; MCP scores 72%
+- **[Scalekit's benchmark](https://scalekit.com/blog/mcp-vs-cli-use)**: CLI is 10–32× cheaper and 100% reliable; MCP scores 72%
 - [MCP-Zero (arXiv:2506.01056)](https://arxiv.org/abs/2506.01056): on-demand tool
   retrieval achieves near-constant cost regardless of tool count
 - [SEP-1576](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576):
