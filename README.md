@@ -5,7 +5,7 @@
 
 **Add 1,000 MCP tools locally — your token context never feels it.**
 
-mcptoon is a 156KB CLI that saves you two bills.
+mcptoon is a 179KB CLI that saves you two bills.
 
 **① Token** — it keeps MCP tool schemas out of your agent's context. Tool discovery drops **71,929 → 581 tokens at 255 tools (−99.2%, measured)**; call results shrink another ~34% with `--toon`.
 
@@ -83,7 +83,7 @@ covering every agent at once.
 ## Up and running in 30 seconds
 
 ```bash
-pip install mcptoon                          # pure stdlib, 156KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 179KB, zero dependencies
 
 # Add any MCP server — one command:
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
@@ -159,7 +159,7 @@ mcptoon quickstart     # discover + configure + list tools — one command
 ```
 
 That's it. No hand-written JSON config. No MCP protocol debugging. No polluted context
-window. The wheel is 156KB with zero dependencies, and mcptoon itself needs no API
+window. The wheel is 179KB with zero dependencies, and mcptoon itself needs no API
 key and phones nothing home — $0 in service fees, everything runs on your machine.
 
 ---
@@ -211,7 +211,7 @@ engineering problem, and the same answer keeps appearing on every roadmap:
 |---|---|---|
 | Tool Search Tool / PTC | Claude-platform betas | tool *results* still enter context token by token on every other agent |
 | MuleSoft gateway | enterprise gateway | behind MuleSoft; MCP spec one generation behind |
-| **mcptoon** | **any agent that can run a shell command** | none — 156KB, no key, no proxy, MCP 2026-07-28 GA |
+| **mcptoon** | **any agent that can run a shell command** | none — 179KB, no key, no proxy, MCP 2026-07-28 GA |
 
 The direction is settled. mcptoon is the version of this answer you can run
 **today, on every agent at once** — the results-side discipline without the
@@ -239,7 +239,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon connects, discovers tools, generates the handler, registers it. No restart
-needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 156KB with zero
+needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 179KB with zero
 dependencies, because servers are external processes your machine runs directly, not
 code bundled into mcptoon. Four steps, one command, no agent restart.
 
@@ -522,7 +522,7 @@ MCP servers — it runs `mcptoon` commands. Schemas live on disk in
 **Two-layer decoupling:**
 
 ```
-Layer 1: mcptoon CLI (156KB, zero deps)
+Layer 1: mcptoon CLI (179KB, zero deps)
          runs in the agent's shell. schemas stay out of context by default.
                     │
 Layer 2: the actual MCP servers (npm/pip packages)

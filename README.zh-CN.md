@@ -4,7 +4,7 @@
 
 **本地添加 1,000 个 MCP 工具，也不用担心 token 上下文。**
 
-mcptoon 是一个 156KB 的小命令，帮你省下两笔开销。
+mcptoon 是一个 179KB 的小命令，帮你省下两笔开销。
 
 **① 省 token** —— 它把 MCP 工具 schema 挡在 Agent 上下文之外。发现工具直接省 **71,929 → 581 token（255 个工具，实测 −99.2%）**；调用结果加 `--toon` 再省约 34%。
 
@@ -71,7 +71,7 @@ Codex、脚本、CI——的 MCP 工具，工具实例全局共享，大幅削�
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，156KB，零依赖
+pip install mcptoon                          # 纯标准库，179KB，零依赖
 
 # 添加任意 MCP 服务器——一条命令：
 mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
@@ -144,7 +144,7 @@ serve` 桥，并自带一份技能说明书让 Agent 知道什么时候压缩。
 mcptoon quickstart     # 自动发现 + 配置 + 展示工具——一条命令搞定
 ```
 
-就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 156KB、
+就这些。不用手写 JSON 配置。不用调试 MCP 协议。不污染上下文窗口。wheel 只有 179KB、
 零依赖；mcptoon 本体不需要任何 API key，也不向任何云端打电话——服务费 $0，一切都在
 你自己的机器上跑。
 
@@ -194,7 +194,7 @@ token（50 工具 114，−99.2%）。
 |---|---|---|
 | Tool Search Tool / PTC | Claude 平台 beta | 只管*定义*和编排；其他所有 agent 上，工具*结果*仍逐 token 进上下文 |
 | MuleSoft 网关 | 企业网关 | 要过 MuleSoft；MCP 规范落后一代 |
-| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——156KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
+| **mcptoon** | **任何能跑 shell 命令的 agent** | 无——179KB，不要密钥、不要代理进程，MCP 2026-07-28 GA |
 
 方向已定。mcptoon 是这个答案里**今天就能跑、每个 agent 一次到位**的版本——
 「结果侧」的纪律，不收平台税，不收网关税。
@@ -221,7 +221,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon 自动连接、发现工具、生成 handler、注册。不需要重启。
-每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 156KB、零依赖，因为服务器是你的
+每次安装给 mcptoon 本体**新增 0 KB**——CLI 保持 179KB、零依赖，因为服务器是你的
 机器直接运行的外部进程，不是打包进 mcptoon 的代码。四个步骤、一条命令、不用重启 Agent。
 
 **支持任何 MCP 服务器：**
@@ -487,7 +487,7 @@ mcptoon 是 **CLI 工具**，不是 MCP 客户端库。你的 Agent 不连接 MC
 **两层解耦：**
 
 ```
-第 1 层: mcptoon CLI (156KB, 零依赖)
+第 1 层: mcptoon CLI (179KB, 零依赖)
          在 Agent 的 shell 里运行。schema 默认不进上下文。
                     │
 第 2 层: 实际 MCP 服务器 (npm/pip 包)

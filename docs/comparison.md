@@ -12,7 +12,7 @@
 | Add one server, N agents | edit N files × N formats | 1 command, syncs | 1 form, syncs | **1 command** (`mcptoon add` + auto-detect) |
 | Agent-side setup required | yes (per agent) | yes (per agent) | yes (per agent) | **no — any shell-capable agent works day one** |
 | Platforms | — | usually macOS/Linux-first | often macOS-only (e.g. commercial managers) | **Windows / macOS / Linux equal** (pure Python stdlib) |
-| Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (156KB wheel)** |
+| Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (179KB wheel)** |
 | Token cost of tool discovery | full JSON schemas | full JSON schemas | full JSON schemas | **−88.5% (slim) or −99.2% (name-only manifest)** |
 | Result payload size | raw JSON | raw JSON | raw JSON | **−34% (TOON encoding)** |
 | Security inspection of results | none | none | none | **injection / credential-leak / destructive-op guards on every call** |
@@ -48,7 +48,7 @@ session; mcptoon's compact manifest costs a sticky note.
 ## Try it
 
 ```bash
-pip install mcptoon      # zero deps, 156KB wheel
+pip install mcptoon      # zero deps, 179KB wheel
 mcptoon quickstart       # import existing configs, see your numbers
 ```
 
