@@ -95,7 +95,8 @@ from .errors import is_error
 # flag gets warned as unknown; add a phantom and the dead-entry test fails.
 KNOWN_FLAGS = frozenset(
     {
-        "--agent", "--auth", "--auto", "--all", "--compact", "--copy", "--destructive", "--dry",
+        "--agent", "--archive", "--auth", "--auto", "--all", "--compact", "--copy",
+        "--derived", "--destructive", "--dry",
         "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
         "--full", "--head", "--desc",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
@@ -105,7 +106,8 @@ KNOWN_FLAGS = frozenset(
         "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--raw", "--remove", "--request-state", "--search",
         "--slim",
-        "--stdin", "--stdio", "--timeout", "--toon", "--tools-k", "--url", "--usage", "--version", "--watch",
+        "--stdin", "--stdio", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
+        "--version", "--version-gate", "--watch",
         "--watch-mode", "--write",
     }
 )

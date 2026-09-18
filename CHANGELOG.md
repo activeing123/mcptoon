@@ -41,7 +41,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`~/.mcptoon/settings.json`, separate from server config so a settings write
   can never corrupt a server definition). Unknown keys fail loudly.
 
+- **The catalog manager reached parity with the script it replaces.** Taking over
+  from a long-running sync script means matching it byte for byte, not just
+  approximately — a derived view that differs by a line ending is a diff the next
+  sync has to fight. Four capabilities close the gap, each one learned from a real
+  failure in that lineage:
+  - `mcptoon skills sync --version-gate` blocks a skill whose content changed but
+    whose frontmatter `version` did not, and prints why. It reads the **same**
+    ledger file the other manager wrote (`skill_versions.json`, overridable with
+    `MCPTOON_SKILLS_LEDGER`), so during a hand-over both reach the same verdict on
+    the same bytes. `--force` is the escape hatch (lets the change through and
+    rebaselines); a skill with no `version` is warned about rather than blocked;
+    the ledger's own files are excluded from the hash so the tool that owns the
+    ledger cannot gate itself forever.
+  - `mcptoon skills sync --derived roo|opencode|all` regenerates the flat
+    `<slug>.md` views (plus each skill's `.py` attachments as `<slug>_<file>.py`)
+    that Roo and OpenCode read. Output is byte-identical to the incumbent's — 422
+    files per view verified against the live folders — including the platform line
+    endings a text-mode write produces. Stale entries are moved to the graveyard,
+    never deleted.
+  - `mcptoon skills remove --tombstone` commits the removal so a two-way git sync
+    cannot resurrect a deleted skill. The commit is **path-scoped**; a whole-repo
+    `git add -A` is refused on purpose, because the repo holding a real skill
+    source routinely has hundreds of unrelated edits in flight and sweeping them
+    into a "tombstone" is how one manager silently commits another session's work.
+  - `--archive DIR` points drift and removals at a shared graveyard, so a
+    rollback is the same `mv` whichever manager performed the removal.
+
 ### Fixed
+
+- **`_index` is no longer published as a skill.** The vault keeps its index card
+  at `skills/_index/SKILL.md`; it carries a SKILL.md but is not a skill. mcptoon
+  walked into it and would have written a phantom `_index.md` into every derived
+  view — caught by the byte-parity check against the live `~/.roo/commands`, which
+  had 371 files to mcptoon's 372. The name is now skipped everywhere a tree is
+  walked, matching the incumbent's behaviour in all 13 of its walkers.
 
 - **The footprint guard could not see a comma-glued test total.** Its regex
   required whitespace before the separator, so a line reading `956 passed, 1

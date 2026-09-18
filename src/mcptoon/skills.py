@@ -43,6 +43,7 @@ recall when aliases are resolved.
 
 Zero dependencies: standard library only.
 """
+import hashlib
 import json
 import math
 import os
@@ -267,6 +268,8 @@ def _iter_skill_dirs(root: Path):
             continue
         for child in children:
             md = child / "SKILL.md"
+            if _skip_dir(child.name):
+                continue
             if md.is_file():
                 yield child.name, md
 
@@ -593,8 +596,12 @@ def _skills_usage() -> str:
         "  mcptoon skills index [ROOT ...]        Scan roots, build the on-disk index\n"
         "  mcptoon skills sync [SRC] [VIEW ...]   Distribute a source catalog to agent views\n"
         "                    [--copy] [--dry]      (link by default; never deletes a real dir)\n"
+        "                    [--version-gate]      Block skills whose content moved but version did not\n"
+        "                    [--derived roo|opencode|all]  Regenerate the flat .md views\n"
+        "                    [--archive DIR]       Where drift/removals are parked (default <src>/../_archive)\n"
         "  mcptoon skills add <name> [--desc D]   Create a skill in the source\n"
         "  mcptoon skills remove <name>           Archive a skill out of the source\n"
+        "                    [--tombstone]         Commit the removal (path-scoped) so git sync cannot revive it\n"
         "  mcptoon skills list [--usage]          List skills, optionally with hit counts\n"
         "  mcptoon skills resolve <query> [--k N] BM25 shortlist (no LLM, no tokens)\n"
         "  mcptoon skills route <query> [--k N]   Shortlist then let an LLM pick\n"
@@ -607,7 +614,8 @@ def _skills_usage() -> str:
     )
 
 
-_VALUE_FLAGS = ("--k", "--tools-k", "--model", "--endpoint", "--desc")
+_VALUE_FLAGS = ("--k", "--tools-k", "--model", "--endpoint", "--desc",
+                "--archive", "--derived", "--version-gate")
 
 
 def _query_of(args: list[str]) -> str:
@@ -740,15 +748,20 @@ def _source_skills(source: Path) -> dict[str, Path]:
         except OSError:
             continue
         for child in children:
+            if _skip_dir(child.name):
+                continue
             if (child / "SKILL.md").is_file():
                 out.setdefault(child.name, child)
     return out
 
 
 def sync_skills(source: Path, views: list[Path], *, strategy: str = "link",
-                dry_run: bool = False, archive: Path | None = None) -> dict:
+                dry_run: bool = False, archive: Path | None = None,
+                skills: dict[str, Path] | None = None) -> dict:
     """Distribute ``source`` skills into every view. Idempotent; never deletes.
 
+    ``skills`` overrides the discovered catalog — the caller passes the
+    version-gate survivors so a blocked skill is never placed in a view.
     Returns a report dict: per-view ``added`` / ``ok`` / ``drifted`` / ``pruned``
     and, separately, ``foreign`` — links owned by another manager, which are left
     untouched. A real directory in a view is moved to ``archive`` (never removed)
@@ -756,7 +769,7 @@ def sync_skills(source: Path, views: list[Path], *, strategy: str = "link",
     """
     if strategy not in ("link", "copy"):
         raise ValueError(f"strategy must be 'link' or 'copy', not {strategy!r}")
-    skills = _source_skills(source)
+    skills = skills if skills is not None else _source_skills(source)
     archive = archive or (source.parent / "_archive")
     report: dict = {"source": str(source), "strategy": strategy,
                     "skills": sorted(skills), "views": {}, "dryRun": dry_run}
@@ -877,6 +890,277 @@ def _print_sync_report(report: dict, fmt: str) -> None:
 
 
 # ═══════════════════════════════════════════════════
+# Parity with the tongbu-skills lineage: the version gate,
+# the derived flat views, and a tombstoned removal
+# ═══════════════════════════════════════════════════
+#
+# Four things a catalog manager needs before it can take over from a
+# long-running script — each one learned from a real failure in the
+# tongbu-skills v7 lineage:
+#
+#   * a VERSION GATE, so "content changed but version did not" is caught
+#     before it reaches every agent view;
+#   * DERIVED flat views (Roo / OpenCode), regenerated from the same source;
+#   * a TOMBSTONED removal that lands as a git commit, so a two-way git sync
+#     cannot resurrect a deleted skill;
+#   * a SHARED graveyard, so a rollback is the same `mv` on either side.
+#
+# The gate reads the SAME ledger file tongbu wrote, so during the coexistence
+# phase both managers reach the same verdict on the same bytes. Its hash
+# therefore mirrors tongbu's algorithm exactly (sha256 over sorted relative
+# paths + raw bytes, dot-entries skipped, the ledger's own files excluded) —
+# any difference would make the two managers disagree on unchanged content.
+
+# Files that must never enter their own content hash: the gate rewrites them on
+# every run, so hashing them would make the hash drift forever and the gate
+# would block the very skill that owns the ledger (tongbu-skills hit exactly
+# this, and it was the one block of six that was not a stale-ledger artefact).
+_VERSION_HASH_EXCLUDE = {"skill_versions.json", "sync_log.json"}
+# Directory names that are never a skill, wherever the tree is walked. `_index`
+# is the vault's own index card: it carries a SKILL.md and would otherwise be
+# published to every agent view as if it were a skill (tongbu-skills has skipped
+# it in all 13 of its walkers since v5, and the derived views prove why — the
+# byte-parity check against the live ~/.roo/commands caught this as the one
+# file mcptoon added that tongbu had never written).
+_SKIP_DIR_NAMES = {"_index", ".git", "__pycache__", "node_modules", ".DS_Store"}
+
+
+def _skip_dir(name: str) -> bool:
+    return name in _SKIP_DIR_NAMES or name.startswith(".")
+
+
+def _version_ledger_path(source: Path) -> Path:
+    """The version ledger for ``source``.
+
+    Defaults to the tongbu-skills location so the two managers share one
+    ledger; override with MCPTOON_SKILLS_LEDGER (tests, or a second catalog).
+    """
+    env = os.environ.get("MCPTOON_SKILLS_LEDGER")
+    if env:
+        return Path(env)
+    return source / "tongbu-skills" / "skill_versions.json"
+
+
+def _load_version_ledger(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_version_ledger(path: Path, ledger: dict) -> None:
+    """Atomic write (tmp + os.replace) — the discipline the ledger already had."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(ledger, ensure_ascii=False, indent=2, sort_keys=True),
+                   encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _skill_content_hash(skill_dir: Path) -> str:
+    """tongbu-compatible content hash: raw bytes over sorted relative paths."""
+    h = hashlib.sha256()
+    files = []
+    for f in skill_dir.rglob("*"):
+        if not f.is_file():
+            continue
+        parts = f.relative_to(skill_dir).parts
+        if any(_skip_dir(p) for p in parts):
+            continue
+        if f.name in _VERSION_HASH_EXCLUDE:
+            continue
+        files.append(f)
+    for f in sorted(files, key=lambda x: str(x.relative_to(skill_dir))):
+        h.update(str(f.relative_to(skill_dir)).replace("\\", "/").encode("utf-8"))
+        h.update(f.read_bytes())
+    return h.hexdigest()
+
+
+def version_gate(skills: dict[str, Path], ledger_path: Path, *, force: bool = False,
+                 update_ledger: bool = True) -> dict:
+    """Filter ``skills`` through the version ledger.
+
+    A skill is BLOCKED when its content hash moved but its frontmatter
+    ``version`` did not — the exact rule tongbu enforces. ``force`` lets it
+    through and refreshes the ledger. A skill with no version is only warned
+    about (gradual enforcement), and a skill absent from the ledger is
+    onboarded on first sight. Returns a report dict.
+    """
+    from .plugin import parse_skill_frontmatter  # local: import-light
+    ledger = _load_version_ledger(ledger_path)
+    allowed: list[str] = []
+    blocked: list[tuple[str, str]] = []
+    onboard: list[str] = []
+    legacy: list[str] = []
+    forced: list[str] = []
+    for slug, skill_dir in sorted(skills.items()):
+        try:
+            meta = parse_skill_frontmatter(skill_dir / "SKILL.md")
+        except OSError:
+            meta = {}
+        ver = str(meta.get("version") or "").strip()
+        digest = _skill_content_hash(skill_dir)
+        rec = ledger.get(slug)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if rec is None:
+            ledger[slug] = {"hash": digest, "version": ver, "at": now}
+            allowed.append(slug)
+            onboard.append(slug)
+            continue
+        if rec.get("hash") == digest:
+            if rec.get("version", "") != ver:
+                ledger[slug] = {**rec, "version": ver, "at": now}
+            allowed.append(slug)
+            continue
+        if not rec.get("version"):
+            ledger[slug] = {"hash": digest, "version": ver, "at": now}
+            allowed.append(slug)
+            legacy.append(slug)
+            continue
+        if ver == rec["version"] and not force:
+            blocked.append((slug, ver))
+            continue
+        if ver == rec["version"]:
+            forced.append(slug)
+        ledger[slug] = {"hash": digest, "version": ver, "at": now}
+        allowed.append(slug)
+    if update_ledger:
+        _save_version_ledger(ledger_path, ledger)
+    return {"allowed": allowed, "blocked": blocked, "onboarded": onboard,
+            "legacy": legacy, "forced": forced, "ledger": str(ledger_path)}
+
+
+# Derived views: a flat ``<slug>.md`` per skill plus its ``.py`` attachments.
+# This is how Roo and OpenCode consume a catalog (slash commands load on demand,
+# so the whole catalog can live there without costing session context).
+_DERIVED_VIEWS = {
+    "roo": Path.home() / ".roo" / "commands",
+    "opencode": Path.home() / ".config" / "opencode" / "commands",
+}
+
+
+def _derived_view_paths() -> dict[str, Path]:
+    env = os.environ.get("MCPTOON_SKILLS_DERIVED")
+    if env:  # "roo=path,opencode=path2" — tests stay hermetic
+        out: dict[str, Path] = {}
+        for part in env.split(","):
+            if "=" in part:
+                name, _, p = part.partition("=")
+                out[name.strip()] = Path(p.strip())
+        return out
+    return dict(_DERIVED_VIEWS)
+
+
+def _derive_one(skill_dir: Path, slug: str, view: Path, *, dry_run: bool) -> list[str]:
+    """Write one skill's flat ``<slug>.md`` (+ ``<slug>_*.py``).
+
+    Byte-identical to tongbu's output: the source is read with universal
+    newlines and written back with the platform separator, which on Windows
+    turns the source's LF into CRLF. Reproducing that exactly is the whole
+    point — a derived view that differs by a line ending is not "the same
+    catalog", it is a diff the next sync has to fight.
+    """
+    actions: list[str] = []
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.is_file():
+        return actions
+    text = skill_md.read_text(encoding="utf-8")          # universal newlines -> \n
+    if not dry_run:
+        view.mkdir(parents=True, exist_ok=True)
+        (view / f"{slug}.md").write_text(text, encoding="utf-8")  # -> os.linesep
+    actions.append(f"WRITE {slug}.md")
+    for item in sorted(skill_dir.iterdir()):
+        if item.name == "SKILL.md" or item.name.startswith("."):
+            continue
+        if item.is_file() and item.suffix == ".py":
+            if not dry_run:
+                shutil.copy2(item, view / f"{slug}_{item.name}")
+            actions.append(f"COPY {slug}_{item.name}")
+    return actions
+
+
+def sync_derived(source: Path, skills: dict[str, Path], views: dict[str, Path],
+                 *, dry_run: bool = False, archive: Path | None = None) -> dict:
+    """Regenerate every derived flat view from the source.
+
+    Stale files (a ``<slug>.md`` whose skill left the source) are MOVED into the
+    graveyard, never deleted — a generated file is cheap to lose, but the rule
+    is the rule, and a wrong guess here should still be a `mv` back.
+    """
+    archive = archive or (source.parent / "_archive")
+    report: dict = {"dryRun": dry_run, "views": {}}
+    wanted = {s.lower() for s in skills}
+    for name, view in views.items():
+        acts: dict = {"written": 0, "stale": [], "errors": []}
+        for slug, skill_dir in sorted(skills.items()):
+            try:
+                _derive_one(skill_dir, slug, view, dry_run=dry_run)
+                acts["written"] += 1
+            except OSError as e:
+                acts["errors"].append(f"{slug}: {e}")
+        if view.is_dir():
+            stale = [f for f in view.glob("*.md") if f.stem.lower() not in wanted]
+            stale += [f for f in view.glob("*.py")
+                      if f.stem.split("_")[0].lower() not in wanted]
+            for f in stale:
+                acts["stale"].append(f.name)
+                if dry_run:
+                    continue
+                dst = archive / f"derived-{name}" / f.name
+                try:
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(f), str(dst))
+                except OSError:
+                    pass
+        report["views"][name] = acts
+    return report
+
+
+def _git_tombstone(source: Path, rel_path: str, message: str) -> tuple[bool, str]:
+    """Commit the removal of ``rel_path`` as a git tombstone.
+
+    The commit is PATH-SCOPED. A whole-repo ``git add -A`` is refused here on
+    purpose: the repo holding a real skill source routinely has hundreds of
+    unrelated edits in flight, and sweeping them into a "tombstone" commit is
+    how one manager silently commits another session's work. Every git call
+    below carries an explicit pathspec.
+    """
+    repo = None
+    for cand in (source, source.parent):
+        if (cand / ".git").exists():
+            repo = cand
+            break
+    if repo is None:
+        return False, "not a git repository — tombstone skipped"
+    rel = os.path.relpath(source / rel_path, repo).replace("\\", "/")
+    add = subprocess.run(["git", "add", "-A", "--", rel], cwd=str(repo),
+                         capture_output=True, text=True)
+    if add.returncode != 0:
+        return False, (add.stderr or add.stdout).strip()[:200]
+    commit = subprocess.run(["git", "commit", "-m", message, "--", rel],
+                            cwd=str(repo), capture_output=True, text=True)
+    if commit.returncode != 0:
+        out = (commit.stderr or commit.stdout).strip()
+        if "nothing to commit" in out or "no changes added" in out:
+            return False, "nothing to commit"
+        return False, out[:200]
+    return True, rel
+
+
+def _print_derived_report(report: dict) -> None:
+    tag = " (dry run — nothing written)" if report["dryRun"] else ""
+    print(f"mcptoon skills sync --derived{tag}")
+    for name, a in report["views"].items():
+        bits = [f"{a['written']} regenerated"]
+        if a["stale"]:
+            bits.append(f"{len(a['stale'])} stale->archived")
+        print(f"  {name}: {', '.join(bits)}")
+        for e in a["errors"]:
+            print(f"    ⚠ {e}")
+
+
+# ═══════════════════════════════════════════════════
 # Catalog management: add / remove / list --usage
 # ═══════════════════════════════════════════════════
 #
@@ -931,8 +1215,14 @@ def _skills_root(source: Path, slug: str) -> Path:
     return source / slug
 
 
-def _archive_dir(source: Path) -> Path:
-    return source.parent / "_archive" / "removed"
+def _archive_dir(source: Path, archive: Path | None = None) -> Path:
+    """The graveyard a removal is parked in.
+
+    Defaults beside the source, but ``archive`` lets a second manager point at
+    the SAME graveyard so a rollback is the same `mv` whichever manager
+    performed the removal.
+    """
+    return (archive or (source.parent / "_archive")) / "removed"
 
 
 def _cmd_skills_add(source: Path, name: str, desc: str, fmt: str) -> int:
@@ -958,7 +1248,8 @@ def _cmd_skills_add(source: Path, name: str, desc: str, fmt: str) -> int:
     return 0
 
 
-def _cmd_skills_remove(source: Path, name: str, fmt: str) -> int:
+def _cmd_skills_remove(source: Path, name: str, fmt: str, *,
+                       tombstone: bool = False, archive: Path | None = None) -> int:
     if not name:
         print("mcptoon: remove needs a slug name", file=sys.stderr)
         return 1
@@ -971,19 +1262,32 @@ def _cmd_skills_remove(source: Path, name: str, fmt: str) -> int:
     if target is None:
         print(f"mcptoon: no skill named {name!r} under {source}", file=sys.stderr)
         return 1
+    rel = os.path.relpath(target, source).replace("\\", "/")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    dest = _archive_dir(source) / f"{stamp}_{name}"
+    dest = _archive_dir(source, archive) / f"{stamp}_{name}"
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(target), str(dest))
     except OSError as e:
         print(f"mcptoon: could not archive {name}: {e}", file=sys.stderr)
         return 1
+    committed, detail = (False, "")
+    if tombstone:
+        committed, detail = _git_tombstone(
+            source, rel, f"skills: remove {name} (tombstone)")
     if fmt == "json":
-        print(json.dumps({"removed": name, "archivedTo": str(dest)}, ensure_ascii=False))
+        out = {"removed": name, "archivedTo": str(dest), "tombstone": committed}
+        if tombstone:
+            out["git"] = detail
+        print(json.dumps(out, ensure_ascii=False))
     else:
         print(f"removed {name}")
         print(f"  archived to: {dest}   (recover with a plain move; nothing was deleted)")
+        if tombstone:
+            if committed:
+                print(f"  ✅ git tombstone committed (path-scoped to {detail})")
+            else:
+                print(f"  ⚠ no git tombstone: {detail}")
         print("  next: run `mcptoon skills sync` so the views drop it too.")
     return 0
 
@@ -1047,10 +1351,53 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         if not source.is_dir():
             print(f"mcptoon: source is not a directory: {source}", file=sys.stderr)
             sys.exit(1)
+        archive = Path(_flag(args, "--archive")).expanduser() if _flag(args, "--archive") else None
+        dry = "--dry" in args or "--dry-run" in args
+        catalog = _source_skills(source)
+
+        # The version gate runs BEFORE anything is written to a view, so a
+        # blocked skill is never half-published.
+        gate_on = "--version-gate" in args
+        if gate_on:
+            gate = version_gate(catalog, _version_ledger_path(source),
+                                force="--force" in args, update_ledger=not dry)
+            blocked = gate["blocked"]
+            if blocked:
+                for slug, ver in blocked:
+                    print(f"🚫 version gate blocked {slug}: content changed but "
+                          f"version is still {ver!r} — bump it, or pass --force",
+                          file=sys.stderr)
+            if fmt != "json":
+                if gate["onboarded"]:
+                    print(f"🧮 version gate: onboarded {len(gate['onboarded'])} new skill(s)")
+                if gate["legacy"]:
+                    print(f"🧮 version gate: {len(gate['legacy'])} unversioned skill(s) "
+                          f"changed — allowed, but add a version to gate them")
+            allowed = set(gate["allowed"])
+            catalog = {s: d for s, d in catalog.items() if s in allowed}
+            if not catalog and blocked:
+                print("mcptoon: every skill was blocked by the version gate; nothing synced",
+                      file=sys.stderr)
+                sys.exit(1)
+
+        if "--derived" in args:
+            derived = _flag(args, "--derived")
+            views = (_derived_view_paths() if derived in ("", "all")
+                     else {derived: _derived_view_paths().get(derived)
+                           or Path(derived).expanduser()})
+            views = {k: v for k, v in views.items() if v}
+            rep = sync_derived(source, catalog, views, dry_run=dry, archive=archive)
+            if fmt == "json":
+                print(json.dumps(rep, ensure_ascii=False, indent=1))
+            else:
+                _print_derived_report(rep)
+            return
+
         views = ([Path(p).expanduser() for p in positional[1:]] if len(positional) > 1
                  else _view_roots())
         strategy = "copy" if "--copy" in args else "link"
-        report = sync_skills(source, views, strategy=strategy, dry_run="--dry" in args)
+        report = sync_skills(source, views, strategy=strategy, dry_run=dry,
+                             archive=archive, skills=catalog)
         _print_sync_report(report, fmt)
         return
 
@@ -1069,7 +1416,10 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
             desc = _flag(args, "--desc")
             rc = _cmd_skills_add(source, name, desc, fmt)
         else:
-            rc = _cmd_skills_remove(source, name, fmt)
+            rc = _cmd_skills_remove(
+                source, name, fmt, tombstone="--tombstone" in args,
+                archive=(Path(_flag(args, "--archive")).expanduser()
+                         if _flag(args, "--archive") else None))
         if rc:
             sys.exit(rc)
         return

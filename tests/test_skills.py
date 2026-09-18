@@ -8,6 +8,7 @@ model sees. So the load-bearing test is `test_uninformative_name_is_retrievable_
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -747,6 +748,352 @@ class UnroutableTests(unittest.TestCase):
     def test_healthy_catalog_reports_none(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(skills.unroutable(skills.scan_roots([fixture(tmp)])), [])
+
+
+class VersionGateTests(unittest.TestCase):
+    """The gate is the discipline that stops "edited but forgot to bump".
+
+    Every rule below mirrors the tongbu-skills v7 ledger the two managers share,
+    so a skill the gate blocks here is blocked there too — and, just as
+    important, a skill it lets through is not blocked there.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        self.src.mkdir()
+        self.ledger = self.base / "versions.json"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _skill(self, slug: str, version: str | None, body: str = "b") -> Path:
+        d = self.src / slug
+        d.mkdir(parents=True, exist_ok=True)
+        ver = f"version: {version}\n" if version is not None else ""
+        (d / "SKILL.md").write_text(
+            f"---\nname: {slug}\ndescription: d\n{ver}---\n\n{body}\n", encoding="utf-8")
+        return d
+
+    def test_first_sight_onboards_without_blocking(self):
+        self._skill("alpha", "1.0")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["allowed"], ["alpha"])
+        self.assertEqual(rep["blocked"], [])
+        self.assertEqual(rep["onboarded"], ["alpha"])
+
+    def test_unchanged_content_passes_on_the_second_run(self):
+        self._skill("alpha", "1.0")
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["allowed"], ["alpha"])
+        self.assertEqual(rep["blocked"], [])
+
+    def test_content_change_without_a_bump_is_blocked(self):
+        self._skill("alpha", "1.0")
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self._skill("alpha", "1.0", body="changed!")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["allowed"], [])
+        self.assertEqual(rep["blocked"], [("alpha", "1.0")])
+
+    def test_a_bump_lets_the_change_through(self):
+        self._skill("alpha", "1.0")
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self._skill("alpha", "1.1", body="changed!")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["allowed"], ["alpha"])
+        self.assertEqual(rep["blocked"], [])
+
+    def test_force_overrides_and_refreshes_the_ledger(self):
+        self._skill("alpha", "1.0")
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self._skill("alpha", "1.0", body="changed!")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger, force=True)
+        self.assertEqual(rep["allowed"], ["alpha"])
+        self.assertEqual(rep["forced"], ["alpha"])
+        again = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(again["blocked"], [], "a forced run must rebaseline the ledger")
+
+    def test_unversioned_skill_is_warned_not_blocked(self):
+        self._skill("legacy", None)
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self._skill("legacy", None, body="changed!")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["allowed"], ["legacy"])
+        self.assertEqual(rep["legacy"], ["legacy"])
+
+    def test_ledger_files_do_not_hash_themselves(self):
+        """A skill holding the ledger must not drift every run (the self-reference bug)."""
+        d = self.src / "tongbu-skills"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            "---\nname: tongbu-skills\ndescription: d\nversion: 1.0\n---\n\nb\n",
+            encoding="utf-8")
+        (d / "skill_versions.json").write_text("{}", encoding="utf-8")
+        first = skills._skill_content_hash(d)
+        (d / "skill_versions.json").write_text('{"x": 1}', encoding="utf-8")
+        self.assertEqual(skills._skill_content_hash(d), first)
+
+    def test_dry_run_does_not_write_the_ledger(self):
+        self._skill("alpha", "1.0")
+        skills.version_gate(skills._source_skills(self.src), self.ledger, update_ledger=False)
+        self.assertFalse(self.ledger.exists())
+
+    def test_cli_blocks_and_exits_nonzero_when_everything_is_gated(self):
+        self._skill("alpha", "1.0")
+        env = {"MCPTOON_SKILLS_LEDGER": str(self.ledger)}
+        run_cli(["mcptoon", "skills", "sync", str(self.src), str(self.base / "v1"),
+                 "--version-gate"], env)
+        self._skill("alpha", "1.0", body="changed!")
+        fresh = self.base / "v2"
+        with self.assertRaises(SystemExit) as cm:
+            run_cli(["mcptoon", "skills", "sync", str(self.src), str(fresh),
+                     "--version-gate"], env)
+        self.assertEqual(cm.exception.code, 1)
+        self.assertFalse(fresh.exists(),
+                         "a blocked skill must not be linked into a view")
+
+    def test_cli_force_lets_a_blocked_skill_through(self):
+        self._skill("alpha", "1.0")
+        env = {"MCPTOON_SKILLS_LEDGER": str(self.ledger)}
+        run_cli(["mcptoon", "skills", "sync", str(self.src), str(self.base / "v1"),
+                 "--version-gate"], env)
+        self._skill("alpha", "1.0", body="changed!")
+        out = run_cli(["mcptoon", "skills", "sync", str(self.src), str(self.base / "v2"),
+                       "--version-gate", "--force"], env)
+        self.assertIn("+1 new", out)
+        self.assertTrue(skills._is_link(self.base / "v2" / "alpha"))
+
+
+class DerivedViewTests(unittest.TestCase):
+    """Roo/OpenCode consume a flat ``<slug>.md`` per skill.
+
+    The bytes must match the tongbu lineage exactly, line endings included:
+    a derived view that differs by CRLF is a diff the next sync has to fight.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        d = self.src / "alpha"
+        d.mkdir(parents=True)
+        self.body = "---\nname: alpha\ndescription: d\n---\n\nline one\nline two\n"
+        (d / "SKILL.md").write_text(self.body, encoding="utf-8")
+        (d / "helper.py").write_text("print('x')\n", encoding="utf-8")
+        self.view = self.base / "roo"
+        self.views = {"roo": self.view}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_derived_md_matches_the_source_body(self):
+        skills.sync_derived(self.src, skills._source_skills(self.src), self.views)
+        got = (self.view / "alpha.md").read_text(encoding="utf-8")
+        self.assertEqual(got.replace("\r\n", "\n"), self.body)
+
+    def test_derived_md_uses_platform_line_endings(self):
+        """tongbu writes via text mode, so on Windows the view is CRLF."""
+        skills.sync_derived(self.src, skills._source_skills(self.src), self.views)
+        raw = (self.view / "alpha.md").read_bytes()
+        expected = self.body.replace("\n", os.linesep).encode("utf-8")
+        self.assertEqual(raw, expected)
+
+    def test_py_attachments_are_copied_with_the_slug_prefix(self):
+        skills.sync_derived(self.src, skills._source_skills(self.src), self.views)
+        self.assertTrue((self.view / "alpha_helper.py").is_file())
+
+    def test_stale_derived_files_are_archived_not_deleted(self):
+        skills.sync_derived(self.src, skills._source_skills(self.src), self.views)
+        (self.view / "ghost.md").write_text("old\n", encoding="utf-8")
+        rep = skills.sync_derived(self.src, skills._source_skills(self.src), self.views)
+        self.assertEqual(rep["views"]["roo"]["stale"], ["ghost.md"])
+        self.assertFalse((self.view / "ghost.md").exists())
+        archived = list((self.base / "_archive" / "derived-roo").iterdir())
+        self.assertEqual([f.name for f in archived], ["ghost.md"])
+
+    def test_dry_run_writes_nothing(self):
+        skills.sync_derived(self.src, skills._source_skills(self.src), self.views,
+                            dry_run=True)
+        self.assertFalse(self.view.exists())
+
+    def test_cli_derived_writes_the_flat_view(self):
+        env = {"MCPTOON_SKILLS_DERIVED": f"roo={self.view}"}
+        out = run_cli(["mcptoon", "skills", "sync", str(self.src), "--derived", "roo"], env)
+        self.assertIn("roo:", out)
+        self.assertTrue((self.view / "alpha.md").is_file())
+
+
+class TombstoneTests(unittest.TestCase):
+    """Removal must land as a git commit, or a two-way git sync revives it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.repo = self.base / "repo"
+        (self.repo / "skills" / "alpha").mkdir(parents=True)
+        (self.repo / "skills" / "alpha" / "SKILL.md").write_text(
+            "---\nname: alpha\ndescription: d\n---\n", encoding="utf-8")
+        (self.repo / "unrelated.txt").write_text("keep me\n", encoding="utf-8")
+        self._git("init")
+        self._git("config", "user.email", "t@example.com")
+        self._git("config", "user.name", "t")
+        self._git("add", "-A")
+        self._git("commit", "-m", "init")
+        self.src = self.repo / "skills"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _git(self, *args):
+        return subprocess.run(["git", *args], cwd=str(self.repo),
+                              capture_output=True, text=True)
+
+    def test_tombstone_commits_only_the_removed_path(self):
+        (self.repo / "unrelated.txt").write_text("edited by another session\n",
+                                                 encoding="utf-8")
+        rc = skills._cmd_skills_remove(self.src, "alpha", "text", tombstone=True,
+                                       archive=self.base / "graveyard")
+        self.assertEqual(rc, 0)
+        log = self._git("log", "--oneline", "-1").stdout
+        self.assertIn("tombstone", log)
+        changed = self._git("show", "--name-only", "--format=", "HEAD").stdout
+        self.assertIn("skills/alpha", changed)
+        self.assertNotIn("unrelated.txt", changed,
+                         "a tombstone commit must never sweep unrelated work")
+        status = self._git("status", "--porcelain").stdout
+        self.assertIn("unrelated.txt", status, "the other edit stays uncommitted")
+
+    def test_removal_uses_the_shared_graveyard_when_given_one(self):
+        shared = self.base / "skills_archive"
+        rc = skills._cmd_skills_remove(self.src, "alpha", "text",
+                                       archive=shared)
+        self.assertEqual(rc, 0)
+        archived = list((shared / "removed").iterdir())
+        self.assertEqual(len(archived), 1)
+        self.assertTrue((archived[0] / "SKILL.md").is_file())
+
+    def test_removal_without_a_repo_still_archives(self):
+        plain = self.base / "plain"
+        (plain / "alpha").mkdir(parents=True)
+        (plain / "alpha" / "SKILL.md").write_text("---\nname: alpha\n---\n",
+                                                  encoding="utf-8")
+        rc = skills._cmd_skills_remove(plain, "alpha", "text", tombstone=True,
+                                       archive=self.base / "g2")
+        self.assertEqual(rc, 0)
+        self.assertTrue(list((self.base / "g2" / "removed").iterdir()))
+
+
+class ArchiveFlagTests(unittest.TestCase):
+    """`--archive` points drift/removal at the same graveyard tongbu uses."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        d = self.src / "alpha"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("---\nname: alpha\ndescription: d\n---\n",
+                                    encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_sync_parks_drift_in_the_given_archive(self):
+        view = self.base / "v1"
+        view.mkdir()
+        drift = view / "alpha"
+        drift.mkdir()
+        (drift / "SKILL.md").write_text("user copy\n", encoding="utf-8")
+        shared = self.base / "skills_archive"
+        skills.sync_skills(self.src, [view], archive=shared)
+        parked = list((shared / "v1").iterdir())
+        self.assertEqual(len(parked), 1)
+        self.assertIn("user copy", (parked[0] / "SKILL.md").read_text(encoding="utf-8"))
+        self.assertFalse((self.base / "_archive").exists(),
+                         "the default graveyard must not be touched when one is given")
+
+
+class SkipDirTests(unittest.TestCase):
+    """`_index` carries a SKILL.md but is not a skill — it must never be published.
+
+    The live vault keeps its index card at ``skills/_index/SKILL.md``. tongbu-skills
+    skips that name in every walker; mcptoon adding it would put a phantom skill
+    into every derived view, which is exactly what the byte-parity check against
+    the live ``~/.roo/commands`` caught.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        for name in ("_index", ".hidden", "real"):
+            d = self.src / name
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text(f"---\nname: {name}\ndescription: d\n---\n",
+                                        encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_source_skills_skips_index_and_dot_dirs(self):
+        self.assertEqual(list(skills._source_skills(self.src)), ["real"])
+
+    def test_scan_roots_skips_them_too(self):
+        got = [s["slug"] for s in skills.scan_roots([self.src])["skills"]]
+        self.assertEqual(got, ["real"])
+
+    def test_sync_never_publishes_the_index_card(self):
+        view = self.base / "v1"
+        skills.sync_skills(self.src, [view])
+        self.assertEqual(sorted(p.name for p in view.iterdir()), ["real"])
+
+    def test_derived_never_writes_the_index_card(self):
+        view = self.base / "roo"
+        skills.sync_derived(self.src, skills._source_skills(self.src), {"roo": view})
+        self.assertEqual(sorted(p.name for p in view.iterdir()), ["real.md"])
+
+
+class ViewScopeTests(unittest.TestCase):
+    """What a sync must NOT touch in a view folder.
+
+    A real agent skill folder is shared ground: Codex keeps a ``.system`` folder,
+    and a user may keep unrelated directories there. mcptoon only ever acts on
+    the source catalog's own slugs, and never on a dot-entry.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        d = self.src / "alpha"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("---\nname: alpha\ndescription: d\n---\n",
+                                    encoding="utf-8")
+        self.view = self.base / "v1"
+        self.view.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_dot_entries_are_never_touched(self):
+        system = self.view / ".system"
+        system.mkdir()
+        (system / "keep.md").write_text("codex's own\n", encoding="utf-8")
+        skills.sync_skills(self.src, [self.view])
+        self.assertTrue((system / "keep.md").is_file())
+        self.assertEqual((system / "keep.md").read_text(encoding="utf-8"),
+                         "codex's own\n")
+
+    def test_view_entries_outside_the_catalog_are_left_alone(self):
+        mine = self.view / "my-own-thing"
+        mine.mkdir()
+        (mine / "SKILL.md").write_text("---\nname: my-own-thing\n---\n", encoding="utf-8")
+        skills.sync_skills(self.src, [self.view])
+        self.assertTrue(mine.is_dir())
+        self.assertFalse(skills._is_link(mine), "an unrelated folder must not be replaced")
 
 
 if __name__ == "__main__":
