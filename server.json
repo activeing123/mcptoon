@@ -3,7 +3,7 @@
   "name": "io.github.activeing123/mcptoon",
   "title": "mcptoon",
   "description": "Zero-dependency MCP client: one synced config for every agent, 581-token listings, not 71,929.",
-  "version": "0.7.18",
+  "version": "0.7.19",
   "websiteUrl": "https://activeing123.github.io/mcptoon/",
   "repository": {
     "url": "https://github.com/activeing123/mcptoon",
@@ -13,7 +13,7 @@
     {
       "registryType": "pypi",
       "identifier": "mcptoon",
-      "version": "0.7.18",
+      "version": "0.7.19",
       "transport": {
         "type": "stdio"
       }

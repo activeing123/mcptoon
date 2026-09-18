@@ -5,6 +5,29 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.19] - 2026-09-18
+
+### Changed
+
+- **README opening rewritten for a first-time reader.** The lede now says what
+  mcptoon is in plain words — a 189KB CLI that takes over every MCP tool and
+  skill on the machine and keeps both out of the context window — instead of
+  naming the category. The call to action leads with the command that proves the
+  claim on the reader's own machine (`pip install mcptoon && mcptoon bench`, ~30s).
+- **Two duplicated intro paragraphs dropped.** The paragraphs under the opening
+  code block repeated what the "why" and "how" sections already say (tools are
+  not pre-installed, removal is a no-op, the decoupling layer). The sections keep
+  the detail; the duplication is gone.
+- **The opening code block shows two commands, not four.** `mcptoon add …` and
+  `mcptoon manifest` left the hero block because the 30-second quickstart just
+  below already teaches both.
+- **The three external benchmarks now link to their sources.** The Anthropic,
+  Firecrawl and Scalekit figures under "This is not just us talking" each link
+  to the original write-up.
+
+No behavior change — docs only. The wheel size and the suite total are unchanged
+(189KB, 1059 passed + 1 skipped).
+
 ## [0.7.18] - 2026-09-18
 
 ### Fixed
