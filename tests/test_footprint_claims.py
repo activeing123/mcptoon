@@ -41,7 +41,10 @@ TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP
                        "docs/index.html", "docs/index-zh.html")
 # A live claim always pairs the total with the skipped count, which is what
 # separates it from a historical "N passed" (ROADMAP's older entries, CHANGELOG).
-TEST_CLAIM = re.compile(r"(\d+) passed (?:·|\+|,) 1 skipped")
+# The separator may be glued to "passed" ("956 passed, 1 skipped"), which the
+# first cut required a space before — so a stale total hid in plain sight until
+# 2026-09-18. Whitespace is optional on both sides of the separator now.
+TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
 # What `pip install mcptoon` downloads: mcptoon-0.7.16-py3-none-any.whl is 159,232 bytes
 # (155.5 KB), measured from PyPI on 2026-09-17. Re-measure at each release. The wheel is
 # not byte-reproducible (zip timestamps), so quote the PUBLISHED size and keep WHEEL_KB at
@@ -160,6 +163,16 @@ class TestFootprintClaims(unittest.TestCase):
                 self.assertTrue(collected - 1 <= int(n) <= collected,
                                 f"{rel} advertises {n} passed but {collected} tests are collected")
         self.assertGreater(seen, 0, "no live suite-total claim found - did the wording change?")
+
+    def test_claim_regex_sees_every_separator_spelling(self):
+        """The guard missed "956 passed, 1 skipped" for two days because it required a
+        space before the separator. Every spelling a contributor might write must match,
+        or a stale total hides where the guard cannot look."""
+        for text in ("978 passed · 1 skipped", "978 passed + 1 skipped",
+                     "978 passed, 1 skipped", "978 passed,1 skipped"):
+            self.assertEqual(TEST_CLAIM.findall(text), ["978"], text)
+        # a historical line without the skipped count stays exempt
+        self.assertEqual(TEST_CLAIM.findall("931 tests passed in v0.7.14"), [])
 
     def test_no_retired_version_in_the_live_claim(self):
         """ROADMAP's header still said v0.7.12 when 0.7.14 was current. The version in

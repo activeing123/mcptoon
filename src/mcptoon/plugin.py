@@ -520,6 +520,53 @@ def _plugins_dir() -> Path:
         "MCPTOON_PLUGINS_DIR", str(CONFIG_DIR / "plugins")))
 
 
+def parse_skill_frontmatter(path: Path | str) -> dict:
+    """Parse a SKILL.md frontmatter into a dict. Zero-dependency.
+
+    Same block `parse_skill_md` reads, but returns every key and understands the
+    list form — a skill declares the tools it needs either as
+    ``tools: [a, b]``, ``tools: a, b`` or as an indented ``- a`` block:
+
+        tools:
+          - filesystem_read_file
+          - exa_search
+
+    Only scalars and string lists are recognised; a nested map is kept as its raw
+    text rather than guessed at. Missing frontmatter yields ``{}``.
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    data: dict = {}
+    if not text.startswith("---"):
+        return data
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return data
+    pending: str | None = None
+    for line in parts[1].splitlines():
+        if pending is not None:
+            stripped = line.strip()
+            if stripped.startswith("-"):
+                data[pending].append(stripped.lstrip("-").strip().strip("'\""))
+                continue
+            pending = None
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        key = key.strip().lower()
+        value = value.strip()
+        if value.startswith("[") and value.endswith("]"):
+            items = [v.strip().strip("'\"") for v in value[1:-1].split(",")]
+            data[key] = [v for v in items if v]
+        elif value:
+            data[key] = value
+        else:
+            data[key] = []
+            pending = key
+    return data
+
+
 def parse_skill_md(path: Path | str) -> tuple[str, str, str]:
     """Parse a SKILL.md into (name, description, body). Zero-dependency.
 

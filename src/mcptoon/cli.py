@@ -56,6 +56,10 @@ Usage:
     mcptoon serve                        Run as stdio MCP server (1 Agent → 100 servers)
     mcptoon serve --listen :8080         HTTP mode for remote/multi-agent
     mcptoon doctor                       Self-diagnose config + connectivity
+    mcptoon skills index [ROOT ...]      Index skill roots (SKILL.md) for routing
+    mcptoon skills resolve <query>       BM25 shortlist over the index (no LLM)
+    mcptoon skills route <query>         Shortlist, then let an LLM pick
+    mcptoon skills stats                 Catalog health: dupes, aliases, unroutable
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags (global):
@@ -91,15 +95,16 @@ from .errors import is_error
 KNOWN_FLAGS = frozenset(
     {
         "--agent", "--auth", "--auto", "--compact", "--destructive", "--dry",
-        "--dry-run", "--envelope", "--fallback-json", "--force", "--format",
+        "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
         "--full", "--head",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
-        "--json", "--keep", "--list", "--listen", "--max-chars", "--mcptoon",
+        "--json", "--keep", "--k", "--list", "--listen", "--max-chars", "--mcptoon",
+        "--model",
         "--no-configs",
         "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--raw", "--remove", "--request-state", "--search",
         "--slim",
-        "--stdin", "--stdio", "--timeout", "--toon", "--url", "--version", "--watch",
+        "--stdin", "--stdio", "--timeout", "--toon", "--tools-k", "--url", "--version", "--watch",
         "--watch-mode", "--write",
     }
 )
@@ -274,6 +279,9 @@ def main():
         _cmd_health(rest, fmt)
     elif command == "plugin":
         _cmd_plugin(rest, fmt)
+    elif command == "skills":
+        from .skills import _cmd_skills
+        _cmd_skills(rest, fmt)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
