@@ -1,7 +1,7 @@
 ---
 name: mcptoon
-version: 1.0.0
-description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove). mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
+version: 1.1.0
+description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
 ---
 
 # mcptoon — MCP tool-catalog compression
@@ -34,7 +34,11 @@ Skills and MCP servers are the same shape — one source, many agent views — s
 | See what skills exist | `mcptoon skills list` (`--usage` adds per-skill hit counts) |
 | Find the right skill for a task | `mcptoon skills resolve "<task>"` (offline, instant, no LLM) |
 | Distribute one source to every agent's skill folder | `mcptoon skills sync [SRC] [VIEW ...]` (`--dry` to preview, `--copy` for real dirs) |
+| Refuse "edited but forgot to bump the version" | `mcptoon skills sync --version-gate` |
+| Regenerate the flat `.md` views (Roo / OpenCode) | `mcptoon skills sync --derived roo\|opencode\|all` |
 | Create / retire a skill | `mcptoon skills add <name> --desc "…"` / `mcptoon skills remove <name>` |
+| Retire a skill so a git sync cannot revive it | `mcptoon skills remove <name> --tombstone` |
+| Park drift/removals in a chosen graveyard | add `--archive DIR` to `sync` or `remove` |
 
 Sync views are **links** by default (a junction on Windows, no admin needed), so
 one edit at the source is live everywhere and there is no second copy to drift.
@@ -45,9 +49,26 @@ removal is a `mv` back, not a re-clone. `--usage` counts only skills mcptoon
 routed; a skill an agent loaded directly is invisible there, and the output says
 so rather than implying full coverage.
 
-If another tool already manages the same skill folders, point mcptoon at
-sandbox views first with `MCPTOON_SKILLS_VIEWS` and run `--dry` before any real
-sync. Do not run two managers against one view directory.
+### When another manager already runs the catalog
+
+mcptoon is designed to take over from an incumbent sync script **without a
+cutover**, by matching it byte for byte first:
+
+- `--version-gate` reads the **same** ledger the incumbent wrote
+  (`skill_versions.json`; override with `MCPTOON_SKILLS_LEDGER`), so both reach
+  the same verdict on the same bytes. A skill whose content moved while its
+  frontmatter `version` did not is blocked with a printed reason; `--force` lets
+  it through and rebaselines. An unversioned skill is warned about, not blocked.
+- `--derived` output is byte-identical to the incumbent's, **including line
+  endings** (a text-mode write turns the source's LF into CRLF on Windows), so a
+  derived view does not become a diff the next sync has to fight.
+- `--tombstone` commits a removal with a **path-scoped** `git add`. It will never
+  run a whole-repo `git add -A`: a real skill repo has hundreds of unrelated edits
+  in flight, and sweeping them into a "tombstone" commits another session's work.
+
+Point mcptoon at sandbox views first with `MCPTOON_SKILLS_VIEWS` and run `--dry`
+before any real sync. Do not run two managers against one view directory: during
+a hand-over, one is the writer and the other is read-only.
 
 ## Making mcptoon visible in a session
 
