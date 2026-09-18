@@ -45,6 +45,11 @@ TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP
 # first cut required a space before — so a stale total hid in plain sight until
 # 2026-09-18. Whitespace is optional on both sides of the separator now.
 TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
+# The badge and the one-line claim are the machine-readable spellings; prose hides
+# the total in plain English ("1035 tests", "1035 个测试"). Two stragglers survived
+# every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
+# - because nothing looked at that shape. This regex does, so it is judged the same way.
+SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # What `pip install mcptoon` downloads: measured 2026-09-18 with `python -m build` (the
 # same tool CI uses), identical across builds at 184,683 bytes (180.35 KB) -> 180KB. It
 # grew from 155.5 KB because v0.7.17 adds src/mcptoon/skills.py, a new ~68KB module, and
@@ -164,6 +169,37 @@ class TestFootprintClaims(unittest.TestCase):
                 self.assertTrue(collected - 1 <= int(n) <= collected,
                                 f"{rel} advertises {n} passed but {collected} tests are collected")
         self.assertGreater(seen, 0, "no live suite-total claim found - did the wording change?")
+
+    def test_prose_suite_totals_match_collection(self):
+        """The total is also stated in prose, and that spelling had no guard.
+
+        README's contributor note still said "(931 tests" and DEVELOPERS.md plus
+        docs/tiktoken-benchmarks.md said "730 tests" - three stale claims that survived
+        every earlier check because they never pair the total with "1 skipped". Prose
+        is judged the same way the badge is.
+
+        The regex only fires when the number is immediately followed by "test(s)" or
+        "个测试", so the token figures this repo is full of ("8,282 tokens", "581
+        tokens", "300-page book") are never mistaken for a suite total."""
+        proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
+                              capture_output=True, text=True, cwd=ROOT)
+        collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
+        self.assertGreater(collected, 500, "collection failed - the prose claims cannot be judged")
+        seen = 0
+        for rel in TEST_CLAIM_SURFACES + ("docs/tiktoken-benchmarks.md",):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            for raw in SUITE_PROSE.findall(text):
+                n = int(raw.replace(",", ""))
+                seen += 1
+                self.assertTrue(collected - 1 <= n <= collected,
+                                f"{rel} says {raw} tests but {collected} are collected")
+        self.assertGreater(seen, 0, "no prose suite-total claim found - did the wording change?")
+        # Pin the exclusion rule so a later wording change cannot silently widen the net.
+        self.assertEqual(SUITE_PROSE.findall("581 tests"), ["581"])
+        self.assertEqual(SUITE_PROSE.findall("1036 个测试"), ["1036"])
+        self.assertEqual(SUITE_PROSE.findall("8,282 tokens"), [],
+                         "a token figure must not be read as a suite total")
+        self.assertEqual(SUITE_PROSE.findall("a 300-page book"), [])
 
     def test_claim_regex_sees_every_separator_spelling(self):
         """The guard missed "956 passed, 1 skipped" for two days because it required a

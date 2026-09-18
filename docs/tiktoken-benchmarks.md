@@ -126,7 +126,7 @@ Each layer is independent. Swap agents without touching servers. Swap servers wi
 
 ## Community
 
-The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 730 tests, fully open source.
+The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 1036 tests, fully open source.
 
 ## Try it
 
@@ -161,4 +161,4 @@ That's it.
 
 ---
 
-*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 730 tests · Zero dependencies*
+*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 1036 tests · Zero dependencies*
