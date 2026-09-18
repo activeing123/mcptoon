@@ -59,8 +59,22 @@ class TestSampleConfig:
         assert "servers" in cfg.SAMPLE_CONFIG
         assert len(cfg.SAMPLE_CONFIG["servers"]) > 0
 
-    def test_sample_config_has_fetch(self):
-        assert "fetch" in cfg.SAMPLE_CONFIG["servers"]
+    def test_sample_config_has_live_servers(self):
+        # The sample ships with servers that actually exist on npm; the old
+        # `fetch` entry pointed at a package gone from the registry (E404),
+        # so `mcptoon init` produced a config that died on first run.
+        assert "filesystem" in cfg.SAMPLE_CONFIG["servers"]
+        assert "memory" in cfg.SAMPLE_CONFIG["servers"]
+
+    def test_sample_config_has_no_dead_packages(self):
+        dead = ("@modelcontextprotocol/server-fetch",
+                "@modelcontextprotocol/server-time",
+                "@modelcontextprotocol/server-git",
+                "@modelcontextprotocol/server-docker",
+                "@modelcontextprotocol/server-sqlite")
+        blob = repr(cfg.SAMPLE_CONFIG)
+        for pkg in dead:
+            assert pkg not in blob, f"dead package in SAMPLE_CONFIG: {pkg}"
 
     def test_sample_config_uses_stdio(self):
         for server in cfg.SAMPLE_CONFIG["servers"].values():

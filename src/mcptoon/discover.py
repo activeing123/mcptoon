@@ -384,31 +384,49 @@ def _detect_from_env() -> list[dict]:
 # Layer 3: Local tool detection
 # ═══════════════════════════════════════════════════════════════
 
-# Zero-config servers: only need npx, no API key
-_ZERO_CONFIG_SERVERS = [
-    ("fetch", ["npx", "-y"], ["@modelcontextprotocol/server-fetch"],
-     "Zero-config (no API key needed)"),
+# Zero-config servers shipped on npm — only need `npx`, no API key.
+#
+# Only packages that ACTUALLY EXIST on the npm registry belong here. The
+# official reference servers are split by ecosystem: filesystem, memory and
+# sequential-thinking are published to npm, while fetch, time, git and sqlite
+# are Python packages on PyPI (see `_UVX_ZERO_CONFIG_SERVERS`). The old list
+# mixed the two and told `npx` to fetch Python-only names — every one 404'd
+# (`npm error 404 ... server-fetch`) on a fresh machine, so `quickstart`
+# advertised five dead servers. Verified against the registries 2026-09-18.
+_NPX_ZERO_CONFIG_SERVERS = [
     ("filesystem", ["npx", "-y"], ["@modelcontextprotocol/server-filesystem", "."],
      "Zero-config — current directory as allowed path"),
     ("memory", ["npx", "-y"], ["@modelcontextprotocol/server-memory"],
      "Zero-config (knowledge graph in memory)"),
     ("sequential-thinking", ["npx", "-y"], ["@modelcontextprotocol/server-sequential-thinking"],
      "Zero-config (thinking tool for reasoning)"),
-    ("time", ["npx", "-y"], ["@modelcontextprotocol/server-time"],
+]
+
+# Python reference servers, run through `uvx` (no global install).
+_UVX_ZERO_CONFIG_SERVERS = [
+    ("fetch", ["uvx"], ["mcp-server-fetch"],
+     "Zero-config (no API key needed)"),
+    ("time", ["uvx"], ["mcp-server-time"],
      "Zero-config (time and timezone)"),
-    ("git", ["npx", "-y"], ["@modelcontextprotocol/server-git"],
+    ("git", ["uvx"], ["mcp-server-git"],
      "Zero-config (git operations on current repo)"),
 ]
 
 
 def _detect_local_tools() -> list[dict]:
-    """Detect local tools and recommend zero-config MCP servers."""
+    """Detect local tools and recommend zero-config MCP servers.
+
+    Each candidate is gated on the runner it actually needs: npm-only servers
+    are offered only when `npx` exists, PyPI servers only when `uvx` exists.
+    Recommending a runner that is not installed (or a package that is not on
+    the registry) is what made `quickstart` show a wall of `npm error 404`.
+    """
     found = []
     has_npx = _which("npx") is not None
     has_uvx = _which("uvx") is not None
 
     if has_npx:
-        for name, command, args, reason in _ZERO_CONFIG_SERVERS:
+        for name, command, args, reason in _NPX_ZERO_CONFIG_SERVERS:
             found.append({
                 "name": name,
                 "config": {
@@ -419,54 +437,29 @@ def _detect_local_tools() -> list[dict]:
                 "source": "local",
                 "reason": reason,
             })
-    else:
-        # No npx — check if uvx (uv) is available as alternative
-        if has_uvx:
+
+    if has_uvx:
+        for name, command, args, reason in _UVX_ZERO_CONFIG_SERVERS:
             found.append({
-                "name": "fetch",
+                "name": name,
                 "config": {
                     "transport": "stdio",
-                    "command": ["uvx"],
-                    "args": ["mcp-server-fetch"],
+                    "command": command,
+                    "args": args,
                 },
                 "source": "local",
-                "reason": "uvx detected (Python MCP servers)",
+                "reason": reason,
             })
 
-    # sqlite3 available
-    if _which("sqlite3"):
-        found.append({
-            "name": "sqlite",
-            "config": {
-                "transport": "stdio",
-                "command": ["npx", "-y"],
-                "args": ["@modelcontextprotocol/server-sqlite"],
-            },
-            "source": "local",
-            "reason": "sqlite3 detected in PATH",
-        })
-
-    # Docker available
-    if _which("docker"):
-        found.append({
-            "name": "docker",
-            "config": {
-                "transport": "stdio",
-                "command": ["npx", "-y"],
-                "args": ["@modelcontextprotocol/server-docker"],
-            },
-            "source": "local",
-            "reason": "docker detected in PATH",
-        })
-
-    # In a git repository — git server is extra useful
-    if Path.cwd().is_dir() and (Path.cwd() / ".git").exists():
+    # In a git repository the git server is extra useful — but only when uvx
+    # (its real runner) is present.
+    if has_uvx and Path.cwd().is_dir() and (Path.cwd() / ".git").exists():
         found.append({
             "name": "git",
             "config": {
                 "transport": "stdio",
-                "command": ["npx", "-y"],
-                "args": ["@modelcontextprotocol/server-git"],
+                "command": ["uvx"],
+                "args": ["mcp-server-git"],
             },
             "source": "local",
             "reason": "Currently in a git repository",

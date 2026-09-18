@@ -448,10 +448,10 @@ def list_policies() -> dict:
 
 SAMPLE_CONFIG = {
     "servers": {
-        "fetch": {
+        "memory": {
             "transport": "stdio",
             "command": ["npx", "-y"],
-            "args": ["@modelcontextprotocol/server-fetch"],
+            "args": ["@modelcontextprotocol/server-memory"],
         },
         "filesystem": {
             "transport": "stdio",
@@ -639,10 +639,10 @@ def _dump_toml(servers: dict) -> str:
         # mcptoon configuration
         # See: https://github.com/activeing123/mcptoon
 
-        [servers.fetch]
+        [servers.memory]
         transport = "stdio"
         command = ["npx", "-y"]
-        args = ["@modelcontextprotocol/server-fetch"]
+        args = ["@modelcontextprotocol/server-memory"]
 
         [servers.filesystem]
         transport = "stdio"

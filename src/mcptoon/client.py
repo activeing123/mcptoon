@@ -241,10 +241,16 @@ class MCPClient:
         # stdio state
         self._proc: Optional[subprocess.Popen] = None
         self._stdout_lock = threading.Lock()
-        # One-shot stderr tail cache: the FIRST consumer (EOF sentinel or
-        # write-failure path) drains the pipe; later error paths must reuse
-        # the cached tail instead of reading an already-empty pipe.
-        self._stderr_cache: Optional[str] = None
+        # stderr is drained CONTINUOUSLY while the child is alive — see
+        # _start_stderr_pump. An unread stderr pipe fills after ~4 KB, and the
+        # child then blocks inside write(), which stops it reading stdin and
+        # answering stdout. That is the spec="auto" probe deadlock (#19): one
+        # `server/discover` makes a legacy Python server emit ~6.8 KB of
+        # pydantic validation warnings. The drained text is kept in a bounded
+        # ring of 8 KB chunks (~512 KB) so error paths can still report a tail.
+        self._stderr_buf: collections.deque[str] = collections.deque(maxlen=64)
+        self._stderr_lock = threading.Lock()
+        self._stderr_thread: Optional[threading.Thread] = None
 
         # Response pump (v0.7.4): a background thread reads stdout lines and
         # routes every JSON-RPC message into a queue keyed by response id.
@@ -494,7 +500,9 @@ class MCPClient:
         )
         self._start_response_pump()
         # Fresh process → forget any stderr tail from the previous one.
-        self._stderr_cache = None
+        with self._stderr_lock:
+            self._stderr_buf.clear()
+        self._start_stderr_pump()
 
     def _start_response_pump(self):
         """Start the background stdout reader thread (v0.7.4).
@@ -515,42 +523,79 @@ class MCPClient:
         )
         self._pump_thread.start()
 
-    def _stderr_tail(self) -> str:
-        """Best-effort tail of a dead server's stderr, cached one-shot.
+    def _start_stderr_pump(self):
+        """Drain the child's stderr for as long as it lives (#19).
 
-        Only the first call after a process death reads the pipe (EOF once
-        the child is gone); the result is cached so later error paths —
-        e.g. the auto-probe failure followed by the legacy-handshake
-        failure — all carry the same diagnostic tail.
+        Not reading stderr is not a cosmetic loss. A pipe holds only ~4 KB:
+        a server that logs more than that blocks inside write(), so it stops
+        reading stdin and stops writing stdout, and every request then times
+        out as though the server had "gone silent". One `server/discover`
+        probe is enough to trigger it — the Python reference servers answer
+        that unknown method with ~6.8 KB of pydantic validation warnings.
+
+        Reading on a background thread keeps the pipe empty. The text lands in
+        a bounded ring for post-mortem diagnostics; nothing here consumes it,
+        so callers may read it more than once.
         """
-        if self._stderr_cache is not None:
-            return self._stderr_cache
-        if not (self._proc and self._proc.stderr):
-            return ""
-        # NOTE: do NOT gate this read on poll() — inside the exit race a
-        # child's pipe handles close (EOF becomes visible) before the
-        # process object flips to signaled, so poll() can still report
-        # alive on a process whose stderr is already fully written. Read
-        # in a helper thread with a 1s cap instead: post-mortem reads
-        # return immediately, and a live server never blocks the caller.
-        def _drain() -> None:
-            try:
-                # Keep the END of stderr: a failing npx prints its
-                # actionable line (npm error 404 ...) last, after a wall of
-                # Node warnings. A head slice showed only the warnings.
-                tail = self._proc.stderr.read().decode(  # type: ignore[union-attr]
-                    "utf-8", errors="replace")[-2000:]
-            except Exception:
-                tail = ""  # stderr diagnostics are best-effort
-            self._stderr_cache = tail
+        if self._proc is None or self._proc.stderr is None:
+            return
 
-        t = threading.Thread(target=_drain, daemon=True,
-                             name="mcptoon-stderr-drain")
-        t.start()
-        t.join(timeout=1.0)
-        if self._stderr_cache is None:
-            return ""  # still draining in background; don't block callers
-        return self._stderr_cache
+        def _keep(chunk) -> None:
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8", errors="replace")
+            if chunk:
+                with self._stderr_lock:
+                    self._stderr_buf.append(chunk)
+
+        def _drain() -> None:
+            stream = self._proc.stderr  # type: ignore[union-attr]
+            read1 = getattr(stream, "read1", None)
+            try:
+                if read1 is not None:
+                    # read1 hands back whatever is available; read(n) waits for
+                    # n bytes or EOF, so a server emitting one huge line with no
+                    # newline would block at the pipe buffer again — the very
+                    # failure this pump exists to prevent. Line iteration has
+                    # the same problem, which is why it is not used here.
+                    while True:
+                        chunk = read1(8192)
+                        if not chunk:
+                            return  # EOF — the child is gone
+                        _keep(chunk)
+                else:  # pragma: no cover — subprocess.PIPE is always buffered
+                    for raw in stream:
+                        if not raw:
+                            return
+                        _keep(raw)
+            except Exception:
+                pass  # stderr diagnostics are best-effort
+
+        self._stderr_thread = threading.Thread(
+            target=_drain, daemon=True,
+            name=f"mcptoon-stderr-pump-{id(self._proc)}")
+        self._stderr_thread.start()
+
+    def _stderr_tail(self) -> str:
+        """Best-effort tail of the child's stderr.
+
+        Reads the ring filled by ``_start_stderr_pump`` rather than the pipe.
+        The post-mortem pipe read it replaces was itself the bug: nobody read
+        stderr while the server ran, so the pipe filled and the server blocked.
+        A post-mortem read also raced the exit — a child's pipe handles close
+        (EOF becomes visible) before the process object flips to signaled, so
+        poll() could still report it alive.
+
+        When the child has already exited the drain thread is about to hit
+        EOF, so it gets a bounded moment to finish: that keeps the complete
+        tail (a failing npx prints `npm error 404` last, after a wall of Node
+        warnings) available to the error paths that report it.
+        """
+        thread = self._stderr_thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=1.0)
+        with self._stderr_lock:
+            tail = "".join(self._stderr_buf)
+        return tail[-2000:]
 
     def _stdio_request(self, payload: bytes, timeout: float | None = None) -> dict:
         """Send JSON-RPC request over stdin, wait for the response with a

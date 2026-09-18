@@ -20,6 +20,7 @@ from mcptoon.discover import (
     probe_http_endpoint,
     make_http_config,
 )
+from mcptoon import discover as discover_mod
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -148,10 +149,12 @@ class TestLocalDetection:
     def test_npx_available(self):
         # npx is likely available in test env
         results = _detect_local_tools()
-        # If npx is available, should find zero-config servers
+        # If npx is available, the npm-published zero-config servers appear.
+        # `fetch`/`time`/`git` are PyPI packages and must NOT be offered via
+        # npx (they 404) — they come from uvx, gated on uvx being present.
         if _which("npx"):
             names = [r["name"] for r in results]
-            assert "fetch" in names
+            assert "filesystem" in names
             assert "memory" in names
             assert "sequential-thinking" in names
 
@@ -171,6 +174,57 @@ class TestLocalDetection:
                 assert "git" in git_results[0]["reason"].lower() or "Zero-config" in git_results[0]["reason"]
             finally:
                 os.chdir(original)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Dead-package regression guard (found 2026-09-18)
+# ═══════════════════════════════════════════════════════════════
+
+# Packages that are gone from the npm registry (E404, verified 2026-09-18).
+# `mcptoon quickstart` used to recommend all of these via `npx -y`, so a fresh
+# machine saw five dead servers and a wall of `npm error 404`.
+_DEAD_NPM_PACKAGES = (
+    "@modelcontextprotocol/server-fetch",
+    "@modelcontextprotocol/server-time",
+    "@modelcontextprotocol/server-git",
+    "@modelcontextprotocol/server-docker",
+    "@modelcontextprotocol/server-sqlite",
+)
+
+
+class TestNoDeadPackagesOffered:
+    """Discovery must never hand `npx` a package that is not on npm."""
+
+    def test_candidate_lists_are_clean(self):
+        blob = repr(discover_mod._NPX_ZERO_CONFIG_SERVERS)
+        for pkg in _DEAD_NPM_PACKAGES:
+            assert pkg not in blob, f"dead npm package offered: {pkg}"
+
+    def test_pypi_servers_use_uvx_not_npx(self):
+        # fetch/time/git live on PyPI; they must be launched with uvx.
+        for name, command, _args, _reason in discover_mod._UVX_ZERO_CONFIG_SERVERS:
+            assert command == ["uvx"], f"{name} should run via uvx, got {command}"
+
+    def test_live_packages_still_offered(self):
+        names = [n for n, _c, _a, _r in discover_mod._NPX_ZERO_CONFIG_SERVERS]
+        for expected in ("filesystem", "memory", "sequential-thinking"):
+            assert expected in names
+
+    def test_npx_gated_on_npx_and_uvx_on_uvx(self):
+        # npx present, uvx absent -> only the npm servers, no fetch/time.
+        with patch.object(discover_mod, "_which",
+                          lambda cmd: "npx" if cmd == "npx" else None):
+            names = [r["name"] for r in _detect_local_tools()]
+        assert "filesystem" in names
+        assert "fetch" not in names
+        assert "time" not in names
+        # uvx present, npx absent -> only the PyPI servers.
+        with patch.object(discover_mod, "_which",
+                          lambda cmd: "uvx" if cmd == "uvx" else None):
+            names = [r["name"] for r in _detect_local_tools()]
+        assert "fetch" in names
+        assert "time" in names
+        assert "filesystem" not in names
 
 
 # ═══════════════════════════════════════════════════════════════

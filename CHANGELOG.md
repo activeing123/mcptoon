@@ -5,6 +5,48 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.18] - 2026-09-18
+
+### Fixed
+
+- **`mcptoon quickstart` proposed five dead npm packages.** The zero-config list
+  sent `npx` after names that no longer exist on the npm registry —
+  `@modelcontextprotocol/server-fetch`, `-time`, `-git`, `-docker` and
+  `-sqlite` — so on a clean machine the very first `quickstart` came back with
+  `npm error 404` / `PROCESS_DIED` for five of the eight servers it had just
+  recommended. The official reference servers are split by ecosystem:
+  `filesystem`, `memory` and `sequential-thinking` are npm packages, while
+  `fetch`, `time`, `git` and `sqlite` are Python packages on PyPI. The npm list
+  now contains only packages verified to exist there, the Python servers are
+  offered through `uvx` and only when `uvx` is installed, the unmaintained
+  `docker` guess is gone, and `mcptoon init`'s sample config no longer ships the
+  dead `fetch` entry. This was the same bug class as the 2026-09-05 `demo.py`
+  fix; that fix deliberately left the discovery candidates alone, which is why
+  `quickstart` kept advertising them.
+- **A server that logged more than one pipe buffer deadlocked the `spec="auto"`
+  probe (#19).** `_spawn_stdio()` opened the child with
+  `stderr=subprocess.PIPE`, and nothing read that pipe while the server was
+  alive: a server logging more than a few KB blocked inside `write()`, stopped
+  reading stdin and stopped answering stdout, and every request then timed out
+  as `RESPONSE_TIMEOUT ... server went silent`. One `server/discover` probe was
+  enough to trigger it — the Python reference servers answer that unknown method
+  with ~6.8 KB of pydantic validation warnings (measured: 6,793 bytes from
+  `uvx mcp-server-time`) — which made `uvx mcp-server-fetch|time|git` look dead
+  on a fresh machine while `spec="legacy"` worked, because legacy never probes.
+  stderr is now drained continuously on a background thread, in 8 KB chunks via
+  `read1` (so a single huge line with no newline is drained too, which line
+  iteration would not), and the bounded drained ring feeds `_stderr_tail()`.
+  The post-mortem pipe read it replaces was both the reader that was missing and
+  a race against process exit.
+
+The release also re-pins the footprint claims, because the fixes moved them: the
+wheel is **189KB** (194,028 bytes) and `src/mcptoon/*.py` is **15,697** physical
+lines, and the suite total moves to **1,059 tests** (1,058 passed, 1 skipped).
+Both README badges, the landing pages, `DEVELOPERS.md`, `ROADMAP.md`,
+`docs/comparison.md`, `docs/tiktoken-benchmarks.md` and the shipped skill cards
+were updated together — the footprint guard reads all of them, so a partial
+update is a red CI.
+
 ## [0.7.17] - 2026-09-18
 
 ### Added

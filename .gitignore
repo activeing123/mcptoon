@@ -45,6 +45,10 @@ preview.html
 # Exception: __main__.py is NOT a temp script
 !src/mcptoon/__main__.py
 
+# Scratch workspace: task briefs, probe scripts and throwaway venvs. Nothing
+# here ships, and it only ever showed up as untracked noise in `git status`.
+.scratch/
+
 # Old README versions
 readme-v*.md
 readme-preview*.html
