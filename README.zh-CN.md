@@ -4,8 +4,7 @@
 
 **本地添加 1,000 个 MCP 工具和 1,000 个技能，也不用担心 token 上下文。**（本人实测：255 个工具 / 371 个技能）
 
-mcptoon 是一个 189KB 的小命令，同时管住一个 Agent 工具箱的两半——MCP 工具和技能——
-并把两者都挡在上下文窗口之外。
+mcptoon 是一个 189KB 的 CLI 工具，就像一个管家，接管你电脑上所有的 MCP 工具和技能——并把两者都挡在上下文窗口之外。
 
 **① 省 token** —— 它把 MCP 工具 schema 和技能文件都挡在 Agent 上下文之外。工具：**71,929 → 581 token**（255 个工具，实测 −99.2%）；技能：**92.6 万 → 501 token** 就能定位到该用哪个，常驻只占 **39 token**（实测 −99.9%）；调用结果加 `--toon` 再省约 34%。
 
@@ -23,7 +22,9 @@ mcptoon 是一个 189KB 的小命令，同时管住一个 Agent 工具箱的两�
 [![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
 [![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/activeing123/mcptoon)
 
-**👉 先自证：`uvx mcptoon demo --quick`（零安装，30 秒）· 或 `pip install mcptoon`**
+**👉 眼见为实，这条命令可以测试你自己机器上的 agent 工具和技能吃掉你多少上下文，30 秒：`pip install mcptoon && mcptoon bench` —— 在你机器上测试出工具和技能吃掉多少 token。**
+
+**👉 或先看它跑一遍：`uvx mcptoon demo --quick` —— 255 个工具，说明书 71,929 token → 名字清单 581 token（−99.2%）。**（demo 需要 Node）
 
 **👉 [English](README.md) · [开发者文档](DEVELOPERS.md) · [反馈问题](https://github.com/activeing123/mcptoon/issues)**
 
@@ -36,24 +37,7 @@ pip install mcptoon
 
 # 30 秒自证，跑在你自己机器上——不动你的服务器，不要 API key：
 mcptoon demo --quick
-
-# 加任何 MCP 服务器——一条命令：
-mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
-
-# 你的 Agent 实际读到的（只有名字——581 token，而不是 71,929）：
-mcptoon manifest
 ```
-
-**工具是你自己的。** mcptoon 不预装任何工具——它只是遥控器，不是运行时。
-你想用的 MCP 服务器，用一条命令自己装（npm/pip/网址都行），装哪个、装多少都是你的事。
-唯一自带的只有"自我演示"：`mcptoon demo-server` 是 11 个纯标准库写的工具，只有你显式把它
-加进配置，它才会进 Agent 的上下文。
-哪天不用 mcptoon 了，直接删掉它——你的 MCP 服务器是独立的，照常工作，一个都不会少。
-
-**Mcptoon 是一个 Agent 整个工具箱的原生解耦层——MCP 工具和技能都算。** 它同时解决
-"工具列表和技能目录都在吃 token"以及"每个 AI Agent 各自重复配置"这两个痛点。
-0 配置开箱即用：自动扫描接管本机所有 Agent——Claude Code、Cursor、Codex、脚本、CI——
-的 MCP 工具*和*技能目录，工具实例全局共享，两半都默认挡在上下文窗口之外。
 
 ---
 

@@ -5,8 +5,7 @@
 
 **Add 1,000 MCP tools and 1,000 agent skills locally — your token context never feels it.** *(measured on my own machine: 255 tools / 371 skills)*
 
-mcptoon is a 189KB CLI that manages both halves of an agent's toolbox — MCP tools
-and agent skills — and keeps both out of your context window.
+mcptoon is a 189KB CLI — think of it as a steward that takes over every MCP tool and skill on your machine, and keeps both out of your context window.
 
 **① Token** — it keeps both MCP tool schemas and skill files out of your agent's context. Tools: **71,929 → 581 tokens** (−99.2% measured). Skills: **926,000 → 501 tokens** to find the right one, with only **39** resident (−99.9% measured). Call results shrink another ~34% with `--toon`.
 
@@ -24,7 +23,9 @@ and agent skills — and keeps both out of your context window.
 [![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
 [![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/activeing123/mcptoon)
 
-**👉 Prove it first: `uvx mcptoon demo --quick` (zero install, 30s) · or `pip install mcptoon`**
+**👉 Your own numbers, 30s: `pip install mcptoon && mcptoon bench` — it measures what your tools and skills cost, on your machine.**
+
+**👉 Or just watch it work: `uvx mcptoon demo --quick` — 255 tools, 71,929 tokens of schemas → a 581-token name list (−99.2%).** *(demo needs Node)*
 
 **👉 [中文](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md) · [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Issues](https://github.com/activeing123/mcptoon/issues)**
 
@@ -37,27 +38,7 @@ pip install mcptoon
 
 # 30-second proof, on your machine — none of your servers, no API key:
 mcptoon demo --quick
-
-# Add any MCP server — one command:
-mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
-
-# What your agent actually reads (names only — 581 tokens, not 71,929):
-mcptoon manifest
 ```
-
-**Your tools stay yours.** mcptoon bundles nothing — it's a remote control, not a
-runtime. The MCP servers you want, you install yourself, one command each
-(npm/pip/a URL). The one thing it does ship is a demonstration of itself:
-`mcptoon demo-server` is 11 tools written in the standard library, and they enter your
-agent's context only if you add that server deliberately. Delete mcptoon someday? Your
-MCP servers keep running on their own — not one goes missing.
-
-**Mcptoon is the native decoupling layer for an agent's whole toolbox — MCP tools and
-agent skills.** It fixes the twin pain of tool listings and skill catalogs eating
-tokens, and every AI agent re-configuring them on its own. Zero config, out of the
-box: it auto-scans and unifies the MCP tools *and* the skill catalogs of every agent
-on this machine — Claude Code, Cursor, Codex, scripts, CI — shares tool instances
-globally, and keeps both halves out of the context window by default.
 
 ---
 
