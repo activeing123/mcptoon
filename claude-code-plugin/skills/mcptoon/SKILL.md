@@ -22,6 +22,7 @@ back.
 | You don't know which server owns the tool | `mcptoon call --auto <tool> '{...}'` |
 | Huge JSON argument | `mcptoon call <server> <tool> --stdin` |
 | Tool returns images/base64 that must never be compressed | `mcptoon policy set <server> <tool> raw` (one-time; applies to every later call) |
+| Prove the token savings on this machine (tools + skills, one table) | `mcptoon bench` (`--roots DIR` for any catalog; `--json` for scripts) |
 | Diagnose connectivity/config | `mcptoon doctor` |
 
 ## Managing a skill catalog (mcptoon as the skill center)
@@ -94,7 +95,9 @@ and only when `mcptoon serve` is actually registered with that agent.
 3. Tool names in `call` are `server_tool` (namespaced). `--auto` resolves
    the server for you when the name is unambiguous.
 4. Never claim savings percentages you did not observe; if you quote numbers,
-   use the ones printed by the command itself.
+   use the ones printed by the command itself — `mcptoon bench` prints them for
+   this machine. It needs `tiktoken` for the exact figures; without it the table
+   is labelled an estimate, so do not report those as measured.
 5. If a Claude Code plugin install wired the `mcptoon serve` bridge via
    `.mcp.json`, tool discovery is already compressed for the host agent; use
    the CLI commands above in terminal contexts or when the bridge is not
