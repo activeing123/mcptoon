@@ -73,7 +73,7 @@ class TestCatalogAlwaysNonEmpty(unittest.TestCase):
             else:
                 os.environ[k] = v
 
-    def test_empty_config_still_lists_three_tools(self):
+    def test_empty_config_still_lists_the_native_tools(self):
         """The whole point: an empty gateway is not a tool-less gateway."""
         from mcptoon.config import load_config
 
@@ -82,6 +82,8 @@ class TestCatalogAlwaysNonEmpty(unittest.TestCase):
         b._tool_index = {}
         tools = b._handle_list_tools({})["tools"]
         self.assertEqual([t["name"] for t in tools], list(native_tools.NATIVE_NAMES))
+        self.assertGreaterEqual(len(native_tools.NATIVE_NAMES), 3,
+                                "the gateway must always describe itself")
 
     def test_native_defs_survive_our_own_simplifier(self):
         """We gate our own catalog with simplify_tool_def; it must be a no-op here."""
@@ -118,8 +120,9 @@ class TestCatalogAlwaysNonEmpty(unittest.TestCase):
         named = [t for t in tools if t["name"] == "mcptoon_health"]
         self.assertEqual(len(named), 1)
         self.assertEqual(named[0]["description"], upstream["description"])
+        # every native name is present exactly once, upstream's definition winning
         self.assertEqual(sorted(t["name"] for t in tools),
-                         ["mcptoon_health", "mcptoon_manifest", "mcptoon_servers"])
+                         sorted(native_tools.NATIVE_NAMES))
 
 
 class TestManifestTool(unittest.TestCase):
@@ -233,6 +236,116 @@ class TestServersAndHealth(unittest.TestCase):
             "servers": {}, "tool_index": {}, "output_format": "auto",
             "initialized": False, "uptime": 0.0})
         self.assertEqual(res["structuredContent"]["status"], "starting")
+
+
+class TestUsageTool(unittest.TestCase):
+    """`mcptoon_usage` feeds the disclosure footer. Its numbers must be real."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self._old = {k: os.environ.get(k) for k in
+                     ("MCPTOON_SETTINGS_FILE", "MCPTOON_CONFIG_FILE",
+                      "MCPTOON_CONFIG_FILE_TOML")}
+        os.environ["MCPTOON_SETTINGS_FILE"] = str(base / "settings.json")
+        os.environ["MCPTOON_CONFIG_FILE"] = str(base / "cfg.json")
+        os.environ["MCPTOON_CONFIG_FILE_TOML"] = str(base / "cfg.toml")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        for k, v in self._old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def _index(self, n=3):
+        # Verbose on purpose: over the 360-char / 3-sentence budget the gateway
+        # enforces, so simplify_tool_def actually trims and a saving exists.
+        return {
+            f"srv_tool{i}": {
+                "server": "srv",
+                "tool": f"tool{i}",
+                "full_def": {
+                    "name": f"tool{i}",
+                    "description": (
+                        "First sentence describing the tool in more detail than anyone "
+                        "needs. Second sentence adding still more context that will be "
+                        "trimmed. Third sentence that also goes on. Fourth sentence kept "
+                        "only to push this well past the description budget so the "
+                        "compressor has something real to remove. "
+                    ) * 4,
+                    "inputSchema": {"type": "object", "properties": {
+                        "a": {"type": "string", "description": "x " * 200}}},
+                },
+            }
+            for i in range(n)
+        }
+
+    def test_reports_compression_and_a_positive_saving(self):
+        b = _bridge(index=self._index())
+        payload = b._handle_call_tool({"name": "mcptoon_usage", "arguments": {}})["structuredContent"]
+        self.assertEqual(payload["toolsCompressed"], 3)
+        self.assertGreater(payload["tokensSaved"], 0,
+                           "compressing verbose schemas must show a saving")
+        self.assertGreater(payload["savingsPct"], 0)
+
+    def test_footer_state_is_reflected(self):
+        b = _bridge(index=self._index())
+        self.assertTrue(b._handle_call_tool(
+            {"name": "mcptoon_usage", "arguments": {}})["structuredContent"]["footerEnabled"])
+        from mcptoon.config import set_setting
+        set_setting("footer", "off")
+        self.assertFalse(b._handle_call_tool(
+            {"name": "mcptoon_usage", "arguments": {}})["structuredContent"]["footerEnabled"])
+
+    def test_empty_catalog_reports_zero_not_an_error(self):
+        payload = native_tools.call_native("mcptoon_usage", {}, {
+            "servers": {}, "tool_index": {}, "output_format": "auto",
+            "initialized": True, "uptime": 0.0})["structuredContent"]
+        self.assertEqual(payload["toolsCompressed"], 0)
+        self.assertEqual(payload["tokensSaved"], 0)
+        self.assertEqual(payload["savingsPct"], 0.0)
+
+
+class TestFooterDisclosure(unittest.TestCase):
+    """The `instructions` field is the gateway's one line of voice."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self._old = {k: os.environ.get(k) for k in
+                     ("MCPTOON_SETTINGS_FILE", "MCPTOON_CONFIG_FILE",
+                      "MCPTOON_CONFIG_FILE_TOML")}
+        os.environ["MCPTOON_SETTINGS_FILE"] = str(base / "settings.json")
+        os.environ["MCPTOON_CONFIG_FILE"] = str(base / "cfg.json")
+        os.environ["MCPTOON_CONFIG_FILE_TOML"] = str(base / "cfg.toml")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        for k, v in self._old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_on_by_default(self):
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertIn("instructions", res)
+        self.assertIn("mcptoon_usage", res["instructions"])
+
+    def test_off_removes_it_entirely(self):
+        from mcptoon.config import set_setting
+        set_setting("footer", "off")
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertNotIn("instructions", res)
+
+    def test_handshake_still_valid_without_it(self):
+        from mcptoon.config import set_setting
+        set_setting("footer", "off")
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        for key in ("protocolVersion", "capabilities", "serverInfo"):
+            self.assertIn(key, res)
 
 
 class TestProtocolHygiene(unittest.TestCase):

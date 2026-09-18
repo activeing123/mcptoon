@@ -31,6 +31,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from mcptoon.serve import MCPServerBridge, _get_call_timeout
 from mcptoon.client import MCPClientPool
+from mcptoon import native_tools as _native
+
+_NATIVE_N = len(_native.NATIVE_NAMES)  # grows with the gateway's own surface
 
 
 # ═══════════════════════════════════════════════════
@@ -60,10 +63,10 @@ class TestParallelManifestLoading:
                 }
         bridge._initialized = True
 
-        # tools/list should return 300 upstream + the gateway's own 3 (v0.7.13)
+        # tools/list should return 300 upstream + the gateway's own native tools
         result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
-        assert len(tools) == 303
+        assert len(tools) == 300 + _NATIVE_N
         upstream = [t["name"] for t in tools if not t["name"].startswith("mcptoon_")]
         assert len(upstream) == 300
         assert len(set(upstream)) == 300
@@ -87,7 +90,7 @@ class TestParallelManifestLoading:
 
         result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
-        assert len(tools) == 5 + 3  # 5 upstream, no duplicates, plus our 3
+        assert len(tools) == 5 + _NATIVE_N  # 5 upstream, no duplicates, plus ours
         names = [t["name"] for t in tools]
         assert len(names) == len(set(names))  # All unique
         assert "srv0_echo" in names
@@ -151,8 +154,8 @@ class TestConcurrency:
         for th in threads:
             th.join()
 
-        # All readers should see the same catalog: 100 upstream + 3 native
-        assert all(r == 103 for r in results)
+        # All readers should see the same catalog: 100 upstream + the native tools
+        assert all(r == 100 + _NATIVE_N for r in results)
 
 
 # ═══════════════════════════════════════════════════

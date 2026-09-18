@@ -5,6 +5,50 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.17] - 2026-09-18
+
+### Added
+
+- **Skills became a managed catalog, not just a search index.** v0.7.16 taught
+  `mcptoon skills` to index and route a skill catalog. This release adds the
+  other half — distribution and lifecycle — so the same one-source-of-truth
+  model that already governs MCP servers now governs skills too:
+  - `mcptoon skills sync [SRC] [VIEW ...]` distributes a source catalog into
+    every agent's skill folder. Views are **links** (a junction on Windows, no
+    admin needed), so one edit at the source is instantly visible everywhere and
+    there is no second copy to drift. `--copy` forces real directories, `--dry`
+    prints the plan without writing. A real directory where a link belongs is
+    **archived, never deleted**; removal happens at the source and the views
+    follow; a link owned by another manager is reported and left untouched.
+  - `mcptoon skills add <name> [--desc D]` and `mcptoon skills remove <name>`
+    manage the source. Removal **moves** the skill into a dated archive beside
+    the source — a wrong removal is a `mv` back, not a re-clone.
+  - `mcptoon skills list [--usage] [--all]` lists the catalog; `--usage` adds
+    per-skill hit counts. Counts cover skills mcptoon routed (via
+    `resolve`/`route`); a skill an agent loaded directly is invisible, and the
+    output says so rather than implying full coverage.
+
+- **The gateway now has a voice.** `serve` returns an `instructions` field from
+  the MCP initialize handshake — the protocol's official channel for a server to
+  brief the model — so every client that honours it learns what mcptoon is
+  without anyone editing a system prompt. The one-line end-of-turn disclosure it
+  steers ("mcptoon saved ~N tokens this session") is backed by a new first-party
+  tool, `mcptoon_usage`, which returns the real figures, so the model never has
+  to estimate them. Turn it off with `mcptoon config set footer off`; the setting
+  persists and suppresses the field entirely on the next connection.
+
+- **`mcptoon config [get|set]`** reads and writes gateway settings
+  (`~/.mcptoon/settings.json`, separate from server config so a settings write
+  can never corrupt a server definition). Unknown keys fail loudly.
+
+### Fixed
+
+- **The footprint guard could not see a comma-glued test total.** Its regex
+  required whitespace before the separator, so a line reading `956 passed, 1
+  skipped` never matched and a stale suite total hid in the README for two days.
+  The pattern now tolerates optional whitespace on both sides, and a regression
+  test pins every separator spelling.
+
 ## [0.7.16] - 2026-09-17
 
 ### Fixed

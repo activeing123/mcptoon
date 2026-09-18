@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.7.16 · 979 passed + 1 skipped · 0 依赖 · 156KB wheel · 24 模块 · Apache 2.0
+- 版本：v0.7.17 · 1005 passed + 1 skipped · 0 依赖 · 156KB wheel · 24 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -90,6 +90,10 @@ mcptoon serve --http           # 等价 --listen :8080
 | `mcptoon install <name> --npm <pkg>` | 一条命令装服务器并自动发现工具 |
 | `mcptoon search <query>` | 跨服务器模糊搜索（带相关性评分） |
 | `mcptoon doctor` | 自检 Python、配置、连通性 |
+| `mcptoon skills sync` | 一份技能真源 → 所有 Agent 的技能目录（链接，改一次处处生效） |
+| `mcptoon skills add/remove` | 在真源里新建/下架技能（下架进墓地，可反悔） |
+| `mcptoon skills list --usage` | 列出技能 + 各自被路由过几次 |
+| `mcptoon config set footer off` | 关掉会话末尾那行"省了多少 token"的播报 |
 | `mcptoon quickstart` | 检测并导入已有配置，列出全部工具 |
 | `mcptoon demo` | 现场前后对比 token 数字 |
 | `mcptoon demo-server` | 跑一个内置的零依赖 MCP server（11 个纯标准库工具，stdio） |
@@ -111,6 +115,47 @@ mcptoon add demo --stdio python -m mcptoon demo-server   # 显式添加才会生
 它不改变"遥控器不是运行时"的定位：不会自动注册任何东西，`mcptoon serve` 在空配置下
 仍然返回 0 个工具（proxy 语义未变）。工具描述是按 TDQS 六维评分表写的，其中可机械判定的
 硬闸（空描述/同义反复描述/描述与 `readOnlyHint` 矛盾/优先级操纵话术）已进 CI。
+
+---
+
+## 技能目录管理（Skills as a managed catalog）
+
+技能和 MCP 服务器是同一类东西：**一个真源，多个 Agent 视图**。`sync` 早就用这个模型管
+服务器，`skills sync` 把它套到技能上——所以两个子系统不各造轮子。
+
+```bash
+mcptoon skills sync ~/skills                 # 真源 → 所有 Agent 技能目录（默认建链接）
+mcptoon skills sync ~/skills --dry           # 只打印计划，一个字不写
+mcptoon skills sync ~/skills --copy          # 强制真拷贝（无链接的文件系统）
+mcptoon skills add my-skill --desc "…"       # 在真源里新建
+mcptoon skills remove my-skill               # 下架（进 _archive/removed，可反悔）
+mcptoon skills list --usage                  # 列出技能 + 各自被路由过几次
+```
+
+**视图用链接（Windows 上是 junction，无需管理员）**：改一次真源，所有 Agent 立刻看到，
+不存在第二份副本可漂移。三条安全纪律，每条都对应一种会毁用户数据的朴素做法：
+
+1. **链接位置上出现真目录 = 漂移** → 归档进 `_archive/`，**永不删除**（可能是用户手写的）。
+2. **下架只在真源发生**，视图下次 sync 自动跟随；`remove` 是 `mv` 不是 `rm`。
+3. **别的管理器拥有的链接** → 报告并跳过，绝不抢夺（本机 `tongbu-skills` 就管着同一批目录）。
+
+**使用计数只统计经 mcptoon 路由的**（`resolve`/`route`）；Agent 直接加载的技能这里看不见，
+所以 `list --usage` 自己会说这句话，而不是假装全覆盖。
+
+---
+
+## 存在感：网关怎么"说话"（The gateway's voice）
+
+MCP 的 initialize 握手有一个 `instructions` 字段——**协议官方给服务端向模型喊话的口子**。
+`serve` 用它送一句话，于是每个守协议的客户端都知道 mcptoon 是什么，**无需任何人去改 system
+prompt**。它引导的"末尾一行播报"由自报工具 `mcptoon_usage` 喂真实数字（模型不许自己估）。
+
+```bash
+mcptoon config set footer off   # 关掉播报（持久化；下次连接就不再发 instructions）
+mcptoon config set footer on    # 打开
+```
+
+设置存在 `~/.mcptoon/settings.json`，与服务器配置分开——写设置永远不可能损坏服务器定义。
 
 ---
 
@@ -151,7 +196,7 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
 零第三方导入是 review 阶段硬性规则。新功能必须带测试。
-14,285 行 Python（物理行）、24 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+14,944 行 Python（物理行）、24 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 

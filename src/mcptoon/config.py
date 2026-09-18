@@ -64,6 +64,20 @@ def _config_file_toml() -> Path:
 CACHE_DIR = HOME_DIR / ".cache" / "mcptoon"
 LOG_DIR = CONFIG_DIR / "logs"
 TOGGLE_FILE = CONFIG_DIR / "toggles.json"
+# Gateway preferences that are not per-server (footer on/off, ...). Kept apart
+# from config.json so a settings write can never corrupt a server definition.
+# Like _config_file(), the path is resolved at CALL time so a test process can
+# redirect it after import (module-level env reads would freeze the real path).
+SETTINGS_FILE = Path(os.environ.get(
+    "MCPTOON_SETTINGS_FILE", str(CONFIG_DIR / "settings.json")))
+
+# Recognized settings and their defaults. The CLI validates against this map, so
+# a typo fails loudly instead of silently writing a key nothing reads.
+SETTING_DEFAULTS = {"footer": "on"}
+
+
+def _settings_file() -> Path:
+    return Path(os.environ.get("MCPTOON_SETTINGS_FILE", str(SETTINGS_FILE)))
 
 # Ensure dirs exist
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -251,6 +265,54 @@ def list_servers() -> list[str]:
 def get_server_config(name: str) -> dict | None:
     """Get config for a specific server."""
     return load_config().get(name)
+
+
+# ─── Gateway settings (not per-server) ───
+
+def load_settings() -> dict:
+    """Gateway preferences merged over defaults. A missing file is not an error."""
+    values = dict(SETTING_DEFAULTS)
+    path = _settings_file()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                for key in SETTING_DEFAULTS:
+                    if key in data:
+                        values[key] = data[key]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return values
+
+
+def get_setting(key: str) -> str:
+    """One setting's current value (default when unset)."""
+    return str(load_settings().get(key, SETTING_DEFAULTS.get(key, "")))
+
+
+def set_setting(key: str, value: str) -> None:
+    """Persist one setting. Unknown keys raise ValueError so typos fail loudly."""
+    if key not in SETTING_DEFAULTS:
+        raise ValueError(
+            f"unknown setting {key!r}; known: {', '.join(sorted(SETTING_DEFAULTS))}")
+    path = _settings_file()
+    current = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                current = data
+        except (json.JSONDecodeError, OSError):
+            current = {}
+    current[key] = value
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def footer_enabled() -> bool:
+    """Whether the end-of-turn disclosure is on. Default: on."""
+    return get_setting("footer").strip().lower() not in ("off", "0", "false", "no")
 
 
 # ─── Toggle management (per-tool enable/disable) ───

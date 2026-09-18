@@ -7,10 +7,12 @@ model sees. So the load-bearing test is `test_uninformative_name_is_retrievable_
 """
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from datetime import date
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -491,6 +493,236 @@ class CliTests(unittest.TestCase):
             self.assertEqual(stats["canonical"], 5)
             self.assertEqual(stats["aliases"], 1)
             self.assertEqual(stats["no_description"], [])
+
+
+class SyncTests(unittest.TestCase):
+    """`skills sync` distributes a source catalog into agent views.
+
+    These pin the three safety rules, because each one corresponds to a real
+    way a naive sync destroys user work: drift silently overwritten, deletion
+    propagated as data loss, and two managers fighting over one folder.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        for slug in ("alpha", "beta"):
+            d = self.src / slug
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text(
+                f"---\nname: {slug}\ndescription: d\n---\n", encoding="utf-8")
+        self.v1 = self.base / "v1"
+        self.v2 = self.base / "v2"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_links_every_skill_into_every_view(self):
+        rep = skills.sync_skills(self.src, [self.v1, self.v2])
+        for view in (self.v1, self.v2):
+            self.assertEqual(sorted(rep["views"][str(view)]["added"]), ["alpha", "beta"])
+            self.assertTrue(skills._is_link(view / "alpha"))
+
+    def test_second_run_is_a_no_op(self):
+        skills.sync_skills(self.src, [self.v1])
+        rep = skills.sync_skills(self.src, [self.v1])
+        a = rep["views"][str(self.v1)]
+        self.assertEqual(a["added"], [])
+        self.assertEqual(sorted(a["ok"]), ["alpha", "beta"])
+
+    def test_drift_is_archived_never_deleted(self):
+        skills.sync_skills(self.src, [self.v1])
+        stray = self.v1 / "alpha"
+        stray.unlink()
+        stray.mkdir()
+        (stray / "SKILL.md").write_text("user's hand-edited copy\n", encoding="utf-8")
+        rep = skills.sync_skills(self.src, [self.v1])
+        self.assertEqual(rep["views"][str(self.v1)]["drifted"], ["alpha"])
+        self.assertTrue(skills._is_link(self.v1 / "alpha"))
+        archived = list((self.base / "_archive" / "v1").iterdir())
+        self.assertEqual(len(archived), 1)
+        self.assertIn("user's hand-edited copy", (archived[0] / "SKILL.md").read_text(
+            encoding="utf-8"))
+
+    def test_source_removal_prunes_the_views(self):
+        skills.sync_skills(self.src, [self.v1, self.v2])
+        shutil.rmtree(self.src / "beta")
+        rep = skills.sync_skills(self.src, [self.v1, self.v2])
+        for view in (self.v1, self.v2):
+            self.assertEqual(rep["views"][str(view)]["pruned"], ["beta"])
+            self.assertFalse((view / "beta").exists())
+
+    def test_foreign_link_is_left_alone(self):
+        """A view entry another manager owns must never be touched."""
+        other = self.base / "other" / "alpha"
+        other.mkdir(parents=True)
+        self.v2.mkdir(parents=True)
+        if os.name == "nt":
+            import subprocess
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(self.v2 / "alpha"), str(other)],
+                           capture_output=True, check=False)
+        else:
+            os.symlink(other, self.v2 / "alpha", target_is_directory=True)
+        rep = skills.sync_skills(self.src, [self.v2])
+        # alpha is owned elsewhere: reported, never touched. beta is missing, so
+        # it is still placed — leaving a foreign entry alone does not block the
+        # rest of the sync.
+        self.assertEqual(rep["views"][str(self.v2)]["foreign"], ["alpha"])
+        self.assertEqual(rep["views"][str(self.v2)]["added"], ["beta"])
+        self.assertTrue(skills._is_link(self.v2 / "beta"))
+
+    def test_real_directory_that_is_not_ours_is_never_removed(self):
+        """A plain folder in a view is not drift — it may be a user's own skill."""
+        self.v1.mkdir(parents=True)
+        keep = self.v1 / "gamma"
+        keep.mkdir()
+        (keep / "SKILL.md").write_text("mine\n", encoding="utf-8")
+        skills.sync_skills(self.src, [self.v1])
+        self.assertTrue(keep.is_dir())
+        self.assertFalse(skills._is_link(keep))
+
+    def test_source_is_never_written(self):
+        before = sorted(p.name for p in self.src.iterdir())
+        skills.sync_skills(self.src, [self.v1, self.v2])
+        self.assertEqual(before, sorted(p.name for p in self.src.iterdir()))
+
+    def test_dry_run_writes_nothing(self):
+        rep = skills.sync_skills(self.src, [self.v1], dry_run=True)
+        self.assertTrue(rep["dryRun"])
+        self.assertEqual(rep["views"][str(self.v1)]["added"], ["alpha", "beta"])
+        self.assertFalse(self.v1.exists(), "dry run must not create the view")
+
+    def test_copy_strategy_makes_real_directories(self):
+        skills.sync_skills(self.src, [self.v1], strategy="copy")
+        self.assertFalse(skills._is_link(self.v1 / "alpha"))
+        self.assertTrue((self.v1 / "alpha" / "SKILL.md").is_file())
+
+    def test_bad_strategy_is_rejected(self):
+        with self.assertRaises(ValueError):
+            skills.sync_skills(self.src, [self.v1], strategy="teleport")
+
+    def test_whole_directory_view_link_is_never_descended_into(self):
+        """A view that is itself a link to the source must be left alone.
+
+        This is the tongbu-skills layout: ~/.claude/skills is a junction to the
+        source. Descending into it would see the source's own children as real
+        directories and archive every one of them.
+        """
+        self.v1.parent.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            import subprocess
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(self.v1), str(self.src)],
+                           capture_output=True, check=False)
+        else:
+            os.symlink(self.src, self.v1, target_is_directory=True)
+        before = sorted(p.name for p in self.src.iterdir())
+        rep = skills.sync_skills(self.src, [self.v1])
+        a = rep["views"][str(self.v1)]
+        self.assertTrue(a.get("wholeDirLink"))
+        self.assertEqual(a["drifted"], [])
+        self.assertEqual(before, sorted(p.name for p in self.src.iterdir()),
+                         "the source must be untouched")
+        self.assertFalse((self.base / "_archive").exists(),
+                         "nothing may be archived when the view is a whole-dir link")
+
+    def test_cli_dry_run_reports_but_writes_nothing(self):
+        out = run_cli(["mcptoon", "skills", "sync", str(self.src), str(self.v1), "--dry"],
+                      {"MCPTOON_SKILLS_VIEWS": ""})
+        self.assertIn("dry run", out)
+        self.assertIn("+2 new", out)
+        self.assertFalse(self.v1.exists())
+
+    def test_cli_json_output_is_machine_readable(self):
+        out = run_cli(["mcptoon", "skills", "sync", str(self.src), str(self.v1), "--json"],
+                      {"MCPTOON_SKILLS_VIEWS": ""})
+        data = json.loads(out)
+        self.assertEqual(data["skills"], ["alpha", "beta"])
+
+
+class CatalogManagementTests(unittest.TestCase):
+    """add / remove / list --usage. Removal archives; it never deletes."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.src = self.base / "src"
+        self.src.mkdir()
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(self.base / "idx.json"),
+            "MCPTOON_SKILLS_USAGE": str(self.base / "usage.json"),
+            "MCPTOON_SKILLS_ROOTS": str(self.src),
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_add_creates_a_valid_skill(self):
+        out = run_cli(["mcptoon", "skills", "add", str(self.src), "search-web",
+                       "--desc", "Search the web. 触发词：搜网页"], self.env)
+        self.assertIn("added search-web", out)
+        md = self.src / "search-web" / "SKILL.md"
+        self.assertTrue(md.is_file())
+        self.assertIn("name: search-web", md.read_text(encoding="utf-8"))
+
+    def test_add_refuses_a_duplicate(self):
+        run_cli(["mcptoon", "skills", "add", str(self.src), "dup"], self.env)
+        with self.assertRaises(SystemExit) as cm:
+            run_cli(["mcptoon", "skills", "add", str(self.src), "dup"], self.env)
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_add_rejects_a_bad_slug(self):
+        with self.assertRaises(SystemExit) as cm:
+            run_cli(["mcptoon", "skills", "add", str(self.src), "bad/name"], self.env)
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_remove_archives_instead_of_deleting(self):
+        run_cli(["mcptoon", "skills", "add", str(self.src), "gone"], self.env)
+        out = run_cli(["mcptoon", "skills", "remove", str(self.src), "gone"], self.env)
+        self.assertIn("archived to", out)
+        self.assertFalse((self.src / "gone").exists())
+        archived = list((self.base / "_archive" / "removed").iterdir())
+        self.assertEqual(len(archived), 1)
+        self.assertIn("gone", archived[0].name)
+        self.assertTrue((archived[0] / "SKILL.md").is_file(),
+                        "the archived skill must still be recoverable")
+
+    def test_remove_unknown_skill_exits_nonzero(self):
+        with self.assertRaises(SystemExit) as cm:
+            run_cli(["mcptoon", "skills", "remove", str(self.src), "ghost"], self.env)
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_resolve_records_usage(self):
+        for name, desc in (("search-web", "Search the web. 触发词：搜网页"),
+                           ("make-pdf", "Typeset a PDF")):
+            run_cli(["mcptoon", "skills", "add", str(self.src), name, "--desc", desc], self.env)
+        run_cli(["mcptoon", "skills", "index", str(self.src)], self.env)
+        run_cli(["mcptoon", "skills", "resolve", "搜网页", "--k", "1"], self.env)
+        run_cli(["mcptoon", "skills", "resolve", "搜网页", "--k", "1"], self.env)
+        usage = json.loads((self.base / "usage.json").read_text(encoding="utf-8"))
+        self.assertEqual(usage["search-web"]["count"], 2)
+        self.assertEqual(usage["search-web"]["last"], date.today().isoformat())
+
+    def test_list_usage_orders_by_hits(self):
+        for name in ("aaa", "bbb"):
+            run_cli(["mcptoon", "skills", "add", str(self.src), name,
+                     "--desc", f"{name} thing"], self.env)
+        run_cli(["mcptoon", "skills", "index", str(self.src)], self.env)
+        run_cli(["mcptoon", "skills", "resolve", "bbb thing", "--k", "1"], self.env)
+        out = run_cli(["mcptoon", "skills", "list", "--usage", "--json"], self.env)
+        rows = json.loads(out)
+        self.assertEqual(rows[0]["slug"], "bbb")
+        self.assertEqual(rows[0]["uses"], 1)
+
+    def test_list_json_hides_alias_cards_by_default(self):
+        write_skill(self.src, "archify", "别名转发：/archify → /tu-archify。触发词：/archify",
+                    layout="flat")
+        write_skill(self.src, "tu-archify", "架构图引擎。触发词：架构图", layout="flat")
+        run_cli(["mcptoon", "skills", "index", str(self.src)], self.env)
+        rows = json.loads(run_cli(["mcptoon", "skills", "list", "--json"], self.env))
+        self.assertEqual([r["slug"] for r in rows], ["tu-archify"])
+        rows_all = json.loads(run_cli(["mcptoon", "skills", "list", "--all", "--json"], self.env))
+        self.assertEqual(sorted(r["slug"] for r in rows_all), ["archify", "tu-archify"])
 
 
 class UnroutableTests(unittest.TestCase):

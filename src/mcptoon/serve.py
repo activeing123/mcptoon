@@ -60,6 +60,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler
 
 from . import __version__
+from . import config
 from .config import load_config, resolve_server_name
 from .client import (
     MCPClientPool,
@@ -82,6 +83,18 @@ from .schema_simplifier import (
 # MCP protocol version we speak as a server
 PROTOCOL_VERSION = "2024-11-05"
 _SERVER_INFO = {"name": "mcptoon", "version": __version__}
+
+# Shown to the model via the `instructions` field of the initialize result.
+# One line, because it rides in context on every turn. It tells the model what
+# the gateway is and how to report it honestly (numbers come from the tool, not
+# from the model). Suppressed entirely when the user sets `footer off`.
+_INSTRUCTIONS = (
+    "You are working through mcptoon, a gateway that compresses MCP tool "
+    "definitions to save context. When a turn used tools, you may close with one "
+    "short line stating how much it saved; read mcptoon_usage for the exact "
+    "figures and never invent them. If the user finds the line noisy, they can "
+    "turn it off with `mcptoon config set footer off`."
+)
 
 # _meta key for server identity on results (2026-07-28 _meta world)
 _META_SERVERINFO_KEY = "io.modelcontextprotocol/serverInfo"
@@ -437,7 +450,7 @@ class MCPServerBridge:
             if client_version in SUPPORTED_PROTOCOL_VERSIONS
             else PROTOCOL_VERSION
         )
-        return {
+        result = {
             "protocolVersion": version,
             "capabilities": {
                 "tools": {},
@@ -449,6 +462,14 @@ class MCPServerBridge:
             "serverInfo": _SERVER_INFO,
             "resultType": "complete",
         }
+        # The gateway's one line of voice. `instructions` is the protocol's
+        # official channel for a server to brief the model, so every client that
+        # honours it learns what mcptoon is without anyone editing a system
+        # prompt. Kept to one sentence plus one imperative: it costs context on
+        # every turn, which is the very thing this tool exists to save.
+        if config.footer_enabled():
+            result["instructions"] = _INSTRUCTIONS
+        return result
 
     def _handle_discover(self) -> dict:
         """server/discover (2026-07-28): advertise versions/capabilities/identity.

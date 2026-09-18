@@ -41,10 +41,10 @@ import json
 import os
 from typing import Any
 
-from .schema_simplifier import namespaced_tool_name
+from .schema_simplifier import namespaced_tool_name, simplify_tool_def
 
 # Names of the first-party tools, in listing order.
-NATIVE_NAMES = ("mcptoon_manifest", "mcptoon_servers", "mcptoon_health")
+NATIVE_NAMES = ("mcptoon_manifest", "mcptoon_servers", "mcptoon_health", "mcptoon_usage")
 
 
 def native_tools() -> list[dict]:
@@ -214,6 +214,40 @@ def native_tools() -> list[dict]:
                 "openWorldHint": False,
             },
         },
+        {
+            "name": "mcptoon_usage",
+            "title": "Token savings so far",
+            "description": (
+                "How much this gateway has saved: tools compressed, tokens saved and the "
+                "session call count. Call this when you want to tell the user what mcptoon "
+                "did. Report these numbers verbatim; never estimate them yourself."
+            ),
+            "inputSchema": {"type": "object", "properties": {}},
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "toolsCompressed": {"type": "integer"},
+                    "tokensSaved": {"type": "integer"},
+                    "savingsPct": {"type": "number"},
+                    "callsRecorded": {
+                        "type": "integer",
+                        "description": "Calls mcptoon has recorded, cumulative across sessions.",
+                    },
+                    "footerEnabled": {
+                        "type": "boolean",
+                        "description": "False when the user turned the disclosure off.",
+                    },
+                },
+                "required": ["toolsCompressed", "tokensSaved", "savingsPct", "footerEnabled"],
+            },
+            "annotations": {
+                "title": "Token savings so far",
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
+            },
+        },
     ]
 
 
@@ -359,10 +393,50 @@ def _health(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform sig
     }
 
 
+def _usage(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform signature
+    """Real savings numbers. The disclosure footer reads these, never an estimate.
+
+    Tokens are a static property of the catalog (raw JSON vs the compressed
+    manifest), so they are stable for a given tool set; calls are the cumulative
+    ledger. Both come from the same code path the ``mcptoon stats`` CLI uses, so
+    the CLI and the footer can never disagree.
+    """
+    from . import usage as usage_mod
+    from .config import footer_enabled
+
+    index = state["tool_index"]
+    full_tokens = 0
+    slim_tokens = 0
+    for info in index.values():
+        full_def = info.get("full_def") or {}
+        if not full_def or "error" in full_def:
+            continue
+        full_tokens += len(json.dumps(full_def, ensure_ascii=False)) // 4
+        slim_tokens += len(json.dumps(simplify_tool_def(full_def), ensure_ascii=False)) // 4
+
+    saved = max(0, full_tokens - slim_tokens)
+    pct = round(saved / full_tokens * 100, 1) if full_tokens else 0.0
+
+    try:
+        stats = usage_mod.get_usage_stats()
+        calls = int(stats.get("total_calls", 0))
+    except Exception:  # pragma: no cover - defensive
+        calls = 0
+
+    return {
+        "toolsCompressed": len(index),
+        "tokensSaved": saved,
+        "savingsPct": pct,
+        "callsRecorded": calls,
+        "footerEnabled": footer_enabled(),
+    }
+
+
 _HANDLERS = {
     "mcptoon_manifest": _manifest,
     "mcptoon_servers": _servers,
     "mcptoon_health": _health,
+    "mcptoon_usage": _usage,
 }
 
 

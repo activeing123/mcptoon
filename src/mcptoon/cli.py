@@ -60,6 +60,7 @@ Usage:
     mcptoon skills resolve <query>       BM25 shortlist over the index (no LLM)
     mcptoon skills route <query>         Shortlist, then let an LLM pick
     mcptoon skills stats                 Catalog health: dupes, aliases, unroutable
+    mcptoon config [get|set]             Read/write settings (e.g. footer on|off)
     mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
 
 Output flags (global):
@@ -94,9 +95,9 @@ from .errors import is_error
 # flag gets warned as unknown; add a phantom and the dead-entry test fails.
 KNOWN_FLAGS = frozenset(
     {
-        "--agent", "--auth", "--auto", "--compact", "--destructive", "--dry",
+        "--agent", "--auth", "--auto", "--all", "--compact", "--copy", "--destructive", "--dry",
         "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
-        "--full", "--head",
+        "--full", "--head", "--desc",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
         "--json", "--keep", "--k", "--list", "--listen", "--max-chars", "--mcptoon",
         "--model",
@@ -104,7 +105,7 @@ KNOWN_FLAGS = frozenset(
         "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--raw", "--remove", "--request-state", "--search",
         "--slim",
-        "--stdin", "--stdio", "--timeout", "--toon", "--tools-k", "--url", "--version", "--watch",
+        "--stdin", "--stdio", "--timeout", "--toon", "--tools-k", "--url", "--usage", "--version", "--watch",
         "--watch-mode", "--write",
     }
 )
@@ -282,6 +283,8 @@ def main():
     elif command == "skills":
         from .skills import _cmd_skills
         _cmd_skills(rest, fmt)
+    elif command == "config":
+        _cmd_config(rest, fmt)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -1209,6 +1212,63 @@ def _cmd_stats(_rest, fmt):
                 ss = by_server_slim.get(s, 0)
                 sp = ((sf - ss) / sf * 100) if sf > 0 else 0
                 print(f"    {s:20s} {sf:>6,} → {ss:>6,}  (-{sp:.0f}%)")
+
+
+def _cmd_config(rest, fmt):
+    """Read or write gateway settings (currently: the disclosure footer).
+
+    Usage:
+        mcptoon config                 Show every setting
+        mcptoon config get <key>       Print one value
+        mcptoon config set <key> <v>   Persist one value
+    """
+    from .config import SETTING_DEFAULTS, load_settings, set_setting
+
+    action = rest[0].lower() if rest else "show"
+
+    if action in ("", "show", "list"):
+        values = load_settings()
+        if fmt == "json":
+            print(json.dumps(values, indent=2, ensure_ascii=False))
+            return
+        print("mcptoon settings")
+        for key in sorted(values):
+            print(f"  {key:12s} = {values[key]}")
+        print()
+        print("  footer on|off controls the one-line token-savings disclosure.")
+        return
+
+    if action == "get":
+        if len(rest) < 2:
+            print("Usage: mcptoon config get <key>")
+            return
+        key = rest[1].lower()
+        if key not in SETTING_DEFAULTS:
+            print(f"Unknown setting: {key}. Known: {', '.join(sorted(SETTING_DEFAULTS))}")
+            return
+        print(load_settings()[key])
+        return
+
+    if action == "set":
+        if len(rest) < 3:
+            print("Usage: mcptoon config set <key> <value>")
+            return
+        key, value = rest[1].lower(), rest[2].lower()
+        if key == "footer" and value not in ("on", "off"):
+            print("footer accepts only: on | off")
+            return
+        try:
+            set_setting(key, value)
+        except ValueError as e:
+            print(str(e))
+            return
+        print(f"{key}: {value}   (saved)")
+        if key == "footer" and value == "off":
+            print("The gateway will stop adding the savings line on the next connection.")
+        return
+
+    print(f"Unknown config action: {action}")
+    print("Usage: mcptoon config [get <key> | set <key> <value>]")
 
 
 def _cmd_toggle(rest, fmt):

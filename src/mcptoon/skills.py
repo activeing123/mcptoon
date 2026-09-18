@@ -47,9 +47,13 @@ import json
 import math
 import os
 import re
+import shutil
+import stat as _stat
+import subprocess
 import sys
 import urllib.request
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import CONFIG_DIR
@@ -84,6 +88,27 @@ def _default_roots() -> list[Path]:
         home / ".cursor" / "skills",
     ]
     return [p for p in candidates if p.is_dir()]
+
+
+def _view_roots() -> list[Path]:
+    """Every agent skill folder a synced catalog should appear in.
+
+    Unlike :func:`_default_roots` this does not require the folder to exist yet
+    — sync creates it. ``MCPTOON_SKILLS_VIEWS`` (``os.pathsep``-separated)
+    overrides, which is what tests use to stay in a sandbox.
+    """
+    env = os.environ.get("MCPTOON_SKILLS_VIEWS", "")
+    if env:
+        return [Path(p).expanduser() for p in env.split(os.pathsep) if p.strip()]
+    home = Path.home()
+    return [
+        home / ".claude" / "skills",
+        home / ".agents" / "skills",
+        home / ".codex" / "skills",
+        home / ".cursor" / "skills",
+        home / ".catpaw" / "skills",
+        home / ".codeium" / "windsurf" / "skills",
+    ]
 
 
 # ═══════════════════════════════════════════════════
@@ -564,19 +589,25 @@ MANIFEST_ENTRY = (
 
 def _skills_usage() -> str:
     return (
-        "mcptoon skills — index and route a skill catalog without keeping it in context\n\n"
+        "mcptoon skills — index, sync and route a skill catalog without keeping it in context\n\n"
         "  mcptoon skills index [ROOT ...]        Scan roots, build the on-disk index\n"
+        "  mcptoon skills sync [SRC] [VIEW ...]   Distribute a source catalog to agent views\n"
+        "                    [--copy] [--dry]      (link by default; never deletes a real dir)\n"
+        "  mcptoon skills add <name> [--desc D]   Create a skill in the source\n"
+        "  mcptoon skills remove <name>           Archive a skill out of the source\n"
+        "  mcptoon skills list [--usage]          List skills, optionally with hit counts\n"
         "  mcptoon skills resolve <query> [--k N] BM25 shortlist (no LLM, no tokens)\n"
         "  mcptoon skills route <query> [--k N]   Shortlist then let an LLM pick\n"
         "                    [--model M[,M2]] [--endpoint URL]\n"
         "  mcptoon skills stats                   Catalog health (dupes, aliases, no-desc)\n"
         "  mcptoon skills manifest                The one-line entry to keep in context\n\n"
         "Roots default to MCPTOON_SKILLS_ROOTS or ~/.claude/skills and friends.\n"
+        "Views default to MCPTOON_SKILLS_VIEWS or the same agent folders.\n"
         "Route endpoint/model default to MCPTOON_SKILLS_ENDPOINT / _MODEL."
     )
 
 
-_VALUE_FLAGS = ("--k", "--tools-k", "--model", "--endpoint")
+_VALUE_FLAGS = ("--k", "--tools-k", "--model", "--endpoint", "--desc")
 
 
 def _query_of(args: list[str]) -> str:
@@ -609,6 +640,386 @@ def _flag(rest: list[str], name: str, default: str = "") -> str:
     return default
 
 
+# ═══════════════════════════════════════════════════
+# Distribution: one source of truth -> N agent views
+# ═══════════════════════════════════════════════════
+#
+# Skills are the same shape as MCP servers, which `mcptoon sync` already
+# distributes: one canonical source, many agent-native views. The only new
+# decision is what a view IS. For a directory the cheapest correct view is a
+# LINK, not a copy — one edit at the source is instantly visible everywhere and
+# there is no second copy to drift. A copy is the fallback for filesystems
+# without links, or when freezing a version on purpose.
+#
+# The three disciplines that keep this safe (each one learned from a real
+# failure in the tongbu-skills lineage):
+#   1. A real directory where a link belongs is DRIFT -> archive it, never delete.
+#   2. Removal happens at the SOURCE; the views follow on the next sync.
+#   3. Never fight a view that is already managed by something else — report it.
+#
+# Nothing here ever writes inside the source, and nothing ever deletes a real
+# directory. `--dry-run` proves the plan before a single link is made.
+
+_FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+
+
+def _is_link(path: Path) -> bool:
+    """True for a symlink or a Windows junction (both are reparse points)."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if _stat.S_ISLNK(st.st_mode):
+        return True
+    return bool(getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_REPARSE_POINT)
+
+
+def _link_target(path: Path) -> str:
+    """The raw target a link was created with, or "" if it is not a link.
+
+    ``os.readlink`` is used rather than ``realpath`` on purpose. On Windows a
+    junction stores whatever path it was made with — often 8.3 short form
+    (``ADMINI~1``) — and ``realpath`` only expands that while the target still
+    exists. After the source directory is deleted the link dangles and realpath
+    stops expanding, so a realpath-based ownership test would suddenly report a
+    link of ours as foreign. The stored string is stable either way.
+    """
+    try:
+        raw = os.readlink(path)
+    except OSError:
+        return ""
+    if not raw:
+        return ""
+    if raw.startswith("\\\\?\\"):  # NT namespace prefix on Windows junctions
+        raw = raw[4:]
+    if not os.path.isabs(raw):
+        raw = os.path.join(str(path.parent), raw)
+    return os.path.normpath(raw)
+
+
+def _points_into(target: str, source: Path) -> bool:
+    """Whether a link target lives under ``source`` (either may be 8.3 short)."""
+    if not target:
+        return False
+
+    def norm(p) -> str:
+        return os.path.normcase(os.path.normpath(str(p)))
+
+    t, s = norm(target), norm(source)
+    if t == s or t.startswith(s + os.sep):
+        return True
+    # Fallback for a link stored in the other form (long vs short): realpath
+    # expands 8.3 while the path exists, so try the resolved pair too.
+    try:
+        tr = os.path.normcase(os.path.realpath(target))
+        sr = os.path.normcase(os.path.realpath(str(source)))
+    except OSError:
+        return False
+    return tr == sr or tr.startswith(sr + os.sep)
+
+
+def _make_link(src: Path, dst: Path) -> None:
+    """Create a directory link. Junction on Windows (no admin), symlink elsewhere."""
+    if os.name == "nt":
+        r = subprocess.run(["cmd", "/c", "mklink", "/J", str(dst), str(src)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise OSError((r.stderr or r.stdout).strip() or "mklink failed")
+    else:
+        os.symlink(src, dst, target_is_directory=True)
+
+
+def _source_skills(source: Path) -> dict[str, Path]:
+    """``{slug: skill_dir}`` for a source root. A skill is a dir with SKILL.md."""
+    out: dict[str, Path] = {}
+    for base in (source, source / "skills"):
+        if not base.is_dir():
+            continue
+        try:
+            children = sorted(p for p in base.iterdir() if p.is_dir())
+        except OSError:
+            continue
+        for child in children:
+            if (child / "SKILL.md").is_file():
+                out.setdefault(child.name, child)
+    return out
+
+
+def sync_skills(source: Path, views: list[Path], *, strategy: str = "link",
+                dry_run: bool = False, archive: Path | None = None) -> dict:
+    """Distribute ``source`` skills into every view. Idempotent; never deletes.
+
+    Returns a report dict: per-view ``added`` / ``ok`` / ``drifted`` / ``pruned``
+    and, separately, ``foreign`` — links owned by another manager, which are left
+    untouched. A real directory in a view is moved to ``archive`` (never removed)
+    and the link is then created.
+    """
+    if strategy not in ("link", "copy"):
+        raise ValueError(f"strategy must be 'link' or 'copy', not {strategy!r}")
+    skills = _source_skills(source)
+    archive = archive or (source.parent / "_archive")
+    report: dict = {"source": str(source), "strategy": strategy,
+                    "skills": sorted(skills), "views": {}, "dryRun": dry_run}
+
+    for view in views:
+        acts = {"added": [], "ok": [], "drifted": [], "pruned": [], "foreign": []}
+
+        # A view that is ITSELF a link must never be descended into. The common
+        # real-world case is a whole-directory junction (`~/.claude/skills ->
+        # ~/skills`), which is already a perfect view; iterating it would show
+        # the source's own children as "real directories" and archive every one
+        # of them — destroying the user's view to "fix" a drift that is not
+        # there. Report it and move on, whoever owns it.
+        if _is_link(view):
+            if _points_into(_link_target(view), source):
+                acts["wholeDirLink"] = True
+            else:
+                acts["foreign"].append("(whole directory linked elsewhere)")
+            report["views"][str(view)] = acts
+            continue
+
+        if not dry_run:
+            try:
+                view.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                acts["error"] = str(e)
+                report["views"][str(view)] = acts
+                continue
+        wanted = set(skills)
+
+        # 1) prune links whose source is gone (removal happens at the source)
+        if view.is_dir():
+            try:
+                existing = sorted(view.iterdir())
+            except OSError:
+                existing = []
+            for item in existing:
+                if item.name in wanted:
+                    continue
+                if not _is_link(item):
+                    continue  # a real dir here belongs to someone else; leave it
+                target = _link_target(item)
+                # only prune a link that points back into OUR source
+                if not _points_into(target, source):
+                    acts["foreign"].append(item.name)
+                    continue
+                if not dry_run:
+                    try:
+                        item.unlink()
+                    except OSError:
+                        continue
+                acts["pruned"].append(item.name)
+
+        # 2) place each skill
+        for slug, src in sorted(skills.items()):
+            dest = view / slug
+            if _is_link(dest):
+                target = _link_target(dest)
+                if not _points_into(target, source):
+                    acts["foreign"].append(slug)   # another manager owns it
+                else:
+                    acts["ok"].append(slug)
+                continue
+            if dest.exists():
+                # a real directory where a link belongs = drift; archive, never delete
+                stamp = int(os.stat(dest).st_mtime)
+                dst = archive / view.name / f"{slug}.{stamp}"
+                if not dry_run:
+                    try:
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(dest), str(dst))
+                    except OSError:
+                        acts.setdefault("error", f"could not archive {slug}")
+                        continue
+                acts["drifted"].append(slug)
+            if not dry_run:
+                try:
+                    if strategy == "link":
+                        _make_link(src, dest)
+                    else:
+                        shutil.copytree(src, dest)
+                except OSError as e:
+                    acts.setdefault("error", f"{slug}: {e}")
+                    continue
+            acts["added"].append(slug)
+        report["views"][str(view)] = acts
+    return report
+
+
+def _print_sync_report(report: dict, fmt: str) -> None:
+    if fmt == "json":
+        print(json.dumps(report, ensure_ascii=False, indent=1))
+        return
+    tag = " (dry run — nothing written)" if report["dryRun"] else ""
+    print(f"mcptoon skills sync{tag}")
+    print(f"  source: {report['source']}  ({len(report['skills'])} skills)")
+    for view, a in report["views"].items():
+        if a.get("wholeDirLink"):
+            print(f"  {view}")
+            print("    already a link to the source — nothing to do")
+            continue
+        bits = []
+        if a["added"]:
+            bits.append(f"+{len(a['added'])} new")
+        if a["ok"]:
+            bits.append(f"{len(a['ok'])} ok")
+        if a["drifted"]:
+            bits.append(f"{len(a['drifted'])} drifted->archived")
+        if a["pruned"]:
+            bits.append(f"{len(a['pruned'])} pruned")
+        if a.get("foreign"):
+            bits.append(f"{len(a['foreign'])} left alone (other manager)")
+        print(f"  {view}")
+        print(f"    {', '.join(bits) if bits else 'no change'}")
+        if a.get("error"):
+            print(f"    ⚠ {a['error']}")
+    print("\n  one source, many views — edits at the source are already live.")
+
+
+# ═══════════════════════════════════════════════════
+# Catalog management: add / remove / list --usage
+# ═══════════════════════════════════════════════════
+#
+# Removal follows the same rule the rest of this module does: never delete.
+# A removed skill is MOVED into a dated archive beside the source, so a wrong
+# removal is a `mv` back, not a re-clone. "Uninstall" that cannot be undone is
+# how a manager loses a user's trust the first time they fat-finger a name.
+#
+# Usage is recorded only for skills this gateway routed (resolve/route). Skills
+# an agent loaded directly are invisible here — the counts are a floor, not a
+# census, and `list --usage` says so rather than implying full coverage.
+
+def _usage_path() -> Path:
+    return Path(os.environ.get(
+        "MCPTOON_SKILLS_USAGE", str(CONFIG_DIR / "skills-usage.json")))
+
+
+def _load_skill_usage() -> dict:
+    path = _usage_path()
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def record_skill_use(slugs: list[str]) -> None:
+    """Bump the hit counter for skills a route/resolve just surfaced."""
+    if not slugs:
+        return
+    data = _load_skill_usage()
+    for slug in slugs:
+        entry = data.get(slug) or {"count": 0}
+        entry["count"] = int(entry.get("count", 0)) + 1
+        entry["last"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        data[slug] = entry
+    path = _usage_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass  # a read-only home must never break a resolve
+
+
+def _skills_root(source: Path, slug: str) -> Path:
+    """Where a new skill dir for ``slug`` belongs inside a source root."""
+    if (source / "skills").is_dir() or not (source / slug).exists():
+        # prefer the nested layout only when it already exists, else flat
+        return (source / "skills" / slug) if (source / "skills").is_dir() else (source / slug)
+    return source / slug
+
+
+def _archive_dir(source: Path) -> Path:
+    return source.parent / "_archive" / "removed"
+
+
+def _cmd_skills_add(source: Path, name: str, desc: str, fmt: str) -> int:
+    if not name or not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        print("mcptoon: add needs a slug name ([A-Za-z0-9._-]+)", file=sys.stderr)
+        return 1
+    dest = _skills_root(source, name)
+    if dest.exists():
+        print(f"mcptoon: {name} already exists at {dest}", file=sys.stderr)
+        return 1
+    dest.mkdir(parents=True, exist_ok=True)
+    desc = desc or f"{name} — TODO: one line describing when to use this skill."
+    (dest / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: {desc}\n---\n\n# {name}\n\n"
+        f"TODO: write the skill body. Keep the trigger words in the description —\n"
+        f"the router only reads the frontmatter before loading.\n",
+        encoding="utf-8")
+    if fmt == "json":
+        print(json.dumps({"added": name, "path": str(dest)}, ensure_ascii=False))
+    else:
+        print(f"added {name}\n  {dest / 'SKILL.md'}")
+        print("  next: write the body, then run `mcptoon skills sync` to publish it.")
+    return 0
+
+
+def _cmd_skills_remove(source: Path, name: str, fmt: str) -> int:
+    if not name:
+        print("mcptoon: remove needs a slug name", file=sys.stderr)
+        return 1
+    target = None
+    for base in (source / "skills", source):
+        cand = base / name
+        if cand.is_dir() and (cand / "SKILL.md").is_file():
+            target = cand
+            break
+    if target is None:
+        print(f"mcptoon: no skill named {name!r} under {source}", file=sys.stderr)
+        return 1
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    dest = _archive_dir(source) / f"{stamp}_{name}"
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(target), str(dest))
+    except OSError as e:
+        print(f"mcptoon: could not archive {name}: {e}", file=sys.stderr)
+        return 1
+    if fmt == "json":
+        print(json.dumps({"removed": name, "archivedTo": str(dest)}, ensure_ascii=False))
+    else:
+        print(f"removed {name}")
+        print(f"  archived to: {dest}   (recover with a plain move; nothing was deleted)")
+        print("  next: run `mcptoon skills sync` so the views drop it too.")
+    return 0
+
+
+def _cmd_skills_list(index: dict, fmt: str, show_usage: bool,
+                     include_aliases: bool = False) -> None:
+    skills_list = index.get("skills", [])
+    usage = _load_skill_usage() if show_usage else {}
+    rows = []
+    for s in skills_list:
+        if s.get("alias_of") and not include_aliases:
+            continue
+        row = {"slug": s["slug"], "desc": (s.get("desc") or "").split("触发词")[0].strip()}
+        if s.get("alias_of"):
+            row["aliasOf"] = s["alias_of"]
+        if show_usage:
+            u = usage.get(s["slug"]) or {}
+            row["uses"] = int(u.get("count", 0))
+            row["lastUsed"] = u.get("last", "")
+        rows.append(row)
+    rows.sort(key=lambda r: (-r.get("uses", 0), r["slug"]) if show_usage else (r["slug"],))
+    if fmt == "json":
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        return
+    if show_usage:
+        print(f"{'uses':>5}  {'last':<11}  skill")
+        for r in rows:
+            print(f"{r['uses']:>5}  {r['lastUsed'] or '-':<11}  {r['slug']}")
+        print("\n  counts cover skills mcptoon routed; a skill an agent loaded "
+              "directly is invisible here.")
+    else:
+        for r in rows:
+            print(f"{r['slug']:32s} {r['desc'][:70]}")
+        print(f"\n  {len(rows)} skills (alias cards hidden; --all to include)")
+
+
 def _cmd_skills(rest: list[str], fmt: str) -> None:
     action = rest[0] if rest else ""
     args = rest[1:]
@@ -619,6 +1030,48 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
 
     if action == "manifest":
         print(MANIFEST_ENTRY)
+        return
+
+    if action == "sync":
+        # Distribute a source catalog into every agent's skill folder. Needs no
+        # index, so it is handled before the index gate below.
+        positional = [a for a in args if not a.startswith("-")]
+        source = Path(positional[0]).expanduser() if positional else None
+        if source is None:
+            roots = _default_roots()
+            if not roots:
+                print("mcptoon: no source. Usage: mcptoon skills sync <source-dir>",
+                      file=sys.stderr)
+                sys.exit(1)
+            source = roots[0]
+        if not source.is_dir():
+            print(f"mcptoon: source is not a directory: {source}", file=sys.stderr)
+            sys.exit(1)
+        views = ([Path(p).expanduser() for p in positional[1:]] if len(positional) > 1
+                 else _view_roots())
+        strategy = "copy" if "--copy" in args else "link"
+        report = sync_skills(source, views, strategy=strategy, dry_run="--dry" in args)
+        _print_sync_report(report, fmt)
+        return
+
+    if action in ("add", "remove"):
+        # Catalog management edits the SOURCE, so it needs a source but no index.
+        positional = [a for a in args if not a.startswith("-")]
+        roots = _default_roots()
+        source = Path(positional[0]).expanduser() if len(positional) > 1 else (
+            roots[0] if roots else None)
+        name = positional[1] if len(positional) > 1 else (positional[0] if positional else "")
+        if source is None:
+            print("mcptoon: no skills root. Pass one: mcptoon skills "
+                  f"{action} <source> <name>", file=sys.stderr)
+            sys.exit(1)
+        if action == "add":
+            desc = _flag(args, "--desc")
+            rc = _cmd_skills_add(source, name, desc, fmt)
+        else:
+            rc = _cmd_skills_remove(source, name, fmt)
+        if rc:
+            sys.exit(rc)
         return
 
     if action == "index":
@@ -658,6 +1111,7 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         shortlist = bm.search(query, k)
         declared = bm.declared_tools(shortlist)
         tools = tool_shortlist(query, tk) if tk > 0 else []
+        record_skill_use([c["slug"] for c in shortlist])
         if fmt == "json":
             print(json.dumps({"query": query, "k": k, "shortlist": shortlist,
                               "declared_tools": declared, "tools": tools},
@@ -696,6 +1150,8 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
                   file=sys.stderr)
             sys.exit(1)
         result = route(index, query, k, endpoint, models)
+        if result.get("skill"):
+            record_skill_use([result["skill"]])
         if fmt == "json":
             print(json.dumps(result, ensure_ascii=False, indent=1))
             return
@@ -703,6 +1159,11 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
               f"confidence: {result['confidence']}  unanimous: {result['unanimous']}")
         for model, pick in result["picks"].items():
             print(f"  {model}: {pick or '(empty)'}")
+        return
+
+    if action == "list":
+        _cmd_skills_list(index, fmt, show_usage="--usage" in args,
+                         include_aliases="--all" in args)
         return
 
     if action == "stats":
