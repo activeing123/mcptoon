@@ -94,6 +94,32 @@ class TestCallTool:
         # Should fall through to MCP and fail with UNKNOWN_SERVER
         assert is_error(result)
 
+    def test_handler_only_server_bad_tool_reports_tool_not_server(self):
+        """A handler-only server must not be blamed for a wrong tool name.
+
+        Regression: `mcp-cli call mcp-searxng searxng_search` used to answer
+        "Server 'mcp-searxng' not configured" — which sent agents chasing a
+        dead server when the real problem was the tool name. Handler-only
+        servers are not in load_config(), so they fell into the UNKNOWN_SERVER
+        branch.
+        """
+
+        @register("test-handler-toolerr")
+        def handler(tool, args):
+            return None  # no result for an unknown tool
+
+        with patch("mcptoon.router.load_config", return_value={}):
+            result = call_tool("test-handler-toolerr", "nope", {})
+        assert is_error(result)
+        assert "UNKNOWN_TOOL" in str(result)
+        assert "UNKNOWN_SERVER" not in str(result)
+
+    def test_truly_unknown_server_still_reports_unknown_server(self):
+        with patch("mcptoon.router.load_config", return_value={}):
+            result = call_tool("no-handler-no-config", "nope", {})
+        assert is_error(result)
+        assert "UNKNOWN_SERVER" in str(result)
+
 
 class TestCheckPoisoning:
     """Tests for prompt injection detection in tool results."""

@@ -342,6 +342,7 @@ def call_tool(
 
     # 1. Custom handler
     handler = _HANDLERS.get(server)
+    handler_error = None
     if handler:
         try:
             result = handler(tool, args)
@@ -364,13 +365,32 @@ def call_tool(
                         )
                 usage.track_call(server, tool, ok=not is_error(result))
                 return result
-        except Exception:
-            # Fall through to MCP
-            pass
+        except Exception as exc:
+            # Remember the real failure and fall through to MCP below. If the
+            # server also turns out not to be an MCP server, report *this*
+            # error instead of the misleading "not configured" one.
+            handler_error = exc
 
     # 2. MCP protocol — reuse global pool
     servers = load_config()
     if server not in servers:
+        if handler is not None:
+            # A local handler owns this server, but it did not produce a result
+            # for this tool. Reporting UNKNOWN_SERVER here is misleading (it
+            # blames the server for what is usually a wrong tool name).
+            if handler_error is not None:
+                return make_error(
+                    "TOOL_ERROR",
+                    f"Tool '{tool}' failed on server '{server}': "
+                    f"{type(handler_error).__name__}: {handler_error}",
+                    "router", retry=False, server=server, tool=tool,
+                )
+            return make_error(
+                "UNKNOWN_TOOL",
+                f"Tool '{tool}' is not available on server '{server}' "
+                f"(this server is not an MCP server either).",
+                "router", retry=False, server=server, tool=tool,
+            )
         return make_error(
             "UNKNOWN_SERVER",
             f"Server '{server}' not configured. Run: mcptoon init",
