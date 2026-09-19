@@ -13,7 +13,7 @@ MCP 工具 + Agent 技能，压缩说明书 71,929 token → 581（省 99.2% tok
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1061%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1069%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20%E5%B7%A5%E5%85%B7%20%2B%20Agent%20%E6%8A%80%E8%83%BD-8250df)](#工具箱的另一半技能)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -689,10 +689,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1061 passed, 1 skipped
+python -m pytest tests/ -v   # 1069 passed, 1 skipped
 ```
 
-零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1061 个测试。见
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1069 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
 项目本体：15,697 行 Python、25 个模块，零第三方依赖——供应链里 0 个要审计的环节。
