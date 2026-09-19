@@ -58,6 +58,18 @@ LATEST_PROTOCOL_VERSION = "2026-07-28"
 #: their own version; anything at or below this gets classic session semantics.
 LEGACY_PROTOCOL_VERSION = "2025-06-18"
 
+#: Default ``User-Agent`` for HTTP transport requests. urllib would otherwise
+#: announce ``Python-urllib/3.x``, which bot filters in front of public hosted
+#: endpoints (Cloudflare error 1010 and friends) reject outright — the server
+#: is never reached, so the failure looks like a transport bug but is not.
+#: A caller-supplied ``User-Agent`` header (via ``headers=`` / ``--header``)
+#: always wins over this default.
+try:
+    from mcptoon import __version__ as _pkg_version
+    DEFAULT_USER_AGENT = f"mcptoon/{_pkg_version}"
+except ImportError:  # pragma: no cover - package not installed (direct source runs)
+    DEFAULT_USER_AGENT = "mcptoon/dev"
+
 #: Every revision mcptoon knows how to talk to, newest first.
 SUPPORTED_PROTOCOL_VERSIONS = [
     "2026-07-28",
@@ -684,6 +696,10 @@ class MCPClient:
         req = urllib.request.Request(self._http_url, data=payload, method="POST")
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "application/json, text/event-stream")
+        # Bot filters on public hosted endpoints 403 the default
+        # "Python-urllib/3.x" signature (Cloudflare error 1010); announce
+        # ourselves instead — unless the caller already set a User-Agent.
+        req.add_header("User-Agent", DEFAULT_USER_AGENT)
         for k, v in self._headers.items():
             req.add_header(k, v)
         if extra_headers:
@@ -734,6 +750,7 @@ class MCPClient:
         try:
             req = urllib.request.Request(self._http_url, data=payload, method="POST")
             req.add_header("Content-Type", "application/json")
+            req.add_header("User-Agent", DEFAULT_USER_AGENT)
             for k, v in self._headers.items():
                 req.add_header(k, v)
             if self._session_id:
