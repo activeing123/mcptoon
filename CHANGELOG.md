@@ -5,6 +5,36 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.20] - 2026-09-20
+
+### Fixed
+
+- **HTTP transport announced `Python-urllib/3.x`, and bot filters 403'd it.**
+  `urllib` sets `Python-urllib/3.x` when no `User-Agent` is given. Public hosted
+  MCP endpoints sit behind bot filters (Cloudflare error 1010 and friends) that
+  reject that signature outright — so `mcptoon add <name> --http <url>` configured
+  fine, but every later `manifest` / `call` died with `HTTP_ERROR 403` that read
+  like a transport bug. The transport now announces `mcptoon/<version>` by
+  default, in both `_http_request` and `_http_notify`. A caller-supplied
+  `User-Agent` (via `headers=` / `--header`) still wins, and `extra_headers` are
+  untouched, so nothing changes for anyone already setting their own UA. 9 tests
+  (`tests/test_http_user_agent.py`), mocked opener, no network. Contributed by
+  [@mouse-value-add](https://github.com/mouse-value-add) in
+  [#20](https://github.com/activeing123/mcptoon/pull/20).
+
+### Changed
+
+- **The package description now names both halves of the toolbox.** It said
+  "MCP client … Sync MCP servers across agents"; it now says "MCP tools + agent
+  skills … Sync both across agents". The skills half shipped in 0.7.19's README
+  and `mcptoon skills`, but the one-line metadata on PyPI, in `server.json` and
+  in `gemini-extension.json` still described tools only. No behavior change.
+- **`server.json` now points at the measured claim** — "MCP tools + agent skills
+  in one zero-dependency CLI: 71,929 -> 581 tokens (-99.2%, measured)" — instead
+  of the older "581-token listings, not 71,929" phrasing.
+
+Suite total 1069 passed + 1 skipped; wheel 190KB; zero dependencies.
+
 ## [0.7.19] - 2026-09-18
 
 ### Changed

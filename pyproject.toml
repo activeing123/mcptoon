@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcptoon"
-version = "0.7.19"
-description = "MCP client for every AI agent, with no hand-written config. Sync MCP servers across agents. Token-efficient CLI: 99.2% fewer tokens on tool discovery. Zero dependencies."
+version = "0.7.20"
+description = "MCP tools + agent skills for every AI agent, with no hand-written config. Sync both across agents. Token-efficient CLI: 99.2% fewer tokens on tool discovery. Zero dependencies."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [{name = "Alex Chen"}]
