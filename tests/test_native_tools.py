@@ -386,6 +386,28 @@ class TestFooterDisclosure(unittest.TestCase):
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         self.assertIn("never invent figures", res["instructions"])
 
+    def test_instructions_pin_the_mark_and_the_note_line(self):
+        """ "Quote it verbatim" was not enough, so the directive now names the parts.
+
+        Measured failure (2026-09-22): a model told to "report the savings line"
+        wrote one from memory and the `🎉` was gone — the single element the
+        feature exists to make noticeable, and the one a paraphrase drops first.
+        `footer.MARK` is asserted here, so changing the mark without updating the
+        directive (or dropping it from the directive) fails the build instead of
+        silently degrading what the user sees.
+        """
+        from mcptoon import footer as footer_mod
+
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res["instructions"]
+        self.assertIn(footer_mod.MARK, text, "the directive must name the mark itself")
+        self.assertIn("`note:`", text, "the caveat line is part of the pasteable block")
+        self.assertIn("verbatim", text)
+        self.assertIn("Do not retype it from memory", text,
+                      "retyping is exactly how the mark went missing")
+        self.assertIn("do not translate", text,
+                      "translating re-words the line and drops the prefix")
+
     def test_off_removes_it_entirely(self):
         from mcptoon.config import set_setting
         set_setting("footer", "off")

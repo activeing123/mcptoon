@@ -164,6 +164,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as though only the tool count were partial. The line is quoted verbatim into a chat
   turn, so a stale number presented as current is the one failure that matters; both
   caveats now print together.
+- **The directive and the line had drifted, so the mark vanished in the wild.** The
+  savings feature exists to be *noticed*, and `footer.MARK` was measured, pinned and
+  printed — but `serve._INSTRUCTIONS` only asked the model to "quote it verbatim"
+  without ever naming what "it" contains, and the DSH-side instruction block showed
+  an example line with no mark in it. Measured consequence (2026-09-22): on a machine
+  whose footer really printed `🎉 mcptoon: 95 个工具…`, two consecutive turns reported
+  the line **without the 🎉** — the one element the feature exists to make noticeable,
+  and the first thing a paraphrase drops. The directive now names the payload
+  (`🎉 mcptoon:` on the first line plus the `note:` line when present, in whichever
+  language it printed), forbids retyping from memory and translating it, and
+  `test_instructions_pin_the_mark_and_the_note_line` fails the build if the directive
+  ever stops naming `footer.MARK`. The lesson generalises: an instruction that says
+  "quote X verbatim" without describing X is a licence to paraphrase it.
 
 - **The exit door: `mcptoon off` and `mcptoon uninstall`.** Presence alone is not
   what makes a silent installer feel like a trojan — a tool you cannot get rid of
