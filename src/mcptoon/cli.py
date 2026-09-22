@@ -1700,14 +1700,14 @@ def _gateway_wired_in() -> bool:
 
 
 def _cmd_config(rest, fmt):
-    """Read or write gateway settings (currently: the disclosure footer).
+    """Read or write gateway settings (footer, welcome, lang).
 
     Usage:
         mcptoon config                 Show every setting
         mcptoon config get <key>       Print one value
         mcptoon config set <key> <v>   Persist one value
     """
-    from .config import SETTING_DEFAULTS, load_settings, set_setting
+    from .config import SETTING_DEFAULTS, VALID_LANGS, load_settings, resolve_lang, set_setting
 
     action = rest[0].lower() if rest else "show"
 
@@ -1721,6 +1721,8 @@ def _cmd_config(rest, fmt):
             print(f"  {key:12s} = {values[key]}")
         print()
         print("  footer on|off controls the one-line token-savings disclosure.")
+        print("  lang auto|zh|en picks the language of that line;"
+              " auto follows the OS language.")
         return
 
     if action == "get":
@@ -1742,6 +1744,9 @@ def _cmd_config(rest, fmt):
         if key == "footer" and value not in ("on", "off"):
             print("footer accepts only: on | off")
             return
+        if key == "lang" and value not in VALID_LANGS:
+            print("lang accepts only: auto | zh | en")
+            return
         try:
             set_setting(key, value)
         except ValueError as e:
@@ -1750,6 +1755,11 @@ def _cmd_config(rest, fmt):
         print(f"{key}: {value}   (saved)")
         if key == "footer" and value == "off":
             print("The gateway will stop adding the savings line on the next connection.")
+        if key == "lang":
+            # Print what the setting resolves to *now*, not what was typed: with
+            # `auto` those differ, and "auto" alone leaves the user guessing which
+            # machine signal won.
+            print(f"The savings line will speak: {resolve_lang()}")
         return
 
     print(f"Unknown config action: {action}")

@@ -38,7 +38,9 @@ Config format:
 }
 """
 import json
+import locale
 import os
+import sys
 from pathlib import Path
 
 
@@ -108,7 +110,25 @@ WELCOME_FILE = Path(os.environ.get(
 
 # Recognized settings and their defaults. The CLI validates against this map, so
 # a typo fails loudly instead of silently writing a key nothing reads.
-SETTING_DEFAULTS = {"footer": "on", "welcome": "on"}
+#
+# `lang` is not a boolean like the other two: the strings mcptoon prints (the
+# savings line and its caveat) speak one human language, and on a real machine
+# the signals for "which one" disagree — measured on the author's box, the
+# Windows UI language is Chinese (LANGID 0x804) while the shell exports
+# `LANG=en_US.UTF-8`. "auto" therefore means "ask the machine, in a fixed
+# order"; see `resolve_lang` for the order and for why an order — not a guess —
+# is what makes the answer stable.
+SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto"}
+
+# Languages the human-facing strings can be written in. "auto" is not a language:
+# it is the request to detect one.
+VALID_LANGS = ("auto", "zh", "en")
+DEFAULT_LANG = "en"
+
+# Windows LANGID primary-language ids worth naming. Anything unnamed falls back
+# to the locale string and then to English, so an unlisted language degrades to
+# a correct-but-foreign line rather than to a crash.
+_WIN_PRIMARY_LANGS = {0x04: "zh", 0x09: "en"}
 
 
 def _settings_file() -> Path:
@@ -376,6 +396,91 @@ def mark_welcome_seen() -> None:
         path.write_text("", encoding="utf-8")
     except OSError:
         pass
+
+
+# ─── Language of the human-facing strings ───
+
+def _lang_from_tag(tag: str | None) -> str | None:
+    """Map a locale string to 'zh' / 'en', or None when it is neither.
+
+    Two shapes arrive here: POSIX tags ('zh_CN', 'en_US.UTF-8') and the Windows
+    display names `locale.getlocale()` returns ('Chinese (Simplified)_China').
+    Both are matched by prefix, case-insensitively — a full table of every
+    locale would be a dependency on the CLDR, and the only decision this feeds
+    is which of two languages to print.
+    """
+    if not tag:
+        return None
+    text = tag.strip().lower()
+    if text.startswith("zh") or text.startswith("chinese"):
+        return "zh"
+    if text.startswith("en") or text.startswith("english"):
+        return "en"
+    return None
+
+
+def _os_ui_lang() -> str | None:
+    """The operating system's own UI language, or None when it cannot be read.
+
+    On Windows this asks the OS directly rather than `locale.getlocale()`: the
+    console locale is trivially overridden by LC_*/LANG, and that override is
+    exactly the signal this function has to outrank.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            langid = int(ctypes.windll.kernel32.GetUserDefaultUILanguage())
+        except (AttributeError, OSError, ValueError):
+            langid = 0
+        named = _WIN_PRIMARY_LANGS.get(langid & 0x3FF) if langid else None
+        if named:
+            return named
+    try:
+        name = locale.getlocale()[0]
+    except (ValueError, TypeError):
+        name = None
+    return _lang_from_tag(name)
+
+
+def _env_lang() -> str | None:
+    """The language the environment asks for, in locale precedence order."""
+    for key in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        found = _lang_from_tag(os.environ.get(key))
+        if found:
+            return found
+    return None
+
+
+def resolve_lang(setting: str | None = None) -> str:
+    """Which language the human-facing strings speak: 'zh' or 'en'.
+
+    Priority, highest first. It is an explicit order rather than a guess because
+    the sources genuinely disagree — on the author's machine the OS UI language
+    is Chinese while `LANG=en_US.UTF-8` says English, so "just detect it" is a
+    coin flip that changes between a terminal and a service:
+
+      1. the explicit `lang` setting (`mcptoon config set lang zh`)
+      2. `MCPTOON_LANG` in the environment — the same escape hatch as
+         `MCPTOON_CACHE_DIR`, so a caller can pin the language without writing a
+         settings file
+      3. the operating system's UI language
+      4. `LC_ALL` / `LC_MESSAGES` / `LANG`
+      5. English — the language this project writes its documentation in
+
+    An unrecognised value (a hand-edited settings file, a typo) falls through to
+    the machine's answer instead of raising: a settings typo must not break a
+    command whose whole job is to print one line.
+    """
+    chosen = (setting if setting is not None else get_setting("lang")).strip().lower()
+    if chosen != "auto" and chosen in VALID_LANGS:
+        return chosen
+    return (
+        _lang_from_tag(os.environ.get("MCPTOON_LANG"))
+        or _os_ui_lang()
+        or _env_lang()
+        or DEFAULT_LANG
+    )
 
 
 # ─── Toggle management (per-tool enable/disable) ───

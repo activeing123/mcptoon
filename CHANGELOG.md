@@ -114,6 +114,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with an expired TTL (verified: 0.46s at `MCPTOON_CACHE_TTL=1`, where `status`
   took 15.6s). Its numbers come from the same tokenizer and the same per-tool sums
   as `status` and `stats`, so all three agree.
+- **`mcptoon config set lang auto|zh|en`** — the savings line and its caveat now
+  have a stated language instead of an implicit one. The question that exposed the
+  gap was a plain one: *how does it decide Chinese or English?* It had no answer,
+  because the machine's own signals disagree — measured on the author's box, the
+  Windows UI language is Chinese (LANGID `0x804`) while the shell exports
+  `LANG=en_US.UTF-8`, so "detect it" was a coin flip that could land differently in
+  a terminal than under a scheduled task. `config.resolve_lang()` now owns one
+  documented order, highest first: the explicit setting > `MCPTOON_LANG` (the same
+  escape hatch as `MCPTOON_CACHE_DIR`) > the OS UI language — read from
+  `GetUserDefaultUILanguage` on Windows, precisely because `locale.getlocale()` is
+  the thing `LANG` overrides > `LC_ALL`/`LC_MESSAGES`/`LANG` > English. An
+  unrecognised value falls through to the machine's answer rather than raising: a
+  settings typo must not break a command whose whole job is to print a line.
+  - Every surface follows the one setting, because they all render through
+    `footer.line()` / `note()` / `block()`: the CLI tail, `mcptoon footer-facts`,
+    and the first MCP tool result of a session.
+  - **The machine-readable handles stay ASCII in both languages** — the `mcptoon:`
+    prefix, the word `tokens`, the `[caliber]` suffix and the `note: ` label. A
+    handle that changes with the language hands a parsing problem to consumers who
+    never asked for one, and `--json` keeps its English note outright: a JSON body
+    is data, not a message to a person.
+  - The caveat is re-rendered from the figures already in hand (the raw inputs now
+    travel with them), so translating the note never re-reads a cache — let alone
+    contacts a server — to say the same sentence in another language.
+  - 24 tests in `tests/test_lang.py` pin the order itself (including the measured
+    `LANG`-versus-OS conflict), both renderings, and that neither language loses the
+    handles other suites key on.
 
 ### Fixed
 

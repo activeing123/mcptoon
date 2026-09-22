@@ -14,7 +14,7 @@ mcptoon is a 206KB CLI — think of it as a steward that takes over every MCP to
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1230%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1254%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#the-other-half-of-the-toolbox-skills)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -570,9 +570,10 @@ mcptoon uninstall               # full cleanup — prints the plan first (--dry 
 mcptoon usage                   # local call statistics
 mcptoon stats                   # token-savings dashboard (vs raw JSON)
 mcptoon footer-facts            # one line of savings for a chat footer (never blocks)
-mcptoon config                  # show gateway settings (footer, welcome)
+mcptoon config                  # show gateway settings (footer, welcome, lang)
 mcptoon config set footer off   # silence the per-turn savings line
 mcptoon config set welcome off  # silence the one-time first-run note
+mcptoon config set lang auto    # language of that line: auto | zh | en
 mcptoon toggle <server> <tool>  # enable/disable a single tool (--list to show all)
 mcptoon completion ps           # shell completion (bash/zsh/fish/powershell)
 ```
@@ -581,7 +582,10 @@ That savings line does not depend on an agent remembering to ask for it: it is
 printed to **stderr** after every command, and stamped into the **first tool
 result of an MCP session**, so it reaches any agent that can run a shell and any
 MCP client without per-agent setup. `mcptoon config set footer off` turns all of
-it off at once. stderr is deliberate — stdout stays machine-readable, so
+it off at once, and `mcptoon config set lang auto|zh|en` picks the language that
+line speaks — `auto` means the OS UI language, with `LANG` as a fallback rather
+than a rival, because the two disagree on machines like this one. stderr is
+deliberate — stdout stays machine-readable, so
 `mcptoon status --json | jq` keeps working.
 
 ### Format family: four tiers, compact by default
@@ -774,10 +778,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1230 passed, 1 skipped
+python -m pytest tests/ -v   # 1253 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (1230 tests
+Zero dependencies is a hard rule — our test suite gates every change (1254 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 

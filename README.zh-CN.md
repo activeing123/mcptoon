@@ -13,7 +13,7 @@ MCP 工具 + Agent 技能，压缩说明书 71,929 token → 581（省 99.2% tok
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1230%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1254%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20%E5%B7%A5%E5%85%B7%20%2B%20Agent%20%E6%8A%80%E8%83%BD-8250df)](#工具箱的另一半技能)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -527,9 +527,10 @@ mcptoon uninstall               # 彻底清理——先打印清单再动手（-
 mcptoon usage                   # 本地调用统计
 mcptoon stats                   # 省 token 仪表盘（对比原始 JSON）
 mcptoon footer-facts            # 给聊天末尾用的一行省 token 数字（绝不阻塞）
-mcptoon config                  # 查看网关设置（footer、welcome）
+mcptoon config                  # 查看网关设置（footer、welcome、lang）
 mcptoon config set footer off   # 关掉每轮回复末尾的省 token 播报
 mcptoon config set welcome off  # 关掉首次运行的欢迎提示
+mcptoon config set lang auto    # 那一行的语言：auto | zh | en
 mcptoon toggle <server> <tool>  # 单独启用/停用某个工具（--list 看全部）
 mcptoon completion ps           # Shell 补全（bash/zsh/fish/powershell）
 ```
@@ -537,8 +538,10 @@ mcptoon completion ps           # Shell 补全（bash/zsh/fish/powershell）
 那一行省 token 播报不靠 agent 记着去要：每条命令跑完都会打到 **stderr**，
 MCP 会话的**第一条工具结果**里也会带上一份——所以任何能跑 shell 的 agent、
 任何 MCP 客户端都看得到，不用逐个接线。`mcptoon config set footer off`
-一次全关。走 stderr 是故意的：stdout 留给机器读，`mcptoon status --json | jq`
-照样能用。
+一次全关，`mcptoon config set lang auto|zh|en` 决定那一行说哪种语言——
+`auto` 指系统 UI 语言，`LANG` 只作兜底而不是对手，因为这两者在某些机器上
+（比如本机）正好相反。走 stderr 是故意的：stdout 留给机器读，
+`mcptoon status --json | jq` 照样能用。
 ```
 
 ### 格式家族：四个档，默认 compact
@@ -716,10 +719,10 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1230 passed, 1 skipped
+python -m pytest tests/ -v   # 1253 passed, 1 skipped
 ```
 
-零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1230 个测试。见
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1254 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
 项目本体：17,058 行 Python、26 个模块，零第三方依赖——供应链里 0 个要审计的环节。
