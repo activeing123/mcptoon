@@ -5,6 +5,314 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.21] - 2026-09-21
+
+### Fixed
+
+- **mcptoon installed silently and left no trace on the machine.** `pip install`
+  has no post-install hook, so the wheel cannot greet anyone, and the only
+  self-announcing path was `install.sh` / `install.ps1` handing off to
+  `quickstart` — which prints a table and exits. Worse, `sync` and `quickstart`
+  only ever wrote *your* servers into each agent's config; mcptoon's own
+  `mcptoon serve` gateway was never registered anywhere, so the MCP
+  `instructions` field it uses to announce itself to the model fired zero times.
+  From a user's seat that reads like a trojan: it installed, and nothing changed.
+  Three channels now make its presence visible and verifiable:
+  - **Human.** A one-time first-run note (`_maybe_welcome`) prints a short
+    "here's what's configured / here's what to run next" block on the first
+    interactive command. It stays silent for `--json` / `--toon` / `--slim` (a
+    JSON consumer must get clean JSON, and a suppressed welcome does not consume
+    the marker), for `serve` / `demo` / `demo-server` / `completion` / help, and
+    when `mcptoon config set welcome off` is set.
+  - **Agent.** `quickstart` now registers the gateway itself under the reserved
+    name `mcptoon`, so agents can see mcptoon and the `initialize` handshake
+    delivers its `instructions`. The entry uses `sys.executable -m mcptoon serve`
+    rather than a bare `mcptoon`, because an agent may launch with a PATH that
+    lacks the user Scripts directory. `quickstart` defaults it on (it is the
+    install path, and its whole job is to leave a trace); `mcptoon sync` defaults
+    it **off** and opts in with `--self`, because `sync` is routine and silently
+    injecting a new server entry on every routine run would be a surprise.
+    `mcptoon quickstart --no-self` skips it; a user server already named
+    `mcptoon` is never clobbered. Any write that actually changes an agent
+    config first drops a `<config>.bak` (only once, and only when the content
+    differs), so the pre-mcptoon state is one copy away.
+  - **Effect.** `mcptoon status` prints one screen: servers configured, tools
+    indexed, the schema compression with its caliber label, calls recorded, and
+    whether the gateway is wired into any agent config (`--json` for scripts).
+    And `track_call` finally carries a real token count: every call site passed
+    no tokens before, so `mcptoon usage` said `Tokens (est): 0` on every machine
+    — a tool that sells token savings could never show one. The count now comes
+    from `usage.count_tokens`, which delegates to `bench._tokenizer`, so the
+    footer, `usage`, `stats` and `bench` quote one caliber, never two.
+  29 tests (`tests/test_presence.py`), all local and offline.
+
+### Added
+
+- **The savings line now arrives on its own, on every surface mcptoon controls.**
+  The per-turn footer was wired as a *request*: the agent-side directive asked the
+  model to run `mcptoon footer-facts` and paste the result. That is a soft channel
+  — it works only if an agent reads the directive, remembers it and complies — and
+  on a harness that speaks no MCP (DSH, which is why this round exists) nothing
+  appeared at all, so the tool whose entire job is compressing the context was
+  itself invisible. The line is now *stamped* rather than requested, on the two
+  payloads mcptoon already owns, behind one shared implementation:
+  - **Every CLI command.** `cli.main()` prints the block to **stderr** once the
+    command finishes, so any agent that can run a shell sees it — Codex, DSH,
+    Gemini CLI, Aider, anything with a terminal — with no per-agent
+    configuration. stderr rather than stdout on purpose: stdout is
+    machine-readable for `--json` and `--toon`, and a courtesy line that breaks
+    `mcptoon status --json | jq` would be a worse bug than the invisibility it
+    fixes. Silent for the stdio servers (`serve`, `demo-server`), where one stray
+    write can desynchronise the JSON-RPC stream; silent for `--version` and for
+    `footer-facts`, which has already printed the same block on stdout; printed
+    only on success, because after a failed command the terminal is already
+    carrying a diagnostic. The wrapper catches `SystemExit` because 41 places in
+    `cli.py` leave through `sys.exit()` — `mcptoon manifest` among them — and a
+    raised `SystemExit` skips everything written after the dispatch.
+  - **The first tool result of an MCP session.** `MCPServerBridge._stamp_footer`
+    appends the block to the first successful result routed through
+    `_make_tool_result`, the single funnel every proxied call passes through. That
+    rides the protocol payload rather than a prompt, so it reaches Claude Desktop,
+    Cursor, Cline, Windsurf, VS Code Copilot and any other MCP client without
+    needing the model's cooperation. **Once per session, not once per call**: the
+    block measures 32 tokens on the tiktoken cl100k_base caliber while a full
+    catalog compression saves ~5,200, so stamping every result would break even at
+    ~162 calls — and a feature that can eat the savings it advertises is not a
+    feature. Error payloads are skipped, and an unanticipated upstream shape is
+    passed through untouched rather than raising.
+  - The new `footer` module is the single source of truth for all of it
+    (`facts()` / `line()` / `note()` / `block()` / `enabled()`), and
+    `cli._cmd_footer_facts` now delegates to it, so the CLI tail, the MCP stamp,
+    `footer-facts` and the model's own line cannot quote different numbers.
+    `config.footer_enabled()` still governs every surface at once. Measured cost of
+    the CLI half: 171 ms of tiktoken work per command on this 12-server, 95-tool
+    machine — accepted rather than memoised, because a cache-stamp key would still
+    have had to keep the *age* half live, and 171 ms next to a 15-60 s `status` is
+    not the failure mode this feature exists to avoid.
+  - 15 new tests in `tests/test_reversible.py` pin the behaviour: the tail lands on
+    stderr and not stdout, `--json` stays parseable, `--version` stays byte-clean,
+    the stdio servers never stamp, `footer off` silences all of it, a broken footer
+    cannot fail the command carrying it, the MCP stamp lands exactly once, and all
+    four surfaces quote one identical line. Two of them exist because the first
+    draft was wrong: the tail initially sat at the end of `main()`, where
+    `sys.exit()` meant it never ran at all — `mcptoon manifest` printed nothing
+    extra, which is exactly the bug being fixed.
+  - **The line opens with a 🎉 mark.** A savings figure the user never notices is
+    the same failure as no figure at all, and a single emoji is the cheapest way to
+    make a line of numbers catch the eye. Kept as `footer.MARK` so it can be changed
+    or dropped in one place; the text after it stays byte-identical to
+    `footer-facts`, and the mark is confined to the human-facing line — `--json`
+    bodies and `--version` stay undecorated.
+- **`mcptoon footer-facts`** — one line of real savings numbers for a chat footer,
+  read from the cached catalog without contacting any server. This exists because
+  the agent-side directive asks the model to close a turn with a savings line, and
+  the obvious implementation (`mcptoon status`) is unusable in a chat loop: `status`
+  refreshes a stale schema cache by spawning every configured MCP server — measured
+  at **23s cold against 1.9s warm** on a 12-server machine. A footer that
+  occasionally costs 23 seconds is worse than no footer, so `footer-facts` serves
+  whatever the cache holds, says how old it is, and stays under half a second even
+  with an expired TTL (verified: 0.46s at `MCPTOON_CACHE_TTL=1`, where `status`
+  took 15.6s). Its numbers come from the same tokenizer and the same per-tool sums
+  as `status` and `stats`, so all three agree.
+
+### Fixed
+
+- **`MCPTOON_CACHE_DIR` was documented and silently ignored.** `cache.py` built its
+  path from `config.CACHE_DIR`, frozen at import, so the setting moved
+  `config._cache_dir()` and nothing else — a caller who relocated the cache still
+  wrote to the real `~/.cache/mcptoon`. This is the third instance of the same
+  class in this project (the destructive commands had it, and it cost a real
+  `config.json` once); the path is resolved per call now, and `tests/test_cache.py`
+  isolates through the env var instead of patching the constants that hid the bug.
+- **The agent directive pointed at a command the model could not run.** It said
+  "read mcptoon_usage for the exact figures" — not a command, so the natural
+  substitute was `mcptoon status`, with the 23-second refresh above. It now names
+  `mcptoon footer-facts`, says why not `status`, and still states the off switch in
+  the same breath.
+- **A stale figure could be reported as fresh.** `footer-facts` emits a `note` when
+  the catalog is incomplete or old, and the first version tested those two conditions
+  as `elif` branches — so on a machine with one server that never resolves, the note
+  named the missing server and silently swallowed the staleness. Caught on the author's
+  machine where the cache was 128 minutes old against a 5-minute TTL and the note read
+  as though only the tool count were partial. The line is quoted verbatim into a chat
+  turn, so a stale number presented as current is the one failure that matters; both
+  caveats now print together.
+
+- **The exit door: `mcptoon off` and `mcptoon uninstall`.** Presence alone is not
+  what makes a silent installer feel like a trojan — a tool you cannot get rid of
+  is. The three channels above make mcptoon visible; these make it removable, which
+  is the half that was still missing.
+  - `mcptoon off` removes **only** the reserved `mcptoon` gateway entry from every
+    agent config and nothing else: your own server definitions, comments and
+    ordering in those files are untouched, and every file it changes keeps the
+    `<config>.bak` that `sync` writes. `mcptoon sync --self` puts it back. `--dry`
+    prints what would change without writing.
+  - `mcptoon uninstall` prints its complete plan *before* it removes anything, then
+    takes the gateway entries back and deletes mcptoon's own bookkeeping (settings,
+    the first-run marker, toggles, compression policy) and its cache directory. It
+    deliberately **keeps** `~/.mcptoon/config.json` and `config.toml`, because those
+    hold the servers *you* configured — silently deleting a user's server list while
+    claiming to clean up would be the worst possible version of the surprise this
+    release exists to remove. `--no-keep-config` is the explicit opt-in to delete
+    them too. `--dry` shows the same plan and stops. Without `--yes`, a
+    non-interactive stdin makes it refuse rather than delete silently.
+  - The two commands share `sync.remove_gateway_from_agent` / `remove_gateway_from_all`,
+    which de-duplicate by the **resolved** file rather than by the reported path
+    string: `detect_installed_agents` lists Cursor twice (global + project) and those
+    can be the same file, so the old string comparison processed it twice and
+    reported "removed from 6 agents" when five files had changed — its own small lie.
+    Keying on the resolved path also let `remove_gateway_from_agent` take a `path`
+    override, which fixes a real gap: `_agent_config_path("cursor")` only ever names
+    the *global* file, so a project-level `.cursor/mcp.json` silently kept the gateway
+    entry that `off` had just reported as removed. On this machine the reported count
+    went from a wrong 6 to a correct 5, and both behaviours are pinned by tests that
+    fail when the override is dropped (mutation-checked).
+  - Uninstall resolves its paths through the new `config.state_paths()`, so the
+    `MCPTOON_*_FILE` overrides it advertises are honoured by the command that deletes
+    things — the one place getting it wrong is unrecoverable. It also split the
+    paths into bookkeeping / servers / cache, which is what makes the
+    keep-your-servers default expressible instead of implicit.
+  - `_safe_rmtree` refuses to recursively delete any directory not named `mcptoon`
+    (the only name this project creates) and reports the skip. A destructive command
+    should not be one bad constant away from deleting a user's home: if
+    `MCPTOON_CACHE_DIR` ever resolved to a parent, an unguarded `rmtree` would take
+    everything with it.
+- **A first draft of `uninstall` deleted a real `~/.mcptoon`, and the tests did it.**
+  Recording this because it is the strongest argument for the rules above. The
+  initial `_cmd_uninstall` read its paths from config.py's import-time constants
+  (`cfg.CONFIG_DIR` / `cfg.CONFIG_FILE` / `cfg.SETTINGS_FILE`). Those are computed
+  once at import, so they ignore the `MCPTOON_*_FILE` env overrides — and the unit
+  test that exercises the destructive branch redirects *env vars*, not module
+  attributes. The two never met: running `pytest tests/test_reversible.py` deleted
+  the developer's real `config.json` (12 MCP server definitions) and `settings.json`.
+  Recovery was possible only because `sync` leaves dated backups: the newest
+  (`config.json.pre-auto-20260919-175947`) was verified field-by-field against the
+  live agent configs — 11 servers, zero mismatches in command/args/env/url — and the
+  single server it predated was recovered from Cursor's own config, restoring all 12
+  servers and 95 tools. Two independent guards now stand between a test and that
+  outcome, and both were mutation-tested (a dead `cfg.CONFIG_FILE` reference was
+  added to `_cmd_off`, the guard was confirmed to fail, then the mutation was removed):
+  - `_IsolatedHome.setUp` asserts every path `config.state_paths()` returns resolves
+    inside the temp directory, and redirects the whole set by `MCPTOON_*` env
+    (including the previously non-overridable `MCPTOON_COMPRESSION_FILE`) rather than
+    by patching module attributes.
+  - `TestDestructiveCommandsReadPathsLate` inspects the source of `_cmd_uninstall`,
+    `_cmd_off` and `_cmd_status` and fails if any of them names one of config.py's
+    import-time path constants. Reading the source catches a reintroduction even when
+    the running environment happens to make the paths look correct.
+- **A real front door for the CLI.** `mcptoon --help` now opens with a wordmark and
+  a four-command "Start here" block (`quickstart`, `status`, `off`, `uninstall`)
+  before the full command list, so the first thing a new user reads includes how to
+  see what it did and how to undo it. `mcptoon status` gained the same closing
+  section, and `mcptoon sync --self` now prints the undo command on success.
+- **`sync` no longer reports agents it did not write.** The same phantom as the
+  removal fix above, on the other side of the command: `sync_to_all` iterated agent
+  *rows* and called `sync_to_agent(agent["id"])`, but an id maps to one file — for
+  Cursor, the global one. So the project-level row produced a second "✓ 13 servers"
+  line for a file already written once, and a full run reported "6 agents updated,
+  78 servers" where five files and 65 servers is the truth. It now de-duplicates on
+  the file it will actually write, which also keeps sync off a project-level
+  `.cursor/mcp.json` it would otherwise have to create — writing into whatever
+  directory the user is standing in is exactly the kind of unasked-for side effect
+  this release exists to remove.
+- **`off` and `uninstall` no longer greet you on the way out.** Both joined
+  `_WELCOME_EXEMPT`: a first-run note saying "here's what I configured for you",
+  printed immediately above an uninstall, is its own small joke.
+- **End-to-end tests for the destructive commands, in a home that is not yours.**
+  `tests/test_uninstall_end_to_end.py` (10 tests) runs `python -m mcptoon uninstall
+  --yes` and `mcptoon off` as real subprocesses against a fabricated home —
+  `USERPROFILE` and `APPDATA` relocate the agent paths, `MCPTOON_*` relocate
+  mcptoon's own — then asserts the user's server definitions survived on both sides,
+  that `--no-keep-config` really deletes them, that a refusal removes nothing, that a
+  second uninstall does not crash, that `off → sync --self` is a round trip, and that
+  `off` leaves a `<config>.bak` still holding the pre-change state. A shared guard
+  re-reads the developer's real `~/.mcptoon/config.json`, `settings.json` and Cursor
+  config afterwards and fails if they changed at all — the check whose absence let
+  the original incident through.
+- **The non-interactive guard is a courtesy, not the safety property.** Pinned
+  because finding it out was the hard way: on Windows the NUL device is a character
+  device, so `isatty()` returns True for `stdin=DEVNULL` and the
+  `not sys.stdin.isatty()` check does not fire. The prompt then runs, `input()` raises
+  `EOFError`, the answer becomes empty — which is not "yes" — and it refuses there
+  instead. Both routes refuse and neither deletes, and both are now tested separately
+  so that "is it safe to run uninstall in a script" never rests on `isatty()`.
+- 58 tests (`tests/test_reversible.py`): the surgical undo keeps user servers,
+  leaves a `.bak`, writes nothing on `--dry`, tolerates the VS Code `mcp.servers`
+  shape, collapses rows that name the same file (in both directions), uninstall
+  survives `--dry`, `--yes` and a non-interactive refusal, the sandbox asserts it
+  cannot reach outside itself, and the destructive functions are pinned to call-time
+  path resolution. It also pins the per-turn footer's two obligations — its numbers
+  agree with `status`/`stats`, and it cannot be made to wait on a server — plus the
+  cache-dir env var that `MCPTOON_CACHE_DIR` only pretended to honour. 5 more in
+  `tests/test_native_tools.py` pin the agent-side
+  directive below; 10 more at the process level in
+  `tests/test_uninstall_end_to_end.py`.
+
+### Fixed
+
+- **Three commands existed that no user could find.** `mcptoon config`,
+  `mcptoon stats` and `mcptoon toggle` were fully implemented, reachable, and
+  absent from `--help` and from both READMEs (grep: zero mentions in either).
+  `config` is the worst of the three to have lost — it is how a user silences the
+  per-turn savings line, so the release that promised "you can switch this off"
+  shipped with the switch unfindable. All three are now in `--help`, in both
+  READMEs, and on the AI-facing surface (`docs/llms.txt`), which also did not
+  mention them. Every existing guard started from `_print_help()` and looked
+  outward, quietly assuming the help was complete; the missing direction —
+  dispatcher → help — is now covered by
+  `tests/test_command_coverage.py::test_every_dispatched_command_is_either_advertised_or_a_declared_alias`,
+  with an explicit alias table so it cannot be satisfied by hiding a command.
+- **`stats` and `status` disagreed about how much mcptoon saves.** `mcptoon stats`
+  — literally titled the token savings dashboard — measured with
+  `len(json) // 4  # rough token estimate` while `mcptoon status` used
+  `tiktoken cl100k_base`. On the real machine that read 20,306 / 15,292 against
+  20,914 / 15,719 for the same catalog. `stats` now shares the one tokenizer, prints
+  the caliber, and carries `token_caliber` in its JSON. Nobody had noticed for as
+  long as it was true, because `stats` was not in `--help`: the only way to find the
+  discrepancy was to already know both commands existed, which is the same
+  discoverability failure wearing a different hat.
+- **`mcptoon --help` listed `off` twice** and `uninstall` twice (bare, and again as
+  `--dry`), and its description column had drifted into two alignment groups —
+  everything down to `install` padded to column 42, the rest to 41 — visible as a
+  ragged edge in the one block whose whole job is to look like a front door.
+  `uninstall` now appears once, in the `Start here` block where a newcomer needs it,
+  and the padding is uniform and guarded by a test.
+- **cli.py carried a second, drifted copy of the help text as its module
+  docstring.** 68 lines, printed by nothing, and already wrong: it still advertised
+  `mcptoon uninstall` in its Usage block, listed `policy` twice, and had never heard
+  of `config`, `stats` or `toggle`. Replaced with a pointer to `_print_help()`, the
+  single source of truth. Two copies of a front door is one copy too many, and the
+  stale one is the one people read.
+
+### Changed
+
+- **`status` and `bench` now quote one tokenizer, not two.** `status` measured
+  savings with `len(json) // 4` while `bench` used `tiktoken cl100k_base`, so the two
+  commands a user runs back-to-back disagreed about the same catalog — `status` said
+  `-25%` where `bench` said `-88.3%`. Two calibers for "how much did you save" is how
+  a tool loses the argument that its numbers are real, and the smaller number is the
+  one that looks like the honest one. `status` now calls `bench._tokenizer`
+  directly, labels the figure with the caliber it used (`chars/4` only as a stated
+  fallback when tiktoken is absent), and its `--json` gained `tokens_full`,
+  `tokens_slim` and `token_caliber` so both sides of the saving are auditable.
+- **The agent-side savings line is now expected rather than permitted.** The
+  `initialize` `instructions` field asked the model to *maybe* close with one line,
+  which in practice meant turns silently dropped it — the same invisibility this
+  release is fixing, one layer down. It now says to end every tool-using turn with
+  the figure, to take the number from `mcptoon_usage` and never invent it, to load
+  the `mcptoon` skill for the per-server breakdown (so "saved compared to what?" has
+  a reachable answer), and how to switch the line off
+  (`mcptoon config set footer off`) in the same breath as asking for it. A line the
+  user cannot silence is the reason it would read as spam.
+- **README's first-push path is now `quickstart`, not `bench`.** The 30-second
+  "your own numbers" pitch still points at `bench`, but a fresh reader is sent to
+  the command that actually configures the machine and announces itself. Both
+  READMEs also now state the undo path next to the gateway paragraph.
+- Both READMEs, `DEVELOPERS.md`, `ROADMAP.md`, the landing pages and the benchmark
+  post carry re-measured footprint numbers (206KB wheel, 16,839 lines, 1194 tests).
+  The wheel byte growth was attributed to this session's source changes by comparing
+  the deflate delta of `src/mcptoon/*.py`, so the number is not a toolchain artifact.
+
 ## [0.7.20] - 2026-09-20
 
 ### Fixed

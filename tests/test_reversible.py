@@ -807,6 +807,25 @@ class TestTheFooterReachesEverySurface(_IsolatedHome):
         self.assertIn("mcptoon:", err,
                       "a command that prints nothing extra is the invisibility bug")
 
+    def test_the_line_opens_with_the_emoji_mark(self):
+        """The whole point is that the line gets noticed; the user asked for an emoji
+        (2026-09-22). Pinned so a later edit cannot quietly drop it, and pinned as a
+        *prefix* so the `mcptoon:` substring every other test keys on stays intact."""
+        from mcptoon import footer as footer_mod
+
+        self.assertTrue(footer_mod.MARK, "the mark must not be empty")
+        self.assertTrue(footer_mod.line().startswith(footer_mod.MARK + " mcptoon:"),
+                        "the line must open with the emoji mark, then `mcptoon:`")
+
+    def test_the_emoji_mark_does_not_leak_into_json_or_version(self):
+        """`--json` and `--version` are machine channels: the mark belongs on the
+        human-facing line only, or a parser would choke on a decorated payload."""
+        self._seed_cache()
+        out, _ = _run_main_streams(["footer-facts", "--json"])
+        json.loads(out)  # raises if the emoji leaked into the JSON body
+        vout, _ = _run_main_streams(["--version"])
+        self.assertRegex(vout.strip(), r"^mcptoon \d")
+
     def test_the_cli_tail_goes_to_stderr_not_stdout(self):
         """stdout is a data channel: `mcptoon status --json | jq` must keep working."""
         self._seed_cache()

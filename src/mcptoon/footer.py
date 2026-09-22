@@ -42,7 +42,15 @@ from __future__ import annotations
 
 import json
 
-__all__ = ["facts", "line", "note", "block", "enabled"]
+__all__ = ["facts", "line", "note", "block", "enabled", "MARK"]
+
+# The savings line is meant to be *noticed* — the entire point of this feature is
+# that an install stops being invisible. A single emoji is the cheapest way to
+# make a line of numbers catch the eye in a chat transcript, and the user asked
+# for this one by name (2026-09-22). Kept as a constant so it is trivial to
+# change or drop; the string after it stays byte-identical to `footer-facts`'
+# first line, which every format test pins on the `mcptoon:` prefix.
+MARK = "🎉"
 
 
 def enabled() -> bool:
@@ -138,9 +146,10 @@ def facts() -> dict:
 
 
 def line(f: dict | None = None) -> str:
-    """The one pasteable line. Byte-identical to `footer-facts`' first line."""
+    """The one pasteable line. Byte-identical to `footer-facts`' first line,
+    apart from the leading `MARK` emoji."""
     d = facts() if f is None else f
-    return (f"mcptoon: {d['tools']} tools in {d['servers']} servers — "
+    return (f"{MARK} mcptoon: {d['tools']} tools in {d['servers']} servers — "
             f"{d['tokens_full']:,} → {d['tokens_slim']:,} tokens "
             f"(saved {d['tokens_saved']:,}, {d['savings_pct']:.0f}%) "
             f"[{d['token_caliber']}]")
