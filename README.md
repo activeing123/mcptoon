@@ -5,7 +5,7 @@
 
 **Add 1,000 MCP tools and 1,000 agent skills locally — your token context never feels it.** *(measured on my own machine: 255 tools / 371 skills)*
 
-mcptoon is a 189KB CLI — think of it as a steward that takes over every MCP tool and skill on your machine, and keeps both out of your context window.
+mcptoon is a 206KB CLI — think of it as a steward that takes over every MCP tool and skill on your machine, and keeps both out of your context window.
 
 **① Token** — it keeps both MCP tool schemas and skill files out of your agent's context. Tools: **71,929 → 581 tokens** (−99.2% measured). Skills: **926,000 → 501 tokens** to find the right one, with only **39** resident (−99.9% measured). Call results shrink another ~34% with `--toon`.
 
@@ -14,7 +14,7 @@ mcptoon is a 189KB CLI — think of it as a steward that takes over every MCP to
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1069%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1209%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#the-other-half-of-the-toolbox-skills)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -65,10 +65,11 @@ covering every agent at once.
 ## Up and running in 30 seconds
 
 ```bash
-pip install mcptoon                          # pure stdlib, 189KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 206KB, zero dependencies
 
-# Add any MCP server — one command:
-mcptoon add everything --stdio npx -y @modelcontextprotocol/server-everything
+# One command: find your MCP servers, write your config, register the gateway
+# in every agent you have, and show you what it found:
+mcptoon quickstart
 
 # See every tool available (names-only by default; 255 tools cost 581 tokens):
 mcptoon manifest
@@ -76,6 +77,20 @@ mcptoon manifest
 # Call a tool (JSON output by default; add --toon to save more):
 mcptoon call everything echo '{"message":"hi"}'
 ```
+
+`quickstart` is also what makes mcptoon *visible*: it writes `mcptoon serve` into each
+agent's config as the reserved server `mcptoon`, so your agent can see mcptoon itself
+(and gets its one-line savings report at the end of a turn). Already synced? Re-register
+with `mcptoon sync --self` (plain `mcptoon sync` only writes your servers), skip the
+gateway during onboarding with `mcptoon quickstart --no-self`, and check the state any
+time with `mcptoon status`.
+
+**And it is undoable — the part that makes it not a trojan.** `mcptoon sync --self` is the
+only command that ever touches an agent's config, and it only adds one entry. Take that
+entry back with `mcptoon off` (your own servers untouched, every changed file keeps a
+`.bak`); preview a full removal — gateway plus mcptoon's own files — with
+`mcptoon uninstall --dry`. `uninstall` never deletes your server definitions unless you
+pass `--no-keep-config`, and it prints exactly what it will remove before it removes it.
 
 ### Prove both halves on your own machine (30 seconds)
 
@@ -185,7 +200,7 @@ mcptoon quickstart     # discover + configure + list tools — one command
 ```
 
 That's it. No hand-written JSON config. No MCP protocol debugging. No polluted context
-window. The wheel is 189KB with zero dependencies, and mcptoon itself needs no API
+window. The wheel is 206KB with zero dependencies, and mcptoon itself needs no API
 key and phones nothing home — $0 in service fees, everything runs on your machine.
 
 ---
@@ -274,7 +289,7 @@ platform**, which for the agents you actually run is the same as not shipping it
 |---|---|---|
 | Anthropic's Tool Search Tool / PTC | Claude-platform betas | Claude only — other agents still pay for results token by token |
 | MuleSoft's MCP Payload Optimization | MuleSoft enterprise gateway | behind a gateway; MCP spec one generation behind |
-| **mcptoon** | **any agent that can run a shell command** | none — 189KB, no key, no proxy, MCP 2026-07-28 GA |
+| **mcptoon** | **any agent that can run a shell command** | none — 206KB, no key, no proxy, MCP 2026-07-28 GA |
 
 Every one of those is a wall. mcptoon is the same answer with no wall: it runs
 **today, on every agent at once** — the results-side discipline without the
@@ -302,7 +317,7 @@ mcptoon install --remove brave-search
 ```
 
 mcptoon connects, discovers tools, generates the handler, registers it. No restart
-needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 189KB with zero
+needed. Each install adds **0 KB to mcptoon itself** — the CLI stays 206KB with zero
 dependencies, because servers are external processes your machine runs directly, not
 code bundled into mcptoon. Four steps, one command, no agent restart.
 
@@ -533,7 +548,7 @@ mcptoon remove <name>           # remove a server
 mcptoon install <name> --npm|--pip|--url <pkg>  # install + auto-generate handler
 mcptoon install --list          # list installed
 mcptoon install --remove <name> # uninstall
-mcptoon sync                    # sync native config to every detected agent
+mcptoon sync                    # sync native config to every detected agent (--self also registers the mcptoon gateway itself)
 mcptoon health                  # health-check every MCP server (--json exits 1 if any is dead)
 mcptoon policy                  # per-tool compression policy (raw / toon / slim)
 mcptoon skills index [ROOT ...] # build the on-disk index (required before list/resolve)
@@ -549,9 +564,25 @@ mcptoon plugin install <dir>    # install an Agent Plugins 1.0.0 plugin
 mcptoon serve                   # run as an MCP server (stdio/HTTP) — MCP 2026-07-28: stateless-first, server/discover, cacheable list results
 mcptoon demo                    # one command, live demo on your machine
 mcptoon doctor                  # self-check: Python, config, connectivity
+mcptoon status                  # one screen: what's configured, gateway wired, tokens saved
+mcptoon off                     # remove the gateway entry from your agents (reversible)
+mcptoon uninstall               # full cleanup — prints the plan first (--dry to preview)
 mcptoon usage                   # local call statistics
+mcptoon stats                   # token-savings dashboard (vs raw JSON)
+mcptoon footer-facts            # one line of savings for a chat footer (never blocks)
+mcptoon config                  # show gateway settings (footer, welcome)
+mcptoon config set footer off   # silence the per-turn savings line
+mcptoon config set welcome off  # silence the one-time first-run note
+mcptoon toggle <server> <tool>  # enable/disable a single tool (--list to show all)
 mcptoon completion ps           # shell completion (bash/zsh/fish/powershell)
 ```
+
+That savings line does not depend on an agent remembering to ask for it: it is
+printed to **stderr** after every command, and stamped into the **first tool
+result of an MCP session**, so it reaches any agent that can run a shell and any
+MCP client without per-agent setup. `mcptoon config set footer off` turns all of
+it off at once. stderr is deliberate — stdout stays machine-readable, so
+`mcptoon status --json | jq` keeps working.
 
 ### Format family: four tiers, compact by default
 
@@ -617,8 +648,8 @@ Both halves of the toolbox share one engine, one config and one index format.
 | **Add / remove** | `install` · `add` · `remove` | `skills add` · `skills remove --tombstone` |
 | **Health** | `mcptoon health` | `mcptoon skills stats` |
 
-**Runtime.** Python ≥ 3.10 (CI: 3.10–3.13 × Linux, Windows, macOS). 25 modules,
-15,697 lines of Python, a **189KB** wheel, **zero third-party dependencies** — standard
+**Runtime.** Python ≥ 3.10 (CI: 3.10–3.13 × Linux, Windows, macOS). 26 modules,
+16,839 lines of Python, a **206KB** wheel, **zero third-party dependencies** — standard
 library only, enforced in CI by `scripts/check_zero_deps.py`. No daemon, no listening
 port, no telemetry, no stored credentials.
 
@@ -704,7 +735,7 @@ toolbox behaves like one thing because it is one thing.
 **Two-layer decoupling:**
 
 ```
-Layer 1: mcptoon CLI (189KB, zero deps)
+Layer 1: mcptoon CLI (206KB, zero deps)
          runs in the agent's shell. schemas stay out of context by default.
                     │
 Layer 2: the actual MCP servers (npm/pip packages)
@@ -743,14 +774,14 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1069 passed, 1 skipped
+python -m pytest tests/ -v   # 1209 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (1069 tests
+Zero dependencies is a hard rule — our test suite gates every change (1209 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: 15,697 lines of Python across 25 modules, zero third-party dependencies.
+The codebase: 16,839 lines of Python across 26 modules, zero third-party dependencies.
 
 ---
 

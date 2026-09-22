@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 460" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="1179" height="459" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="165" cy="92" r="193" fill="#2ea043" opacity="0.055"/><circle cx="1038" cy="377" r="184" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="1179" height="459" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="590" y="50" font-size="28" fill="#1f2328" text-anchor="middle" font-weight="800">Works with every AI agent</text>
+<text x="590" y="80" font-size="14.5" fill="#57606a" text-anchor="middle">mcptoon is a CLI. If your agent can run a shell command, it can use mcptoon.</text>
+<rect x="90" y="104" width="1000" height="42" rx="11" fill="url(#strip)" filter="url(#soft)"/>
+<circle cx="118" cy="125" r="5" fill="#ffffff" opacity="0.85"/><circle cx="136" cy="125" r="5" fill="#ffffff" opacity="0.6"/><circle cx="154" cy="125" r="5" fill="#ffffff" opacity="0.4"/>
+<text x="590" y="131" font-size="13.5" fill="#ffffff" text-anchor="middle" font-weight="700">mcptoon — one config, shared by every agent</text>
+<rect x="90" y="156" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="156" width="6" height="36" rx="3" fill="#1a7f37"/>
+<circle cx="122" cy="174" r="9" fill="#1a7f37" opacity="0.16"/>
+<circle cx="122" cy="174" r="4.5" fill="#1a7f37"/>
+<text x="146" y="180" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Claude Code</text>
+<text x="420" y="180" font-size="13.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">put mcptoon commands in SKILL.md</text>
+<rect x="90" y="198" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="198" width="6" height="36" rx="3" fill="#0969da"/>
+<circle cx="122" cy="216" r="9" fill="#0969da" opacity="0.16"/>
+<circle cx="122" cy="216" r="4.5" fill="#0969da"/>
+<text x="146" y="222" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Codex (OpenAI)</text>
+<text x="420" y="222" font-size="13.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">add mcptoon to AGENTS.md</text>
+<rect x="90" y="240" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="240" width="6" height="36" rx="3" fill="#bf8700"/>
+<circle cx="122" cy="258" r="9" fill="#bf8700" opacity="0.16"/>
+<circle cx="122" cy="258" r="4.5" fill="#bf8700"/>
+<text x="146" y="264" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Cursor</text>
+<text x="420" y="264" font-size="13.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">add mcptoon to .cursorrules</text>
+<rect x="90" y="282" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="282" width="6" height="36" rx="3" fill="#8250df"/>
+<circle cx="122" cy="300" r="9" fill="#8250df" opacity="0.16"/>
+<circle cx="122" cy="300" r="4.5" fill="#8250df"/>
+<text x="146" y="306" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Windsurf</text>
+<text x="420" y="306" font-size="13.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">add mcptoon to .windsurfrules</text>
+<rect x="90" y="324" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="324" width="6" height="36" rx="3" fill="#1a7f37"/>
+<circle cx="122" cy="342" r="9" fill="#1a7f37" opacity="0.16"/>
+<circle cx="122" cy="342" r="4.5" fill="#1a7f37"/>
+<text x="146" y="348" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Gemini CLI</text>
+<text x="420" y="348" font-size="13.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">add mcptoon to GEMINI.md</text>
+<rect x="90" y="366" width="1000" height="36" rx="9" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="90" y="366" width="6" height="36" rx="3" fill="#0969da"/>
+<circle cx="122" cy="384" r="9" fill="#0969da" opacity="0.16"/>
+<circle cx="122" cy="384" r="4.5" fill="#0969da"/>
+<text x="146" y="390" font-size="14" fill="#1f2328" text-anchor="start" font-weight="700">Any agent</text>
+<text x="420" y="390" font-size="13.5" fill="#57606a" text-anchor="start">can run shell commands</text>
+<rect x="190" y="424" width="800" height="34" rx="10" fill="#eaf6ec"/>
+<text x="590" y="446" font-size="13.5" fill="#1a7f37" text-anchor="middle" font-weight="700">Configure once in ~/.mcptoon/config.json; custom formats never touch the wire protocol.</text>
+</svg>

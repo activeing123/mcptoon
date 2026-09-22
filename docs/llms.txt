@@ -23,7 +23,12 @@ real numbers on your own machine (it needs Node.js only because it boots a demo 
 - `mcptoon sync` — push one config to all your agents (Claude Desktop, Cursor, Codex, opencode, …).
 - `mcptoon skills` — manage an agent skill catalog the same way: `list` / `resolve "<task>"` (offline BM25 shortlist, no LLM) / `sync <src>` (one source, every agent's skill folder, linked not copied) / `add` / `remove`. Lifecycle flags: `--version-gate`, `--derived`, `--archive`, `remove --tombstone`.
 - `mcptoon plugin scan|install|list|remove` — validate and distribute Agent Plugins packages.
-- `mcptoon doctor` / `mcptoon usage` / `mcptoon completion <shell>` — self-diagnose, stats, shell completion.
+- `mcptoon doctor` / `mcptoon usage` / `mcptoon stats` / `mcptoon completion <shell>` — self-diagnose, call stats, token-savings dashboard, shell completion.
+- `mcptoon footer-facts` — one line of real savings numbers for a chat footer, read from the cached catalog without contacting any server (sub-second even on a stale cache). The same line is printed to **stderr** after every other command and stamped into the **first tool result of an MCP session**, so it reaches any agent with a shell and any MCP client without per-agent configuration; `mcptoon config set footer off` silences all of those at once. `mcptoon status` answers the same question but may spend seconds refreshing, so it is not the command to call per turn.
+- `mcptoon config` — read or change gateway settings. Two settings today, both disclosure controls: `footer` (the one-line savings report an agent prints at the end of a turn) and `welcome` (the one-time first-run note). Both default `on`; `mcptoon config set footer off` silences the line.
+- `mcptoon toggle <server> <tool>` / `--list` — disable a single tool without editing config.
+- `mcptoon off` — remove the gateway entry from every agent config, leaving your server definitions and mcptoon's own files alone. `mcptoon sync --self` puts it back; each agent config also keeps a `.bak`.
+- `mcptoon uninstall` — full cleanup. Prints the plan first; `--dry` shows it and changes nothing; `--yes` skips the prompt; your server definitions are kept unless you pass `--no-keep-config`.
 
 ## Token tiers (the same 255-tool corpus, so they are directly comparable)
 

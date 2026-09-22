@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 440" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="1179" height="439" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="165" cy="88" r="184" fill="#2ea043" opacity="0.055"/><circle cx="1038" cy="360" r="176" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="1179" height="439" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="590" y="50" font-size="28" fill="#1f2328" text-anchor="middle" font-weight="800">Choose with manifest. Call with inspect.</text>
+<text x="590" y="80" font-size="14.5" fill="#57606a" text-anchor="middle">Names pick the tool; on-demand inspect gets the arguments right.</text>
+<rect x="60" y="112" width="300" height="196" rx="14" fill="#ffffff" stroke="#d0d7de" filter="url(#soft)"/>
+<path d="M74,112 h272 a0,0 0 0 1 0,0 v0 h-272 z" fill="none"/>
+<rect x="60" y="112" width="300" height="44" rx="14" fill="url(#strip)"/>
+<rect x="60" y="140" width="300" height="16" fill="url(#strip)"/>
+<circle cx="94" cy="134" r="14" fill="#ffffff" opacity="0.22"/>
+<text x="94" y="140" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="800">1</text>
+<g transform="translate(124,134) scale(1.05)" fill="#ffffff"><rect x="-7" y="-7" width="6" height="6" rx="1.6"/><rect x="1" y="-7" width="6" height="6" rx="1.6"/><rect x="-7" y="1" width="6" height="6" rx="1.6"/><rect x="1" y="1" width="6" height="6" rx="1.6"/></g>
+<text x="152" y="140" font-size="13.5" fill="#ffffff" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">manifest</text>
+<rect x="76" y="0" width="0" height="0"/>
+<rect x="76" y="172" width="268" height="52" rx="9" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="210" y="195" font-size="13.5" fill="#1f2328" text-anchor="middle" font-weight="700">names only</text>
+<text x="210" y="214" font-size="12.5" fill="#57606a" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">255 tools · 581 tokens</text>
+<rect x="76" y="236" width="268" height="52" rx="9" fill="#eaf6ec"/>
+<text x="150" y="270" font-size="22" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">581</text>
+<text x="210" y="270" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-weight="700">tokens</text>
+<path d="M366,210 L434,210" stroke="#1a7f37" stroke-width="3.5" marker-end="url(#arwg)"/>
+<rect x="440" y="112" width="300" height="196" rx="14" fill="#ffffff" stroke="#d0d7de" filter="url(#soft)"/>
+<path d="M454,112 h272 a0,0 0 0 1 0,0 v0 h-272 z" fill="none"/>
+<rect x="440" y="112" width="300" height="44" rx="14" fill="url(#strip)"/>
+<rect x="440" y="140" width="300" height="16" fill="url(#strip)"/>
+<circle cx="474" cy="134" r="14" fill="#ffffff" opacity="0.22"/>
+<text x="474" y="140" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="800">2</text>
+<g transform="translate(504,134) scale(1.05)" fill="none" stroke="#ffffff" stroke-width="2"><path d="M-8.5,0 Q0,-6.5 8.5,0 Q0,6.5 -8.5,0 Z"/><circle cx="0" cy="0" r="2.6" fill="#ffffff" stroke="none"/></g>
+<text x="532" y="140" font-size="13.5" fill="#ffffff" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">inspect &lt;server&gt; &lt;tool&gt;</text>
+<rect x="456" y="0" width="0" height="0"/>
+<rect x="456" y="172" width="268" height="52" rx="9" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="590" y="195" font-size="13.5" fill="#1f2328" text-anchor="middle" font-weight="700">one schema</text>
+<text x="590" y="214" font-size="12.5" fill="#57606a" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">on demand · ~37 tokens</text>
+<rect x="456" y="236" width="268" height="52" rx="9" fill="#eaf6ec"/>
+<text x="530" y="270" font-size="22" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">37</text>
+<text x="590" y="270" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-weight="700">tokens</text>
+<path d="M366,210 L434,210" stroke="#1a7f37" stroke-width="3.5" marker-end="url(#arwg)"/>
+<rect x="820" y="112" width="300" height="196" rx="14" fill="#ffffff" stroke="#d0d7de" filter="url(#soft)"/>
+<path d="M834,112 h272 a0,0 0 0 1 0,0 v0 h-272 z" fill="none"/>
+<rect x="820" y="112" width="300" height="44" rx="14" fill="url(#strip)"/>
+<rect x="820" y="140" width="300" height="16" fill="url(#strip)"/>
+<circle cx="854" cy="134" r="14" fill="#ffffff" opacity="0.22"/>
+<text x="854" y="140" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="800">3</text>
+<g transform="translate(884,134) scale(1.05)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="-8" y="-6.5" width="16" height="13" rx="2.4"/><polyline points="-4.5,-1.5 -2,1 -4.5,3.5"/><line x1="1" y1="3.5" x2="5" y2="3.5"/></g>
+<text x="912" y="140" font-size="13.5" fill="#ffffff" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">call … --toon</text>
+<rect x="836" y="0" width="0" height="0"/>
+<rect x="836" y="172" width="268" height="52" rx="9" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="970" y="195" font-size="13.5" fill="#1f2328" text-anchor="middle" font-weight="700">call + shrink result</text>
+<text x="970" y="214" font-size="12.5" fill="#57606a" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">~34% off the result</text>
+<rect x="836" y="236" width="268" height="52" rx="9" fill="#eaf6ec"/>
+<text x="910" y="270" font-size="22" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">34%</text>
+<text x="970" y="270" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-weight="700">saved</text>
+<rect x="60" y="332" width="520" height="84" rx="14" fill="#ffebe9" stroke="#cf222e" stroke-width="1.2"/>
+<g transform="translate(102,374) scale(1.3)" fill="none" stroke="#cf222e" stroke-width="2" stroke-linecap="round"><circle cx="-1" cy="-1" r="5.5"/><line x1="3" y1="3" x2="7.5" y2="7.5"/></g>
+<text x="134" y="362" font-size="14" fill="#cf222e" text-anchor="start" font-weight="700">Guessing args from names alone: 4/41 valid calls (≈10%)</text>
+<text x="134" y="388" font-size="12.5" fill="#cf222e" text-anchor="start" opacity="0.8">names alone</text>
+<rect x="600" y="332" width="520" height="84" rx="14" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1.2"/>
+<g transform="translate(642,374) scale(1.3)"><path d="M0,-9 L8,-5.4 L8,1.6 Q0,8.6 0,9 Q0,8.6 -8,1.6 L-8,-5.4 Z" fill="#1a7f37"/><path d="M-3.2,0 L-0.8,2.6 L3.6,-2.6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="674" y="362" font-size="14" fill="#1a7f37" text-anchor="start" font-weight="700">Inspect first: 41/41 (100%), same as dumping every schema</text>
+<text x="674" y="388" font-size="12.5" fill="#1a7f37" text-anchor="start" opacity="0.85">recommended loop</text>
+</svg>

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 430" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="1179" height="429" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="165" cy="86" r="180" fill="#2ea043" opacity="0.055"/><circle cx="1038" cy="352" r="172" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="1179" height="429" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="590" y="50" font-size="28" fill="#1f2328" text-anchor="middle" font-weight="800">一份配置，喂给所有 Agent</text>
+<text x="590" y="80" font-size="14.5" fill="#57606a" text-anchor="middle">mcptoon 给每个 Agent 写它自己的原生配置，于是大家共用同一个工具箱。</text>
+<rect x="60" y="168" width="250" height="66" rx="12" fill="url(#strip)" filter="url(#soft)"/>
+<g transform="translate(96,201) scale(1.0)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="-8" y="-6.5" width="16" height="13" rx="2.4"/><polyline points="-4.5,-1.5 -2,1 -4.5,3.5"/><line x1="1" y1="3.5" x2="5" y2="3.5"/></g>
+<text x="190" y="208" font-size="14" fill="#ffffff" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">$ mcptoon sync</text>
+<path d="M318,201 L392,201" stroke="#1a7f37" stroke-width="3.5" marker-end="url(#arwg)"/>
+<rect x="400" y="158" width="270" height="86" rx="14" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1.5" filter="url(#soft)"/>
+<g transform="translate(437,201) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2"><rect x="-6.5" y="-1.5" width="13" height="10" rx="2.2"/><path d="M-4,-1.5 L-4,-5 A4,4 0 0 1 4,-5 L4,-1.5"/><circle cx="0" cy="3.6" r="1.3" fill="#1a7f37" stroke="none"/></g>
+<text x="535" y="194" font-size="13.5" fill="#1f2328" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">~/.mcptoon/config.json</text>
+<text x="535" y="220" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-weight="700">唯一事实源</text>
+<path d="M672,201 C700,201 700,145 718,145" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="726" y="122" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="726" y="122" width="6" height="46" rx="3" fill="#1a7f37"/>
+<circle cx="752" cy="145" r="8" fill="#1a7f37" opacity="0.85"/>
+<text x="770" y="142" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">Claude Code</text>
+<text x="770" y="159" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">.mcp.json</text>
+<path d="M672,201 C700,201 700,145 932,145" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="940" y="122" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="940" y="122" width="6" height="46" rx="3" fill="#0969da"/>
+<circle cx="966" cy="145" r="8" fill="#0969da" opacity="0.85"/>
+<text x="984" y="142" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">Codex</text>
+<text x="984" y="159" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">config.toml</text>
+<path d="M672,201 C700,201 700,221 718,221" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="726" y="198" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="726" y="198" width="6" height="46" rx="3" fill="#bf8700"/>
+<circle cx="752" cy="221" r="8" fill="#bf8700" opacity="0.85"/>
+<text x="770" y="218" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">Cursor</text>
+<text x="770" y="235" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">mcp.json</text>
+<path d="M672,201 C700,201 700,221 932,221" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="940" y="198" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="940" y="198" width="6" height="46" rx="3" fill="#8250df"/>
+<circle cx="966" cy="221" r="8" fill="#8250df" opacity="0.85"/>
+<text x="984" y="218" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">Windsurf</text>
+<text x="984" y="235" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">mcp_config.json</text>
+<path d="M672,201 C700,201 700,297 718,297" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="726" y="274" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="726" y="274" width="6" height="46" rx="3" fill="#0969da"/>
+<circle cx="752" cy="297" r="8" fill="#0969da" opacity="0.85"/>
+<text x="770" y="294" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">Gemini CLI</text>
+<text x="770" y="311" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">settings.json</text>
+<path d="M672,201 C700,201 700,297 932,297" fill="none" stroke="#8c959f" stroke-width="2.4" marker-end="url(#arw)"/>
+<rect x="940" y="274" width="194" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<rect x="940" y="274" width="6" height="46" rx="3" fill="#57606a"/>
+<circle cx="966" cy="297" r="8" fill="#57606a" opacity="0.85"/>
+<text x="984" y="294" font-size="13.5" fill="#1f2328" text-anchor="start" font-weight="700">任何 CLI</text>
+<text x="984" y="311" font-size="11.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">shell</text>
+<rect x="120" y="384" width="940" height="34" rx="10" fill="#eaf6ec"/>
+<text x="590" y="406" font-size="14" fill="#1a7f37" text-anchor="middle" font-weight="700">装一次 · 加新工具立刻生效 · 不用重启任何 Agent</text>
+</svg>

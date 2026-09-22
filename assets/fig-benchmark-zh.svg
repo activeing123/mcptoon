@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 470" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="979" height="469" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="137" cy="94" r="197" fill="#2ea043" opacity="0.055"/><circle cx="862" cy="385" r="188" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="979" height="469" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="490" y="50" font-size="25" fill="#1f2328" text-anchor="middle" font-weight="800">各格式的 token 消耗（越低越好）</text>
+<text x="490" y="78" font-size="14" fill="#57606a" text-anchor="middle">tiktoken cl100k_base · 数字越小越好</text>
+<rect x="200" y="98" width="13" height="13" rx="3" fill="#8c959f"/>
+<text x="220" y="109" font-size="13.5" fill="#57606a" text-anchor="start" font-weight="700">JSON</text>
+<rect x="375" y="98" width="13" height="13" rx="3" fill="#0969da"/>
+<text x="395" y="109" font-size="13.5" fill="#57606a" text-anchor="start" font-weight="700">TOON</text>
+<rect x="550" y="98" width="13" height="13" rx="3" fill="#bf8700"/>
+<text x="570" y="109" font-size="13.5" fill="#57606a" text-anchor="start" font-weight="700">SLIM</text>
+<rect x="725" y="98" width="13" height="13" rx="3" fill="#1a7f37"/>
+<text x="745" y="109" font-size="13.5" fill="#57606a" text-anchor="start" font-weight="700">Compact</text>
+<rect x="130.0" y="245.0" width="44" height="147.0" rx="4" fill="#8c959f"/>
+<text x="152.0" y="238.0411251174108" font-size="12.5" fill="#8c959f" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">1,519</text>
+<rect x="182.0" y="257.0" width="44" height="135.0" rx="4" fill="#0969da"/>
+<text x="204.0" y="250.0054578240838" font-size="12.5" fill="#0969da" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">1,017</text>
+<rect x="234.0" y="296.1" width="44" height="95.9" rx="4" fill="#bf8700"/>
+<text x="256.0" y="289.11619004640283" font-size="12.5" fill="#bf8700" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">274</text>
+<rect x="286.0" y="392.0" width="44" height="0.0" rx="4" fill="#1a7f37"/>
+<text x="308.0" y="385.0" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">11</text>
+<text x="230" y="416" font-size="14.5" fill="#1f2328" text-anchor="middle" font-weight="700">5 个工具</text>
+<rect x="390.0" y="178.6" width="44" height="213.4" rx="4" fill="#8c959f"/>
+<text x="412.0" y="171.56716964885138" font-size="12.5" fill="#8c959f" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">14,113</text>
+<rect x="442.0" y="191.0" width="44" height="201.0" rx="4" fill="#0969da"/>
+<text x="464.0" y="184.0052757804812" font-size="12.5" fill="#0969da" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">9,300</text>
+<rect x="494.0" y="243.1" width="44" height="148.9" rx="4" fill="#bf8700"/>
+<text x="516.0" y="236.12138319805328" font-size="12.5" fill="#bf8700" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">1,620</text>
+<rect x="546.0" y="322.3" width="44" height="69.7" rx="4" fill="#1a7f37"/>
+<text x="568.0" y="315.2677507642786" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">114</text>
+<text x="490" y="416" font-size="14.5" fill="#1f2328" text-anchor="middle" font-weight="700">50 个工具</text>
+<rect x="650.0" y="130.0" width="44" height="262.0" rx="4" fill="#8c959f"/>
+<text x="672.0" y="123.0" font-size="12.5" fill="#8c959f" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">71,929</text>
+<rect x="702.0" y="142.4" width="44" height="249.6" rx="4" fill="#0969da"/>
+<text x="724.0" y="135.4134724218326" font-size="12.5" fill="#0969da" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">47,438</text>
+<rect x="754.0" y="194.5" width="44" height="197.5" rx="4" fill="#bf8700"/>
+<text x="776.0" y="187.46250656797048" font-size="12.5" fill="#bf8700" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">8,282</text>
+<rect x="806.0" y="273.7" width="44" height="118.3" rx="4" fill="#1a7f37"/>
+<text x="828.0" y="266.7015012496876" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">581</text>
+<text x="750" y="416" font-size="14.5" fill="#1f2328" text-anchor="middle" font-weight="700">255 个工具</text>
+<line x1="70" y1="392" x2="910" y2="392" stroke="#d0d7de" stroke-width="1.5"/>
+<line x1="70" y1="326.2" x2="910" y2="326.2" stroke="#d0d7de" stroke-dasharray="3 5"/>
+<text x="62" y="330.17524041164546" font-size="11.5" fill="#8c959f" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">100</text>
+<line x1="70" y1="257.5" x2="910" y2="257.5" stroke="#d0d7de" stroke-dasharray="3 5"/>
+<text x="62" y="261.5081662414266" font-size="11.5" fill="#8c959f" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">1,000</text>
+<line x1="70" y1="188.8" x2="910" y2="188.8" stroke="#d0d7de" stroke-dasharray="3 5"/>
+<text x="62" y="192.8410920712077" font-size="11.5" fill="#8c959f" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">10,000</text>
+<text x="490" y="446" font-size="13" fill="#57606a" text-anchor="middle">对数量程 · 每格 10×</text>
+</svg>

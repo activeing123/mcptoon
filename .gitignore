@@ -58,6 +58,14 @@ readme-preview*.html
 # kept `git status` noisy. A rewrite is not a shipping artifact until it is
 # applied to README.md itself; until then it is scratch, like readme-v*.md above.
 README.*-draft*.md
+# 2026-09-22: the drafts also used `.vN` / `.proposed` naming, which the glob
+# above missed, so they showed up as 20 phantom "new files" in `git status`.
+# Enumerated so the real README.md / README.zh-CN.md stay tracked.
+README.v*.md
+README.zh-CN.v*.md
+README.proposed.md
+README.zh-CN.proposed.md
+readme_preview*.html
 
 # Internal docs (not for public repo)
 docs/new-docs-overview.html

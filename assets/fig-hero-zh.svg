@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 520" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="1179" height="519" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="165" cy="104" r="218" fill="#2ea043" opacity="0.055"/><circle cx="1038" cy="426" r="208" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="1179" height="519" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="590" y="56" font-size="33" fill="#1f2328" text-anchor="middle" font-weight="800">插一次，全都能用。</text>
+<text x="590" y="88" font-size="16" fill="#57606a" text-anchor="middle">一个 189KB 的零依赖 CLI，把 MCP 工具 schema 和 Agent 技能挡在上下文之外。</text>
+<text x="150" y="132" font-size="13.5" fill="#57606a" text-anchor="middle" font-weight="700" letter-spacing="1.4">你的工具</text>
+<text x="1030" y="132" font-size="13.5" fill="#57606a" text-anchor="middle" font-weight="700" letter-spacing="1.4">你的 AI</text>
+<rect x="34" y="150" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(62,173) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2" stroke-linecap="round"><circle cx="-1" cy="-1" r="5.5"/><line x1="3" y1="3" x2="7.5" y2="7.5"/></g>
+<text x="150" y="179" font-size="15" fill="#1f2328" text-anchor="middle">联网搜索</text>
+<rect x="914" y="150" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(942,173) scale(1.0)"><path d="M0,-8 L2.2,-2.2 L8,0 L2.2,2.2 L0,8 L-2.2,2.2 L-8,0 L-2.2,-2.2 Z" fill="#1a7f37"/></g>
+<text x="1030" y="179" font-size="15" fill="#1f2328" text-anchor="middle">Claude / Codex</text>
+<rect x="34" y="206" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(62,229) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2" stroke-linecap="round"><circle cx="-4" cy="-5" r="2.4"/><circle cx="-4" cy="6" r="2.4"/><circle cx="5" cy="0" r="2.4"/><path d="M-4,-2.6 L-4,3.6 M-1.8,-4.4 C2,-4 3,-2 4.6,-1"/></g>
+<text x="150" y="235" font-size="15" fill="#1f2328" text-anchor="middle">GitHub</text>
+<rect x="914" y="206" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(942,229) scale(1.0)"><path d="M-4,-8 L-4,7 L-0.5,3.4 L2,9 L4.6,7.8 L2.2,2.4 L7,2.2 Z" fill="#1a7f37"/></g>
+<text x="1030" y="235" font-size="15" fill="#1f2328" text-anchor="middle">Cursor</text>
+<rect x="34" y="262" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(62,285) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2"><ellipse cx="0" cy="-5.5" rx="7" ry="2.8"/><path d="M-7,-5.5 L-7,5.5 A7,2.8 0 0 0 7,5.5 L7,-5.5"/><path d="M-7,0 A7,2.8 0 0 0 7,0"/></g>
+<text x="150" y="291" font-size="15" fill="#1f2328" text-anchor="middle">文件 · 数据库</text>
+<rect x="914" y="262" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(942,285) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="-6,-6 -0.5,0 -6,6"/><polyline points="1,-6 6.5,0 1,6"/></g>
+<text x="1030" y="291" font-size="15" fill="#1f2328" text-anchor="middle">Copilot · Cline</text>
+<rect x="34" y="318" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(62,341) scale(1.0)" fill="none" stroke="#1a7f37" stroke-width="2"><circle cx="0" cy="0" r="7"/><ellipse cx="0" cy="0" rx="3" ry="7"/><line x1="-7" y1="0" x2="7" y2="0"/></g>
+<text x="150" y="347" font-size="15" fill="#1f2328" text-anchor="middle">翻译 · 任何工具</text>
+<rect x="914" y="318" width="232" height="46" rx="10" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<g transform="translate(942,341) scale(1.0)" fill="#1a7f37"><rect x="-7" y="-7" width="6" height="6" rx="1.6"/><rect x="1" y="-7" width="6" height="6" rx="1.6"/><rect x="-7" y="1" width="6" height="6" rx="1.6"/><rect x="1" y="1" width="6" height="6" rx="1.6"/></g>
+<text x="1030" y="347" font-size="15" fill="#1f2328" text-anchor="middle">任何 AI，任何终端</text>
+<path d="M266,173 C330,173 330,215 375,215" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M914,173 C850,173 850,215 805,215" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M266,229 C330,229 330,228 375,228" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M914,229 C850,229 850,228 805,228" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M266,285 C330,285 330,240 375,240" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M914,285 C850,285 850,240 805,240" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M266,341 C330,341 330,252 375,252" fill="none" stroke="#8c959f" stroke-width="3"/>
+<path d="M914,341 C850,341 850,252 805,252" fill="none" stroke="#8c959f" stroke-width="3"/>
+<rect x="375" y="178" width="430" height="100" rx="24" fill="url(#strip)" filter="url(#glow)"/>
+<rect x="395" y="192" width="390" height="34" rx="10" fill="#ffffff" opacity="0.14"/>
+<g transform="translate(430,209) scale(1.0)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"><line x1="-3.5" y1="-9" x2="-3.5" y2="-4"/><line x1="3.5" y1="-9" x2="3.5" y2="-4"/><path d="M-6,-4 L6,-4 L6,1 A6,6 0 0 1 -6,1 Z" fill="#ffffff" stroke="none"/><line x1="0" y1="7" x2="0" y2="10"/></g>
+<text x="600" y="217" font-size="20" fill="#ffffff" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">mcptoon</text>
+<rect x="415" y="238" width="46" height="26" rx="6" fill="#0f2e18"/>
+<circle cx="430" cy="248" r="3.4" fill="#7ee787"/><circle cx="446" cy="248" r="3.4" fill="#7ee787"/>
+<rect x="495" y="238" width="46" height="26" rx="6" fill="#0f2e18"/>
+<circle cx="510" cy="248" r="3.4" fill="#7ee787"/><circle cx="526" cy="248" r="3.4" fill="#7ee787"/>
+<rect x="575" y="238" width="46" height="26" rx="6" fill="#0f2e18"/>
+<circle cx="590" cy="248" r="3.4" fill="#7ee787"/><circle cx="606" cy="248" r="3.4" fill="#7ee787"/>
+<rect x="655" y="238" width="46" height="26" rx="6" fill="#0f2e18"/>
+<circle cx="670" cy="248" r="3.4" fill="#7ee787"/><circle cx="686" cy="248" r="3.4" fill="#7ee787"/>
+<rect x="735" y="238" width="46" height="26" rx="6" fill="#0f2e18"/>
+<circle cx="750" cy="248" r="3.4" fill="#7ee787"/><circle cx="766" cy="248" r="3.4" fill="#7ee787"/>
+<circle cx="438" cy="251" r="9" fill="#1a7f37" opacity="0.4" filter="url(#glow)"/>
+<circle cx="598" cy="251" r="9" fill="#1a7f37" opacity="0.4" filter="url(#glow)"/>
+<rect x="120" y="396" width="290" height="54" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<text x="265" y="419" font-size="15.5" fill="#1a7f37" text-anchor="middle" font-weight="700">1 · 装上</text>
+<text x="265" y="440" font-size="13.5" fill="#1f2328" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">pip install mcptoon</text>
+<rect x="445" y="396" width="290" height="54" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<text x="590" y="419" font-size="15.5" fill="#1a7f37" text-anchor="middle" font-weight="700">2 · 插上</text>
+<text x="590" y="440" font-size="13.5" fill="#1f2328" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">mcptoon quickstart</text>
+<rect x="770" y="396" width="290" height="54" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<text x="915" y="419" font-size="15.5" fill="#1a7f37" text-anchor="middle" font-weight="700">3 · 完成</text>
+<text x="915" y="440" font-size="13.5" fill="#1f2328" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">mcptoon demo</text>
+<polygon points="414,419 434,419 424,431" fill="#8c959f"/>
+<polygon points="739,419 759,419 749,431" fill="#8c959f"/>
+<text x="590" y="486" font-size="14.5" fill="#57606a" text-anchor="middle">不用手写 JSON · 零依赖 · 离线可用 · Apache-2.0</text>
+</svg>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 400" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="979" height="399" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="137" cy="80" r="168" fill="#2ea043" opacity="0.055"/><circle cx="862" cy="328" r="160" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="979" height="399" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="490" y="50" font-size="25" fill="#1f2328" text-anchor="middle" font-weight="800">What does "which tools are there?" cost in tokens?</text>
+<text x="490" y="78" font-size="14" fill="#57606a" text-anchor="middle">255 tools · tiktoken cl100k_base · measured, reproducible</text>
+<text x="276" y="140" font-size="14.5" fill="#1f2328" text-anchor="end" font-weight="700">Raw JSON schema</text>
+<rect x="300" y="118" width="460" height="34" rx="7" fill="#f6f8fa"/>
+<rect x="300" y="118" width="460.0" height="34" rx="7" fill="#cf222e"/>
+<text x="776" y="141" font-size="17" fill="#cf222e" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">71,929</text>
+<text x="276" y="214" font-size="14.5" fill="#1f2328" text-anchor="end">--slim  names + params</text>
+<rect x="300" y="192" width="460" height="34" rx="7" fill="#f6f8fa"/>
+<rect x="300" y="192" width="53.0" height="34" rx="7" fill="#bf8700"/>
+<text x="776" y="215" font-size="17" fill="#bf8700" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">8,282</text>
+<text x="864" y="215" font-size="14.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">−88.5%</text>
+<text x="276" y="288" font-size="14.5" fill="#1f2328" text-anchor="end">--compact  names only</text>
+<rect x="300" y="266" width="460" height="34" rx="7" fill="#f6f8fa"/>
+<rect x="300" y="266" width="8.0" height="34" rx="7" fill="#1a7f37"/>
+<text x="776" y="289" font-size="17" fill="#1a7f37" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">581</text>
+<text x="864" y="289" font-size="14.5" fill="#57606a" text-anchor="start" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace">−99.2%</text>
+<line x1="60" y1="330" x2="920" y2="330" stroke="#d0d7de"/>
+<text x="490" y="358" font-size="15" fill="#57606a" text-anchor="middle">71,929 ≈ a 300-page book   ·   581 ≈ half a page</text>
+<text x="490" y="384" font-size="15" fill="#1a7f37" text-anchor="middle" font-weight="700">The point is not compression: the schema never enters the context</text>
+</svg>

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 470" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f7f2"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ea043"/><stop offset="1" stop-color="#1a7f37"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+<rect x="0.5" y="0.5" width="1179" height="469" rx="18" fill="url(#bg)" stroke="#d0d7de"/>
+<circle cx="165" cy="94" r="197" fill="#2ea043" opacity="0.055"/><circle cx="1038" cy="385" r="188" fill="#bf8700" opacity="0.045"/>
+<rect x="0.5" y="0.5" width="1179" height="469" rx="18" filter="url(#grain)" opacity="0.045"/>
+<text x="590" y="50" font-size="28" fill="#1f2328" text-anchor="middle" font-weight="800">工具箱的另一半：Agent 技能</text>
+<text x="590" y="80" font-size="14.5" fill="#57606a" text-anchor="middle">同一套引擎，管你的 SKILL.md 目录</text>
+<rect x="50" y="108" width="480" height="214" rx="14" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<text x="290" y="140" font-size="15" fill="#1f2328" text-anchor="middle" font-weight="700">371 个 SKILL.md 全量加载</text>
+<rect x="78" y="156" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="86" y="165" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="105" y="165" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="105" y="173" width="62" height="4" rx="2" fill="#d0d7de"/>
+<rect x="226" y="156" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="234" y="165" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="253" y="165" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="253" y="173" width="62" height="4" rx="2" fill="#d0d7de"/>
+<rect x="374" y="156" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="382" y="165" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="401" y="165" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="401" y="173" width="62" height="4" rx="2" fill="#d0d7de"/>
+<rect x="78" y="196" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="86" y="205" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="105" y="205" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="105" y="213" width="62" height="4" rx="2" fill="#d0d7de"/>
+<rect x="226" y="196" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="234" y="205" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="253" y="205" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="253" y="213" width="62" height="4" rx="2" fill="#d0d7de"/>
+<rect x="374" y="196" width="136" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="382" y="205" width="12" height="12" rx="3" fill="#2ea043" opacity="0.5"/>
+<rect x="401" y="205" width="88" height="4" rx="2" fill="#d0d7de"/>
+<rect x="401" y="213" width="62" height="4" rx="2" fill="#d0d7de"/>
+<text x="290" y="250" font-size="15" fill="#57606a" text-anchor="middle" font-weight="700">… ×371</text>
+<rect x="78" y="268" width="424" height="34" rx="8" fill="#ffebe9"/>
+<text x="290" y="291" font-size="17" fill="#cf222e" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">926,232 token</text>
+<path d="M556,215 L624,215" stroke="#1a7f37" stroke-width="3.5" marker-end="url(#arwg)"/>
+<text x="590" y="196" font-size="12.5" fill="#1a7f37" text-anchor="middle" font-weight="700">BM25 · 离线 · 不调 LLM</text>
+<rect x="650" y="108" width="480" height="214" rx="14" fill="#ffffff" stroke="#d0d7de" stroke-width="1" filter="url(#soft)"/>
+<text x="890" y="140" font-size="14.5" fill="#1f2328" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="700">mcptoon skills resolve "…" --k 5</text>
+<rect x="678" y="156" width="424" height="24" rx="6" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1"/>
+<circle cx="696" cy="168" r="4.5" fill="#1a7f37"/>
+<rect x="710" y="165" width="140" height="6" rx="3" fill="#1a7f37" opacity="0.45"/>
+<rect x="678" y="186" width="424" height="24" rx="6" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1"/>
+<circle cx="696" cy="198" r="4.5" fill="#1a7f37"/>
+<rect x="710" y="195" width="128" height="6" rx="3" fill="#1a7f37" opacity="0.45"/>
+<rect x="678" y="216" width="424" height="24" rx="6" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1"/>
+<circle cx="696" cy="228" r="4.5" fill="#1a7f37"/>
+<rect x="710" y="225" width="116" height="6" rx="3" fill="#1a7f37" opacity="0.45"/>
+<rect x="678" y="246" width="424" height="24" rx="6" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1"/>
+<circle cx="696" cy="258" r="4.5" fill="#1a7f37"/>
+<rect x="710" y="255" width="104" height="6" rx="3" fill="#1a7f37" opacity="0.45"/>
+<rect x="678" y="276" width="424" height="24" rx="6" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1"/>
+<circle cx="696" cy="288" r="4.5" fill="#1a7f37"/>
+<rect x="710" y="285" width="92" height="6" rx="3" fill="#1a7f37" opacity="0.45"/>
+<rect x="678" y="268" width="424" height="34" rx="8" fill="#eaf6ec"/>
+<text x="890" y="291" font-size="15.5" fill="#1a7f37" text-anchor="middle" font-weight="800">501 token · 返回最该用的 5 个</text>
+<rect x="50" y="348" width="1080" height="86" rx="14" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<text x="90" y="380" font-size="13.5" fill="#57606a" text-anchor="start" font-weight="700">一个 128K 上下文窗口</text>
+<rect x="90" y="390" width="760" height="26" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<rect x="90" y="390" width="760" height="26" rx="6" fill="#cf222e" opacity="0.85"/>
+<rect x="850" y="390" width="240" height="26" rx="6" fill="#cf222e" opacity="0.35" stroke="#cf222e" stroke-dasharray="4 4"/>
+<text x="1140" y="408" font-size="13" fill="#cf222e" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Consolas,'Courier New',monospace" font-weight="800">…×7.07</text>
+<text x="90" y="428" font-size="14" fill="#cf222e" text-anchor="start" font-weight="700">926,232 token = 7.07 个 128K 窗口，装不下</text>
+</svg>
