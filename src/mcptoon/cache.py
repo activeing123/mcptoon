@@ -25,15 +25,32 @@ import json
 import os
 import time
 import threading
+from pathlib import Path
 
 from .config import CACHE_DIR
 
 _DEFAULT_TTL = 300  # 5 minutes
-_CACHE_FILE = CACHE_DIR / "schema_cache.json"
-_LOCK_FILE = CACHE_DIR / "schema_cache.lock"
 
 # In-process lock (for multi-thread, same process)
 _process_lock = threading.Lock()
+
+
+def _cache_file() -> Path:
+    """Where the schema cache lives, resolved at call time.
+
+    Deliberately NOT a module constant. `config.CACHE_DIR` is frozen at import,
+    so `MCPTOON_CACHE_DIR` — documented in `mcptoon doctor`'s path list — moved
+    `config._cache_dir()` but not this file: the setting looked honoured and was
+    silently ignored, so a caller who relocated the cache still wrote to the real
+    `~/.cache/mcptoon`. Resolving per call is the same fix this repo already
+    applied to the destructive commands' paths.
+    """
+    return Path(os.environ.get("MCPTOON_CACHE_DIR", str(CACHE_DIR))) / "schema_cache.json"
+
+
+def _lock_file() -> Path:
+    """Companion lock file; same call-time resolution as `_cache_file`."""
+    return _cache_file().with_name("schema_cache.lock")
 
 
 def _get_ttl() -> int:
@@ -63,10 +80,11 @@ def tools_fingerprint(tools: list[dict]) -> str:
 
 def _load_cache() -> dict:
     """Load the cache file."""
-    if not _CACHE_FILE.exists():
+    path = _cache_file()
+    if not path.exists():
         return {}
     try:
-        return json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -74,14 +92,16 @@ def _load_cache() -> dict:
 def _save_cache(data: dict):
     """Save the cache file with in-process lock + atomic write."""
     try:
+        path = _cache_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
         # Atomic write: write to temp file, then rename
-        tmp_file = _CACHE_FILE.with_suffix(".tmp")
+        tmp_file = path.with_suffix(".tmp")
         tmp_file.write_text(
             json.dumps(data, ensure_ascii=False),
             encoding="utf-8",
         )
         # os.replace is atomic on most platforms
-        os.replace(str(tmp_file), str(_CACHE_FILE))
+        os.replace(str(tmp_file), str(path))
     except OSError:
         pass
 
@@ -96,6 +116,25 @@ def get_cached_tools(server: str) -> list[dict] | None:
     if time.time() - entry.get("ts", 0) > _get_ttl():
         return None
     return entry.get("tools", [])
+
+
+def get_cached_tools_any_age(server: str) -> tuple[list[dict] | None, float | None]:
+    """Cached tools for a server even when the TTL has expired.
+
+    Returns (tools, age_seconds), or (None, None) when the server was never
+    cached. This exists for the one caller that must never wait on a server:
+    the per-turn footer. `get_cached_tools` deliberately returns None for stale
+    entries so that callers refresh — correct for `status`/`manifest`, fatal for
+    a footer, because a stale cache means spawning every configured server
+    (~23s here). A footer that sometimes takes 23s is worse than no footer, so
+    it reads whatever is on disk and says how old it is instead of refreshing.
+    """
+    with _process_lock:
+        cache = _load_cache()
+    entry = cache.get(server)
+    if not entry:
+        return None, None
+    return entry.get("tools", []), time.time() - entry.get("ts", 0)
 
 
 def set_cached_tools(server: str, tools: list[dict]) -> bool:
@@ -120,7 +159,7 @@ def clear_cache():
     """Clear all cached tools."""
     with _process_lock:
         try:
-            _CACHE_FILE.unlink()
+            _cache_file().unlink()
         except FileNotFoundError:
             pass
 

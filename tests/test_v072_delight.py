@@ -27,6 +27,7 @@ from mcptoon import cli
 from mcptoon import config as cfg
 from mcptoon import demo as demo_mod
 from mcptoon import discover as disc
+from mcptoon import sync as sync_mod
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -44,7 +45,7 @@ class _A1Celebration(unittest.TestCase):
         self.assertIn("37 tools ready across 5 servers", out)
         self.assertIn("🎉", out)
         self.assertIn("Now you can:", out)
-        self.assertIn("mcptoon sync", out)
+        self.assertIn("mcptoon status", out)
         self.assertIn("mcptoon serve", out)
 
     def test_without_tool_count(self):
@@ -121,6 +122,7 @@ class _A1QuickstartIntegration(unittest.TestCase):
              mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
              mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
              mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
              mock.patch.object(cli.manifest_mod, "get_manifest",
                                side_effect=RuntimeError("no servers running")):
             import io
@@ -131,8 +133,64 @@ class _A1QuickstartIntegration(unittest.TestCase):
         out = buf.getvalue()
         self.assertIn("2 MCP servers configured", out)
         self.assertIn("Now you can:", out)
-        self.assertIn("mcptoon sync", out)
+        self.assertIn("mcptoon status", out)
         self.assertIn("Could not fetch tools yet", out)
+
+    def test_quickstart_registers_the_gateway_in_agents(self):
+        """quickstart is the install path that has to leave a trace: it must sync."""
+        fake = _FakeResult(2)
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]) as fake_sync, \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        self.assertTrue(fake_sync.call_args.kwargs.get("include_self"),
+                        "quickstart must register the mcptoon gateway, not just the servers")
+
+    def test_quickstart_no_self_opts_out(self):
+        fake = _FakeResult(2)
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]) as fake_sync, \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart(["--no-self"])
+        self.assertFalse(fake_sync.call_args.kwargs.get("include_self"))
+
+    def test_quickstart_survives_a_sync_failure(self):
+        """A broken agent config must not abort onboarding."""
+        fake = _FakeResult(2)
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", side_effect=OSError("disk")), \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        out = buf.getvalue()
+        self.assertIn("Could not sync to agents yet", out)
+        self.assertIn("2 MCP servers configured", out)
 
     def test_quickstart_dry_has_no_celebration(self):
         fake = _FakeResult(1)

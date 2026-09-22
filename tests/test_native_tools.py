@@ -332,7 +332,59 @@ class TestFooterDisclosure(unittest.TestCase):
     def test_on_by_default(self):
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         self.assertIn("instructions", res)
-        self.assertIn("mcptoon_usage", res["instructions"])
+        self.assertIn("mcptoon footer-facts", res["instructions"])
+
+    def test_instructions_ask_for_the_line_every_turn(self):
+        """The savings line is the whole point of the channel: it makes the tool's
+        effect visible inside the conversation. Two softer phrasings failed before
+        this one — "you may close" produced turns that silently dropped it, and
+        "every turn that used tools" was worse: the gateway is injected into
+        clients as an MCP server, and in a client that never routes a tool call
+        through it, that condition is never true, so the line never appeared at
+        all. The number describes the compressed catalog, not the turn, so the
+        directive must not gate it on tool use."""
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res["instructions"]
+        self.assertIn("End every turn with one short line", text)
+        self.assertNotIn("you may close", text, "a permissive phrasing is the old bug")
+        self.assertNotIn("that used tools", text,
+                         "gating the line on tool use silences it in clients that "
+                         "never route a call through the gateway")
+
+    def test_instructions_name_a_command_that_cannot_stall_the_turn(self):
+        """The directive must name a command that is safe to run every turn.
+
+        It used to say "read mcptoon_usage", which is not a command the model can
+        run; then the natural substitute was `mcptoon status`, which refreshes a
+        stale schema cache by spawning every configured server (~23s cold here).
+        A footer that occasionally costs 23 seconds is worse than no footer, so
+        the instructions point at `footer-facts` and say why not `status`.
+        """
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res["instructions"]
+        self.assertIn("mcptoon footer-facts", text)
+        self.assertNotIn("read mcptoon_usage", text,
+                         "the old text named a thing that is not a command")
+        self.assertIn("do not substitute", text,
+                      "the instructions must steer away from the slow command")
+        self.assertIn("mcptoon status", text)
+
+    def test_instructions_disclose_how_to_switch_the_line_off(self):
+        """A line the user cannot silence is the reason it reads as spam. The off
+        switch has to be stated in the same breath as the request for the line."""
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertIn("mcptoon config set footer off", res["instructions"])
+
+    def test_instructions_point_at_the_skill_for_the_breakdown(self):
+        """The one-line figure invites "saved compared to what?". The answer must be
+        reachable without guessing, so the instructions name where it lives."""
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertIn("mcptoon` skill", res["instructions"])
+        self.assertIn("mcptoon bench", res["instructions"])
+
+    def test_instructions_never_license_inventing_numbers(self):
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertIn("never invent figures", res["instructions"])
 
     def test_off_removes_it_entirely(self):
         from mcptoon.config import set_setting

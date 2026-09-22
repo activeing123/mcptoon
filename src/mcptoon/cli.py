@@ -15,70 +15,19 @@
 """
 mcptoon cli — Command-line entry point
 
-Usage:
-    mcptoon list                         List configured servers
-    mcptoon manifest                     List all tools (compact)
-    mcptoon policy                       Per-tool compression policy (raw/toon/slim)
-    mcptoon manifest --full              List all tools with params
-    mcptoon manifest --format openai    Export as OpenAI function calling
-    mcptoon manifest --format openapi   Export as OpenAPI 3.0 spec
-    mcptoon discover                     Auto-discover MCP servers (scan + probe)
-    mcptoon discover --write             Discover + write to config
-    mcptoon discover --http <url>        Probe a specific HTTP MCP endpoint
-    mcptoon inspect <server> <tool>      Show tool schema
-    mcptoon search <query>              Search tools across all servers
-    mcptoon call <server> <tool> [ARGS]  Call a tool
-    mcptoon call --auto <tool> [ARGS]    Call a tool (auto-find server)
-    mcptoon call <server> <tool> --envelope   Return complete MCP result envelope
-    mcptoon call <server> <tool> --stdin   Read args from stdin (large payloads)
-    mcptoon init                         Create sample config
-    mcptoon init --auto                  Auto-discover all MCP servers
-    mcptoon init --auto --dry            Discover, print only, don't write
-    mcptoon init --auto --http <url>     Add HTTP MCP endpoint
-    mcptoon add <name> [options]         Add a server
-    mcptoon remove <name>                Remove a server
-    mcptoon usage                        Show usage stats
-    mcptoon stats                        Token savings dashboard (detailed)
-    mcptoon toggle <server> <tool>       Toggle a tool on/off
-    mcptoon toggle --list                List all toggled tools
-    mcptoon policy                       Per-tool compression policy (raw/toon/slim)
-    mcptoon install <name> --npm <pkg>    Install MCP server from npm
-    mcptoon install <name> --pip <pkg>    Install MCP server from pip
-    mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
-    mcptoon install --list               List installed servers
-    mcptoon install --remove <name>      Remove an installed server
-    mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
-    mcptoon sync --dry                   Preview without writing
-    mcptoon sync --agent <id>            Sync to one agent only
-    mcptoon health                       Health check all MCP servers (catches zombies)
-    mcptoon health --json                JSON output for CI/CD (exit 1 if any dead)
-    mcptoon health --timeout <sec>       Set per-server timeout
-    mcptoon serve                        Run as stdio MCP server (1 Agent → 100 servers)
-    mcptoon serve --listen :8080         HTTP mode for remote/multi-agent
-    mcptoon doctor                       Self-diagnose config + connectivity
-    mcptoon skills index [ROOT ...]      Index skill roots (SKILL.md) for routing
-    mcptoon skills resolve <query>       BM25 shortlist over the index (no LLM)
-    mcptoon skills route <query>         Shortlist, then let an LLM pick
-    mcptoon skills stats                 Catalog health: dupes, aliases, unroutable
-    mcptoon config [get|set]             Read/write settings (e.g. footer on|off)
-    mcptoon completion <shell>           Generate shell completion (bash|zsh|fish|ps)
-
-Output flags (global):
-    --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
-    --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens, round-trip safe)
-    --slim         Ultra-compact tool manifests (88.5% savings, tiktoken-measured)
-    --json         JSON output
-    --compact      Names only
-    --raw          Raw output
-    --head N       Limit to N items
-    --max-chars N  Truncate to N chars
-    --full         No truncation
-    --format X     Export format: openai|openapi|mcp|json|human
-    --stdin        Read JSON args from stdin (for large payloads)
+The user-facing command list lives in exactly one place: `_print_help()` below.
+Do not restate it here. This module used to carry a second copy of the whole help
+text, and by the time anyone looked it had drifted: it still advertised
+`mcptoon uninstall` in its Usage block, listed `policy` twice, and never mentioned
+`config`, `stats` or `toggle` — the three commands that exist to let a user turn
+the per-turn savings line off. Two copies of a front door is one copy too many,
+and the stale one is the one people end up reading.
 """
+
 import json
 import sys
 import os
+from pathlib import Path
 
 from . import config as cfg
 from . import manifest as manifest_mod
@@ -101,14 +50,16 @@ KNOWN_FLAGS = frozenset(
         "--full", "--head", "--desc",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
         "--json", "--keep", "--k", "--list", "--listen", "--max-chars", "--mcptoon",
+        "--no-keep-config",
         "--model",
         "--no-configs",
-        "--no-env", "--no-local", "--no-network", "--no-sync", "--npm", "--pip",
+        "--no-env", "--no-local", "--no-network", "--no-self", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
+        "--self",
         "--slim",
         "--stdin", "--stdio", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
         "--version", "--version-gate", "--watch",
-        "--watch-mode", "--write",
+        "--watch-mode", "--write", "--yes",
     }
 )
 
@@ -138,7 +89,78 @@ def unknown_flag_warnings(args):
     return found
 
 
-def main():
+# Commands whose whole job is to make noise already; the one-time welcome would
+# only be in the way (and `serve` speaks over stdio, so stdout must stay clean).
+# `off` and `uninstall` are here for a different reason: a farewell should not be
+# preceded by "hi, here's what I configured for you" — greeting someone on the way
+# out is the same obliviousness this release is about.
+_WELCOME_EXEMPT = frozenset({"serve", "demo", "demo-server", "completion",
+                             "help", "-h", "--help", "off", "uninstall"})
+
+
+def _maybe_welcome(command: str, fmt: str) -> None:
+    """Introduce mcptoon once per machine — the answer to "it installed silently".
+
+    A pip install cannot print anything, so a tool that never speaks looks like
+    something that installed a trojan. The first real command therefore greets
+    once, names what it found, and hands over one next action; the marker file
+    means never again. Silent when: not the first run, `welcome off`, a
+    machine-readable format was asked for (JSON/TOON/slim), or the command
+    already prints its own noise.
+    """
+    if command in _WELCOME_EXEMPT:
+        return
+    if fmt != "auto":
+        return
+    try:
+        if not cfg.welcome_enabled() or cfg.welcome_seen():
+            return
+    except Exception:
+        return
+
+    try:
+        servers = cfg.list_servers()
+    except Exception:
+        servers = []
+    n_servers = len(servers)
+
+    tool_count = 0
+    try:
+        manifest = manifest_mod.get_manifest(use_cache=True)
+        tool_count = _manifest_tool_count(manifest)
+    except Exception:
+        tool_count = 0
+
+    line = "─" * 54
+    print(line)
+    print("  👋 mcptoon is installed — first run on this machine.")
+    print(line)
+    if n_servers:
+        found = f"{n_servers} MCP server(s)"
+        if tool_count:
+            found += f", {tool_count} tool(s)"
+        print(f"  Found: {found} already configured.")
+    else:
+        print("  Found: no MCP servers yet.")
+    print("")
+    print("  Next:")
+    if n_servers:
+        print("    mcptoon sync --self   # register the gateway in your agents,")
+        print("                          # then sync the rest of your config")
+    else:
+        print("    mcptoon quickstart    # find servers already on this machine")
+    print("    mcptoon status        # what's here, and what it saves")
+    print("")
+    print("  It only touches your agents when you run `mcptoon sync --self`.")
+    print("  Undo any time: mcptoon off  ·  full cleanup: mcptoon uninstall --dry")
+    print("  This note shows once. Silence it any time: mcptoon config set welcome off")
+    print(line)
+    print("")
+
+    cfg.mark_welcome_seen()
+
+
+def _run(state: dict) -> None:
     args = sys.argv[1:]
 
     if not args:
@@ -222,6 +244,7 @@ def main():
 
     command = cmd_args[0]
     rest = cmd_args[1:]
+    state["command"] = command
 
     # Asking for help must never run the command you asked about: `mcptoon
     # quickstart --help` used to discover servers and write them into config, and
@@ -229,6 +252,9 @@ def main():
     if command not in _COMMANDS_WITH_OWN_HELP and any(a in ("-h", "--help") for a in rest):
         _print_help()
         return
+
+    # First real command on this machine introduces mcptoon once (see _maybe_welcome).
+    _maybe_welcome(command, fmt)
 
     # ─── Dispatch ───
     if command in ("list", "servers"):
@@ -251,8 +277,12 @@ def main():
         _cmd_remove(rest)
     elif command == "usage":
         _cmd_usage(rest, fmt)
+    elif command in ("status", "brief"):
+        _cmd_status(rest, fmt)
     elif command == "stats":
         _cmd_stats(rest, fmt)
+    elif command == "footer-facts":
+        _cmd_footer_facts(rest, fmt)
     elif command == "toggle":
         _cmd_toggle(rest, fmt)
     elif command == "policy":
@@ -278,6 +308,10 @@ def main():
         _cmd_demo_server(rest)
     elif command == "sync":
         _cmd_sync(rest, fmt)
+    elif command == "off":
+        _cmd_off(rest, fmt)
+    elif command == "uninstall":
+        _cmd_uninstall(rest, fmt)
     elif command == "health":
         _cmd_health(rest, fmt)
     elif command == "plugin":
@@ -295,6 +329,72 @@ def main():
     else:
         # Try natural language: "mcptoon 有什么工具"
         _try_natural(command, rest, fmt, head_n, max_chars, full)
+
+
+def main() -> None:
+    """Entry point: run the CLI, then emit the savings footer.
+
+    The footer cannot sit at the end of `_run`, because 41 places in this module
+    leave through `sys.exit()` — `mcptoon manifest` among them — and a raised
+    `SystemExit` skips everything written after the dispatch. Catching it here is
+    the one seam that sees every exit path.
+
+    Emitted only on success (`code` falsy): after a failed command the terminal
+    already carries a diagnostic and one more line is noise. `_run` records the
+    resolved command in `state`; the paths that never resolve one — `mcptoon
+    --version`, or no arguments at all — leave it empty and stay silent, which
+    keeps the version string parseable by scripts.
+
+    Deliberately not `atexit`: that would also fire after an unhandled traceback
+    and for any other caller of `_run`, and it could not tell success from
+    failure.
+    """
+    state: dict = {}
+    try:
+        _run(state)
+    except SystemExit as exc:
+        if not exc.code:
+            _emit_footer(state.get("command", ""))
+        raise
+    _emit_footer(state.get("command", ""))
+
+
+# Commands whose streams are a protocol, not a human terminal, plus the one
+# command that has already printed the same block.
+_FOOTER_SILENT_COMMANDS = frozenset({"serve", "demo-server", "footer-facts"})
+
+
+def _emit_footer(command: str) -> None:
+    """Print the savings line to stderr after a command finishes.
+
+    The CLI half of the universal-surface design described in the `footer`
+    module: every agent that can run a shell sees command output, so a tail here
+    reaches Codex, DSH, Gemini CLI, Aider and everything else that has a
+    terminal — no per-agent configuration, no reliance on the model remembering
+    a directive.
+
+    stderr rather than stdout, deliberately. stdout is machine-readable for
+    `--json`, `--toon` and piped output, and a courtesy line that corrupts
+    `mcptoon status --json | jq` would be a worse bug than the invisibility it
+    fixes. Terminals and agent tool surfaces both display stderr.
+
+    Silent for the MCP stdio servers (`serve`, `demo-server`), where one stray
+    write can desynchronise the JSON-RPC stream, and for `footer-facts`, which
+    already printed this exact block on stdout.
+
+    Never raises: a footer is a courtesy, and a command must not fail because
+    its footer could not be built.
+    """
+    if not command or command.startswith("-") or command in _FOOTER_SILENT_COMMANDS:
+        return
+    try:
+        from . import footer as footer_mod
+
+        if not footer_mod.enabled():
+            return
+        print(footer_mod.block(), file=sys.stderr)
+    except Exception:
+        return
 
 
 # ═══════════════════════════════════════════════════
@@ -766,12 +866,14 @@ def _cmd_quickstart(rest, fmt="auto"):
     Replaces the old 4-step flow (init → add → manifest → call) with one command.
 
     Usage:
-        mcptoon quickstart              # discover + configure + show slim manifest
+        mcptoon quickstart              # discover + configure + sync + show slim manifest
         mcptoon qs                      # alias
         mcptoon quickstart --http URL    # include HTTP MCP endpoint
         mcptoon quickstart --dry        # don't write config, just show
+        mcptoon quickstart --no-self    # sync servers only, don't register the gateway
     """
     is_dry = "--dry" in rest
+    include_self = "--no-self" not in rest
     http_url = ""
     for i, a in enumerate(rest):
         if a == "--http" and i + 1 < len(rest):
@@ -832,10 +934,34 @@ def _cmd_quickstart(rest, fmt="auto"):
 
     print("")
 
-    # Step 3: Show summary
+    # Step 3: Sync into every detected agent — including mcptoon itself.
+    #
+    # This is the step that turns "installed" into "visible". Without it the
+    # gateway's `mcptoon serve` entry is never written anywhere, so the MCP
+    # `instructions` handshake that announces mcptoon to the model never fires
+    # and the install leaves no trace. Registering it here (and in `sync`) is
+    # what a user actually notices.
+    if not is_dry:
+        from .sync import sync_to_all, format_sync_report
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("  Registering mcptoon in your agents...")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        try:
+            results = sync_to_all(dry_run=False, include_self=include_self)
+            print(format_sync_report(results, dry_run=False))
+            written = sum(1 for r in results if r.get("written"))
+            if written:
+                print("")
+                print("  ✓ Your agents can now see mcptoon itself (`mcptoon serve`).")
+        except Exception as e:  # never let a sync failure abort onboarding
+            print(f"  Could not sync to agents yet: {e}")
+            print("  Run 'mcptoon sync --self' when ready")
+        print("")
+
+    # Step 4: Show summary
     print(result.summary())
 
-    # Step 4: The "aha moment" — show slim manifest
+    # Step 5: The "aha moment" — show slim manifest
     tool_count = None
     if not is_dry:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -894,8 +1020,7 @@ def _quickstart_celebration(tool_count, server_count):
         print(line)
     print("")
     print("  Now you can:")
-    print("    mcptoon sync    # write this config into Claude Desktop,")
-    print("                    # Cursor, Codex, Cline, Windsurf, VS Code")
+    print("    mcptoon status  # what's here, and what it saves")
     print("    mcptoon serve   # or expose ALL servers as ONE stdio server")
     print("")
     print("  Next steps:")
@@ -1134,6 +1259,43 @@ def _cmd_usage(_rest, fmt):
                 print(f"  {t:30s} {c}")
 
 
+def _cmd_footer_facts(_rest, fmt):
+    """One line of real numbers for the per-turn savings footer. Never blocks.
+
+    Usage:
+        mcptoon footer-facts
+        mcptoon footer-facts --json
+    This exists because the agent-side directive tells the model to close a turn
+    with one line of savings, and the obvious implementation — run
+    `mcptoon status` — is unusable in a chat loop: `status` refreshes a stale
+    schema cache by spawning every configured MCP server, measured at ~23s here
+    against ~1.9s warm. A footer that occasionally costs 23 seconds is worse than
+    no footer, so this reads the cache at whatever age it has and never opens a
+    connection. When the cache is missing or older than the freshness TTL it says
+    so in `note` rather than refreshing, because a number the caller can date is
+    honest and a 23-second pause is not.
+
+    The figures live in `footer.facts()` rather than here, because three surfaces
+    now need them: this command, the tail of every other command, and the first
+    tool result of an MCP session. Keeping one implementation is what makes all of
+    them agree — see the `footer` module docstring for why the line stopped being
+    the model's job to remember.
+    """
+    from . import footer as footer_mod
+
+    f = footer_mod.facts()
+
+    if fmt == "json":
+        print(json.dumps(f, indent=2, ensure_ascii=False))
+        return
+
+    # Human line — the whole point is that this is pasteable into a turn.
+    print(footer_mod.line(f))
+    n = footer_mod.note(f)
+    if n:
+        print(f"note: {n}")
+
+
 def _cmd_stats(_rest, fmt):
     """Token savings dashboard — shows how much mcptoon saves vs raw JSON.
 
@@ -1142,9 +1304,21 @@ def _cmd_stats(_rest, fmt):
         mcptoon stats --json       JSON output
     """
     from . import schema_simplifier
+    from .bench import _tokenizer
 
     manifest = manifest_mod.get_manifest(use_cache=True)
     usage = usage_mod.get_usage_stats()
+
+    # One ruler for every savings figure in the CLI. This dashboard used to divide
+    # character counts by 4 while `mcptoon status` used tiktoken, so the two
+    # commands a user runs back-to-back answered "how much does this save?" with
+    # two different numbers — and this one is literally titled the savings
+    # dashboard. It was invisible until `stats` was added to `--help`, which is
+    # its own lesson about discoverability hiding defects.
+    encode, caliber, _exact = _tokenizer()
+
+    def _tokens(text: str) -> int:
+        return max(1, int(encode(text)))
 
     # Count tools & compute token savings
     total_tools = 0
@@ -1165,8 +1339,8 @@ def _cmd_stats(_rest, fmt):
             full_json = json.dumps(t, ensure_ascii=False)
             slim = schema_simplifier.simplify_tool_def(t)
             slim_json = json.dumps(slim, ensure_ascii=False)
-            full_tok = len(full_json) // 4  # rough token estimate
-            slim_tok = len(slim_json) // 4
+            full_tok = _tokens(full_json)
+            slim_tok = _tokens(slim_json)
             total_full_tokens += full_tok
             total_slim_tokens += slim_tok
             server_full += full_tok
@@ -1174,6 +1348,12 @@ def _cmd_stats(_rest, fmt):
         by_server_full[server] = server_full
         by_server_slim[server] = server_slim
 
+    # NOTE: this deliberately sums per-tool measurements, which is exactly what
+    # `mcptoon status` does — the two commands are now required to print the same
+    # numbers for the same catalog. Do not "improve" one of them to measure the
+    # whole manifest in a single dump: that is a different (and larger) quantity,
+    # and having a third number that matches neither command is worse than having
+    # one that matches both.
     saved = total_full_tokens - total_slim_tokens
     pct = (saved / total_full_tokens * 100) if total_full_tokens > 0 else 0
     disabled = cfg.list_disabled_tools()
@@ -1181,10 +1361,14 @@ def _cmd_stats(_rest, fmt):
     if fmt == "json":
         data = {
             "total_tools": total_tools,
+            # Kept under their original names so existing consumers do not break;
+            # the values are now measured with the shared tokenizer instead of
+            # chars/4, which is a correction rather than a contract change.
             "full_tokens_est": total_full_tokens,
             "slim_tokens_est": total_slim_tokens,
             "tokens_saved": saved,
             "savings_pct": round(pct, 1),
+            "token_caliber": caliber,
             "total_calls": usage["total_calls"],
             "success_rate": usage["success_rate"],
             "disabled_tools": len(disabled),
@@ -1202,6 +1386,7 @@ def _cmd_stats(_rest, fmt):
         print(f"  ─────────────────────────────────")
         print(f"  Tokens SAVED:         {saved:,} ({pct:.1f}%)")
         print(f"  Disabled tools:       {len(disabled)}")
+        print(f"  Caliber:              {caliber}")
         print()
         if usage["total_calls"] > 0:
             print(f"  Usage: {usage['total_calls']} calls, {usage['success_rate']} success")
@@ -1217,6 +1402,301 @@ def _cmd_stats(_rest, fmt):
                 ss = by_server_slim.get(s, 0)
                 sp = ((sf - ss) / sf * 100) if sf > 0 else 0
                 print(f"    {s:20s} {sf:>6,} → {ss:>6,}  (-{sp:.0f}%)")
+
+
+def _cmd_status(_rest, fmt):
+    """One screen: what's here, what it saves, and how to undo it.
+
+    The "is it doing anything?" answer for a tool that installs silently. Four
+    facts a newcomer needs and nothing else; every number is read, never guessed.
+    The savings figure uses the SAME caliber as `bench` (tiktoken cl100k_base) —
+    quoting a different number here than `bench` prints is how a tool loses the
+    argument that its numbers are real.
+
+    Usage:
+        mcptoon status
+        mcptoon status --json
+    """
+    from . import schema_simplifier
+    from .bench import _tokenizer
+
+    servers = cfg.list_servers()
+    n_servers = len(servers)
+
+    # One tokenizer, one caliber — the same call `bench` makes.
+    encode, caliber, _exact = _tokenizer()
+
+    # Tools + savings, from the cached catalog (never spawns servers).
+    try:
+        manifest = manifest_mod.get_manifest(use_cache=True)
+    except Exception:
+        manifest = {}
+
+    total_tools = 0
+    full_tokens = 0
+    slim_tokens = 0
+    for _server, tools in manifest.items():
+        if not tools:
+            continue
+        for t in tools:
+            if not isinstance(t, dict) or "error" in t:
+                continue
+            total_tools += 1
+            full_tokens += max(1, int(encode(json.dumps(t, ensure_ascii=False))))
+            slim_tokens += max(1, int(encode(json.dumps(
+                schema_simplifier.simplify_tool_def(t), ensure_ascii=False))))
+    saved = max(0, full_tokens - slim_tokens)
+    pct = round(saved / full_tokens * 100, 1) if full_tokens else 0.0
+
+    try:
+        stats = usage_mod.get_usage_stats()
+        calls = int(stats.get("total_calls", 0))
+    except Exception:
+        calls = 0
+
+    # Is the gateway itself registered in any agent config? Read-only check.
+    wired = _gateway_wired_in()
+
+    if fmt == "json":
+        print(json.dumps({
+            "servers": n_servers,
+            "tools": total_tools,
+            "tokens_full": full_tokens,
+            "tokens_slim": slim_tokens,
+            "tokens_saved_est": saved,
+            "savings_pct": pct,
+            "token_caliber": caliber,
+            "calls_recorded": calls,
+            "gateway_registered": wired,
+            "footer_enabled": cfg.footer_enabled(),
+        }, indent=2, ensure_ascii=False))
+        return
+
+    line = "─" * 54
+    print(line)
+    print("  mcptoon — status")
+    print(line)
+    if n_servers:
+        print(f"  Managing           : {n_servers} MCP servers, {total_tools} tools")
+    else:
+        print("  Managing           : nothing yet — run `mcptoon quickstart`")
+    if total_tools:
+        print(f"  Tool definitions   : {full_tokens:,} → {slim_tokens:,} tokens "
+              f"(saved {saved:,}, {pct:.0f}%)  [{caliber}]")
+    print(f"  Calls recorded     : {calls}")
+    if wired:
+        print("  Gateway in agents  : yes — agents can see mcptoon itself")
+    else:
+        print("  Gateway in agents  : no — run `mcptoon sync --self` to register it")
+    print(line)
+    print("  Take it back any time:")
+    print("    mcptoon off          remove the gateway from your agents")
+    print("    mcptoon uninstall    full cleanup (preview with --dry)")
+    print("  Prove the numbers: mcptoon bench   ·   what it did: mcptoon usage")
+    print("")
+
+
+def _cmd_off(rest, fmt):
+    """Remove the gateway entry from every agent config — the reversible "off".
+
+    Keeps mcptoon installed and your server definitions intact; it only stops
+    the gateway from being handed to your agents. `mcptoon sync --self` puts it
+    back. This is the answer to "I want it to stop touching my agents".
+
+    Usage:
+        mcptoon off
+        mcptoon off --dry     preview without writing
+    """
+    from .sync import remove_gateway_from_all
+
+    dry_run = "--dry" in rest or "--dry-run" in rest
+    results = remove_gateway_from_all(dry_run=dry_run)
+    present = [r for r in results if r.get("removed")]
+
+    if fmt == "json":
+        print(json.dumps({
+            "dry_run": dry_run,
+            "removed_from": [r.get("agent") for r in present],
+            "count": len(present),
+        }, indent=2, ensure_ascii=False))
+        return
+
+    line = "─" * 54
+    print(line)
+    print("  mcptoon off" + ("  (DRY RUN — nothing written)" if dry_run else ""))
+    print(line)
+    if not present:
+        print("  Gateway is not registered in any agent. Nothing to remove.")
+    else:
+        for r in present:
+            verb = "would remove" if dry_run else "removed"
+            print(f"  {'→' if dry_run else '✓'} {r.get('agent_name', r.get('agent')):25s} {verb} the gateway entry")
+        print("")
+        if dry_run:
+            print(f"  Preview: {len(present)} agent(s) would lose the gateway entry.")
+        else:
+            print(f"  Done: {len(present)} agent(s) no longer see mcptoon. Your servers are untouched.")
+            print("  Put it back with: mcptoon sync --self")
+    print(line)
+    print("")
+
+
+def _safe_rmtree(path) -> bool:
+    """Delete a directory only if it is one mcptoon itself created.
+
+    A destructive command should not be one bad constant away from deleting
+    something else. If `MCPTOON_CACHE_DIR` (or a future refactor) ever resolved to
+    a parent — the user's home, a drive root — an unguarded `rmtree` would take the
+    user's world with it. `mcptoon` is the only directory name this project
+    creates, so anything else is refused and reported rather than deleted.
+
+    Returns True when the directory was removed.
+    """
+    p = Path(path)
+    if p.name != "mcptoon":
+        return False
+    import shutil
+
+    shutil.rmtree(p, ignore_errors=True)
+    return not p.exists()
+
+
+def _cmd_uninstall(rest, fmt):
+    """Full, reversible cleanup — print exactly what will be removed, then remove it.
+
+    A tool the user cannot get rid of is indistinguishable from one that never
+    asked. This is the exit door: it removes the gateway from every agent config
+    and deletes mcptoon's own files, and it PRINTS the plan first so the user can
+    audit it. `--dry` shows the same plan and stops.
+
+    Usage:
+        mcptoon uninstall
+        mcptoon uninstall --dry       preview only
+        mcptoon uninstall --yes       skip the interactive confirmation
+    """
+    from .sync import remove_gateway_from_all
+
+    dry_run = "--dry" in rest or "--dry-run" in rest
+    assume_yes = "--yes" in rest or "-y" in rest
+    keep_config = "--no-keep-config" not in rest
+
+    # mcptoon's own files, resolved through config.state_paths() so env overrides
+    # (MCPTOON_CONFIG_FILE and friends) are honoured. Crucially this NEVER deletes
+    # your server definitions by default: config.json / config.toml hold the MCP
+    # servers *you* configured. Deleting a user's config while claiming to "clean
+    # up" is exactly the surprise this tool exists to avoid.
+    paths = cfg.state_paths()
+    bookkeeping = paths["bookkeeping"]
+    server_configs = paths["servers"]
+    if not keep_config:
+        bookkeeping = [*bookkeeping, *server_configs]
+
+    agents = remove_gateway_from_all(dry_run=True)
+    agent_hits = [r for r in agents if r.get("removed")]
+    dirs_present = [d for d in paths["cache"] if Path(d).exists()]
+    files_present = [f for f in bookkeeping if Path(f).exists()]
+    config_kept = [f for f in server_configs if Path(f).exists()]
+
+    line = "─" * 54
+    print(line)
+    print("  mcptoon uninstall" + ("  (DRY RUN — nothing removed)" if dry_run else ""))
+    print(line)
+    print("  This will:")
+    if agent_hits:
+        for r in agent_hits:
+            print(f"    · remove the gateway entry from {r.get('agent_name', r.get('agent'))}"
+                  f"  ({r.get('path')})")
+    else:
+        print("    · (no agent config currently has the gateway entry)")
+    for d in dirs_present:
+        print(f"    · delete directory  {d}")
+    for f in files_present:
+        print(f"    · delete file       {f}")
+    if config_kept:
+        kept_names = ", ".join(Path(f).name for f in config_kept)
+        print(f"    · KEEP {kept_names}  (your server definitions — delete with --no-keep-config)")
+    if not dirs_present and not files_present and not agent_hits and not config_kept:
+        print("    · nothing to remove — mcptoon left no trace here")
+    print("")
+    print("  Your own MCP server definitions are never touched (unless you pass")
+    print("  --no-keep-config).")
+    print(line)
+
+    if dry_run:
+        print("  Dry run — nothing was removed. Re-run without --dry to apply.")
+        print("")
+        return
+
+    if not assume_yes:
+        # Non-interactive stdin (CI, piped) means we cannot ask: refuse rather
+        # than delete silently. --yes is the explicit opt-in.
+        #
+        # Note this guard is a courtesy, not the safety property. On Windows the NUL
+        # device reports `isatty() == True`, so `stdin=DEVNULL` slips past it and
+        # reaches the prompt below, where EOF makes the answer empty — which is not
+        # "yes". Both routes refuse; neither deletes. Keep it that way: do not treat
+        # `isatty()` as proof that somebody is there to answer.
+        if not sys.stdin.isatty():
+            print("  Refusing to delete without confirmation. Re-run with --yes.")
+            print("")
+            return
+        try:
+            answer = input("  Remove all of the above? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = ""
+        if answer not in ("y", "yes"):
+            print("  Cancelled — nothing was removed.")
+            print("")
+            return
+
+    removed_agents = remove_gateway_from_all(dry_run=False)
+    n_agents = sum(1 for r in removed_agents if r.get("removed"))
+    refused = []
+    for d in dirs_present:
+        if not _safe_rmtree(d):
+            refused.append(d)
+    for f in files_present:
+        try:
+            Path(f).unlink(missing_ok=True)
+        except OSError:
+            pass
+    print("")
+    print(f"  ✓ Removed the gateway from {n_agents} agent config(s).")
+    n_dirs = len(dirs_present) - len(refused)
+    print(f"  ✓ Deleted {n_dirs} director{'y' if n_dirs == 1 else 'ies'} "
+          f"and {len(files_present)} file(s).")
+    for d in refused:
+        print(f"  ! Refused to delete {d} — not a directory mcptoon owns.")
+    if config_kept:
+        print(f"  ✓ Kept your server definitions: {', '.join(Path(f).name for f in config_kept)}")
+    print("  mcptoon the package is still installed — remove it with:")
+    print("    pip uninstall mcptoon")
+    print(line)
+    print("")
+
+
+def _gateway_wired_in() -> bool:
+    """True if `mcptoon serve` appears as a server entry in any agent config.
+
+    Read-only and best-effort: a malformed agent config is treated as "not wired"
+    rather than crashing the status command.
+    """
+    from .sync import (SELF_SERVER_NAME, _claude_desktop_path, _cline_path,
+                       _cursor_path, _vscode_copilot_path, _windsurf_path)
+    paths = [*_cursor_path(), _claude_desktop_path(), _cline_path(),
+             _windsurf_path(), _vscode_copilot_path()]
+    for path in paths:
+        try:
+            if not path.exists():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, ValueError):
+            continue
+        # Cursor/Claude/Cline/Windsurf: {"mcpServers": {...}}; VS Code: {"mcp": {"servers": {...}}}
+        for section in (data.get("mcpServers"), (data.get("mcp") or {}).get("servers")):
+            if isinstance(section, dict) and SELF_SERVER_NAME in section:
+                return True
+    return False
 
 
 def _cmd_config(rest, fmt):
@@ -1974,7 +2454,14 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
 # ═══════════════════════════════════════════════════
 
 def _print_help():
-    print(f"""mcptoon v{__import__('mcptoon').__version__} — Token-efficient MCP CLI client
+    print(f"""mcptoon v{__import__('mcptoon').__version__} — one gateway for all your MCP tools
+                       compressed · visible · reversible
+
+Start here:
+    mcptoon quickstart                    One-command setup (discover + config + wire agents)
+    mcptoon status                        What's here, what it saves, how to undo it
+    mcptoon off                           Remove the gateway from your agents (reversible)
+    mcptoon uninstall                     Full cleanup (--dry to preview)
 
 Usage:
     mcptoon quickstart                    One-command setup (discover + config + show tools)
@@ -1989,51 +2476,58 @@ Usage:
     mcptoon discover --http <url>         Probe a specific HTTP MCP endpoint
     mcptoon discover --health             Health check (legacy discover behavior)
     mcptoon inspect <server> <tool>       Show tool schema
-    mcptoon search <query>              Search tools across all servers
+    mcptoon search <query>                Search tools across all servers
     mcptoon call <server> <tool> [ARGS]   Call a tool
-    mcptoon call --auto <tool> [ARGS]    Call a tool (auto-find server)
-    mcptoon call <server> <tool> --stdin   Read args from stdin (large payloads)
+    mcptoon call --auto <tool> [ARGS]     Call a tool (auto-find server)
+    mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)
     mcptoon init                          Create sample config
     mcptoon init --auto                   Auto-discover all MCP servers
     mcptoon init --auto --http <url>      Auto-discover + add HTTP MCP endpoint
     mcptoon add <name> [options]          Add a server
     mcptoon remove <name>                 Remove a server
     mcptoon usage                         Show usage stats
+    mcptoon status                        One-screen: what's here and what it saves
+    mcptoon stats                         Token-savings dashboard (vs raw JSON)
+    mcptoon footer-facts                  One line of savings for a chat footer
+    mcptoon config                        Show gateway settings (footer, welcome)
+    mcptoon config set footer off         Silence the per-turn savings line
+    mcptoon toggle <server> <tool>        Enable/disable one tool (--list to show)
     mcptoon policy                        Per-tool compression policy (raw/toon/slim)
     mcptoon doctor                        Self-diagnose config + connectivity
     mcptoon completion <shell>            Generate shell completion (bash|zsh|fish|ps)
     mcptoon install <name> --npm <pkg>    Install MCP server from npm
     mcptoon install <name> --pip <pkg>    Install MCP server from pip
-    mcptoon install <name> --url <url>   Install HTTP/SSE MCP server
-    mcptoon install --list               List installed servers
-    mcptoon install --remove <name>      Remove an installed server
+    mcptoon install <name> --url <url>    Install HTTP/SSE MCP server
+    mcptoon install --list                List installed servers
+    mcptoon install --remove <name>       Remove an installed server
 
-    mcptoon plugin scan <dir>            Validate an Agent Plugins 1.0.0 package
-    mcptoon plugin install <dir>         Install a plugin into every agent
-    mcptoon plugin list                  List installed plugins
-    mcptoon plugin remove <name>         Remove a plugin
+    mcptoon plugin scan <dir>             Validate an Agent Plugins 1.0.0 package
+    mcptoon plugin install <dir>          Install a plugin into every agent
+    mcptoon plugin list                   List installed plugins
+    mcptoon plugin remove <name>          Remove a plugin
 
-    mcptoon serve                        Run as MCP server (stdio bridge for agents)
-    mcptoon serve --http --auth          HTTP mode; bare --auth auto-generates a token
-    mcptoon demo                         Zero-config one-command demo
-    mcptoon demo --quick                 Results only, skip the step-by-step narration
-    mcptoon demo --keep                  Leave the demo server in config afterwards
-    mcptoon demo-server                  Self-contained MCP demo server (11 tools, no network)
+    mcptoon serve                         Run as MCP server (stdio bridge for agents)
+    mcptoon serve --http --auth           HTTP mode; bare --auth auto-generates a token
+    mcptoon demo                          Zero-config one-command demo
+    mcptoon demo --quick                  Results only, skip the step-by-step narration
+    mcptoon demo --keep                   Leave the demo server in config afterwards
+    mcptoon demo-server                   Self-contained MCP demo server (11 tools, no network)
     mcptoon add demo --stdio python -m mcptoon demo-server
-    mcptoon --version                    Print the installed version and exit
-    mcptoon sync                         Sync config to all agents (Claude Desktop, Cursor, etc.)
-    mcptoon sync --dry                   Preview without writing
-    mcptoon sync --agent <id>            Sync to one agent only
-    mcptoon health                       Health check all MCP servers
-    mcptoon health --json                JSON output for CI/CD (exit 1 if dead)
+    mcptoon --version                     Print the installed version and exit
+    mcptoon sync                          Sync config to all agents (Claude Desktop, Cursor, etc.)
+    mcptoon sync --dry                    Preview without writing
+    mcptoon sync --agent <id>             Sync to one agent only
+    mcptoon sync --self                   Also register the mcptoon gateway itself in each agent
+    mcptoon health                        Health check all MCP servers
+    mcptoon health --json                 JSON output for CI/CD (exit 1 if dead)
 
-    mcptoon skills list                  List the agent skill catalog (--usage adds hit counts)
-    mcptoon skills resolve <query>       BM25 shortlist of skills (offline, no LLM)
-    mcptoon skills sync [SRC] [VIEW...]  Distribute a skill catalog to every agent's folder
-    mcptoon skills add|remove <name>     Create a skill in the source / retire it to the archive
+    mcptoon skills list                   List the agent skill catalog (--usage adds hit counts)
+    mcptoon skills resolve <query>        BM25 shortlist of skills (offline, no LLM)
+    mcptoon skills sync [SRC] [VIEW...]   Distribute a skill catalog to every agent's folder
+    mcptoon skills add|remove <name>      Create a skill in the source / retire it to the archive
 
-    mcptoon bench                        Prove the savings on your own machine (tools + skills)
-    mcptoon bench --json                 Machine-readable; --roots/--query/-k tune the skills half
+    mcptoon bench                         Prove the savings on your own machine (tools + skills)
+    mcptoon bench --json                  Machine-readable; --roots/--query/-k tune the skills half
 
 Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
@@ -2050,9 +2544,9 @@ Output flags:
 
 Examples:
     mcptoon init
-    mcptoon manifest --toon              # standard TOON format
-    mcptoon manifest --mcptoon           # legacy pipe format
-    mcptoon manifest --slim              # ultra-compact tool schemas
+    mcptoon manifest --toon               # standard TOON format
+    mcptoon manifest --mcptoon            # legacy pipe format
+    mcptoon manifest --slim               # ultra-compact tool schemas
     mcptoon call fetch fetch '{{"url":"https://example.com"}}' --toon
     echo '{{"huge":"payload"}}' | mcptoon call server tool --stdin --toon
     mcptoon discover
@@ -2097,12 +2591,19 @@ def _cmd_sync(rest, fmt):
         mcptoon sync --agent cursor  # sync to specific agent only
         mcptoon sync --agent claude-desktop
         mcptoon sync --agent windsurf
+        mcptoon sync --self          # ALSO register `mcptoon serve` in each agent
+        mcptoon sync --no-self       # explicit servers-only (the default)
         mcptoon sync --watch         # keep syncing as configs change
         mcptoon sync --watch --interval 5 --quiet --watch-mode strict
     """
     from .sync import sync_to_all, sync_to_agent, format_sync_report
 
     dry_run = "--dry" in rest or "--dry-run" in rest
+    # Default OFF, unlike `quickstart`: `sync` is a routine, repeatable command, and
+    # silently injecting a *new* server entry into an agent's config on every routine
+    # run would be a surprise. `--self` opts in; `quickstart` (the install path) turns
+    # it on by default, and `mcptoon status` points here when the gateway is missing.
+    include_self = "--self" in rest
 
     # --watch: continuous sync loop (see watch.py)
     if "--watch" in rest:
@@ -2120,13 +2621,17 @@ def _cmd_sync(rest, fmt):
             break
 
     if agent_id:
-        result = sync_to_agent(agent_id, dry_run=dry_run)
+        result = sync_to_agent(agent_id, dry_run=dry_run, include_self=include_self)
         report = format_sync_report([result], dry_run=dry_run)
     else:
-        results = sync_to_all(dry_run=dry_run)
+        results = sync_to_all(dry_run=dry_run, include_self=include_self)
         report = format_sync_report(results, dry_run=dry_run)
 
     print(report)
+    if include_self and not dry_run:
+        print("")
+        print("  Gateway registered: agents can now see mcptoon itself (`mcptoon serve`).")
+        print("  Undo any time: mcptoon off")
 
 
 def _cmd_health(rest, fmt):

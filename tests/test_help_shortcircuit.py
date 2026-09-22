@@ -100,7 +100,12 @@ class TestHelpShortCircuit(unittest.TestCase):
 
     def test_help_is_still_help_before_a_command(self):
         out = self._run(["--help"], {"_cmd_manifest": _exploder("manifest")})
-        self.assertIn("Token-efficient MCP CLI client", out)
+        self.assertIn("one gateway for all your MCP tools", out)
+        # The front door must also show the exit: a CLI whose help never mentions
+        # how to undo its agent-config writes is the reason mcptoon felt like a
+        # trojan. `off`/`uninstall` live in the help's "Start here" block.
+        self.assertIn("mcptoon off", out)
+        self.assertIn("mcptoon uninstall", out)
 
     def test_demo_keeps_its_own_help_handler(self):
         """demo prints command-specific help itself; the guard must not swallow it."""

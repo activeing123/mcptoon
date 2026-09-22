@@ -72,6 +72,21 @@ def _index_path() -> Path:
         "MCPTOON_SKILLS_INDEX", str(CONFIG_DIR / "skills-index.json")))
 
 
+def _clean_desc(desc: str) -> str:
+    """A description with any surrounding YAML quotes removed.
+
+    The indexer stores the raw frontmatter value, which for many skills is
+    YAML-quoted (``description: "…"``). Both the rendered output and BM25 must
+    see the same cleaned text, so a description is never quoted in one place and
+    bare in another. Only a matching pair at the very start/end is stripped —
+    internal quotes are content and are preserved.
+    """
+    desc = desc or ""
+    if len(desc) >= 2 and desc[0] == desc[-1] and desc[0] in ("'", '"'):
+        return desc[1:-1]
+    return desc
+
+
 def _default_roots() -> list[Path]:
     """Common agent skill roots, most-specific first.
 
@@ -253,39 +268,87 @@ def _body_triggers(body: str) -> list[str]:
     return out[:40]
 
 
-def _iter_skill_dirs(root: Path):
-    """Yield ``(slug, skill_md_path)`` for one root.
+def _walk_skill_dirs(base: Path, seen: set[str]):
+    """Yield ``(slug, skill_md_path)`` anywhere under ``base``, depth-first.
 
-    Accepts both layouts seen in the wild: ``<root>/<slug>/SKILL.md`` and
-    ``<root>/skills/<slug>/SKILL.md``. One level only, never recursive.
+    Skills nest: a catalog ships sub-catalogs (``<skill>/skills/<slug>/``) and
+    bundled examples. A one-level walk indexed 376 of this machine's 405 skills
+    and silently hid the other 29 — including the whole ``video-seedance``
+    sub-family, which is the reason a one-line catalog entry can point at a
+    family at all. Directories are visited once by resolved real path, so a
+    junction pointing back into the tree cannot loop.
     """
+    try:
+        key = str(base.resolve())
+    except OSError:
+        key = str(base)
+    if key in seen:
+        return
+    seen.add(key)
+    try:
+        children = sorted(p for p in base.iterdir() if p.is_dir())
+    except OSError:
+        return
+    for child in children:
+        if _skip_dir(child.name):
+            continue
+        md = child / "SKILL.md"
+        if md.is_file():
+            yield child.name, md
+        yield from _walk_skill_dirs(child, seen)
+
+
+def _iter_skill_dirs(root: Path):
+    """Yield ``(slug, skill_md_path)`` for one root, recursively.
+
+    Accepts both layouts seen in the wild — ``<root>/<slug>/SKILL.md`` and
+    ``<root>/skills/<slug>/SKILL.md`` — and keeps descending past a skill
+    directory, because a skill may carry nested skills of its own. The second
+    layout is usually already inside the first, and sharing one ``seen`` set is
+    what keeps it from being walked twice.
+    """
+    seen: set[str] = set()
     for base in (root, root / "skills"):
         if not base.is_dir():
             continue
-        try:
-            children = sorted(p for p in base.iterdir() if p.is_dir())
-        except OSError:
-            continue
-        for child in children:
-            md = child / "SKILL.md"
-            if _skip_dir(child.name):
-                continue
-            if md.is_file():
-                yield child.name, md
+        yield from _walk_skill_dirs(base, seen)
 
 
 def scan_roots(roots: list[Path]) -> dict:
-    """Build an index dict from skill roots. Read-only; never writes to roots."""
+    """Build an index dict from skill roots. Read-only; never writes to roots.
+
+    Roots are de-duplicated by resolved real path first, the same way ``bench``
+    does it. Agent skill folders are commonly junctions onto one real catalog, so
+    a naive walk would index the catalog once per alias and emit a
+    ``SKILL_DUPLICATE`` per file — noise, not a real conflict. A machine with no
+    aliases sees no change, because distinct roots keep distinct real paths.
+    """
     from .plugin import parse_skill_frontmatter, parse_skill_md  # local: import-light
 
     skills: list[dict] = []
     warnings: list[dict] = []
     seen: dict[str, str] = {}
+    seen_files: set[str] = set()
+    seen_roots: set[str] = set()
     for root in roots:
         if not root.is_dir():
             warnings.append({"code": "ROOT_MISSING", "message": f"skill root not found: {root}"})
             continue
+        try:
+            root_key = str(root.resolve())
+        except OSError:
+            root_key = str(root)
+        if root_key in seen_roots:
+            continue  # alias of a root already walked — not a duplicate skill
+        seen_roots.add(root_key)
         for slug, md in _iter_skill_dirs(root):
+            try:
+                md_key = str(md.resolve())
+            except OSError:
+                md_key = str(md)
+            if md_key in seen_files:
+                continue  # same real SKILL.md reached through another root
+            seen_files.add(md_key)
             try:
                 name, desc, body = parse_skill_md(md)
             except OSError as exc:
@@ -409,13 +472,14 @@ class _BM25:
         docs: dict[str, Counter] = {}
         df: Counter = Counter()
         for slug, s in canonical.items():
-            parts = [slug, s.get("name") or "", s.get("desc") or "", " ".join(s.get("triggers") or [])]
+            parts = [slug, s.get("name") or "", _clean_desc(s.get("desc")),
+                     " ".join(s.get("triggers") or [])]
             for a in back.get(slug, []):
                 as_ = by_slug.get(a, {})
-                parts += [a, as_.get("desc") or "", " ".join(as_.get("triggers") or [])]
+                parts += [a, _clean_desc(as_.get("desc")), " ".join(as_.get("triggers") or [])]
             counts = Counter(_tokenize(" ".join(parts)))
             docs[slug] = counts
-            self.descs[slug] = s.get("desc") or ""
+            self.descs[slug] = _clean_desc(s.get("desc"))
             for t in counts:
                 df[t] += 1
         self.docs = docs
@@ -446,7 +510,15 @@ class _BM25:
         return total
 
     def search(self, query: str, k: int = 5) -> list[dict]:
-        """Top-k ``[{slug, score, desc}]``, best first."""
+        """Top-k ``[{slug, score, desc}]``, best first.
+
+        ``k <= 0`` asks for nothing and gets ``[]``. It used to be clamped up to
+        1, which made "no results, please" indistinguishable from "one result";
+        a negative ``k`` was worse — ``ranked[:-1]`` sliced the ranking from the
+        end and returned a silent wrong answer instead of nothing.
+        """
+        if k <= 0:
+            return []
         q = _tokenize(query)
         ranked = sorted(
             ((self._score(q, d), slug) for slug, d in self.docs.items()),
@@ -454,7 +526,7 @@ class _BM25:
         )
         return [
             {"slug": slug, "score": round(score, 4), "desc": self.descs.get(slug, "")}
-            for score, slug in ranked[:max(1, k)]
+            for score, slug in ranked[:k]
             if score > 0
         ]
 
@@ -646,6 +718,30 @@ def _flag(rest: list[str], name: str, default: str = "") -> str:
         if a.startswith(name + "="):
             return a.split("=", 1)[1]
     return default
+
+
+def _parse_k(rest: list[str], name: str, default: int, minimum: int = 1) -> int:
+    """Read an integer option, failing loudly instead of raising a traceback.
+
+    ``--k abc`` used to escape as ``ValueError: invalid literal for int()`` with
+    a stack trace, so a typo read as a crash inside mcptoon. An out-of-range
+    value is refused for the same reason: ``--k 0`` silently became one result,
+    which is a different answer from the one that was asked for. Both print one
+    line on stderr and exit 1, matching every other bad-invocation path in this
+    CLI (the repo has no exit-2 convention to join).
+    """
+    raw = _flag(rest, name, "")
+    if raw == "":
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        print(f"mcptoon: {name} needs an integer, got {raw!r}", file=sys.stderr)
+        sys.exit(1)
+    if value < minimum:
+        print(f"mcptoon: {name} must be at least {minimum}, got {value}", file=sys.stderr)
+        sys.exit(1)
+    return value
 
 
 # ═══════════════════════════════════════════════════
@@ -1300,7 +1396,8 @@ def _cmd_skills_list(index: dict, fmt: str, show_usage: bool,
     for s in skills_list:
         if s.get("alias_of") and not include_aliases:
             continue
-        row = {"slug": s["slug"], "desc": (s.get("desc") or "").split("触发词")[0].strip()}
+        row = {"slug": s["slug"],
+               "desc": _clean_desc(s.get("desc")).split("触发词")[0].strip()}
         if s.get("alias_of"):
             row["aliasOf"] = s["alias_of"]
         if show_usage:
@@ -1452,11 +1549,11 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         if not query:
             print("mcptoon: resolve needs a query", file=sys.stderr)
             sys.exit(1)
-        k = int(_flag(args, "--k", "5") or 5)
+        k = _parse_k(args, "--k", 5)
         # Opt-in: `resolve` is documented as instant and offline, so it does not
         # reach for MCP servers unless asked. Declared tools come from the index
         # and cost nothing; the tool bucket is a separate, explicit budget.
-        tk = int(_flag(args, "--tools-k", "0") or 0)
+        tk = _parse_k(args, "--tools-k", 0, minimum=0)
         bm = _BM25(index)
         shortlist = bm.search(query, k)
         declared = bm.declared_tools(shortlist)
@@ -1487,7 +1584,7 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         if not query:
             print("mcptoon: route needs a query", file=sys.stderr)
             sys.exit(1)
-        k = int(_flag(args, "--k", "5") or 5)
+        k = _parse_k(args, "--k", 5)
         endpoint = _flag(args, "--endpoint") or os.environ.get(
             "MCPTOON_SKILLS_ENDPOINT", "")
         models = [m.strip() for m in (
@@ -1541,7 +1638,7 @@ def unroutable(index: dict) -> list[dict]:
     canonical, _ = resolve_aliases(index)
     out = []
     for slug, s in canonical.items():
-        desc = (s.get("desc") or "").strip()
+        desc = _clean_desc(s.get("desc")).strip()
         triggers = s.get("triggers") or []
         if not desc and not triggers:
             out.append({"slug": s["slug"], "reason": "no description and no triggers — only the slug can find it"})
@@ -1553,7 +1650,7 @@ def index_stats(index: dict, fmt: str = "auto") -> None:
     skills = index.get("skills", [])
     canonical, alias_map = resolve_aliases(index)
     by_slug = {s["slug"].lower(): s for s in skills}
-    no_desc = [s["slug"] for s in skills if not s.get("desc")]
+    no_desc = [s["slug"] for s in skills if not _clean_desc(s.get("desc")).strip()]
     dupes: dict[str, list[str]] = defaultdict(list)
     for s in skills:
         dupes[s["slug"].lower()].append(s["root"])

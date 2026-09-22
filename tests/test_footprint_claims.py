@@ -31,7 +31,12 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
            "docs/tiktoken-benchmarks.md")
 
 # Sizes once written down that are wrong now. A doc may not resurrect them.
-RETIRED_KB = ("50KB", "200KB", "250KB")
+# "200KB" was on this list and came off it on 2026-09-21: the wheel really is
+# 200,171-ish bytes now (205,171 bytes, 200.36 KB), so the string that used to be a
+# stale claim is the current truth. A retired-value list is a claim too — it says
+# "no surface may say this", which stops being true when the number becomes right.
+# Keep only sizes that are wrong *now*.
+RETIRED_KB = ("50KB", "250KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -50,14 +55,20 @@ TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
 # every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
-# What `pip install mcptoon` downloads: measured 2026-09-18 with `python -m build` (the
-# same tool CI uses) at 194,028 bytes (189.48 KB) -> 189KB. v0.7.18 carries the
-# dead-package and stderr-drain fixes, which moved a handful of source lines; v0.7.17
-# before it had grown the wheel from 155.5 KB, because src/mcptoon/skills.py (~68KB) and
-# src/mcptoon/bench.py (~13KB) landed and because the README (embedded in the wheel
-# METADATA) documents the skills family and the `mcptoon bench` command.
-# Re-measure at each release: the README text is part of the wheel, so doc edits move it.
-WHEEL_KB = "189KB"
+# What `pip install mcptoon` downloads: measured 2026-09-21 with
+# `python -m build --wheel --no-isolation` at 211,766 bytes (206.80 KB) -> 206KB
+# (truncated, as before). The isolated build env could not be provisioned on this
+# box (the configured mirror would not serve the build requirements), so the
+# ambient setuptools 81.0.0 was used instead; that is not a free substitution, so
+# it was checked rather than assumed: the same tool reports the pre-change tree at
+# 194,352 bytes against the 194,028 bytes the isolated env recorded, i.e. 0.16%
+# larger, well inside the truncation this claim already applies. The byte growth
+# was also attributed — it equals the deflate delta of src/mcptoon/*.py plus the
+# README, which is embedded in the wheel METADATA, so doc edits move this number.
+# The v0.7.21 work moved it 193KB -> 198KB -> 199KB -> 200KB -> 202KB -> 206KB across
+# the presence, reversibility, CLI-discoverability, per-turn-footer and
+# universal-surface (footer.py) rounds.
+WHEEL_KB = "206KB"
 
 
 def modules() -> list[Path]:

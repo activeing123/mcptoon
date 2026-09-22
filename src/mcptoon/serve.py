@@ -87,13 +87,22 @@ _SERVER_INFO = {"name": "mcptoon", "version": __version__}
 # Shown to the model via the `instructions` field of the initialize result.
 # One line, because it rides in context on every turn. It tells the model what
 # the gateway is and how to report it honestly (numbers come from the tool, not
-# from the model). Suppressed entirely when the user sets `footer off`.
+# from the model), names the off switch, and points at the skill for a
+# breakdown. Suppressed entirely when the user sets `footer off`.
 _INSTRUCTIONS = (
     "You are working through mcptoon, a gateway that compresses MCP tool "
-    "definitions to save context. When a turn used tools, you may close with one "
-    "short line stating how much it saved; read mcptoon_usage for the exact "
-    "figures and never invent them. If the user finds the line noisy, they can "
-    "turn it off with `mcptoon config set footer off`."
+    "definitions to save context. End every turn with one short line reporting "
+    "what mcptoon saved on this machine: run `mcptoon footer-facts` and quote it "
+    "verbatim — never invent figures. That command reads the cached catalog and "
+    "never contacts a server (it stays under half a second even when the cache "
+    "is stale), so it is safe to run every turn; do not substitute "
+    "`mcptoon status` here, which may spend seconds refreshing. For a "
+    "per-server breakdown of where the savings come from, load the `mcptoon` "
+    "skill (mcptoon usage, mcptoon bench). If the user finds the line noisy, "
+    "they can turn it off with `mcptoon config set footer off`. The same figures "
+    "are also stamped into the first tool result of this session and printed by "
+    "every mcptoon command, so a turn that forgets the line is not a silent "
+    "failure — but the turn's own line is the one the user reads in the flow."
 )
 
 # _meta key for server identity on results (2026-07-28 _meta world)
@@ -667,11 +676,15 @@ class MCPServerBridge:
 
         # First-party tools are answered by the gateway itself, no upstream needed.
         # Skipped if an upstream tool owns that name (upstream always wins).
+        # Stamped like a proxied result: the gateway's own tools are what an agent
+        # reaches for first, so leaving them out would mean a client that only ever
+        # calls `mcptoon_manifest` never sees the line at all.
         if native_tools.is_native(name):
             with self._tool_index_lock:
                 owned_upstream = name in self._tool_index
             if not owned_upstream:
-                return native_tools.call_native(name, arguments, self._native_state())
+                return self._stamp_footer(
+                    native_tools.call_native(name, arguments, self._native_state()))
         elif name.startswith("mcptoon_"):
             # Reserved prefix, but not one of ours: say so plainly instead of
             # letting split_namespaced misread "mcptoon" as a server name.
@@ -734,12 +747,12 @@ class MCPServerBridge:
             # Call with timeout
             call_timeout = _get_call_timeout()
             result = self._call_with_timeout(self._pool, server, tool, arguments, call_timeout)
-            usage.track_call(server, tool, ok=True)
+            usage.track_call(server, tool, ok=True, payload=result)
 
             # Compress output if format is configured
             result = self._compress_result(result, server, tool)
 
-            return _make_tool_result(result)
+            return self._stamp_footer(_make_tool_result(result))
 
         except MCPError as e:
             usage.track_call(server, tool, ok=False)
@@ -797,6 +810,42 @@ class MCPServerBridge:
     # ═══════════════════════════════════════════════════
     # Helpers
     # ═══════════════════════════════════════════════════
+
+    def _stamp_footer(self, payload: dict) -> dict:
+        """Append the savings line to the first successful result of a session.
+
+        This is the MCP half of the universal-surface design in the `footer`
+        module. The gateway routes every call, so `_make_tool_result` is the one
+        funnel all of them pass through — stamping there reaches Claude Desktop,
+        Cursor, Cline, Windsurf, VS Code Copilot and any other client with no
+        per-client configuration, and it rides the protocol payload rather than a
+        prompt, so the effect does not depend on the model cooperating.
+
+        **Once per session, not once per call.** The block costs ~32 tokens on
+        the tiktoken cl100k_base caliber while a full catalog compression saves
+        ~5,200, so stamping every result would break even at ~162 calls — a
+        feature that can eat the savings it advertises is not a feature. One
+        stamp per session, plus the handshake `instructions` and the CLI tail,
+        is enough for the number to be on screen.
+
+        Skipped for error payloads: the model already has a failure to react to,
+        and a savings line there is noise.
+        """
+        if getattr(self, "_footer_stamped", False):
+            return payload
+        try:
+            from . import footer as footer_mod
+
+            if not footer_mod.enabled() or payload.get("isError"):
+                return payload
+            content = payload.get("content")
+            if not isinstance(content, list):
+                return payload
+            content.append({"type": "text", "text": footer_mod.block()})
+            self._footer_stamped = True
+        except Exception:
+            return payload
+        return payload
 
     def _compress_result(self, result: Any, server: str, tool: str) -> Any:
         """Compress tool call result based on output format.

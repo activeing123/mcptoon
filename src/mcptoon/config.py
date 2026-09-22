@@ -64,6 +64,35 @@ def _config_file_toml() -> Path:
 CACHE_DIR = HOME_DIR / ".cache" / "mcptoon"
 LOG_DIR = CONFIG_DIR / "logs"
 TOGGLE_FILE = CONFIG_DIR / "toggles.json"
+
+
+def _cache_dir() -> Path:
+    return Path(os.environ.get("MCPTOON_CACHE_DIR", str(CACHE_DIR)))
+
+
+def _toggle_file() -> Path:
+    return Path(os.environ.get("MCPTOON_TOGGLE_FILE", str(TOGGLE_FILE)))
+
+
+def state_paths() -> dict:
+    """Every path mcptoon owns, resolved at CALL time (env overrides respected).
+
+    Split into three groups because `mcptoon uninstall` treats them differently:
+
+      - ``bookkeeping`` — mcptoon's own state (settings, first-run marker,
+        toggles, compression policy). Safe to delete; deleting it is what
+        "uninstall" means.
+      - ``servers``     — the MCP server definitions the *user* configured.
+        Preserved by default: silently deleting someone's server list while
+        claiming to clean up would be the worst kind of surprise.
+      - ``cache``       — regenerable (manifest + usage). Always safe to delete.
+    """
+    return {
+        "bookkeeping": [_settings_file(), _welcome_file(), _toggle_file(), _policy_file()],
+        "servers": [_config_file(), _config_file_toml()],
+        "cache": [_cache_dir()],
+    }
+
 # Gateway preferences that are not per-server (footer on/off, ...). Kept apart
 # from config.json so a settings write can never corrupt a server definition.
 # Like _config_file(), the path is resolved at CALL time so a test process can
@@ -71,13 +100,23 @@ TOGGLE_FILE = CONFIG_DIR / "toggles.json"
 SETTINGS_FILE = Path(os.environ.get(
     "MCPTOON_SETTINGS_FILE", str(CONFIG_DIR / "settings.json")))
 
+# First-run marker. Absent means mcptoon has never introduced itself on this
+# machine — the one moment it is allowed to speak unprompted (see
+# cli._maybe_welcome). Resolved at CALL time for the same test-isolation reason.
+WELCOME_FILE = Path(os.environ.get(
+    "MCPTOON_WELCOME_FILE", str(CONFIG_DIR / ".welcome")))
+
 # Recognized settings and their defaults. The CLI validates against this map, so
 # a typo fails loudly instead of silently writing a key nothing reads.
-SETTING_DEFAULTS = {"footer": "on"}
+SETTING_DEFAULTS = {"footer": "on", "welcome": "on"}
 
 
 def _settings_file() -> Path:
     return Path(os.environ.get("MCPTOON_SETTINGS_FILE", str(SETTINGS_FILE)))
+
+
+def _welcome_file() -> Path:
+    return Path(os.environ.get("MCPTOON_WELCOME_FILE", str(WELCOME_FILE)))
 
 # Ensure dirs exist
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -313,6 +352,30 @@ def set_setting(key: str, value: str) -> None:
 def footer_enabled() -> bool:
     """Whether the end-of-turn disclosure is on. Default: on."""
     return get_setting("footer").strip().lower() not in ("off", "0", "false", "no")
+
+
+def welcome_enabled() -> bool:
+    """Whether the one-time first-run welcome may print. Default: on."""
+    return get_setting("welcome").strip().lower() not in ("off", "0", "false", "no")
+
+
+def welcome_seen() -> bool:
+    """True once the first-run welcome has been shown (marker file exists)."""
+    return _welcome_file().exists()
+
+
+def mark_welcome_seen() -> None:
+    """Drop the first-run marker so the welcome never prints again.
+
+    Best-effort: a read-only home directory must not turn a normal command into
+    a crash, and the worst case (welcome repeats) is harmless.
+    """
+    try:
+        path = _welcome_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    except OSError:
+        pass
 
 
 # ─── Toggle management (per-tool enable/disable) ───

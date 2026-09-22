@@ -176,6 +176,149 @@ def _build_mcp_servers_dict(config: dict) -> dict:
     return result
 
 
+# Reserved name for the gateway's own entry. It cannot collide with a real MCP
+# server in practice: `mcptoon` is this package, and a config that shadowed it
+# would already be broken.
+SELF_SERVER_NAME = "mcptoon"
+
+
+def _self_serve_entry() -> dict:
+    """The agent-format entry that puts `mcptoon serve` in an agent's config.
+
+    Why this exists: `mcptoon serve` is the only surface where mcptoon speaks to
+    the *model* (the MCP `instructions` field of the initialize handshake). But
+    nothing ever wrote that entry into an agent's config — `sync` deliberately
+    carried only the user's servers — so the gateway's voice was never heard on
+    any machine. Registering it is what turns "installed silently" into "the
+    agent knows mcptoon is here".
+
+    Uses `sys.executable -m mcptoon` rather than a bare `mcptoon`, because an
+    agent process may launch with a PATH that lacks the user Scripts dir; the
+    interpreter running this code always exists.
+    """
+    return {"command": sys.executable, "args": ["-m", "mcptoon", "serve"]}
+
+
+def _merge_self_entry(mcp_servers: dict) -> dict:
+    """Add the gateway's own `serve` entry (never clobbering a user server)."""
+    merged = dict(mcp_servers)
+    merged.setdefault(SELF_SERVER_NAME, _self_serve_entry())
+    return merged
+
+
+# ─── Removing the gateway (the undo side of `sync --self`) ───
+# A tool the user cannot switch off is indistinguishable from one that never
+# asked. `mcptoon off` and `mcptoon uninstall` are the answers to "how do I get
+# rid of this?" — they remove ONLY the gateway entry, leaving every other server
+# in the user's config untouched.
+
+def _agent_config_path(agent_id: str) -> Path | None:
+    """The config file a given agent id writes to (None when unknown)."""
+    if agent_id == "claude-desktop":
+        return _claude_desktop_path()
+    if agent_id == "cursor":
+        return _cursor_path()[0]
+    if agent_id == "cline":
+        return _cline_path()
+    if agent_id == "windsurf":
+        return _windsurf_path()
+    if agent_id == "vscode-copilot":
+        return _vscode_copilot_path()
+    return None
+
+
+def _servers_section(data: dict, agent_id: str) -> dict:
+    """The mcpServers-shaped mapping inside an agent's config (read-only view).
+
+    Cursor/Claude/Cline/Windsurf keep servers at ``mcpServers``; VS Code keeps
+    them at ``mcp.servers`` inside its shared settings.json.
+    """
+    if agent_id == "vscode-copilot":
+        return (data.get("mcp") or {}).get("servers", {}) or {}
+    return data.get("mcpServers", {}) or {}
+
+
+def gateway_present_in(agent_id: str) -> bool:
+    """True if the gateway entry exists in this agent's config (read-only)."""
+    path = _agent_config_path(agent_id)
+    if path is None or not path.exists():
+        return False
+    section = _servers_section(_read_json_safe(path), agent_id)
+    return isinstance(section, dict) and SELF_SERVER_NAME in section
+
+
+def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
+                              path: Path | None = None) -> dict:
+    """Remove ONLY the gateway entry from an agent's config, servers left intact.
+
+    The inverse of `sync --self`. Returns a sync-shaped result; ``removed`` is
+    True when the entry was actually there (so callers can report a real count).
+
+    ``path`` overrides the file to edit. It exists because an agent id does not
+    always map to one file: Cursor keeps a project-level `.cursor/mcp.json` next to
+    its global one, and `_agent_config_path("cursor")` only ever names the global
+    file — so without an override the project-level copy silently kept the gateway
+    entry that `mcptoon off` had just claimed to remove.
+    """
+    target = path if path is not None else _agent_config_path(agent_id)
+    if target is None:
+        return {"agent": agent_id, "path": "", "removed": False, "written": False,
+                "error": f"Unknown agent: {agent_id}"}
+    path = target
+    if not path.exists():
+        return {"agent": agent_id, "path": str(path), "removed": False,
+                "written": False, "error": None}
+
+    data = _read_json_safe(path)
+    if not data:
+        return {"agent": agent_id, "path": str(path), "removed": False,
+                "written": False, "error": None}
+
+    if agent_id == "vscode-copilot":
+        section = (data.get("mcp") or {}).get("servers")
+    else:
+        section = data.get("mcpServers")
+    if not isinstance(section, dict) or SELF_SERVER_NAME not in section:
+        return {"agent": agent_id, "path": str(path), "removed": False,
+                "written": False, "error": None}
+
+    section.pop(SELF_SERVER_NAME, None)
+    if dry_run:
+        return {"agent": agent_id, "path": str(path), "removed": True,
+                "written": False, "error": None}
+    ok = _write_json_safe(path, data)
+    return {"agent": agent_id, "path": str(path), "removed": True, "written": ok,
+            "error": None if ok else "Write failed"}
+
+
+def remove_gateway_from_all(dry_run: bool = False) -> list[dict]:
+    """Remove the gateway entry from every detected agent's config file.
+
+    De-duplicated by the *resolved* file, not by the reported path: Cursor lists a
+    global and a project-level config, and on some setups those are the same file.
+    Keying on the reported string missed that (so the same file was processed twice
+    and "6 agents" was reported for five files), while keying on the resolved path
+    also lets the project-level file be cleaned at all.
+    """
+    agents = detect_installed_agents()
+    results = []
+    seen_paths = set()
+    for agent in agents:
+        target = Path(agent["config_path"])
+        try:
+            key = str(target.resolve()).lower()
+        except OSError:  # unreachable drive, malformed path
+            key = str(target).lower()
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        r = remove_gateway_from_agent(agent["id"], dry_run=dry_run, path=target)
+        r["agent_name"] = agent["name"]
+        r["config_exists"] = agent["exists"]
+        results.append(r)
+    return results
+
+
 # ─── Detection (which agents are installed) ───
 
 def detect_installed_agents() -> list[dict]:
@@ -246,13 +389,31 @@ def _read_json_safe(path: Path) -> dict:
 
 
 def _write_json_safe(path: Path, data: dict) -> bool:
-    """Write JSON file, creating parent dirs. Returns True on success."""
+    """Write JSON file, creating parent dirs. Returns True on success.
+
+    Writing into someone's agent config is destructive, so a first `.bak` copy is
+    taken *only when the content actually changes* — that keeps the backup
+    meaningful (it is the pre-mcptoon state) instead of littering one file per
+    routine sync, and it means the very first `sync` that adds the gateway leaves
+    a one-command undo: copy `<config>.bak` back, or delete the `mcptoon` entry.
+    A failed backup does not block the write; the write is what the user asked for.
+    """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        new_text = json.dumps(data, indent=2, ensure_ascii=False)
+        if path.exists():
+            try:
+                old_text = path.read_text(encoding="utf-8")
+            except OSError:
+                old_text = None
+            if old_text is not None and old_text != new_text:
+                bak = path.with_suffix(path.suffix + ".bak")
+                if not bak.exists():  # never overwrite an existing backup
+                    try:
+                        bak.write_text(old_text, encoding="utf-8")
+                    except OSError:
+                        pass
+        path.write_text(new_text, encoding="utf-8")
         return True
     except OSError:
         return False
@@ -271,13 +432,16 @@ def _merge_mcp_servers(existing: dict, new_servers: dict) -> dict:
     return result
 
 
-def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = None) -> dict:
+def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = None,
+                  include_self: bool = False) -> dict:
     """Sync mcptoon config to a specific agent.
 
     Args:
         agent_id: One of 'claude-desktop', 'cursor', 'cline', 'windsurf', 'vscode-copilot', 'codex'
         dry_run: If True, return what would be written without writing
         config: Override config (for testing). If None, loads from default.
+        include_self: Also register `mcptoon serve` (the gateway's own entry) so
+            the agent can see mcptoon itself, not just the servers it manages.
 
     Returns:
         {
@@ -301,6 +465,9 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
             "written": False,
             "error": "No servers in mcptoon config. Run: mcptoon add <name> ...",
         }
+
+    if include_self:
+        mcp_servers = _merge_self_entry(mcp_servers)
 
     # Determine config file path and write logic
     if agent_id == "claude-desktop":
@@ -343,7 +510,10 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
     elif agent_id == "vscode-copilot":
         path = _vscode_copilot_path()
         existing = _read_json_safe(path)
-        # VS Code stores MCP servers under "mcp.servers" in settings.json
+        # VS Code stores MCP servers under "mcp.servers" in settings.json.
+        # The user's settings.json is a large shared file, so this one is edited
+        # in place rather than rewritten: a full re-serialisation would reorder
+        # keys and reformat comments. An existing backup is left untouched.
         mcp_section = existing.get("mcp", {})
         current_servers = dict(mcp_section.get("servers", {}))
         current_servers.update(mcp_servers)
@@ -372,20 +542,43 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         return {"agent": agent_id, "path": "", "servers_synced": 0, "written": False, "error": f"Unknown agent: {agent_id}"}
 
 
-def sync_to_all(dry_run: bool = False, config: dict | None = None) -> list[dict]:
+def sync_to_all(dry_run: bool = False, config: dict | None = None,
+                include_self: bool = False) -> list[dict]:
     """Sync mcptoon config to all installed agents.
 
     Args:
         dry_run: If True, preview without writing
         config: Override config (for testing)
+        include_self: Also register `mcptoon serve` in each agent (see sync_to_agent).
 
     Returns:
-        List of sync results, one per agent.
+        List of sync results, one per *config file written*.
     """
     agents = detect_installed_agents()
     results = []
+    seen_paths = set()
     for agent in agents:
-        result = sync_to_agent(agent["id"], dry_run=dry_run, config=config)
+        # Dedupe on the file `sync_to_agent` will actually write, not on the path the
+        # agent row reports. Cursor lists a global and a project-level config, but
+        # sync only ever writes the global one — so the project row used to produce a
+        # second "✓ 13 servers" line for the same file, and "6 agents / 78 servers"
+        # counted a write that never happened. Keying on the real target also keeps
+        # sync off the project-level path entirely, which is deliberate: writing a
+        # `.cursor/mcp.json` into whatever directory the user happens to be in is
+        # exactly the kind of unasked-for side effect this command should not have.
+        target = _agent_config_path(agent["id"])
+        if target is None:
+            key = f"id:{agent['id']}"
+        else:
+            try:
+                key = str(target.resolve()).lower()
+            except OSError:  # unreachable drive, malformed path
+                key = str(target).lower()
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        result = sync_to_agent(agent["id"], dry_run=dry_run, config=config,
+                               include_self=include_self)
         result["agent_name"] = agent["name"]
         result["config_exists"] = agent["exists"]
         results.append(result)

@@ -567,6 +567,20 @@ def parse_skill_frontmatter(path: Path | str) -> dict:
     return data
 
 
+def strip_yaml_quotes(value: str) -> str:
+    """Drop one matching pair of YAML quotes wrapping *value*.
+
+    A frontmatter line ``description: "…"`` carries the quotes as YAML syntax,
+    not as part of the value — but the raw line keeps them. Only a *matching*
+    pair at the very start and end is stripped, so a description that
+    legitimately contains internal quotes (``He said "hi"``) survives intact;
+    blanket-replacing quote characters would corrupt it.
+    """
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
 def parse_skill_md(path: Path | str) -> tuple[str, str, str]:
     """Parse a SKILL.md into (name, description, body). Zero-dependency.
 
@@ -586,7 +600,7 @@ def parse_skill_md(path: Path | str) -> tuple[str, str, str]:
                 if key == "name":
                     name = value.strip()
                 elif key == "description":
-                    description = value.strip()
+                    description = strip_yaml_quotes(value.strip())
             body = parts[2].strip()
     return name, description, body
 

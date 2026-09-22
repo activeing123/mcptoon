@@ -363,7 +363,7 @@ def call_tool(
                             f"Tool result may contain exposed credentials: {leak}",
                             "router", retry=False, server=server, tool=tool,
                         )
-                usage.track_call(server, tool, ok=not is_error(result))
+                usage.track_call(server, tool, ok=not is_error(result), payload=result)
                 return result
         except Exception as exc:
             # Remember the real failure and fall through to MCP below. If the
@@ -424,7 +424,7 @@ def call_tool(
                     "router", retry=False, server=server, tool=tool,
                 )
 
-        usage.track_call(server, tool, ok=not is_error(result))
+        usage.track_call(server, tool, ok=not is_error(result), payload=result)
         return result
     except MCPError as e:
         usage.track_call(server, tool, ok=False)

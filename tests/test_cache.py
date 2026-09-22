@@ -12,6 +12,7 @@
 # governing permissions and limitations under the License.
 
 """Tests for schema cache content fingerprinting and staleness handling."""
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,15 +27,25 @@ def _tools(names_reqs):
 
 
 class CacheIsolated(unittest.TestCase):
+    """Redirect the cache through the env var the product reads.
+
+    `_CACHE_FILE` / `_LOCK_FILE` used to be module constants and these tests
+    patched them directly. They are functions now, because the constants were
+    frozen at import and silently ignored `MCPTOON_CACHE_DIR` — so the setting
+    that is supposed to relocate the cache moved `config._cache_dir()` and
+    nothing else. Isolating by env rather than by patching module attributes is
+    also the convention this repo settled on after the destructive-command
+    incident: a test that patches only what it happens to know about leaves the
+    rest of the real machine reachable.
+    """
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
-        self.cache_file = Path(self._tmp.name) / "schema_cache.json"
-        p1 = mock.patch.object(c, "_CACHE_FILE", self.cache_file)
-        p2 = mock.patch.object(c, "_LOCK_FILE", Path(self._tmp.name) / "lock")
-        p1.start()
-        p2.start()
-        self.addCleanup(p1.stop)
-        self.addCleanup(p2.stop)
+        self.cache_dir = Path(self._tmp.name)
+        self.cache_file = self.cache_dir / "schema_cache.json"
+        self._env = mock.patch.dict(os.environ, {"MCPTOON_CACHE_DIR": str(self.cache_dir)})
+        self._env.start()
+        self.addCleanup(self._env.stop)
         self.addCleanup(self._tmp.cleanup)
 
 

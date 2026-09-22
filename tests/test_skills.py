@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import date
 from io import StringIO
 from pathlib import Path
@@ -1056,6 +1056,138 @@ class SkipDirTests(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in view.iterdir()), ["real.md"])
 
 
+class RealPathDedupTests(unittest.TestCase):
+    """`skills index` must de-duplicate roots by *real* path, like `bench` does.
+
+    A machine whose agent skill folders are junctions onto one real catalog is the
+    normal multi-agent layout, not an exotic one. Walking each root naively then
+    reports the catalog N times and emits a bogus ``SKILL_DUPLICATE`` per file —
+    the exact noise `bench` already avoids. These pin the same behaviour here.
+    """
+
+    def _catalog(self, base: Path, *slugs: str) -> Path:
+        real = base / "real"
+        for slug in slugs:
+            d = real / slug
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "SKILL.md").write_text(
+                f"---\nname: {slug}\ndescription: does {slug}\n---\n\nbody\n",
+                encoding="utf-8")
+        return real
+
+    def test_alias_root_does_not_duplicate_the_catalog(self):
+        """Two roots pointing at the same real files must index each skill once."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            real = self._catalog(base, "alpha", "beta")
+            alias = base / "alias"
+            try:
+                alias.symlink_to(real, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                alias = real  # platform without symlink rights: same path, one count
+            idx = skills.scan_roots([real, alias])
+            self.assertEqual(sorted(s["slug"] for s in idx["skills"]), ["alpha", "beta"])
+            self.assertEqual(idx["warnings"], [])
+
+    def test_same_root_twice_counts_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real = self._catalog(Path(tmp), "alpha")
+            idx = skills.scan_roots([real, real])
+            self.assertEqual([s["slug"] for s in idx["skills"]], ["alpha"])
+            self.assertFalse([w for w in idx["warnings"]
+                              if w["code"] == "SKILL_DUPLICATE"])
+
+    def test_distinct_roots_are_unchanged(self):
+        """No aliases on the machine: counts must not move (the safety net)."""
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            root_a = self._catalog(Path(a), "alpha", "beta")
+            root_b = self._catalog(Path(b), "gamma")
+            idx = skills.scan_roots([root_a, root_b])
+            self.assertEqual(sorted(s["slug"] for s in idx["skills"]),
+                             ["alpha", "beta", "gamma"])
+            self.assertEqual(idx["warnings"], [])
+
+    def test_same_slug_from_two_distinct_real_files_is_still_flagged(self):
+        """The genuinely ambiguous case (different files, same slug) keeps warning."""
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            write_skill(Path(a), "dup", "one. 触发词：alpha")
+            write_skill(Path(b), "dup", "two. 触发词：beta")
+            idx = skills.scan_roots([Path(a), Path(b)])
+            self.assertEqual(len(idx["skills"]), 2)
+            self.assertIn("SKILL_DUPLICATE", {w["code"] for w in idx["warnings"]})
+
+
+class DescriptionQuoteTests(unittest.TestCase):
+    """A YAML-quoted ``description: "…"`` must never leak its quotes.
+
+    YAML quoting is frontmatter syntax, not part of the value. It must be gone
+    everywhere a description is seen — the index, `skills list`, `skills resolve`
+    and BM25 matching — while internal quotes stay as content.
+    """
+
+    def test_scan_strips_surrounding_double_quotes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_skill(Path(tmp), "agent", '"🤖 子代理管理器。触发词：/agent、agent"')
+            idx = skills.scan_roots([Path(tmp)])
+            self.assertEqual(idx["skills"][0]["desc"], "🤖 子代理管理器。触发词：/agent、agent")
+
+    def test_scan_strips_surrounding_single_quotes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_skill(Path(tmp), "q", "'single quoted desc. 触发词：q'")
+            idx = skills.scan_roots([Path(tmp)])
+            self.assertEqual(idx["skills"][0]["desc"], "single quoted desc. 触发词：q")
+
+    def test_internal_quotes_are_preserved(self):
+        """Only a matching pair at the very ends is stripped — never a blanket replace."""
+        with tempfile.TemporaryDirectory() as tmp:
+            write_skill(Path(tmp), "inner", 'He said "hi" then left. 触发词：inner')
+            idx = skills.scan_roots([Path(tmp)])
+            self.assertEqual(idx["skills"][0]["desc"], 'He said "hi" then left. 触发词：inner')
+
+    def test_unquoted_description_is_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_skill(Path(tmp), "plain", "no quotes here. 触发词：plain")
+            idx = skills.scan_roots([Path(tmp)])
+            self.assertEqual(idx["skills"][0]["desc"], "no quotes here. 触发词：plain")
+
+    def test_list_output_has_no_leading_quote(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as store:
+            write_skill(Path(tmp), "agent", '"🤖 子代理管理器。触发词：/agent、agent"')
+            env = {"MCPTOON_SKILLS_INDEX": str(Path(store) / "idx.json"),
+                   "MCPTOON_SKILLS_ROOTS": str(Path(tmp))}
+            run_cli(["mcptoon", "skills", "index"], env)
+            out = run_cli(["mcptoon", "skills", "list"], env)
+            self.assertNotIn('"', out)
+            self.assertIn("🤖 子代理管理器", out)
+
+    def test_resolve_output_and_matching_see_cleaned_text(self):
+        """Display AND BM25 read the same cleaned description."""
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as store:
+            write_skill(Path(tmp), "agent", '"子代理管理器。触发词：/agent、agent"')
+            env = {"MCPTOON_SKILLS_INDEX": str(Path(store) / "idx.json"),
+                   "MCPTOON_SKILLS_ROOTS": str(Path(tmp))}
+            run_cli(["mcptoon", "skills", "index"], env)
+            out = run_cli(["mcptoon", "skills", "resolve", "子代理管理器", "--k", "1"], env)
+            self.assertIn("agent", out)
+            self.assertNotIn('"', out)
+
+    def test_bm25_matches_through_a_legacy_quoted_index(self):
+        """An index built before the fix is still clean at match and display time."""
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as store:
+            write_skill(Path(tmp), "agent", '"子代理管理器。触发词：/agent、agent"')
+            env = {"MCPTOON_SKILLS_INDEX": str(Path(store) / "idx.json"),
+                   "MCPTOON_SKILLS_ROOTS": str(Path(tmp))}
+            run_cli(["mcptoon", "skills", "index"], env)
+            idx_path = Path(store) / "idx.json"
+            legacy = json.loads(idx_path.read_text(encoding="utf-8"))
+            for s in legacy["skills"]:  # simulate a pre-fix persisted index
+                s["desc"] = f'"{s["desc"]}"'
+            idx_path.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+            shortlist = skills._BM25(skills.load_index()).search("子代理管理器", 1)
+            self.assertEqual(shortlist[0]["slug"], "agent")
+            self.assertFalse(shortlist[0]["desc"].startswith('"'))
+
+
 class ViewScopeTests(unittest.TestCase):
     """What a sync must NOT touch in a view folder.
 
@@ -1094,6 +1226,180 @@ class ViewScopeTests(unittest.TestCase):
         skills.sync_skills(self.src, [self.view])
         self.assertTrue(mine.is_dir())
         self.assertFalse(skills._is_link(mine), "an unrelated folder must not be replaced")
+
+
+class NestedSkillScanTests(unittest.TestCase):
+    """Skills nest, and a one-level walk hid them without raising anything.
+
+    On the machine this was found on, 29 skills sat one level deeper than the
+    walk looked — the whole ``video-seedance`` family plus a bundled example.
+    The catalog indexed 376 of 405 and retrieval simply never offered the rest:
+    a silent miss, which is the worst failure mode for a router.
+    """
+
+    def _nested(self, tmp: str, depth: int = 1) -> Path:
+        """One skill whose own ``skills/`` folder holds another one.
+
+        ``depth=1`` is the real-world shape (``<skill>/skills/<slug>/``);
+        higher values add extra sub-catalogs in between.
+        """
+        root = Path(tmp)
+        write_skill(root, "video-seedance", "Seedance 2.0 video router", layout="nested")
+        base = root / "skills" / "video-seedance" / "skills"
+        for level in range(depth - 1):
+            base = base / f"sub{level}"
+        base.mkdir(parents=True, exist_ok=True)
+        write_skill(base, "seedance-audio",
+                    "Seedance audio, dialogue, lip-sync, music, sound effects",
+                    layout="flat")
+        return root
+
+    def test_skill_nested_inside_a_skill_is_indexed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            idx = skills.scan_roots([self._nested(tmp)])
+            slugs = {s["slug"] for s in idx["skills"]}
+            self.assertIn("video-seedance", slugs)
+            self.assertIn("seedance-audio", slugs,
+                          "a skill one level below another must still be indexed")
+
+    def test_nested_skill_is_retrievable_by_its_own_words(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = skills._BM25(skills.scan_roots([self._nested(tmp)]))
+            top = [c["slug"] for c in bm.search("audio lip-sync dialogue", 3)]
+            self.assertEqual(top[0], "seedance-audio", top)
+
+    def test_arbitrary_depth_is_walked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            idx = skills.scan_roots([self._nested(tmp, depth=4)])
+            self.assertIn("seedance-audio", {s["slug"] for s in idx["skills"]})
+
+    def test_skipped_directories_stay_skipped_at_depth(self):
+        """Recursion must not sneak into ``node_modules`` or a dot-folder."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._nested(tmp)
+            parent = root / "skills" / "video-seedance"
+            for junk in ("node_modules", ".git", "__pycache__"):
+                write_skill(parent / junk, f"ghost-{junk.strip('.')}",
+                            "should never be indexed", layout="flat")
+            slugs = {s["slug"] for s in skills.scan_roots([root])["skills"]}
+            self.assertFalse([s for s in slugs if s.startswith("ghost-")], slugs)
+
+
+class SearchKBudgetTests(unittest.TestCase):
+    """``search`` must read ``k <= 0`` as "nothing", not as "one".
+
+    ``max(1, k)`` quietly turned a request for zero results into one result, so
+    a caller could not tell "nothing, please" from "here is one". A negative
+    ``k`` was worse: ``ranked[:-1]`` returned the entire ranking minus its last
+    entry — a plausible-looking answer nobody asked for, and no error anywhere.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.bm = skills._BM25(skills.scan_roots([fixture(self.tmp.name)]))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_zero_asks_for_nothing(self):
+        self.assertEqual(self.bm.search("剪视频", 0), [])
+
+    def test_negative_k_does_not_slice_from_the_end(self):
+        """The old bug answered with the whole ranking minus its last entry.
+
+        Needs two matches to be a real test: with one match, ``ranked[:-1]`` is
+        empty too, and the bug would hide behind a passing assertion.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_skill(root, "cut-a", "剪视频 竖屏 烧字幕", layout="nested")
+            write_skill(root, "cut-b", "剪视频 剪辑 工具箱", layout="nested")
+            bm = skills._BM25(skills.scan_roots([root]))
+            full = bm.search("剪视频", 5)
+            self.assertGreaterEqual(len(full), 2, full)
+            self.assertNotEqual(full[:-1], [])
+            self.assertEqual(bm.search("剪视频", -1), [])
+
+    def test_positive_k_still_returns_that_ranking(self):
+        hits = self.bm.search("剪视频", 3)
+        self.assertTrue(hits)
+        self.assertLessEqual(len(hits), 3)
+        self.assertEqual(hits[0]["slug"], "ffmpeg-skill")
+
+    def test_k_past_the_catalog_is_harmless(self):
+        self.assertLessEqual(len(self.bm.search("剪视频", 999)), 6)
+
+
+class KFlagTests(unittest.TestCase):
+    """``--k`` must refuse bad input in one line instead of a traceback.
+
+    ``--k abc`` escaped as ``ValueError: invalid literal for int()`` from inside
+    the parser, so a typo read as a crash in mcptoon. ``--k 0`` answered with
+    one result. Both are now a clear message on stderr and exit 1, matching
+    every other bad-invocation path in this CLI.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = tempfile.TemporaryDirectory()
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(Path(self.store.name) / "idx.json"),
+            "MCPTOON_SKILLS_ROOTS": str(fixture(self.tmp.name)),
+        }
+        self._cli(["mcptoon", "skills", "index"], self.env)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        self.store.cleanup()
+
+    def _cli(self, argv, env=None):
+        buf = StringIO()
+        with patch.dict(os.environ, env or self.env), patch.object(sys, "argv", argv), \
+                redirect_stdout(buf):
+            cli.main()
+        return buf.getvalue()
+
+    def _refusal(self, argv):
+        err = StringIO()
+        with patch.dict(os.environ, self.env), patch.object(sys, "argv", argv), \
+                redirect_stdout(StringIO()), redirect_stderr(err):
+            with self.assertRaises(SystemExit) as caught:
+                cli.main()
+        return caught.exception.code, err.getvalue()
+
+    def _resolve(self, *extra):
+        return json.loads(self._cli(["mcptoon", "skills", "resolve", "考记忆", "--json", *extra]))
+
+    def test_non_integer_k_is_refused_in_one_line(self):
+        code, err = self._refusal(["mcptoon", "skills", "resolve", "考记忆", "--k", "abc"])
+        self.assertEqual(code, 1)
+        self.assertIn("--k needs an integer", err)
+        self.assertIn("'abc'", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_zero_and_negative_k_are_refused(self):
+        for bad in ("0", "-1", "-5"):
+            code, err = self._refusal(["mcptoon", "skills", "resolve", "考记忆", "--k", bad])
+            self.assertEqual(code, 1, bad)
+            self.assertIn("--k must be at least 1", err, bad)
+
+    def test_bad_tools_k_names_the_flag_it_complained_about(self):
+        code, err = self._refusal(
+            ["mcptoon", "skills", "resolve", "考记忆", "--tools-k", "abc"])
+        self.assertEqual(code, 1)
+        self.assertIn("--tools-k needs an integer", err)
+
+    def test_tools_k_zero_is_the_documented_default_not_an_error(self):
+        self.assertEqual(self._resolve("--tools-k", "0")["k"], 5)
+
+    def test_valid_k_is_honoured(self):
+        payload = self._resolve("--k", "2")
+        self.assertEqual(payload["k"], 2)
+        self.assertTrue(payload["shortlist"])
+        self.assertLessEqual(len(payload["shortlist"]), 2)
+
+    def test_k_defaults_when_absent(self):
+        self.assertEqual(self._resolve()["k"], 5)
 
 
 if __name__ == "__main__":

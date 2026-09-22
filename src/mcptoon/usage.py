@@ -41,6 +41,30 @@ def _load_usage() -> dict:
         return {"calls": [], "total": 0}
 
 
+def count_tokens(payload) -> int:
+    """Token cost of a payload, on the *same caliber* `mcptoon bench` uses.
+
+    tiktoken cl100k_base when installed, otherwise ``len//4``. Delegates to
+    ``bench._tokenizer`` so there is exactly one caliber in the codebase — the
+    footer, `usage`, `stats` and `bench` can never quote two different numbers
+    for the same payload. Never raises: a measurement failure returns 0.
+    """
+    if payload is None:
+        return 0
+    try:
+        text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return 0
+    if not text:
+        return 0
+    try:
+        from .bench import _tokenizer
+        encode, _name, _exact = _tokenizer()
+        return max(1, int(encode(text)))
+    except Exception:
+        return max(1, len(text) // 4)
+
+
 def _save_usage(data: dict):
     """Atomic write: unique tmp file + os.replace — readers never see a
     torn/partial usage.json even under concurrent writers."""
@@ -61,12 +85,22 @@ def _save_usage(data: dict):
                 pass
 
 
-def track_call(server: str, tool: str, ok: bool = True, tokens_est: int = 0):
+def track_call(server: str, tool: str, ok: bool = True, tokens_est: int | None = None,
+               payload=None):
     """Record a tool call.
 
     Crash-safe by contract: usage tracking must never break the actual
     tool call it is recording.
+
+    ``payload`` is the tool result; when given and ``tokens_est`` is not, the
+    token cost is counted on the ``bench`` caliber (tiktoken cl100k_base when
+    available, else ``len//4``). Before v0.7.21 every caller passed no tokens, so
+    ``mcptoon usage`` reported ``Tokens (est): 0`` on every machine — a tool that
+    claims to save tokens and can never show one. Errors and unknown results
+    still record 0 rather than guessing.
     """
+    if tokens_est is None:
+        tokens_est = count_tokens(payload)
     try:
         with _usage_lock:
             data = _load_usage()
@@ -74,7 +108,7 @@ def track_call(server: str, tool: str, ok: bool = True, tokens_est: int = 0):
                 "server": server,
                 "tool": tool,
                 "ok": ok,
-                "tokens": tokens_est,
+                "tokens": int(tokens_est or 0),
                 "ts": time.time(),
             })
             # Keep last 1000 calls
