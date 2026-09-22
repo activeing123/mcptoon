@@ -22,7 +22,7 @@ _src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from mcptoon import cli, skills
+from mcptoon import cli, plugin, skills
 
 
 def write_skill(root: Path, slug: str, desc: str, *, layout: str = "nested",
@@ -1400,6 +1400,260 @@ class KFlagTests(unittest.TestCase):
 
     def test_k_defaults_when_absent(self):
         self.assertEqual(self._resolve()["k"], 5)
+
+
+class BlockScalarDescriptionTests(unittest.TestCase):
+    """A ``description: |`` block must yield its text, not the pipe.
+
+    Five skills on this machine — humanizer, the four insforge cards and
+    browser-skill — were indexed with a description of literally ``"|"``, so the
+    catalog showed a pipe where their text belongs and no query could match them.
+    humanizer also keeps its 触发词 line inside that block, so its only Chinese
+    routing signal was discarded along with it.
+    """
+
+    def _skill(self, tmp: str, front: str) -> Path:
+        d = Path(tmp) / "alpha"
+        d.mkdir(parents=True, exist_ok=True)
+        md = d / "SKILL.md"
+        md.write_text(f"---\n{front}---\n\nbody text\n", encoding="utf-8")
+        return md
+
+    def test_literal_block_is_folded_into_the_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            md = self._skill(
+                tmp, "name: alpha\ndescription: |\n  First line.\n  Second line. 触发词：/alpha\n")
+            name, desc, body = plugin.parse_skill_md(md)
+            self.assertEqual(name, "alpha")
+            self.assertEqual(desc, "First line. Second line. 触发词：/alpha")
+            self.assertEqual(body, "body text")
+
+    def test_every_block_indicator_spelling_is_accepted(self):
+        for header in ("description: |", "description: |-", "description: |+",
+                       "description: >", "description: >-", "description: |2"):
+            with tempfile.TemporaryDirectory() as tmp:
+                md = self._skill(tmp, f"name: alpha\n{header}\n  one two\n  three\n")
+                self.assertEqual(plugin.parse_skill_md(md)[1], "one two three", header)
+
+    def test_later_keys_are_still_parsed_after_a_block(self):
+        """The bug also swallowed the keys that followed the block."""
+        with tempfile.TemporaryDirectory() as tmp:
+            md = self._skill(
+                tmp, "name: alpha\ndescription: |\n  text here\nlicense: MIT\ntools:\n  - a\n  - b\n")
+            data = plugin.parse_skill_frontmatter(md)
+            self.assertEqual(data["description"], "text here")
+            self.assertEqual(data["license"], "MIT")
+            self.assertEqual(data["tools"], ["a", "b"])
+
+    def test_a_plain_quoted_description_still_loses_its_quotes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            md = self._skill(tmp, 'name: alpha\ndescription: "quoted text"\n')
+            self.assertEqual(plugin.parse_skill_md(md)[1], "quoted text")
+
+    def test_indexing_a_block_scalar_skill_makes_it_searchable(self):
+        """End to end: the text, not the pipe, is what BM25 gets to match."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_skill(root, "blocky", "ignored", layout="nested")
+            md = root / "skills" / "blocky" / "SKILL.md"
+            md.write_text(
+                "---\nname: blocky\ndescription: |\n  Rewrite prose. 触发词：去AI味、人味\n---\n\nbody\n",
+                encoding="utf-8")
+            bm = skills._BM25(skills.scan_roots([root]))
+            top = [c["slug"] for c in bm.search("去AI味 人味", 3)]
+            self.assertEqual(top, ["blocky"])
+
+
+class GlossTests(unittest.TestCase):
+    """A skill documented only in English needs a gloss entry to be reachable
+    from a Chinese request.
+
+    ``_tokenize`` matches ASCII words plus CJK unigrams and bigrams, and an
+    English document contains no CJK at all — so there is nothing for a Chinese
+    query to match, however obvious the answer is to a human. The sidecar adds
+    those terms without touching the skill file, which matters because the
+    affected skills are vendored and version-gated.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = tempfile.TemporaryDirectory()
+        self.gloss = Path(self.store.name) / "skills-gloss.json"
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(Path(self.store.name) / "idx.json"),
+            "MCPTOON_SKILLS_GLOSS": str(self.gloss),
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        self.store.cleanup()
+
+    def _index(self) -> dict:
+        root = Path(self.tmp.name)
+        write_skill(root, "alpha-en", "Compress a large tool catalog", layout="nested")
+        write_skill(root, "beta-zh", "中文技能，用来写文章和排版", layout="nested")
+        return skills.scan_roots([root])
+
+    def _gloss_file(self, mapping: dict) -> None:
+        self.gloss.write_text(json.dumps(mapping, ensure_ascii=False), encoding="utf-8")
+
+    def test_chinese_query_cannot_reach_an_english_only_skill(self):
+        with patch.dict(os.environ, self.env):
+            bm = skills._BM25(self._index())
+            self.assertEqual(bm.search("压缩工具目录", 5), [])
+
+    def test_gloss_makes_it_reachable(self):
+        self._gloss_file({"alpha-en": ["压缩工具目录"]})
+        with patch.dict(os.environ, self.env):
+            bm = skills._BM25(self._index())
+            top = [c["slug"] for c in bm.search("压缩工具目录", 5)]
+            self.assertIn("alpha-en", top)
+
+    def test_gloss_does_not_disturb_skills_that_already_route(self):
+        self._gloss_file({"alpha-en": ["压缩工具目录"]})
+        with patch.dict(os.environ, self.env):
+            bm = skills._BM25(self._index())
+            top = [c["slug"] for c in bm.search("写文章 排版", 3)]
+            self.assertEqual(top[0], "beta-zh")
+
+    def test_missing_or_malformed_gloss_is_never_fatal(self):
+        with patch.dict(os.environ, self.env):
+            self.assertFalse(self.gloss.exists())
+            self.assertEqual(skills._load_gloss(), {})
+            self._gloss_file({"alpha-en": "not a list"})
+            self.assertEqual(skills._load_gloss(), {})
+            self.gloss.write_text("{ not json at all", encoding="utf-8")
+            self.assertEqual(skills._load_gloss(), {})
+            self.assertTrue(skills._BM25(self._index()).search("写文章", 3))
+
+    def test_stats_flags_the_blind_spot_and_the_gloss_clears_it(self):
+        with patch.dict(os.environ, self.env):
+            self.assertIn("alpha-en", skills._cjk_unreachable(self._index()))
+            self.assertNotIn("beta-zh", skills._cjk_unreachable(self._index()))
+            self._gloss_file({"alpha-en": ["压缩工具目录"]})
+            self.assertNotIn("alpha-en", skills._cjk_unreachable(self._index()))
+
+
+class ExactNameBoostTests(unittest.TestCase):
+    """A query that names a skill outright must not lose to a term pile-up.
+
+    Live case: 「用 ComfyUI 出一个视频」 ranked ``comfyui`` **11th**, because five
+    skills that shared only 泛词 and 视频 accumulated more score. The name is the
+    strongest routing evidence the catalog can offer, so an exact slug hit is
+    weighted. These two tests pin both halves: the name wins when given, and the
+    rival still wins when it is not — which is what keeps the boost narrow.
+    """
+
+    def _index(self, tmp):
+        root = Path(tmp)
+        write_skill(root, "comfyui", "视频 出片", layout="nested")
+        write_skill(root, "rival", "视频 视频 视频 出片 出片 视频 出片 视频",
+                    layout="nested")
+        return skills._BM25(skills.scan_roots([root]))
+
+    def test_naming_a_skill_puts_it_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = self._index(tmp)
+            top = [c["slug"] for c in bm.search("用 comfyui 出一个视频", 3)]
+            self.assertEqual(top[0], "comfyui", top)
+
+    def test_the_rival_still_wins_when_the_skill_is_not_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = self._index(tmp)
+            top = [c["slug"] for c in bm.search("视频 出片", 3)]
+            self.assertEqual(top[0], "rival", top)
+
+    def test_a_skill_is_retrievable_by_its_bare_name(self):
+        """The slug is indexed as a term, so asking for the name alone works.
+
+        This is what makes a name-only catalog survivable: even with nothing else
+        to match on, the name still lands. (It is also why the boost cannot be
+        tested through a name that matches nothing — the name always matches.)
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = self._index(tmp)
+            self.assertEqual([c["slug"] for c in bm.search("comfyui", 3)], ["comfyui"])
+
+    def test_an_unknown_name_still_matches_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = self._index(tmp)
+            self.assertEqual(bm.search("zzzz-not-a-skill", 3), [])
+
+
+class LengthNormalisationTests(unittest.TestCase):
+    """b=0.5, not 0.75 — length here is verbosity, not scope.
+
+    A chatty description was taxed twice as hard as a terse one for no gain:
+    `comfyui` (dl 432 against an avgdl of 215) fell behind a rival scoring the
+    same eight terms from half the length. Normalisation must still exist, just
+    not dominate, so both directions are pinned.
+    """
+
+    def test_a_short_document_still_outranks_a_long_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_skill(root, "terse", "转录", layout="nested")
+            write_skill(root, "chatty", "转录 " + " ".join(["填充"] * 120), layout="nested")
+            bm = skills._BM25(skills.scan_roots([root]))
+            top = [c["slug"] for c in bm.search("转录", 3)]
+            self.assertEqual(top[0], "terse", top)
+            self.assertIn("chatty", top, "the long document must still be retrievable")
+
+
+class QuerySynonymTests(unittest.TestCase):
+    """A wording mismatch must not be an automatic miss.
+
+    The user says 分角色; the skill says 说话人分离. BM25 cannot match a word that is
+    absent from the document, and no amount of tuning changes that — so the query
+    carries the synonym instead of every skill carrying every phrasing. Measured
+    on a 30-case Chinese set: one case fixed, none broken (28/30 -> 29/30 top-1).
+
+    The two maps share one file, so the tests also pin that ``_synonyms`` never
+    leaks into the gloss as if it were a skill named ``_synonyms``.
+    """
+
+    def setUp(self):
+        self.store = tempfile.TemporaryDirectory()
+        self.gloss = Path(self.store.name) / "skills-gloss.json"
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(Path(self.store.name) / "idx.json"),
+            "MCPTOON_SKILLS_GLOSS": str(self.gloss),
+        }
+
+    def _index(self, tmp):
+        root = Path(tmp)
+        write_skill(root, "asr", "说话人分离", layout="nested")
+        write_skill(root, "decoy", "录音 录音 录音", layout="nested")
+        return skills.scan_roots([root])
+
+    def _write(self, payload) -> None:
+        self.gloss.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    def test_without_the_synonym_the_wrong_skill_wins(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, self.env):
+            bm = skills._BM25(self._index(tmp))
+            hits = [c["slug"] for c in bm.search("帮我把这段录音分角色", 3)]
+            self.assertEqual(hits[0], "decoy", hits)
+
+    def test_with_the_synonym_the_right_skill_wins(self):
+        self._write({"_synonyms": {"录音": ["转录"], "分角色": ["说话人", "分离"]}})
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, self.env):
+            bm = skills._BM25(self._index(tmp))
+            hits = [c["slug"] for c in bm.search("帮我把这段录音分角色", 3)]
+            self.assertEqual(hits[0], "asr", hits)
+
+    def test_the_two_maps_do_not_bleed_into_each_other(self):
+        self._write({"_synonyms": {"录音": ["转录"]}, "asr": ["转写"]})
+        with patch.dict(os.environ, self.env):
+            self.assertEqual(skills._load_gloss(), {"asr": ["转写"]})
+            self.assertEqual(skills._load_synonyms(), {"录音": ["转录"]})
+
+    def test_a_malformed_synonym_map_is_never_fatal(self):
+        for bad in ("not a map", {"录音": "not a list"}, {"录音": []}):
+            self._write({"_synonyms": bad})
+            with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, self.env):
+                self.assertEqual(skills._load_synonyms(), {})
+                self.assertTrue(skills._BM25(self._index(tmp)).search("说话人", 3))
 
 
 if __name__ == "__main__":

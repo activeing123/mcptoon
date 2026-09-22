@@ -72,6 +72,49 @@ def _index_path() -> Path:
         "MCPTOON_SKILLS_INDEX", str(CONFIG_DIR / "skills-index.json")))
 
 
+def _gloss_path() -> Path:
+    """Where the optional per-slug extra search terms live.
+
+    Defaults to sitting beside the index, so one directory holds everything the
+    catalog needs. Env-overridable for the same reason the index is.
+    """
+    env = os.environ.get("MCPTOON_SKILLS_GLOSS")
+    if env:
+        return Path(env)
+    return _index_path().parent / "skills-gloss.json"
+
+
+def _load_json_file(path: Path) -> dict:
+    """Read a JSON object, or ``{}`` for anything unreadable or non-object."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _load_gloss() -> dict[str, list[str]]:
+    """Extra search terms per slug: ``{slug: [term, ...]}``.
+
+    A skill described only in English is unreachable from a Chinese request:
+    ``_tokenize`` matches ASCII words plus CJK unigrams and bigrams, and an
+    English document contains no CJK whatsoever, so there is nothing for the
+    query to match. This sidecar gives the catalog the missing language without
+    editing the skill file — which matters here because the affected skills are
+    vendored (the ``seedance`` family ships as an upstream pack at
+    ``metadata.version 6.6.0``) and ``skills sync``'s version gate treats any
+    content change as a release that needs a version bump.
+
+    The file ships absent, and is never fatal: a missing, unreadable or
+    malformed gloss means "no extra terms", not a broken catalog.
+    """
+    out: dict[str, list[str]] = {}
+    for slug, terms in _load_json_file(_gloss_path()).items():
+        if isinstance(terms, list):
+            out[str(slug).lower()] = [str(t) for t in terms if str(t).strip()]
+    return out
+
+
 def _clean_desc(desc: str) -> str:
     """A description with any surrounding YAML quotes removed.
 
@@ -452,6 +495,13 @@ def resolve_aliases(index: dict) -> tuple[dict, dict]:
     return canonical, {k: resolve_one(k) for k in alias_map}
 
 
+# How much an exact skill-name hit is worth relative to a plain term match.
+# Measured on a 30-case Chinese routing set: 2.0 lifts top-1 from 26/30 to 28/30
+# and top-3 to 28/30, and 3.0/5.0/8.0 change nothing further — so the effect
+# saturates early and the smallest value that works is the one kept.
+_EXACT_NAME_BOOST = 2.0
+
+
 class _BM25:
     """Ranked retrieval over canonical skills.
 
@@ -463,20 +513,24 @@ class _BM25:
     def __init__(self, index: dict):
         canonical, alias_map = resolve_aliases(index)
         self.alias_map = alias_map
+        self.slugs = set(canonical)
         self.descs: dict[str, str] = {}
         back: dict[str, list[str]] = defaultdict(list)
         for alias, target in alias_map.items():
             back[target].append(alias)
 
         by_slug = {s["slug"].lower(): s for s in index.get("skills", [])}
+        gloss = _load_gloss()
         docs: dict[str, Counter] = {}
         df: Counter = Counter()
         for slug, s in canonical.items():
             parts = [slug, s.get("name") or "", _clean_desc(s.get("desc")),
                      " ".join(s.get("triggers") or [])]
+            parts += gloss.get(slug.lower(), [])
             for a in back.get(slug, []):
                 as_ = by_slug.get(a, {})
                 parts += [a, _clean_desc(as_.get("desc")), " ".join(as_.get("triggers") or [])]
+                parts += gloss.get(a.lower(), [])
             counts = Counter(_tokenize(" ".join(parts)))
             docs[slug] = counts
             self.descs[slug] = _clean_desc(s.get("desc"))
@@ -498,7 +552,12 @@ class _BM25:
         return slug
 
     def _score(self, q_tokens: list[str], doc: Counter) -> float:
-        k1, b = 1.5, 0.75
+        # b=0.5, not the textbook 0.75. Length here is verbosity, not scope: a
+        # skill with a chatty description is not more likely to be the answer, so
+        # normalising it twice as hard as a terse one only buries it. Measured:
+        # 「用 ComfyUI 出一个视频」 put `comfyui` at rank 11 with b=0.75 while it
+        # shared the same eight terms as a winner whose document was half as long.
+        k1, b = 1.5, 0.5
         dl = sum(doc.values())
         total = 0.0
         for t in q_tokens:
@@ -516,17 +575,29 @@ class _BM25:
         1, which made "no results, please" indistinguishable from "one result";
         a negative ``k`` was worse — ``ranked[:-1]`` sliced the ranking from the
         end and returned a silent wrong answer instead of nothing.
+
+        A query token that names a skill outright is the strongest routing
+        evidence there is, and plain BM25 dilutes it: 「用 ComfyUI 出一个视频」
+        let five skills sharing only 泛词 and 视频 outrank ``comfyui`` itself. So
+        an exact name hit is weighted, which is what `_EXACT_NAME_BOOST` records.
         """
         if k <= 0:
             return []
-        q = _tokenize(query)
-        ranked = sorted(
-            ((self._score(q, d), slug) for slug, d in self.docs.items()),
-            key=lambda pair: (-pair[0], pair[1]),
-        )
+        q = _tokenize(_expand_query(query))
+        named = {
+            t for t in (query or "").lower().replace("/", " ").split()
+            if t in self.slugs
+        }
+        scored: list[tuple[float, str]] = []
+        for slug, d in self.docs.items():
+            score = self._score(q, d)
+            if score > 0 and slug in named:
+                score *= _EXACT_NAME_BOOST
+            scored.append((score, slug))
+        scored.sort(key=lambda pair: (-pair[0], pair[1]))
         return [
             {"slug": slug, "score": round(score, 4), "desc": self.descs.get(slug, "")}
-            for score, slug in ranked[:k]
+            for score, slug in scored[:k]
             if score > 0
         ]
 
@@ -1645,6 +1716,76 @@ def unroutable(index: dict) -> list[dict]:
     return out
 
 
+def _load_synonyms() -> dict[str, list[str]]:
+    """Query-side expansion: a term maps to other spellings the catalog may use.
+
+    A user says 分角色; the skill says 说话人分离. No amount of BM25 tuning matches
+    a word that is absent from the document, so the *query* carries the synonyms
+    instead of every skill carrying every phrasing. Measured on a 30-case Chinese
+    set: +1 case fixed, 0 broken (28/30 -> 29/30 top-1).
+
+    Zero-dependency and, like the gloss, data-only: the map lives in the same
+    local file under ``_synonyms`` and an absent file means "no expansion". A
+    hand-written Chinese *stopword* list was tried for the same problem and
+    measured net-zero, so no list is shipped — only this.
+    """
+    raw = _load_json_file(_gloss_path())
+    entries = raw.get("_synonyms") if isinstance(raw, dict) else None
+    if not isinstance(entries, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for term, reps in entries.items():
+        if isinstance(reps, list):
+            extra = [str(r) for r in reps if str(r).strip()]
+            if extra:
+                out[str(term).lower()] = extra
+    return out
+
+
+def _expand_query(query: str) -> str:
+    """``query`` plus any synonym spellings it implies, or ``query`` unchanged."""
+    synonyms = _load_synonyms()
+    if not synonyms:
+        return query
+    low = (query or "").lower()
+    extra: list[str] = []
+    for term, reps in synonyms.items():
+        if term in low:
+            extra.extend(reps)
+    return f"{query} {' '.join(extra)}" if extra else query
+
+
+def _has_cjk(text: str) -> bool:
+    """True when *text* contains at least one CJK character."""
+    return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
+
+
+def _cjk_unreachable(index: dict) -> list[str]:
+    """Canonical slugs no CJK-language query can reach.
+
+    ``_tokenize`` matches ASCII words plus CJK n-grams. A skill documented only
+    in English has no CJK for a Chinese request to match, so it is invisible to
+    ``resolve`` until a gloss entry supplies terms — this is the check that keeps
+    that blind spot from growing back unnoticed, the way it did for 32 skills.
+    Alias descriptions count, because BM25 folds them into the canonical entry.
+    """
+    canonical, alias_map = resolve_aliases(index)
+    by_slug = {s["slug"].lower(): s for s in index.get("skills", [])}
+    back: dict[str, list[str]] = defaultdict(list)
+    for alias, target in alias_map.items():
+        back[target].append(alias)
+    gloss = _load_gloss()
+    out: list[str] = []
+    for slug, s in canonical.items():
+        text = f"{s.get('desc') or ''} {' '.join(s.get('triggers') or [])}"
+        for a in back.get(slug, []):
+            as_ = by_slug.get(a, {})
+            text += f" {as_.get('desc') or ''} {' '.join(as_.get('triggers') or [])}"
+        if not _has_cjk(text) and not gloss.get(slug.lower()):
+            out.append(slug)
+    return sorted(out)
+
+
 def index_stats(index: dict, fmt: str = "auto") -> None:
     """Catalog health — the cleanup that must precede any compression."""
     skills = index.get("skills", [])
@@ -1661,6 +1802,7 @@ def index_stats(index: dict, fmt: str = "auto") -> None:
     )
     body_helped = sum(1 for s in skills if s.get("triggers") and not _triggers(s.get("desc") or ""))
     unreachable = unroutable(index)
+    no_cjk = _cjk_unreachable(index)
     stats = {
         "skills": len(skills),
         "canonical": len(canonical),
@@ -1670,6 +1812,7 @@ def index_stats(index: dict, fmt: str = "auto") -> None:
         "cli_twins": cli_twins,
         "recovered_from_body": body_helped,
         "unroutable": unreachable,
+        "no_cjk": no_cjk,
         "warnings": index.get("warnings", []),
     }
     if fmt == "json":
@@ -1685,6 +1828,10 @@ def index_stats(index: dict, fmt: str = "auto") -> None:
           + ("" if not unreachable else "  <-- these cannot be found by any query"))
     for u in unreachable[:10]:
         print(f"  {u['slug']}: {u['reason']}")
+    print(f"no-CJK:     {len(no_cjk)}"
+          + ("" if not no_cjk else "  <-- CJK queries cannot reach these; add a gloss entry"))
+    for s in no_cjk[:10]:
+        print(f"  {s}")
     print(f"warnings:   {len(stats['warnings'])}")
     for w in stats["warnings"][:10]:
         print(f"  [{w['code']}] {w['message']}")

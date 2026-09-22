@@ -520,6 +520,79 @@ def _plugins_dir() -> Path:
         "MCPTOON_PLUGINS_DIR", str(CONFIG_DIR / "plugins")))
 
 
+def _block_indicator(value: str) -> str | None:
+    """Return ``"|"`` or ``">"`` when *value* starts a YAML block scalar, else None.
+
+    YAML lets a scalar span lines — ``description: |`` puts the text in the
+    indented lines below. Reading only the line that carries the colon yields the
+    indicator itself as the value, which is what shipped: five skills on this
+    machine were indexed with a description of literally ``|``, so the catalog
+    showed a pipe where their text belongs and no query could match them. One of
+    those, ``humanizer``, also keeps its 触发词 line inside that block, so its
+    only Chinese routing signal was being thrown away with it.
+
+    An indentation indicator (``|2``) is accepted; the digits only feed YAML's own
+    column arithmetic, which folding-and-stripping makes moot.
+    """
+    v = value.strip()
+    if not v or v[0] not in "|>":
+        return None
+    return v[0] if v[1:].rstrip("+-0123456789") == "" else None
+
+
+def _fold_block_scalar(lines: list[str], i: int, style: str) -> tuple[str, int]:
+    """Fold the indented block after ``lines[i]`` into one line.
+
+    Returns ``(text, next_index)``. ``|`` keeps its newlines, ``>`` folds them to
+    spaces; either way the result is collapsed to a single line, because every
+    caller here wants a value it can read off one line. Common leading
+    indentation is removed first so the text is not padded.
+    """
+    block: list[str] = []
+    j = i + 1
+    while j < len(lines):
+        raw = lines[j]
+        if raw.strip() == "":
+            block.append("")
+            j += 1
+            continue
+        if not raw.startswith((" ", "\t")):
+            break
+        block.append(raw)
+        j += 1
+    while block and not block[-1].strip():
+        block.pop()
+    if not block:
+        return "", j
+    indents = [len(b) - len(b.lstrip()) for b in block if b.strip()]
+    cut = min(indents) if indents else 0
+    body = [b[cut:] if len(b) >= cut else "" for b in block]
+    text = "\n".join(body) if style == "|" else " ".join(p.strip() for p in body)
+    return " ".join(text.split()), j
+
+
+def _fold_frontmatter_blocks(block: str) -> str:
+    """Rewrite block scalars in a frontmatter *block* as one-line values.
+
+    Pre-processing here rather than inside the parsers keeps their existing
+    line-by-line loops unchanged — one place to get block scalars right instead
+    of two that can drift apart.
+    """
+    lines = block.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        key, sep, value = lines[i].partition(":")
+        style = _block_indicator(value) if sep else None
+        if style is None:
+            out.append(lines[i])
+            i += 1
+            continue
+        text, i = _fold_block_scalar(lines, i, style)
+        out.append(f"{key}: {text}")
+    return "\n".join(out)
+
+
 def parse_skill_frontmatter(path: Path | str) -> dict:
     """Parse a SKILL.md frontmatter into a dict. Zero-dependency.
 
@@ -542,7 +615,7 @@ def parse_skill_frontmatter(path: Path | str) -> dict:
     if len(parts) != 3:
         return data
     pending: str | None = None
-    for line in parts[1].splitlines():
+    for line in _fold_frontmatter_blocks(parts[1]).splitlines():
         if pending is not None:
             stripped = line.strip()
             if stripped.startswith("-"):
@@ -594,7 +667,7 @@ def parse_skill_md(path: Path | str) -> tuple[str, str, str]:
     if text.startswith("---"):
         parts = text.split("---", 2)
         if len(parts) == 3:
-            for line in parts[1].splitlines():
+            for line in _fold_frontmatter_blocks(parts[1]).splitlines():
                 key, _, value = line.partition(":")
                 key = key.strip().lower()
                 if key == "name":
