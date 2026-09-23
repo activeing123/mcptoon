@@ -103,10 +103,10 @@ def _maybe_welcome(command: str, fmt: str) -> None:
 
     A pip install cannot print anything, so a tool that never speaks looks like
     something that installed a trojan. The first real command therefore greets
-    once, names what it found, and hands over one next action; the marker file
-    means never again. Silent when: not the first run, `welcome off`, a
-    machine-readable format was asked for (JSON/TOON/slim), or the command
-    already prints its own noise.
+    once — through `welcome.render()`, which owns the layout, the colour, the
+    glyph fallback and the language — and the marker file means never again.
+    Silent when: not the first run, `welcome off`, a machine-readable format was
+    asked for (JSON/TOON/slim), or the command already prints its own noise.
     """
     if command in _WELCOME_EXEMPT:
         return
@@ -118,44 +118,27 @@ def _maybe_welcome(command: str, fmt: str) -> None:
     except Exception:
         return
 
+    # Figures come from `footer.facts()`: cache-only (it never spawns a server),
+    # one tokenizer, so the greeting and the per-turn footer cannot quote two
+    # different numbers a second apart. A greeting that disagrees with the footer
+    # is a bug report, not a decoration.
     try:
-        servers = cfg.list_servers()
+        from . import footer as footer_mod
+        facts = footer_mod.facts()
     except Exception:
-        servers = []
-    n_servers = len(servers)
+        facts = {}
 
-    tool_count = 0
+    # The skills index is a file read; when it was never built the row is dropped
+    # rather than shown as 0 — "0 skills" would be a claim, and a false one.
+    skills_count: int | None = None
     try:
-        manifest = manifest_mod.get_manifest(use_cache=True)
-        tool_count = _manifest_tool_count(manifest)
+        from . import skills as skills_mod
+        skills_count = len(skills_mod.load_index().get("skills") or []) or None
     except Exception:
-        tool_count = 0
+        skills_count = None
 
-    line = "─" * 54
-    print(line)
-    print("  👋 mcptoon is installed — first run on this machine.")
-    print(line)
-    if n_servers:
-        found = f"{n_servers} MCP server(s)"
-        if tool_count:
-            found += f", {tool_count} tool(s)"
-        print(f"  Found: {found} already configured.")
-    else:
-        print("  Found: no MCP servers yet.")
-    print("")
-    print("  Next:")
-    if n_servers:
-        print("    mcptoon sync --self   # register the gateway in your agents,")
-        print("                          # then sync the rest of your config")
-    else:
-        print("    mcptoon quickstart    # find servers already on this machine")
-    print("    mcptoon status        # what's here, and what it saves")
-    print("")
-    print("  It only touches your agents when you run `mcptoon sync --self`.")
-    print("  Undo any time: mcptoon off  ·  full cleanup: mcptoon uninstall --dry")
-    print("  This note shows once. Silence it any time: mcptoon config set welcome off")
-    print(line)
-    print("")
+    from . import welcome as welcome_mod
+    print(welcome_mod.render(facts, skills=skills_count, lng=cfg.resolve_lang()))
 
     cfg.mark_welcome_seen()
 
@@ -1457,10 +1440,23 @@ def _cmd_status(_rest, fmt):
     # Is the gateway itself registered in any agent config? Read-only check.
     wired = _gateway_wired_in()
 
+    # Skills are the other half of the catalog, and this screen used to report
+    # only the MCP half — a manager that manages two things naming one. Read from
+    # the built index (the same count `skills list --all` prints, recursive and
+    # de-duplicated); never re-scan here, because a status command must not walk
+    # the filesystem. Absent index → no row, never a guessed 0.
+    try:
+        from . import skills as skills_mod
+        n_skills = len(skills_mod.load_index().get("skills") or []) or None
+    except Exception:
+        n_skills = None
+
     if fmt == "json":
         print(json.dumps({
             "servers": n_servers,
             "tools": total_tools,
+            "skills": n_skills,
+            "skills_source": "index" if n_skills else None,
             "tokens_full": full_tokens,
             "tokens_slim": slim_tokens,
             "tokens_saved_est": saved,
@@ -1480,6 +1476,8 @@ def _cmd_status(_rest, fmt):
         print(f"  Managing           : {n_servers} MCP servers, {total_tools} tools")
     else:
         print("  Managing           : nothing yet — run `mcptoon quickstart`")
+    if n_skills:
+        print(f"  Skills in catalog  : {n_skills} (recursive, deduped)  [skills index]")
     if total_tools:
         print(f"  Tool definitions   : {full_tokens:,} → {slim_tokens:,} tokens "
               f"(saved {saved:,}, {pct:.0f}%)  [{caliber}]")

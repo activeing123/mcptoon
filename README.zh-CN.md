@@ -13,7 +13,7 @@ MCP 工具 + Agent 技能，压缩说明书 71,929 token → 581（省 99.2% tok
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1255%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1264%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20%E5%B7%A5%E5%85%B7%20%2B%20Agent%20%E6%8A%80%E8%83%BD-8250df)](#工具箱的另一半技能)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -605,8 +605,8 @@ agent，调用合法率只有 **4/41 ≈ 10%**——栽就栽在 `account`、`pa
 | **增删** | `install` · `add` · `remove` | `skills add` · `skills remove --tombstone` |
 | **体检** | `mcptoon health` | `mcptoon skills stats` |
 
-**运行时。** Python ≥ 3.10（CI：3.10–3.13 × Linux、Windows、macOS）。26 个模块、
-17,058 行 Python、**206KB** wheel、**零第三方依赖**——只用标准库，由 CI 的
+**运行时。** Python ≥ 3.10（CI：3.10–3.13 × Linux、Windows、macOS）。27 个模块、
+17,574 行 Python、**206KB** wheel、**零第三方依赖**——只用标准库，由 CI 的
 `scripts/check_zero_deps.py` 强制。没有守护进程、没有监听端口、没有遥测、不存凭证。
 
 **工具格式。** `compact`（只有名字，默认）· `slim`（`name|param:type*`，mcptoon 原创）
@@ -719,13 +719,13 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1254 passed, 1 skipped
+python -m pytest tests/ -v   # 1264 passed, 1 skipped
 ```
 
-零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1255 个测试。见
+零依赖是硬规则，我们的测试门槛是每次改动先跑绿全套 1264 个测试。见
 [CONTRIBUTING.md](CONTRIBUTING.md)、[DEVELOPERS.md](DEVELOPERS.md)。
 
-项目本体：17,058 行 Python、26 个模块，零第三方依赖——供应链里 0 个要审计的环节。
+项目本体：17,574 行 Python、27 个模块，零第三方依赖——供应链里 0 个要审计的环节。
 
 ---
 

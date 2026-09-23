@@ -34,8 +34,14 @@ Two honesty rules this module is built around:
 2. **Never double-count a junction.** A machine where several agent folders are
    junctions onto one real skills directory is the *normal* multi-agent layout, and
    walking each root naively inflates the catalog by the number of links (4x on the
-   reference machine). Roots are de-duplicated by real ``SKILL.md`` path first, and
-   the skipped duplicates are reported rather than hidden.
+   reference machine). Roots and files are de-duplicated by real ``SKILL.md`` path
+   first, and the skipped duplicate roots are reported rather than hidden.
+
+   The walk is **recursive**, because skills nest: a one-level walk silently hid 30
+   of this machine's 406 skills (the whole ``video-seedance`` sub-family) and made
+   ``bench`` disagree with ``skills index`` by exactly that much. A bench that
+   measures a *different* catalog than the manager serves is worse than no bench,
+   so the two now walk the same way.
 """
 from __future__ import annotations
 
@@ -43,9 +49,72 @@ import json
 import os
 from pathlib import Path
 
-# Same skip set the index uses, so the catalog here matches `skills list`.
-_SKIP_DIR_NAMES = {"_index", ".git", "__pycache__", "node_modules", ".DS_Store"}
+# A 128K context window, in tokens — the yardstick the closing line divides by.
 _WINDOWS_128K = 131072
+
+
+def _dedup_roots(roots: list[Path]) -> tuple[list[Path], int]:
+    """Roots with junctions collapsed, and how many alias roots were dropped.
+
+    Roots are de-duplicated by *resolved* real path so the same catalog reached
+    through several agent folders is walked once. That is the whole point of the
+    number ``dupes`` reports, and it is why the note says "roots" rather than
+    "files": a junction farm is a root-level alias, not a duplicated skill.
+
+    The count is deliberately ``roots seen - distinct real paths`` (i.e. the
+    number of alias roots), not "SKILL.md files skipped mid-walk". Both used to
+    be the same number when the walk was one level deep, so the note could not
+    tell them apart; once the walk became recursive the mid-walk skip count
+    inflated with every nested duplicate and stopped meaning anything.
+    """
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for root in roots:
+        try:
+            key = str(root.resolve())
+        except OSError:
+            key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(root)
+    return unique, len(roots) - len(unique)
+
+
+def _unique_skill_files(roots: list[Path]):
+    """Yield ``(slug, skill_md_path)`` once per *real* file.
+
+    **Recursive**, matching what the catalog manager (``skills index`` /
+    ``scan_roots``) treats as a managed skill, and accepting both layouts seen in
+    the wild (``<root>/<slug>`` and ``<root>/skills/<slug>``). It used to be one
+    level deep, which undercounted nested sub-catalogs — on this machine it hid
+    the entire ``video-seedance`` family and printed 376 where the catalog had
+    406. Roots are de-duplicated by resolved path first (see ``_dedup_roots``) so
+    a junction farm counts each SKILL.md exactly once; files are de-duplicated by
+    real path too, so a catalog reachable by two distinct roots cannot
+    double-count either.
+
+    Returns ``(files, dupes)`` where ``dupes`` is the number of alias *roots*
+    dropped, not files skipped.
+    """
+    from . import skills as sk
+
+    unique, dupes = _dedup_roots(roots)
+    seen_files: set[str] = set()
+    out: list[tuple[str, Path]] = []
+    for root in unique:
+        if not root.is_dir():
+            continue
+        for slug, md in sk._iter_skill_dirs(root):
+            try:
+                key = str(md.resolve())
+            except OSError:
+                key = str(md)
+            if key in seen_files:
+                continue
+            seen_files.add(key)
+            out.append((slug, md))
+    return out, dupes
 
 
 # ═══════════════════════════════════════════════════
@@ -136,46 +205,6 @@ def _tool_rows(encode):
 # Skills half
 # ═══════════════════════════════════════════════════
 
-def _unique_skill_files(roots: list[Path]):
-    """Yield ``(slug, skill_md_path)`` once per *real* file.
-
-    One level deep, matching what the catalog manager treats as a managed skill,
-    and accepting both layouts seen in the wild (``<root>/<slug>`` and
-    ``<root>/skills/<slug>``) so this counts the same catalog ``skills index`` does.
-    Roots are de-duplicated by resolved path so a junction farm counts each
-    SKILL.md exactly once.
-    """
-    seen: set[str] = set()
-    out: list[tuple[str, Path]] = []
-    dupes = 0
-    for root in roots:
-        if not root.is_dir():
-            continue
-        for base in (root, root / "skills"):
-            if not base.is_dir():
-                continue
-            try:
-                children = sorted(p for p in base.iterdir() if p.is_dir())
-            except OSError:
-                continue
-            for child in children:
-                if child.name in _SKIP_DIR_NAMES or child.name.startswith("."):
-                    continue
-                md = child / "SKILL.md"
-                if not md.is_file():
-                    continue
-                try:
-                    key = str(md.resolve())
-                except OSError:
-                    key = str(md)
-                if key in seen:
-                    dupes += 1
-                    continue
-                seen.add(key)
-                out.append((child.name, md))
-    return out, dupes
-
-
 def _skill_rows(encode, roots, query, k):
     """Return ``(rows, n_skills, dupes, resolve_note)`` for the skills half."""
     from . import skills as sk
@@ -258,8 +287,8 @@ def _render(tokname, exact, tool_rows, n_tools,
         lines.append(f"  note: {note}")
     if skill_rows:
         lines.append(f"  query: {query!r}   (the resolve row depends on it)")
-        lines.append("  caliber: one level deep, `_index` excluded, roots "
-                     "de-duplicated by real path")
+        lines.append("  caliber: recursive (nested sub-catalogs counted), `_index` "
+                     "excluded, roots de-duplicated by real path")
     lines.append("")
     if skill_rows and skill_rows[0][1]:
         lines.append(f"  {skill_rows[0][1]:,} tokens of skill text is "

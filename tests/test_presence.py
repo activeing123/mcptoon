@@ -39,6 +39,7 @@ from unittest.mock import patch
 from mcptoon import cli
 from mcptoon import config as cfg
 from mcptoon import sync as sync_mod
+from mcptoon import welcome
 from mcptoon.sync import (
     SELF_SERVER_NAME,
     _build_mcp_servers_dict,
@@ -74,6 +75,12 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_CONFIG_FILE": str(self.home / "config.json"),
             "MCPTOON_SETTINGS_FILE": str(self.home / "settings.json"),
             "MCPTOON_WELCOME_FILE": str(self.home / ".welcome"),
+            # Pin the language. `resolve_lang()` falls back to the OS UI language,
+            # so without this the greeting is Chinese on a Chinese Windows box and
+            # English on CI — the same test would assert against different strings
+            # on different machines, which is the false-green/red-CI trap this file
+            # already warns about for agent config paths.
+            "MCPTOON_LANG": "en",
         })
         self._env.start()
         self.addCleanup(self._env.stop)
@@ -102,20 +109,20 @@ class _IsolatedHome(unittest.TestCase):
 class TestFirstRunWelcome(_IsolatedHome):
     def test_welcome_prints_on_first_run_and_marks_seen(self):
         out = _run_main(["list"])
-        self.assertIn("first run on this machine", out)
+        self.assertIn("First run on this machine", out)
         self.assertIn("mcptoon status", out)
         self.assertTrue(cfg.welcome_seen(), "the marker must be written after greeting")
 
     def test_welcome_prints_only_once(self):
         first = _run_main(["list"])
         second = _run_main(["list"])
-        self.assertIn("first run on this machine", first)
-        self.assertNotIn("first run on this machine", second)
+        self.assertIn("First run on this machine", first)
+        self.assertNotIn("First run on this machine", second)
 
     def test_welcome_is_silent_for_machine_readable_formats(self):
         """A JSON consumer must get clean JSON — and the run must not consume the marker."""
         out = _run_main(["list", "--json"])
-        self.assertNotIn("first run on this machine", out)
+        self.assertNotIn("First run on this machine", out)
         self.assertFalse(cfg.welcome_seen(), "a suppressed welcome must not burn the marker")
 
     def test_welcome_respects_the_off_setting(self):
@@ -136,6 +143,113 @@ class TestFirstRunWelcome(_IsolatedHome):
         """A failed marker write must not turn a normal command into a crash."""
         with patch.object(cfg, "_welcome_file", side_effect=OSError("read-only")):
             cfg.mark_welcome_seen()  # must swallow the OSError, not raise
+
+    def test_welcome_shows_skills_beside_tools(self):
+        """The greeting is where "tools + skills" has to be true, not just the README.
+
+        The skills half is worth ~100% of its native token cost (bench measures it),
+        and for a long time every presence surface mentioned only tools — so the
+        second product claim was invisible exactly where a new user looks first.
+        """
+        out = _run_main(["list"])
+        self.assertIn("skills", out)
+        self.assertIn("mcptoon skills list", out)
+
+    def test_welcome_claims_privacy_and_undo(self):
+        """A greeting that asks for attention must answer "why is this on my machine".
+
+        Both lines are assertions the user can check, which is the only kind worth
+        printing: `uninstall --dry` previews the cleanup, and "no daemon / no
+        autostart / no upload" is the trojan fear named and denied.
+        """
+        out = _run_main(["list"])
+        for claim in ("no daemon", "no autostart", "no upload",
+                      "mcptoon off", "mcptoon uninstall --dry"):
+            self.assertIn(claim, out)
+
+    def test_welcome_uses_the_resolved_language(self):
+        """One setting moves every human-facing string, greeting included."""
+        with patch.dict(os.environ, {"MCPTOON_LANG": "zh"}):
+            out = _run_main(["list"])
+        self.assertIn("首次在本机运行", out)
+        self.assertIn("无常驻进程", out)
+
+
+class TestWelcomeRendering(unittest.TestCase):
+    """`welcome.render()` — the layout, and the two traps a pretty card creates."""
+
+    _FACTS = {"servers": 3, "tools": 40, "tokens_full": 900, "tokens_slim": 300,
+              "tokens_saved": 600, "savings_pct": 66.7}
+
+    def test_every_card_line_is_the_same_display_width(self):
+        """A right border that does not line up is the one thing a card cannot do.
+
+        `len()` is the wrong ruler here: the Chinese subtitle is 14 characters but 22
+        terminal columns wide, so counting characters would draw the border short on
+        every CJK row — the exact bug this test exists to catch.
+        """
+        text = welcome.render(self._FACTS, skills=376, lng="zh", stream=io.StringIO())
+        card = [ln for ln in text.splitlines() if ln and ln[0] in "┌│└"]
+        self.assertEqual(len(card), 3, "expected a three-line card")
+        widths = {welcome.display_width(ln) for ln in card}
+        self.assertEqual(len(widths), 1, f"card borders disagree: {widths}")
+
+    def test_a_pipe_gets_no_escape_codes(self):
+        """The greeted agent reads this through a pipe; ANSI there is noise."""
+        stream = io.StringIO()          # StringIO.isatty() is False
+        text = welcome.render(self._FACTS, skills=376, lng="en", stream=stream)
+        self.assertNotIn("\x1b[", text)
+
+    def test_force_color_paints_and_no_color_strips_it(self):
+        """Both switches are pinned here because this box exports `NO_COLOR=1`.
+
+        `NO_COLOR` is the cross-tool convention and it wins over `MCPTOON_FORCE_COLOR`
+        — so a test that only sets FORCE_COLOR paints nothing on this machine and
+        everything on a box without NO_COLOR. Pinning the whole pair is what makes
+        the assertion mean the same thing on both.
+        """
+        with patch.dict(os.environ, {"MCPTOON_FORCE_COLOR": "1",
+                                     "NO_COLOR": "", "MCPTOON_NO_COLOR": ""}):
+            painted = welcome.render(self._FACTS, skills=376, lng="en", stream=io.StringIO())
+            self.assertIn("\x1b[", painted)
+            self.assertIn("mcptoon status", painted.replace("\x1b[0m", "")
+                          .replace("\x1b[2m", "").replace("\x1b[1;36m", "")
+                          .replace("\x1b[1m", ""))
+        with patch.dict(os.environ, {"NO_COLOR": "1", "MCPTOON_FORCE_COLOR": ""}):
+            plain = welcome.render(self._FACTS, skills=376, lng="en", stream=io.StringIO())
+            self.assertNotIn("\x1b[", plain)
+
+    def test_an_unknown_skill_count_is_dropped_not_printed_as_zero(self):
+        """`0 skills` would be a claim, and a false one when the index was never built."""
+        text = welcome.render(self._FACTS, skills=None, lng="en", stream=io.StringIO())
+        self.assertNotIn("0 skills", text)
+        self.assertIn("40 tools", text)
+
+    def test_a_console_that_cannot_encode_the_glyphs_gets_ascii(self):
+        """A cp936 console redirected to a file raises on `🎉`/`┌` — the greeting must
+        degrade to ASCII instead of crashing the first command a user ever runs."""
+
+        class _Ascii(io.StringIO):
+            encoding = "ascii"
+
+        text = welcome.render(self._FACTS, skills=376, lng="en", stream=_Ascii())
+        # The whole greeting must survive the write, not just the glyphs this
+        # test happens to list: an earlier cut of this module routed the box
+        # characters through the glyph table but left a hardcoded `·` in the
+        # subtitle and an `—` in the closing note, so the fallback still raised.
+        text.encode("ascii")
+        for glyph in ("┌", "│", "└", "👋", "·", "→", "…", "—"):
+            self.assertNotIn(glyph, text, f"{glyph!r} cannot be encoded by this stream")
+        self.assertIn("mcptoon", text)
+
+    def test_no_row_is_wider_than_the_terminal(self):
+        """Long values must be clipped, never wrapped — a wrapped row breaks the card."""
+        facts = dict(self._FACTS, servers=9999, tools=99999, tokens_full=99_999_999,
+                     tokens_slim=1, tokens_saved=99_999_998, savings_pct=99.9)
+        with patch("shutil.get_terminal_size", return_value=os.terminal_size((60, 24))):
+            text = welcome.render(facts, skills=99999, lng="en", stream=io.StringIO())
+        for ln in text.splitlines():
+            self.assertLessEqual(welcome.display_width(ln), 60, f"too wide: {ln!r}")
 
 
 # ─── Channel B: registering the gateway itself ───
@@ -349,6 +463,73 @@ class TestTokenAccounting(unittest.TestCase):
         usage.reset_usage()
         usage.track_call("echo", "echo", ok=False)
         self.assertEqual(usage.get_usage_stats()["total_tokens_est"], 0)
+
+
+class TestCatalogCountConsistency(unittest.TestCase):
+    """One catalog, one number — on every surface that prints a skill count.
+
+    The failure this pins (found 2026-09-23): `bench` walked the catalog one level
+    deep and said **376**, while `skills list` and the welcome card read the
+    recursive index and said **406** — two commands, two confident answers about
+    the same machine. That is the fastest way for a tool to lose the argument that
+    *any* of its numbers are real, so every surface now walks recursively and reads
+    the same index. The fixture is deliberately nested: a one-level walk sees fewer
+    skills than the recursive one, so if a future edit reintroduces the shallow
+    walk, this test goes red instead of shipping a second number.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        base = Path(self._tmp.name)
+        self.root = base / "catalog"
+
+        def _skill(d: Path, slug: str) -> None:
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "SKILL.md").write_text(
+                f"---\nname: {slug}\ndescription: does {slug} things. 触发词：{slug}\n---\n\nbody\n",
+                encoding="utf-8")
+
+        # One top-level skill, then two more nested two levels below it, so the
+        # recursive catalog (3) and a one-level walk (1) genuinely disagree.
+        _skill(self.root / "top", "top")
+        nest = self.root / "skills" / "video-seedance" / "skills"
+        _skill(nest / "seedance-audio", "seedance-audio")
+        _skill(nest / "seedance-audio" / "skills" / "seedance-vfx", "seedance-vfx")
+
+        self.index_path = base / "index.json"
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(self.index_path),
+            "MCPTOON_SKILLS_ROOTS": str(self.root),
+            "MCPTOON_SKILLS_USAGE": str(base / "usage.json"),
+            "MCPTOON_WELCOME_FILE": str(base / ".welcome"),
+            "MCPTOON_LANG": "en",
+        }
+
+    def _run(self, argv):
+        with patch.dict(os.environ, self.env):
+            return _run_main(argv)
+
+    def test_every_surface_reports_the_same_skill_count(self):
+        # Build the sandbox index exactly the way a user would.
+        self._run(["skills", "index", str(self.root)])
+        indexed = json.loads(self.index_path.read_text(encoding="utf-8"))
+        n = len(indexed["skills"])
+        self.assertIn("seedance-vfx", {s["slug"] for s in indexed["skills"]},
+                      "fixture must nest a skill below another, or the shallow-walk "
+                      "regression this test guards cannot be detected")
+
+        bench = json.loads(self._run(["bench", "--json"]))
+        self.assertEqual(bench["skills"]["count"], n,
+                         "bench must count the same catalog the index serves")
+
+        status = json.loads(self._run(["status", "--json"]))
+        self.assertEqual(status["skills"], n,
+                         "status must report the same catalog count as the index")
+
+        listed = json.loads(self._run(["skills", "list", "--all", "--json"]))
+        self.assertEqual(len(listed), n,
+                         "skills list --all must report the same catalog count")
 
 
 if __name__ == "__main__":
