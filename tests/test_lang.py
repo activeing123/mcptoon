@@ -73,6 +73,7 @@ class _IsolatedState(unittest.TestCase):
             "MCPTOON_CONFIG_FILE_TOML": str(root / "config.toml"),
             "MCPTOON_CACHE_DIR": str(root / "cache"),
             "MCPTOON_WELCOME_FILE": str(root / ".welcome"),
+            "MCPTOON_FOOTER_STATE_FILE": str(root / "footer-state.json"),
         }
         patcher = patch.dict(os.environ, env, clear=False)
         patcher.start()
@@ -177,9 +178,30 @@ _FACTS = {
 
 
 class TestRendering(_IsolatedState):
-    def test_the_english_line_is_byte_identical_to_before(self):
+    def test_the_english_line_is_byte_identical_apart_from_the_live_figure(self):
+        """The catalog figures and the `[caliber]` suffix stay byte-identical; the
+        only addition is the live call count between them, so a parser keying on
+        the old substrings still finds every one of them."""
         self.assertEqual(
             footer_mod.line(_FACTS, "en"),
+            "🎉 mcptoon: 95 tools in 12 servers — 20,914 → 15,719 tokens "
+            "(saved 5,195, 25%) · 0 calls routed [tiktoken cl100k_base]")
+
+    def test_the_line_carries_a_figure_that_moves(self):
+        """The catalog figures are a fixed property of the machine; the running
+        call count is not. That difference is what makes the line worth reading
+        instead of a badge that says the same thing every turn."""
+        busy = dict(_FACTS, calls_recorded=1234)
+        out = footer_mod.line(busy, "en")
+        self.assertIn("1,234 calls routed", out)
+        self.assertIn("1,234", footer_mod.line(busy, "zh"))
+
+    def test_a_dict_without_the_live_figure_yields_the_old_string(self):
+        """A hand-built or older `--json`-shaped dict must not grow the field."""
+        legacy = dict(_FACTS)
+        legacy.pop("calls_recorded")
+        self.assertEqual(
+            footer_mod.line(legacy, "en"),
             "🎉 mcptoon: 95 tools in 12 servers — 20,914 → 15,719 tokens "
             "(saved 5,195, 25%) [tiktoken cl100k_base]")
 

@@ -34,6 +34,17 @@ its own savings is not a feature. The per-turn *narrative* line stays the model'
 job (see `serve._INSTRUCTIONS` and the AGENTS.md block); this module only
 guarantees that the number is on screen.
 
+Repeat, not just cost
+---------------------
+A line that says the same thing every turn stops being read — that is the second
+complaint, and cost was never its cause. The catalog figures change only when the
+machine does, so the line now carries a figure that moves (`calls_recorded`, the
+running total of calls routed through the gateway) and surfaces can skip a
+byte-identical repeat via `changed`/`remember`, backed by
+`config.FOOTER_STATE_FILE`. The live figure makes the line worth reading; the
+change gate stops it from being noise. `mcptoon footer-facts` still prints on
+demand, so an agent that wants the line every turn can still get it.
+
 Single caliber (D3 rule): every figure comes from `bench._tokenizer`, the same
 per-tool sums `status` and `stats` use, so all four surfaces agree.
 
@@ -55,7 +66,8 @@ from __future__ import annotations
 
 import json
 
-__all__ = ["facts", "line", "note", "block", "enabled", "lang", "MARK"]
+__all__ = ["facts", "line", "note", "block", "enabled", "lang", "changed",
+           "remember", "MARK"]
 
 # The savings line is meant to be *noticed* — the entire point of this feature is
 # that an install stops being invisible. A single emoji is the cheapest way to
@@ -204,17 +216,27 @@ def line(f: dict | None = None, lng: str | None = None) -> str:
     parser and every format test keys on those handles, and a handle that changes
     with the language is a parsing problem handed to someone who never asked for
     one.
+
+    A live figure rides in the middle — the running total of calls this machine
+    has routed through the gateway (`calls_recorded`). The catalog figures either
+    side of it are a fixed property of the machine; this one moves the moment a
+    tool is used, which is what turns the line from a repeated badge into a
+    status readout. It sits before `[caliber]` so that suffix stays the last
+    token (parsers key on it), and it is rendered only when the caller supplied
+    the key, so a hand-built `--json`-shaped dict still yields the old string.
     """
     d = facts() if f is None else f
     lng = lng or lang()
+    live_en = f" · {d['calls_recorded']:,} calls routed" if "calls_recorded" in d else ""
+    live_zh = f" · 累计转发 {d['calls_recorded']:,} 次 " if "calls_recorded" in d else ""
     if lng == "zh":
         return (f"{MARK} mcptoon: {d['tools']} 个工具，{d['servers']} 个服务器 — "
                 f"{d['tokens_full']:,} → {d['tokens_slim']:,} tokens"
-                f"（省 {d['tokens_saved']:,}，{d['savings_pct']:.0f}%）"
+                f"（省 {d['tokens_saved']:,}，{d['savings_pct']:.0f}%）{live_zh}"
                 f"[{d['token_caliber']}]")
     return (f"{MARK} mcptoon: {d['tools']} tools in {d['servers']} servers — "
             f"{d['tokens_full']:,} → {d['tokens_slim']:,} tokens "
-            f"(saved {d['tokens_saved']:,}, {d['savings_pct']:.0f}%) "
+            f"(saved {d['tokens_saved']:,}, {d['savings_pct']:.0f}%){live_en} "
             f"[{d['token_caliber']}]")
 
 
@@ -250,3 +272,37 @@ def block(f: dict | None = None, lng: str | None = None) -> str:
     if n:
         out += f"\nnote: {n}"
     return out
+
+
+def changed(text: str) -> bool:
+    """Whether `text` differs from the line shown last time.
+
+    The per-turn complaint was that the footer recited the same number every
+    turn. The figures in it change only when the machine does — a call is routed,
+    the catalog is refreshed — so an identical line is, by construction, a turn
+    that learned nothing new. Suppressing it is the honest reading of the old
+    line's own caveat: a status readout that never changes is not a status
+    readout.
+
+    Compared on the **first line only**, deliberately. The `note:` beneath it
+    carries a "catalog is N min old" age that ticks every minute; comparing the
+    whole block would let the same line reappear every minute wearing a fresh
+    number, which is the repetition this removes. The note is a caveat on the
+    figures, so it travels with them: shown when the figures change, silent
+    otherwise.
+
+    True when nothing has been shown yet, so the first line always appears.
+    """
+    from . import config as cfg
+
+    last = cfg.last_footer_line()
+    if last is None:
+        return True
+    return last.split("\n", 1)[0] != text.split("\n", 1)[0]
+
+
+def remember(text: str) -> None:
+    """Record the line just shown, so an identical one is suppressed next turn."""
+    from . import config as cfg
+
+    cfg.remember_footer_line(text)

@@ -75,6 +75,7 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_CONFIG_FILE": str(self.home / "config.json"),
             "MCPTOON_SETTINGS_FILE": str(self.home / "settings.json"),
             "MCPTOON_WELCOME_FILE": str(self.home / ".welcome"),
+            "MCPTOON_FOOTER_STATE_FILE": str(self.home / "footer-state.json"),
             # Pin the language. `resolve_lang()` falls back to the OS UI language,
             # so without this the greeting is Chinese on a Chinese Windows box and
             # English on CI — the same test would assert against different strings
@@ -503,6 +504,7 @@ class TestCatalogCountConsistency(unittest.TestCase):
             "MCPTOON_SKILLS_ROOTS": str(self.root),
             "MCPTOON_SKILLS_USAGE": str(base / "usage.json"),
             "MCPTOON_WELCOME_FILE": str(base / ".welcome"),
+            "MCPTOON_FOOTER_STATE_FILE": str(base / "footer-state.json"),
             "MCPTOON_LANG": "en",
         }
 

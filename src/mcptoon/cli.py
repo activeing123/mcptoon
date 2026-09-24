@@ -365,6 +365,12 @@ def _emit_footer(command: str) -> None:
     write can desynchronise the JSON-RPC stream, and for `footer-facts`, which
     already printed this exact block on stdout.
 
+    A byte-identical repeat is skipped (`footer.changed`/`remember`): the line
+    exists to be read, and a badge that says the same thing every turn is not
+    read. On a normal terminal this rarely fires — each command is its own
+    process and usually follows a different one — but an agent that runs mcptoon
+    in a loop is exactly the reader this saves.
+
     Never raises: a footer is a courtesy, and a command must not fail because
     its footer could not be built.
     """
@@ -375,7 +381,11 @@ def _emit_footer(command: str) -> None:
 
         if not footer_mod.enabled():
             return
-        print(footer_mod.block(), file=sys.stderr)
+        text = footer_mod.block()
+        if not footer_mod.changed(text):
+            return
+        print(text, file=sys.stderr)
+        footer_mod.remember(text)
     except Exception:
         return
 

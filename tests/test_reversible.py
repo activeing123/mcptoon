@@ -84,6 +84,7 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_CONFIG_FILE_TOML": str(self.home / "config.toml"),
             "MCPTOON_SETTINGS_FILE": str(self.home / "settings.json"),
             "MCPTOON_WELCOME_FILE": str(self.home / ".welcome"),
+            "MCPTOON_FOOTER_STATE_FILE": str(self.home / "footer-state.json"),
             "MCPTOON_TOGGLE_FILE": str(self.home / "toggles.json"),
             "MCPTOON_COMPRESSION_FILE": str(self.home / "compression.json"),
             "MCPTOON_CACHE_DIR": str(self.cache),
@@ -578,8 +579,8 @@ class TestDestructiveCommandsReadPathsLate(unittest.TestCase):
 
     # Every path constant config.py freezes at import time.
     IMPORT_TIME_PATHS = ("CONFIG_DIR", "CONFIG_FILE", "CONFIG_FILE_TOML", "SETTINGS_FILE",
-                         "WELCOME_FILE", "TOGGLE_FILE", "POLICY_FILE", "CACHE_DIR",
-                         "HOME_DIR")
+                         "WELCOME_FILE", "FOOTER_STATE_FILE", "TOGGLE_FILE", "POLICY_FILE",
+                         "CACHE_DIR", "HOME_DIR")
 
     def _assert_reads_late(self, fn, allow=()):
         src = inspect.getsource(fn)
@@ -943,17 +944,55 @@ class TestTheFooterReachesEverySurface(_IsolatedHome):
         # carries the banner and this comparison is about the banner, not the line.
         _run_main_streams(["list"])
         reference = footer_mod.block()
+        state = self.home / "footer-state.json"
 
+        # `footer-facts` always prints: it is the explicit ask, not the ambient tail.
         out, _ = _run_main_streams(["footer-facts"])
         self.assertEqual(out.strip(), reference)
 
+        # The two ambient surfaces suppress a repeat, so clear the memory first —
+        # this test is about the *string* they print, not the change-gate (that has
+        # its own tests below).
+        state.unlink(missing_ok=True)
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             cli._emit_footer("list")
         self.assertEqual(err.getvalue().strip(), reference)
 
+        state.unlink(missing_ok=True)
         payload = self._bridge()._stamp_footer(self._payload())
         self.assertEqual(payload["content"][-1]["text"], reference)
+
+    def test_a_repeated_line_is_suppressed(self):
+        """The 2026-09-24 complaint: the same line every turn is not read, so the
+        ambient tail must not recite it. Two identical calls, one line."""
+        self._seed_cache()
+        first = io.StringIO()
+        with contextlib.redirect_stderr(first):
+            cli._emit_footer("list")
+        self.assertIn("mcptoon:", first.getvalue(), "the first line must appear")
+        second = io.StringIO()
+        with contextlib.redirect_stderr(second):
+            cli._emit_footer("list")
+        self.assertEqual(second.getvalue(), "", "an unchanged line must not repeat")
+
+    def test_changed_compares_against_what_was_remembered(self):
+        from mcptoon import footer as footer_mod
+
+        self.assertTrue(footer_mod.changed("line A"), "the first ever line must show")
+        footer_mod.remember("line A")
+        self.assertFalse(footer_mod.changed("line A"))
+        self.assertTrue(footer_mod.changed("line B"))
+
+    def test_a_note_that_only_ticks_does_not_resurrect_the_line(self):
+        """The `note:` carries a "catalog is N min old" age that ticks every minute.
+        Comparing the whole block would resurface the same line every minute, so the
+        change-gate judges the figures (the first line) only."""
+        from mcptoon import footer as footer_mod
+
+        footer_mod.remember("LINE\nnote: catalog is 1 min old (cache TTL 5 min)")
+        self.assertFalse(footer_mod.changed(
+            "LINE\nnote: catalog is 2 min old (cache TTL 5 min)"))
 
 
 if __name__ == "__main__":

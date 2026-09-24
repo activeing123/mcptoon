@@ -90,7 +90,8 @@ def state_paths() -> dict:
       - ``cache``       — regenerable (manifest + usage). Always safe to delete.
     """
     return {
-        "bookkeeping": [_settings_file(), _welcome_file(), _toggle_file(), _policy_file()],
+        "bookkeeping": [_settings_file(), _welcome_file(), _footer_state_file(),
+                        _toggle_file(), _policy_file()],
         "servers": [_config_file(), _config_file_toml()],
         "cache": [_cache_dir()],
     }
@@ -107,6 +108,14 @@ SETTINGS_FILE = Path(os.environ.get(
 # cli._maybe_welcome). Resolved at CALL time for the same test-isolation reason.
 WELCOME_FILE = Path(os.environ.get(
     "MCPTOON_WELCOME_FILE", str(CONFIG_DIR / ".welcome")))
+
+# What the savings line said the last time it was shown. The per-turn footer
+# compares against this so an unchanged line is not repeated verbatim every turn
+# — the "why is it reciting the same number" complaint. Absent means nothing has
+# been shown yet, so the first line always prints. Resolved at CALL time for the
+# same test-isolation reason as the other state files.
+FOOTER_STATE_FILE = Path(os.environ.get(
+    "MCPTOON_FOOTER_STATE_FILE", str(CONFIG_DIR / "footer-state.json")))
 
 # Recognized settings and their defaults. The CLI validates against this map, so
 # a typo fails loudly instead of silently writing a key nothing reads.
@@ -137,6 +146,11 @@ def _settings_file() -> Path:
 
 def _welcome_file() -> Path:
     return Path(os.environ.get("MCPTOON_WELCOME_FILE", str(WELCOME_FILE)))
+
+
+def _footer_state_file() -> Path:
+    return Path(os.environ.get(
+        "MCPTOON_FOOTER_STATE_FILE", str(FOOTER_STATE_FILE)))
 
 # Ensure dirs exist
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -394,6 +408,35 @@ def mark_welcome_seen() -> None:
         path = _welcome_file()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("", encoding="utf-8")
+    except OSError:
+        pass
+
+
+# ─── Remembering the last savings line ───
+
+def last_footer_line() -> str | None:
+    """The savings line shown last time, or None when nothing has been shown.
+
+    Best-effort: a corrupt or unreadable state file degrades to "nothing shown",
+    which only means the next line prints once more — never a crash.
+    """
+    try:
+        return json.loads(_footer_state_file().read_text(encoding="utf-8")).get("line")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def remember_footer_line(line: str) -> None:
+    """Record the savings line just shown, so an identical one can be suppressed.
+
+    Best-effort for the same reason `mark_welcome_seen` is: a read-only home
+    directory must not turn a normal command into a crash, and the worst case
+    (the line repeats) is exactly the behavior this is trying to reduce.
+    """
+    try:
+        path = _footer_state_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"line": line}), encoding="utf-8")
     except OSError:
         pass
 

@@ -92,11 +92,15 @@ _SERVER_INFO = {"name": "mcptoon", "version": __version__}
 # the user sets `footer off`.
 _INSTRUCTIONS = (
     "You are working through mcptoon, a gateway that compresses MCP tool "
-    "definitions to save context. End every turn with one short line reporting "
-    "what mcptoon saved on this machine: run `mcptoon footer-facts` and paste "
-    "its output verbatim — the whole block, meaning a first line that starts "
-    "with `🎉 mcptoon:` plus the `note:` line when the command prints one, in "
-    "whichever language it printed. Do not retype it from memory (measured "
+    "definitions to save context. End a turn with one short line reporting what "
+    "mcptoon saved on this machine — but only when the numbers have changed since "
+    "the line you last showed: run `mcptoon footer-facts` and paste its output "
+    "verbatim — the whole block, meaning a first line that starts with `🎉 "
+    "mcptoon:` plus the `note:` line when the command prints one, in whichever "
+    "language it printed. If the block is byte-identical to the one you already "
+    "showed this session, show nothing — a line that repeats every turn is noise, "
+    "and the figures (including the running call count) only move when the "
+    "machine does. Do not retype it from memory (measured "
     "2026-09-22: the mark is the first thing a retyped line loses), do not "
     "translate or re-word it, and never invent figures. That command reads the "
     "cached catalog and never contacts a server (it stays under half a second "
@@ -835,6 +839,12 @@ class MCPServerBridge:
 
         Skipped for error payloads: the model already has a failure to react to,
         and a savings line there is noise.
+
+        Also skipped when the line is byte-identical to the one already shown
+        (`footer.changed`): a repeat adds nothing the transcript does not already
+        carry, and the whole complaint this round addresses is a line that says
+        the same thing every turn. The once-per-session flag is still spent, so a
+        session that opens with a repeat does not restamp later.
         """
         if getattr(self, "_footer_stamped", False):
             return payload
@@ -846,7 +856,10 @@ class MCPServerBridge:
             content = payload.get("content")
             if not isinstance(content, list):
                 return payload
-            content.append({"type": "text", "text": footer_mod.block()})
+            text = footer_mod.block()
+            if footer_mod.changed(text):
+                content.append({"type": "text", "text": text})
+                footer_mod.remember(text)
             self._footer_stamped = True
         except Exception:
             return payload

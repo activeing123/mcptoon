@@ -334,7 +334,7 @@ class TestFooterDisclosure(unittest.TestCase):
         self.assertIn("instructions", res)
         self.assertIn("mcptoon footer-facts", res["instructions"])
 
-    def test_instructions_ask_for_the_line_every_turn(self):
+    def test_instructions_ask_for_the_line_when_it_has_changed(self):
         """The savings line is the whole point of the channel: it makes the tool's
         effect visible inside the conversation. Two softer phrasings failed before
         this one — "you may close" produced turns that silently dropped it, and
@@ -342,10 +342,16 @@ class TestFooterDisclosure(unittest.TestCase):
         clients as an MCP server, and in a client that never routes a tool call
         through it, that condition is never true, so the line never appeared at
         all. The number describes the compressed catalog, not the turn, so the
-        directive must not gate it on tool use."""
+        directive must not gate it on tool use.
+
+        2026-09-24: the gate is now "the numbers changed since the line you last
+        showed" — a property of the machine, not the turn, so it still cannot
+        silence a client that never routes a call (the catalog figures move on
+        their own). What it removes is the verbatim repeat that made the line read
+        as spam."""
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         text = res["instructions"]
-        self.assertIn("End every turn with one short line", text)
+        self.assertIn("only when the numbers have changed", text)
         self.assertNotIn("you may close", text, "a permissive phrasing is the old bug")
         self.assertNotIn("that used tools", text,
                          "gating the line on tool use silences it in clients that "
