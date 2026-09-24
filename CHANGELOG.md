@@ -5,6 +5,25 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The wheel-size sweep missed the agent-facing surfaces.** The 0.7.22 correction
+  reached the READMEs, DEVELOPERS.md and two docs, but `skills/mcptoon/SKILL.md` (the
+  copy published to ClawHub and read by other agents) still said 189KB, the live
+  `docs/README-details.html` said 206KB / 26 modules / 17,058 lines, the Claude plugin
+  command and session script said 189KB, and the two token-waste articles said ~250KB.
+  All now state 227KB (28 modules / 18,475 lines where they name those).
+  `test_footprint_claims` now covers `docs/README-details.md` and
+  `skills/mcptoon/SKILL.md`, and retires every historical spelling
+  (128/146/156/179/180/189/190/206/232/233KB) so none can return from an old draft.
+- **The live-registry smoke tests reddened CI at random.** `TestInstallByName`'s three
+  tests call the real MCP Registry and Smithery APIs; when the registry is slow they
+  failed on commits that never touched the network (twice on 2026-09-24, once on the
+  release commit). They now retry twice and skip on a network-shaped failure only — a
+  genuine error still fails the suite.
+
 ## [0.7.22] - 2026-09-24
 
 ### Added
