@@ -28,7 +28,8 @@ SRC = ROOT / "src" / "mcptoon"
 
 # Files whose claims this guard owns.
 COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md",
-           "docs/tiktoken-benchmarks.md")
+           "docs/tiktoken-benchmarks.md", "docs/README-details.md",
+           "skills/mcptoon/SKILL.md")
 
 # Sizes once written down that are wrong now. A doc may not resurrect them.
 # "200KB" was on this list and came off it on 2026-09-21: the wheel really is
@@ -43,7 +44,13 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # is exactly why the guard pins a value and not a memory.
 # "233KB" joins the list later the same day, when the number was finally measured
 # against a real artifact instead of this checkout (see the note on WHEEL_KB below).
-RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB")
+# The same sweep found two surfaces the guard never looked at — the agent-facing
+# skills/mcptoon/SKILL.md (shipped to ClawHub, read by other agents) said 189KB, and
+# the live docs/README-details.html said 206KB — so they join COVERED and their old
+# values are retired here. The other historical spellings below are on the list so a
+# stale figure cannot be reintroduced from an old draft.
+RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
+              "146KB", "180KB", "156KB", "179KB", "190KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -106,7 +113,8 @@ class TestFootprintClaims(unittest.TestCase):
         """The live pages must carry the number that is true, not merely lack the old
         wrong ones - otherwise a later edit can delete the claim and pass quietly."""
         for rel in ("README.md", "README.zh-CN.md", "docs/comparison.md",
-                    "docs/tiktoken-benchmarks.md"):
+                    "docs/tiktoken-benchmarks.md", "docs/README-details.md",
+                    "skills/mcptoon/SKILL.md"):
             self.assertIn(WHEEL_KB, self.texts[rel], f"{rel} no longer states the {WHEEL_KB} wheel")
 
     def test_module_count_claims_match_the_tree(self):

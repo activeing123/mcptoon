@@ -131,7 +131,7 @@ $ mcptoon call fetch fetch '{"url":"https://example.com"}'
 别信我的基准——在你自己的机器上量一遍：
 
 ```bash
-pip install mcptoon     # 纯标准库，约 250KB，零依赖
+pip install mcptoon     # 纯标准库，227KB，零依赖
 
 mcptoon demo            # 现场并排演示：JSON vs mcptoon，真实 token 数
 ```

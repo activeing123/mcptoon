@@ -133,7 +133,7 @@ And because it's a CLI, it works with **anything that can execute a command** â€
 Don't trust my benchmarks â€” measure on your own machine:
 
 ```bash
-pip install mcptoon     # pure stdlib, ~250KB, zero dependencies
+pip install mcptoon     # pure stdlib, 227KB, zero dependencies
 
 mcptoon demo            # live side-by-side: JSON vs mcptoon, real token counts
 ```
