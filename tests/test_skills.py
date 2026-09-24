@@ -1176,14 +1176,19 @@ class DescriptionQuoteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as store:
             write_skill(Path(tmp), "agent", '"子代理管理器。触发词：/agent、agent"')
             env = {"MCPTOON_SKILLS_INDEX": str(Path(store) / "idx.json"),
-                   "MCPTOON_SKILLS_ROOTS": str(Path(tmp))}
+                   "MCPTOON_SKILLS_ROOTS": str(Path(tmp)),
+                   # Isolate the glossary: without this the in-process load_index()
+                   # reads the developer's ~/.mcptoon/skills-gloss.json, so the test
+                   # passes on a dev box and fails in CI where no such file exists.
+                   "MCPTOON_SKILLS_GLOSS": str(Path(store) / "gloss.json")}
             run_cli(["mcptoon", "skills", "index"], env)
             idx_path = Path(store) / "idx.json"
             legacy = json.loads(idx_path.read_text(encoding="utf-8"))
             for s in legacy["skills"]:  # simulate a pre-fix persisted index
                 s["desc"] = f'"{s["desc"]}"'
             idx_path.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
-            shortlist = skills._BM25(skills.load_index()).search("子代理管理器", 1)
+            with patch.dict(os.environ, env, clear=False):
+                shortlist = skills._BM25(skills.load_index()).search("子代理管理器", 1)
             self.assertEqual(shortlist[0]["slug"], "agent")
             self.assertFalse(shortlist[0]["desc"].startswith('"'))
 

@@ -185,18 +185,23 @@ class TestUninstallEndToEnd(_RealHomeUntouched):
         self._assert_nothing_removed()
 
     def test_refuses_when_stdin_is_the_null_device(self):
-        """Windows quirk: NUL is a *character device*, so `isatty()` is True there.
+        """With stdin=DEVNULL the tool must refuse — by whichever route the OS takes.
 
+        Windows quirk: NUL is a *character device*, so `isatty()` is True there.
         The `not sys.stdin.isatty()` guard therefore does not fire for
         `stdin=DEVNULL` — the prompt runs, `input()` raises EOFError, and the answer
-        becomes empty, which is not "yes". The outcome is still a refusal; the point
-        of pinning it is that the safety property must not depend on `isatty()` being
-        a reliable test for "nobody is there to answer".
+        becomes empty, which is not "yes". On Linux/macOS DEVNULL makes `isatty()`
+        False, so the earlier guard fires instead. Both are refusals; the point of
+        pinning it is that the safety property must not depend on `isatty()` being a
+        reliable test for "nobody is there to answer".
         """
         proc = subprocess.run([sys.executable, "-m", "mcptoon", "uninstall"],
                               capture_output=True, text=True, env=self.fake.env(),
                               cwd=str(ROOT), stdin=subprocess.DEVNULL, timeout=180)
-        self.assertIn("nothing was removed", proc.stdout)
+        self.assertTrue(
+            "nothing was removed" in proc.stdout
+            or "Refusing to delete without confirmation" in proc.stdout,
+            f"DEVNULL must be refused by one of the two routes, got:\n{proc.stdout}")
         self.assertNotIn("✓", proc.stdout, "it claimed to have removed something")
         self._assert_nothing_removed()
 

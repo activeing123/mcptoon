@@ -411,12 +411,18 @@ class TestStatusCaliber(_IsolatedHome):
     def test_status_quotes_the_bench_caliber(self):
         """The savings line names the same tokenizer `bench` uses — one caliber."""
         from mcptoon.bench import _tokenizer
-        _encode, caliber, _exact = _tokenizer()
+        _encode, caliber, exact = _tokenizer()
         with patch.object(cli.manifest_mod, "get_manifest", return_value=self._TOOLS):
             out = _run_main(["status"])
+        # The line must quote whatever caliber `bench` is using on this machine —
+        # the exact tiktoken name where it is installed, or the explicit chars/4
+        # fallback label where it is not (CI has no tiktoken). Either way it is
+        # the *same* caliber, and the fallback is labelled, never passed as measured.
         self.assertIn(caliber, out, "status must quote the same caliber as bench")
-        self.assertNotIn("chars/4 estimate", out.split("mcptoon — status")[-1].split("Take it back")[0],
-                         "the old chars/4 caliber must not survive in the savings line")
+        if exact:
+            self.assertNotIn("chars/4 estimate",
+                             out.split("mcptoon — status")[-1].split("Take it back")[0],
+                             "with tiktoken present, the old chars/4 caliber must not survive")
 
     def test_status_json_caliber_matches_bench(self):
         from mcptoon.bench import _tokenizer
