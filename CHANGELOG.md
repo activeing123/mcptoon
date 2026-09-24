@@ -5,6 +5,46 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.22] - 2026-09-24
+
+### Added
+
+- **Four starter skill packs.** `mcptoon install --packs` lists them; `mcptoon install
+  --pack essentials` installs one. Each pack is a named bundle of MCP tools plus a
+  ready-to-use prompt — `essentials` (files, browser, memory, search), `web-research`,
+  `code-review` and `docs`. The packs are **references only**: the wheel ships the pack
+  manifest, never the tools, which are installed from npm/pip when you ask. Preview with
+  `--dry`. Two research packs need no API key.
+- **`mcptoon skills search <query>`** — search the open skills.sh index for a skill by
+  what it does, then install the one you pick with `skills add <git-url>`. Falls back to
+  the local index when the network is down. mcptoon hosts no marketplace of its own.
+
+### Changed
+
+- **Both READMEs rewritten around two reader paths** — "I just use AI tools" and "I build
+  with MCP / agents" — with a plain-language explanation of the token saving up top, a
+  CLI-vs-proxy rationale, and the third-party evidence (Anthropic, Firecrawl, Scalekit,
+  MCP-Zero) promoted to the top. The five directory badges the rewrite had dropped
+  (Manages, AllMCPs, MCPVault, AI Agents Listing, mcpservers.org) are restored.
+- **`packs.json` ships in the wheel** via `[tool.setuptools.package-data]`, so the built-in
+  packs work from an install and not only from a source checkout.
+- **`pyproject.toml` description** now leads with the one-hub positioning.
+
+### Fixed
+
+- **The wheel-size claim was wrong on every surface.** `README` (both languages),
+  `DEVELOPERS.md`, `docs/comparison.md` and `docs/tiktoken-benchmarks.md` said the wheel
+  was 233KB. It is **227KB** — measured 2026-09-24 against the tree as CI builds it
+  (`python -m build --wheel`, confirmed with `uv build --wheel`: 232,828 bytes). The old
+  number came from a Windows checkout whose sources were CRLF and whose README was the
+  pre-rewrite 581-line version; line endings alone added ~1.4KB of pure overhead inside
+  the archive. The `test_footprint_claims` guard now pins 227KB and retires 233KB.
+- **Three tests asserted one machine's environment and failed in CI.** The savings-caliber
+  test rejected the honest `chars/4` label that appears when tiktoken is absent; the BM25
+  legacy-index test read the developer's ambient `~/.mcptoon` index and glossary; the
+  DEVNULL-refusal test accepted only the Windows refusal wording. Product behaviour is
+  unchanged — the tests now hold on Windows, macOS and Linux, with or without tiktoken.
+
 ## [0.7.21] - 2026-09-21
 
 ### Fixed
