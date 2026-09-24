@@ -75,10 +75,13 @@ Two steps used to stand between "pip install" and "the catalog works":
 
 1. **`mcptoon skills index`** — `resolve` refused to answer until you ran it, and
    a skill added afterwards stayed invisible until you ran it again. The index now
-   builds itself on first use and rebuilds when a `SKILL.md` is newer than it is.
-   The probe is a stat-only walk (0.01s for 1,200 files), so it rides every resolve
-   without a perceptible cost. `list` and `stats` stay strict readers and never
-   build an index as a side effect of being asked a question.
+   builds itself on first use and rebuilds when the catalog on disk no longer
+   matches the signature it was built from (path, size and mtime of every
+   manifest, so an add, an edit and a delete are all seen). The probe is a
+   stat-only walk — 0.25s cold, 0.03s warm for this machine's 1,217 manifests —
+   so it rides every resolve without a perceptible cost. `list` and `stats` stay
+   strict readers and never build an index as a side effect of being asked a
+   question. `mcptoon quickstart` builds it too, at the end of onboarding.
 2. **Finding the host** — `sync` now detects Claude Code (`~/.claude.json`) and
    Codex (`~/.codex/AGENTS.md`) alongside the five it already knew, so
    `mcptoon quickstart` registers the gateway wherever it will be read.

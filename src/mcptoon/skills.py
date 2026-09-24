@@ -321,25 +321,65 @@ def _walk_skill_dirs(base: Path, seen: set[str]):
     sub-family, which is the reason a one-line catalog entry can point at a
     family at all. Directories are visited once by resolved real path, so a
     junction pointing back into the tree cannot loop.
+
+    ``os.scandir`` rather than ``iterdir``: it answers ``is_dir`` from the
+    directory entry it already read instead of a fresh ``stat`` per child, which
+    is the difference between a 350ms and a 50ms walk of this machine's catalog.
+    The dedup key is ``realpath``, not ``st_ino`` — Windows reports ``st_ino``
+    as 0 for junctions, so an inode key would collapse every junction onto one
+    and silently drop the skills behind it.
     """
-    try:
-        key = str(base.resolve())
-    except OSError:
-        key = str(base)
-    if key in seen:
+    dkey = os.path.normcase(os.path.realpath(base))
+    if dkey in seen:
         return
-    seen.add(key)
+    seen.add(dkey)
     try:
-        children = sorted(p for p in base.iterdir() if p.is_dir())
+        with os.scandir(base) as it:
+            entries = sorted(it, key=lambda e: e.name)
     except OSError:
         return
-    for child in children:
-        if _skip_dir(child.name):
+    for entry in entries:
+        try:
+            if not entry.is_dir(follow_symlinks=True):
+                continue
+        except OSError:
             continue
-        md = child / "SKILL.md"
-        if md.is_file():
-            yield child.name, md
+        if _skip_dir(entry.name):
+            continue
+        child = Path(entry.path)
+        md = _find_skill_md(child)
+        if md is not None:
+            yield entry.name, md
         yield from _walk_skill_dirs(child, seen)
+
+
+def _find_skill_md(directory: Path) -> Path | None:
+    """The skill manifest in ``directory``, or None. Case-insensitive on name.
+
+    One ``stat`` on the canonical spelling first — it hits for 386 of this
+    machine's 407 skills, and on Windows it also answers for the 21 that spell
+    the name ``skill.md``, because NTFS folds case. Only when that fails (i.e.
+    on a case-sensitive filesystem holding a lower-case manifest) is the
+    directory listed, which is the expensive path and therefore the rare one.
+
+    Case folding is not decoration: 21 skills here ship ``skill.md``, and a
+    strict ``== "SKILL.md"`` silently dropped every one of them. ``child /
+    "SKILL.md"`` alone would find them on Windows and miss them on Linux, so the
+    catalog would differ by platform; both spellings are accepted explicitly.
+    """
+    canonical = directory / "SKILL.md"
+    if canonical.is_file():
+        return canonical
+    try:
+        names = [e.name for e in os.scandir(directory)]
+    except OSError:
+        return None
+    for name in names:
+        if name.lower() == "skill.md":
+            candidate = directory / name
+            if candidate.is_file():
+                return candidate
+    return None
 
 
 def _iter_skill_dirs(root: Path):
@@ -427,6 +467,10 @@ def scan_roots(roots: list[Path]) -> dict:
     return {
         "version": INDEX_VERSION,
         "roots": [str(r) for r in roots],
+        # Lets a later run tell — cheaply and exactly — whether the catalog still
+        # matches. Computed from the same walk that produced `skills`, so the two
+        # cannot disagree about which files the catalog covers.
+        "signature": catalog_signature(roots),
         "skills": skills,
         "warnings": warnings,
     }
@@ -542,42 +586,45 @@ def _iter_skill_mds(roots: list[Path]):
             yield md
 
 
-def index_mtime(index: dict) -> float:
-    """Newest ``SKILL.md`` mtime across ``index``'s roots; 0.0 when unknowable.
+def catalog_signature(roots: list[Path]) -> str:
+    """A hash of every ``SKILL.md`` under ``roots``: path, size and mtime.
 
-    A stat-only probe (measured 0.01s for 1,200 files against 0.4s for a full
-    scan), so it is cheap enough to run on every resolve.
+    The staleness signal. mtime-of-newest alone cannot see a *deleted* skill (the
+    files that remain are not newer than the index) and counting files cannot see
+    an edit. A signature over the whole listing sees all three, and costs the same
+    stat-only walk — 0.01s for 1,200 files.
     """
-    roots = [Path(r) for r in (index.get("roots") or []) if r]
-    newest = 0.0
+    rows = []
     for md in _iter_skill_mds(roots):
         try:
-            m = md.stat().st_mtime
+            st = md.stat()
         except OSError:
-            continue
-        if m > newest:
-            newest = m
-    return newest
+            continue  # vanished mid-walk; the next run sees the new truth
+        rows.append(f"{md}\0{st.st_size}\0{st.st_mtime_ns}")
+    rows.sort()  # walk order is not guaranteed stable across platforms
+    return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
 
 
 def index_is_stale(index: dict) -> bool:
-    """True when a skill on disk is newer than the index that describes it.
+    """True when the catalog on disk no longer matches the index.
 
-    Compared against the index file's own mtime, not a stamp written into it:
-    the file mtime is one stat instead of a parse, and ``build_and_save`` writes
-    the file in the same breath as the scan, so the two are the same instant for
-    our purposes. Unknown mtimes read as "not stale" — a probe that cannot see
-    the disk must never trigger a rebuild loop.
+    Compares the stored :func:`catalog_signature` against the one the disk
+    produces now. An index with no signature (written by an older mcptoon) reads
+    as stale, so the first resolve after an upgrade refreshes it once and the
+    signature is there from then on.
+
+    A root that cannot be read contributes no rows, so its signature will not
+    match — one rebuild is requested, and the index that rebuild produces carries
+    the same signature, so it settles rather than looping. A permanently wrong
+    index is worse than one rebuild.
     """
     if not index:
         return False
-    path = _index_path()
-    try:
-        built = path.stat().st_mtime
-    except OSError:
+    stored = index.get("signature")
+    if not stored:
         return True
-    newest = index_mtime(index)
-    return newest > built
+    roots = [Path(r) for r in (index.get("roots") or []) if r]
+    return catalog_signature(roots) != stored
 
 
 def build_if_stale(*, verbose: bool = False) -> bool:

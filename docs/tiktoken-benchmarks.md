@@ -126,7 +126,7 @@ Each layer is independent. Swap agents without touching servers. Swap servers wi
 
 ## Community
 
-The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 1361 tests, fully open source.
+The community is already contributing: [Dockerfile](https://github.com/activeing123/mcptoon/pull/11) for containerized usage. Apache 2.0 license, 1366 tests, fully open source.
 
 ## Try it
 
@@ -155,10 +155,10 @@ docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --slim
 
 MCP is a good protocol. JSON schema injection is its Achilles' heel. mcptoon doesn't "solve" it — it makes it hurt less: schemas stay out of your context until you actually need them.
 
-SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 227KB wheel, zero dependencies — 19,072 lines of stdlib Python across 28 modules.
+SLIM format saves 91% tokens, tiktoken-verified. CLI approach works with every agent. The 5 pain points are real. A 227KB wheel, zero dependencies — 19,119 lines of stdlib Python across 28 modules.
 
 That's it.
 
 ---
 
-*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 1361 tests · Zero dependencies*
+*GitHub: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) · PyPI: `pip install mcptoon` · License: Apache 2.0 · 1366 tests · Zero dependencies*

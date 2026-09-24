@@ -64,6 +64,49 @@ def fixture(tmp: str, layout: str = "nested") -> Path:
 
 
 class ScanTests(unittest.TestCase):
+    def test_scans_a_lowercase_skill_md(self):
+        """21 skills on this machine spell the manifest ``skill.md``.
+
+        ``child / "SKILL.md"`` found them only because NTFS folds case; the same
+        code on Linux would drop every one. A strict ``== "SKILL.md"`` comparison
+        in the walk dropped them on every platform. Both spellings must index.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            upper = write_skill(root, "upper", "大写清单。触发词：upper", layout="flat")
+            lower_dir = root / "lower"
+            lower_dir.mkdir()
+            (lower_dir / "skill.md").write_text(
+                "---\nname: lower\ndescription: 小写清单。触发词：lower\n---\n\nbody\n",
+                encoding="utf-8")
+            idx = skills.scan_roots([root])
+            slugs = sorted(s["slug"] for s in idx["skills"])
+            self.assertEqual(slugs, ["lower", "upper"])
+            self.assertTrue(upper.is_file())
+
+    def test_canonical_spelling_wins_when_both_exist(self):
+        """Deterministic, not directory-order dependent.
+
+        Skipped on Windows: the two names are the same file there, so "both
+        exist" cannot be set up. The guarantee still matters on a case-sensitive
+        filesystem, where a directory really can hold both.
+        """
+        if os.name == "nt":
+            self.skipTest("NTFS folds case; both spellings cannot coexist")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "both"
+            d.mkdir()
+            (d / "SKILL.md").write_text(
+                "---\nname: both\ndescription: 正名。触发词：both\n---\n\nbody\n",
+                encoding="utf-8")
+            (d / "skill.md").write_text(
+                "---\nname: both\ndescription: 别名。触发词：both\n---\n\nbody\n",
+                encoding="utf-8")
+            idx = skills.scan_roots([root])
+            self.assertEqual(len(idx["skills"]), 1)
+            self.assertIn("正名", idx["skills"][0]["desc"])
+
     def test_scans_both_layouts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = fixture(tmp, layout="nested")
@@ -257,19 +300,61 @@ class AutoIndexTests(unittest.TestCase):
             self.assertTrue(skills.index_is_stale(skills.load_index()))
 
     def test_stale_probe_is_false_when_it_cannot_see_the_disk(self):
-        """A probe that cannot stat the roots must not trigger a rebuild loop."""
-        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        """A probe that cannot stat the roots asks for one rebuild, not a loop.
+
+        The rebuilt index carries the same (empty-listing) signature, so the next
+        probe matches. A permanently-wrong index would be worse than one rebuild.
+        """
         with patch.dict(os.environ, self.env):
-            skills.ensure_index()  # a real index file now exists
-            idx = skills.load_index()
-            idx = dict(idx, roots=[str(self.base / "does-not-exist")])
-            self.assertFalse(skills.index_is_stale(idx),
-                             "an unreadable root reads as 0.0 mtime, i.e. not stale")
+            skills.ensure_index()
+            missing = self.base / "does-not-exist"
+            idx = dict(skills.load_index(), roots=[str(missing)])
+            self.assertTrue(skills.index_is_stale(idx), "asks for a rebuild once")
+            self.assertFalse(skills.index_is_stale(
+                dict(idx, signature=skills.catalog_signature([missing]))),
+                "and then settles instead of looping")
 
     def test_missing_index_file_reads_as_stale(self):
         """The other half: no index file at all must ask for a build."""
         with patch.dict(os.environ, self.env):
             self.assertTrue(skills.index_is_stale({"version": 1, "roots": [], "skills": []}))
+
+    def test_index_is_stale_detects_a_deleted_skill(self):
+        """A removal must be seen too — mtime-of-newest cannot see one, because
+        the files that remain are not newer than the index. This is the case that
+        left a hand-deleted skill answering from a stale index."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        write_skill(self.root, "second", "技能二。触发词：second", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            self.assertEqual(len(skills.load_index()["skills"]), 2)
+            import shutil as _sh
+            _sh.rmtree(self.root / "second")
+            self.assertTrue(skills.index_is_stale(skills.load_index()),
+                            "a deleted skill must mark the index stale")
+            skills.ensure_index()
+            self.assertEqual([s["slug"] for s in skills.load_index()["skills"]], ["first"])
+
+    def test_index_is_stale_detects_an_edited_skill(self):
+        """An edit to an existing SKILL.md, with the file count unchanged."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            md = self.root / "first" / "SKILL.md"
+            md.write_text(md.read_text(encoding="utf-8") + "\nmore\n", encoding="utf-8")
+            self.assertTrue(skills.index_is_stale(skills.load_index()))
+
+    def test_an_index_without_a_signature_reads_as_stale_once(self):
+        """An index written by an older mcptoon has no signature; the first
+        resolve refreshes it once, and after that it settles."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            legacy = dict(skills.load_index())
+            legacy.pop("signature", None)
+            self.assertTrue(skills.index_is_stale(legacy))
+            skills.ensure_index()
+            self.assertFalse(skills.index_is_stale(skills.load_index()))
 
     def test_a_broken_root_never_breaks_a_resolve(self):
         """Best-effort: a scan error is a quiet no-op, not a crash."""

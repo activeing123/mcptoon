@@ -22,6 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **21 skills were invisible to the catalog, and a deleted skill never left it.**
+  Found by running the new staleness probe against this machine's real 407-skill
+  catalog rather than the fixtures:
+  - The walk matched the manifest as `child / "SKILL.md"`. On Windows that found
+    the 21 skills that spell it `skill.md` — but only because NTFS folds case;
+    the same code on Linux would have dropped every one of them, and a stricter
+    `== "SKILL.md"` comparison drops them everywhere. The manifest name is now
+    matched case-insensitively, so the catalog is the same on every platform.
+  - Staleness was "is any SKILL.md newer than the index file", which cannot see a
+    *deletion* (the files that remain are not newer) — a hand-removed skill kept
+    answering from the index. The index now stores a signature over the whole
+    listing (path, size, mtime of every manifest) and compares against it, so an
+    add, an edit and a delete are all detected. Verified against the real
+    catalog: deleting a skill and re-resolving removed it (408 → 407) with no
+    manual `skills index`.
+
 - **Concurrent skill resolves lost their usage counts.** `record_skill_use` was a
   bare read-modify-write, and two callers reach it now — the CLI (`resolve`/`route`)
   and the MCP tool (`mcptoon_resolve_skills`). Measured 2026-09-24: 30 concurrent
@@ -36,10 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mean "working":
   - `mcptoon skills index` was required before `resolve`/`route`/the MCP tools
     would answer anything, and a skill added afterwards stayed invisible until it
-    was re-run. The index now builds itself on first use and rebuilds when a
-    `SKILL.md` on disk is newer than it is — a stat-only probe (0.01s for 1,200
-    files against 0.4s for a full scan), so it is cheap enough to run per resolve.
+    was re-run. The index now builds itself on first use and rebuilds when the
+    catalog on disk no longer matches the signature it was built from — a
+    stat-only probe (measured 0.25s cold, 0.03s warm for this machine's 1,217
+    manifests, against 0.4s for a full parse), so it rides every resolve.
     `list`/`stats` stay strict readers and never build one as a side effect.
+    `mcptoon quickstart` also builds it at the end of onboarding, so the catalog
+    is answerable the moment the install finishes.
   - The `codex` sync target wrote to `Path.cwd()/AGENTS.md` — the pointer landed
     in whichever project the user happened to be in, or nowhere — and its text
     named only `mcptoon manifest`, never the catalog. It now targets

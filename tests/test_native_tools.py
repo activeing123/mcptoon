@@ -31,6 +31,7 @@ from pathlib import Path
 
 from mcptoon import __version__
 from mcptoon import native_tools
+from mcptoon import skills
 from mcptoon.schema_simplifier import (
     _MAX_DESC_LEN,
     _MAX_DESC_SENTENCES,
@@ -500,9 +501,15 @@ class TestSkillsTools(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         base = Path(self.tmp.name)
         self.usage_path = base / "skills-usage.json"
+        # A fixture index describes skills that are not on disk (there are no
+        # SKILL.md files here), so it must carry the signature of an empty
+        # catalog over its roots — otherwise `ensure_index` sees it as stale and
+        # rebuilds over it, wiping the fixture out from under the test.
+        (base / "empty-roots").mkdir()
         self.index = {
             "version": 1,
-            "roots": [str(base)],
+            "roots": [str(base / "empty-roots")],
+            "signature": skills.catalog_signature([base / "empty-roots"]),
             "skills": [
                 {"slug": "yuyin", "name": "yuyin",
                  "desc": "人声分离：把语音与背景音乐分开。触发词：/yuyin、人声分离",
@@ -523,7 +530,6 @@ class TestSkillsTools(unittest.TestCase):
         os.environ["MCPTOON_SKILLS_USAGE"] = str(self.usage_path)
         # Point roots at an empty dir so a test that deletes the index does not
         # silently rebuild it from the *real* catalog on this machine.
-        (base / "empty-roots").mkdir()
         os.environ["MCPTOON_SKILLS_ROOTS"] = str(base / "empty-roots")
 
     def tearDown(self):
