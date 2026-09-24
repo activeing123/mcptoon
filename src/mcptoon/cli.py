@@ -49,13 +49,13 @@ KNOWN_FLAGS = frozenset(
         "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
         "--full", "--head", "--desc",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
-        "--json", "--keep", "--k", "--list", "--listen", "--max-chars", "--mcptoon",
+        "--json", "--keep", "--k", "--limit", "--list", "--listen", "--max-chars", "--mcptoon",
         "--no-keep-config",
         "--model",
         "--no-configs",
         "--no-env", "--no-local", "--no-network", "--no-self", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
-        "--self",
+        "--self", "--pack", "--packs",
         "--slim",
         "--stdin", "--stdio", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
         "--version", "--version-gate", "--watch",
@@ -2101,6 +2101,69 @@ def _doctor_smart_tips(servers: dict):
 # Install — one-command MCP server installation
 # ═══════════════════════════════════════════════════
 
+def _cmd_install_pack(pack_name, *, dry_run, fmt, list_only=False):
+    """List or install a skill pack (a named bundle of MCP tools + a prompt)."""
+    from . import packs as packs_mod
+    from .packs import PackError
+
+    try:
+        catalog = packs_mod.load_catalog()
+    except PackError as e:
+        print(f"  ❌ {e}")
+        sys.exit(1)
+
+    if list_only or pack_name is None:
+        if fmt == "json":
+            print(json.dumps({"packs": catalog}, ensure_ascii=False, indent=1))
+            return
+        print(f"  {len(catalog)} skill pack(s) available:\n")
+        for p in catalog:
+            tools = ", ".join(t.get("name", "?") for t in p.get("tools") or [])
+            print(f"    {p.get('name')}  — {p.get('title', '')}")
+            print(f"        {p.get('description', '')}")
+            print(f"        tools: {tools}")
+        print("\n  Install one:  mcptoon install --pack <name>")
+        print("  Preview:      mcptoon install --pack <name> --dry")
+        return
+
+    pack = packs_mod.find_pack(catalog, pack_name)
+    if pack is None:
+        print(f"  ❌ No pack named {pack_name!r}.")
+        print("  List packs: mcptoon install --packs")
+        sys.exit(1)
+
+    if fmt == "json":
+        report = packs_mod.install_pack(pack, dry_run=dry_run)
+        print(json.dumps(report, ensure_ascii=False, indent=1))
+        sys.exit(0 if report["ok"] else 1)
+
+    tools = pack.get("tools") or []
+    verb = "Would install" if dry_run else "Installing"
+    print(f"  Pack: {pack.get('name')} — {pack.get('title', '')}")
+    print(f"  {verb} {len(tools)} tool(s):")
+    for t in tools:
+        kind, payload = packs_mod._tool_kind(t)
+        print(f"    {t.get('name', '?'):<14} {payload or '(unrecognized)'}  [{kind or '?'}]")
+    if pack.get("prompt"):
+        dest = packs_mod.packs_root() / pack["name"] / "PROMPT.md"
+        print(f"  Prompt → {dest}")
+    if dry_run:
+        print("\n  Dry run — nothing was installed. Drop --dry to install.")
+        return
+
+    report = packs_mod.install_pack(pack)
+    print()
+    for t in report["tools"]:
+        mark = "✅" if t["ok"] else "❌"
+        print(f"    {mark} {t['name']}")
+    if report.get("prompt"):
+        print(f"  Prompt written: {report['prompt']}")
+    if not report["ok"]:
+        print("  ⚠ some tools failed to install — see the report above.", file=sys.stderr)
+        sys.exit(1)
+    print("  Next: mcptoon sync   (hand the new servers to your agents)")
+
+
 def _cmd_install(rest, fmt):
     """Install/list/remove MCP servers with auto-handler generation.
 
@@ -2118,6 +2181,9 @@ def _cmd_install(rest, fmt):
     do_list = False
     do_remove = False
     do_search = False
+    do_packs = False
+    pack_name = None
+    dry_run = False
 
     i = 0
     while i < len(rest):
@@ -2135,6 +2201,15 @@ def _cmd_install(rest, fmt):
             do_search = True
             server_name = rest[i + 1]
             i += 2
+        elif a == "--packs":
+            do_packs = True
+            i += 1
+        elif a == "--pack" and i + 1 < len(rest):
+            pack_name = rest[i + 1]
+            i += 2
+        elif a == "--dry":
+            dry_run = True
+            i += 1
         elif a == "--list":
             do_list = True
             i += 1
@@ -2147,6 +2222,11 @@ def _cmd_install(rest, fmt):
             i += 1
         else:
             i += 1
+
+    # mcptoon install --packs / --pack <name>  → install a whole workflow at once
+    if do_packs or pack_name is not None:
+        _cmd_install_pack(pack_name, dry_run=dry_run, fmt=fmt, list_only=do_packs)
+        return
 
     if do_list:
         from .installer import list_installed
@@ -2245,6 +2325,9 @@ def _cmd_install(rest, fmt):
     print("Usage:")
     print("  mcptoon install <name>              # Auto-search & install from registry")
     print("  mcptoon install --search <keyword>  # Search registries, install nothing")
+    print("  mcptoon install --packs             # List the available skill packs")
+    print("  mcptoon install --pack <name>       # Install a whole pack (tools + prompt)")
+    print("  mcptoon install --pack <name> --dry  # Preview a pack, install nothing")
     print("  mcptoon install <name> --npm <pkg>  # Install from npm")
     print("  mcptoon install <name> --pip <pkg>  # Install from pip")
     print("  mcptoon install <name> --url <url>  # Install HTTP/SSE MCP")

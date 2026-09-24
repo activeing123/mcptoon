@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "name": "essentials",
+      "title": "Essentials (4)",
+      "description": "Four tools that cover most day-to-day work: files, browser, memory and search — none needs an API key.",
+      "tools": [
+        {"name": "filesystem", "npm": "@modelcontextprotocol/server-filesystem"},
+        {"name": "playwright", "npm": "@playwright/mcp"},
+        {"name": "memory", "npm": "@modelcontextprotocol/server-memory"},
+        {"name": "duckduckgo", "pip": "duckduckgo-mcp-server"}
+      ],
+      "skills": [],
+      "prompt": "You have four tools, chosen because between them they cover most work:\n\n- filesystem — read/write local files (the base of everything)\n- playwright — drive a real browser (click, navigate, screenshot)\n- memory — keep notes across sessions\n- duckduckgo — web search (no API key needed)\n\nWorkflow:\n1. Search first (duckduckgo) to find candidate sources.\n2. Open the best sources with playwright to read the real page — do not trust snippets alone.\n3. Read local files before judging anything; save durable facts to memory.\n4. Quote the source URL next to every claim.\n\nNone of these four needs an API key."
+    },
+    {
+      "name": "web-research",
+      "title": "Web research",
+      "description": "Browser automation + page fetch + search, wired for research: navigate real pages, then find things. No API key required.",
+      "tools": [
+        {"name": "playwright", "npm": "@playwright/mcp"},
+        {"name": "fetch", "pip": "mcp-server-fetch"},
+        {"name": "duckduckgo", "pip": "duckduckgo-mcp-server"}
+      ],
+      "skills": [],
+      "prompt": "You have a browser (playwright), a page fetcher (fetch) and a web search tool (duckduckgo).\n\nWorkflow:\n1. Search first (duckduckgo) to find candidate sources.\n2. Open the best sources with playwright (or fetch for plain pages) to read the real page — do not trust snippets alone.\n3. Quote the source URL next to every claim.\n\nNone of these needs an API key."
+    },
+    {
+      "name": "code-review",
+      "title": "Code review",
+      "description": "GitHub + local git history + files: review a repo, its issues and its files in one pass.",
+      "tools": [
+        {"name": "github", "url": "https://api.githubcopilot.com/mcp/"},
+        {"name": "git", "pip": "mcp-server-git"},
+        {"name": "filesystem", "npm": "@modelcontextprotocol/server-filesystem"}
+      ],
+      "skills": [],
+      "prompt": "You have GitHub access (remote), the local repo's git history, and the local filesystem.\n\nWorkflow:\n1. Read the issue/PR context from GitHub.\n2. Check `git log`/`git diff` for what actually changed.\n3. Read the real files before judging — never review from memory.\n4. Report findings as file:line + why it matters + a suggested fix.\n\nNote: the github server authenticates with a GitHub token (OAuth or a PAT)."
+    },
+    {
+      "name": "docs",
+      "title": "Documents",
+      "description": "Read local files, fetch remote URLs and convert documents to markdown, for working through a pile of files.",
+      "tools": [
+        {"name": "filesystem", "npm": "@modelcontextprotocol/server-filesystem"},
+        {"name": "fetch", "pip": "mcp-server-fetch"},
+        {"name": "markitdown", "pip": "markitdown-mcp"}
+      ],
+      "skills": [],
+      "prompt": "You can read local files (filesystem), fetch remote URLs (fetch) and convert documents to markdown (markitdown).\n\nWorkflow:\n1. Locate the files first, then read only the ones that matter.\n2. Convert PDFs/Office files with markitdown rather than guessing their contents.\n3. For anything remote, fetch it instead of guessing.\n4. Summarize with the exact path or URL each point came from."
+    }
+  ]
+}

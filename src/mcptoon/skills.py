@@ -733,6 +733,86 @@ MANIFEST_ENTRY = (
 # CLI
 # ═══════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════
+# Remote search (skills.sh — the open skills registry)
+# ═══════════════════════════════════════════════════
+
+#: skills.sh exposes a live *search* endpoint but no enumerable listing, so this is
+#: search-only: there is no "list all skills" call to make. Verified 2026-09-24.
+SKILLS_SH_SEARCH_URL = "https://skills.sh/api/search"
+
+
+def _search_skills_sh(query: str, limit: int = 10) -> list[dict]:
+    """Search skills.sh. Returns ``[{id, source, skillId, name, installs}]``.
+
+    Raises whatever ``_fetch_json`` raises (network/TLS/timeout) — the caller
+    decides whether to fall back to the offline index. It never turns a failure
+    into an empty list, which is what makes the offline fallback honest.
+    """
+    import urllib.parse
+    from .installer import _fetch_json
+
+    url = f"{SKILLS_SH_SEARCH_URL}?q={urllib.parse.quote(query)}"
+    data = _fetch_json(url)
+    rows = []
+    for s in (data.get("skills") or [])[:limit]:
+        rows.append({
+            "id": s.get("id", ""),
+            "source": s.get("source", ""),
+            "skillId": s.get("skillId") or s.get("name", ""),
+            "name": s.get("name", ""),
+            "installs": s.get("installs") or 0,
+        })
+    return rows
+
+
+def search_skills(query: str, limit: int = 10,
+                  index: dict | None = None) -> tuple[list[dict], str]:
+    """Search skills.sh, falling back to the local index when the network is down.
+
+    Returns ``(rows, source)`` where ``source`` is ``"skills.sh"`` or ``"offline"``.
+    The caller prints the source, so a degraded search is never passed off as a
+    complete one — the same discipline the registry installer learned the hard way.
+    """
+    try:
+        return _search_skills_sh(query, limit), "skills.sh"
+    except Exception:
+        local: list[dict] = []
+        if index:
+            for c in _BM25(index).search(query, limit):
+                local.append({"id": c["slug"], "source": "local", "skillId": c["slug"],
+                              "name": c["slug"], "installs": 0, "desc": c.get("desc", "")})
+        return local, "offline"
+
+
+def _cmd_skills_search(args: list[str], fmt: str) -> None:
+    query = _query_of(args)
+    if not query:
+        print("mcptoon: search needs a query. Usage: mcptoon skills search <query>",
+              file=sys.stderr)
+        sys.exit(1)
+    limit = _parse_k(args, "--limit", 10)
+    rows, source = search_skills(query, limit, index=load_index())
+    if fmt == "json":
+        print(json.dumps({"query": query, "source": source, "skills": rows},
+                         ensure_ascii=False, indent=1))
+        return
+    if not rows:
+        if source == "offline":
+            print(f"  Offline — skills.sh unreachable, and no local match for {query!r}.")
+        else:
+            print(f"  No skill found for {query!r} on skills.sh.")
+        return
+    print(f"  Found {len(rows)} skill(s) for {query!r} ({source}):")
+    for i, r in enumerate(rows, 1):
+        uses = f"   {r['installs']:,} installs" if r.get("installs") else ""
+        print(f"    {i:>2}. {r['id']}{uses}")
+    if source == "offline":
+        print("  (skills.sh unreachable — results are from the local index)")
+    else:
+        print("  Third-party skills are not audited by mcptoon — check the source.")
+
+
 def _skills_usage() -> str:
     return (
         "mcptoon skills — index, sync and route a skill catalog without keeping it in context\n\n"
@@ -746,6 +826,7 @@ def _skills_usage() -> str:
         "  mcptoon skills remove <name>           Archive a skill out of the source\n"
         "                    [--tombstone]         Commit the removal (path-scoped) so git sync cannot revive it\n"
         "  mcptoon skills list [--usage]          List skills, optionally with hit counts\n"
+        "  mcptoon skills search <query> [--limit N]  Search skills.sh (falls back to the local index)\n"
         "  mcptoon skills resolve <query> [--k N] BM25 shortlist (no LLM, no tokens)\n"
         "  mcptoon skills route <query> [--k N]   Shortlist then let an LLM pick\n"
         "                    [--model M[,M2]] [--endpoint URL]\n"
@@ -758,7 +839,7 @@ def _skills_usage() -> str:
 
 
 _VALUE_FLAGS = ("--k", "--tools-k", "--model", "--endpoint", "--desc",
-                "--archive", "--derived", "--version-gate")
+                "--archive", "--derived", "--version-gate", "--limit")
 
 
 def _query_of(args: list[str]) -> str:
@@ -1502,6 +1583,11 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
 
     if action == "manifest":
         print(MANIFEST_ENTRY)
+        return
+
+    if action == "search":
+        # Remote search needs no index (it falls back to one only if present).
+        _cmd_skills_search(args, fmt)
         return
 
     if action == "sync":
