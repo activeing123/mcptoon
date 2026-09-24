@@ -627,20 +627,42 @@ class TestInstallByName:
         from mcptoon.installer import install_by_name
         assert callable(install_by_name)
 
+    def _live_registry(self, fn, *args):
+        """Call a live registry, retry a couple of times, then skip.
+
+        These smoke tests reach real registries. A server-side blip used to redden
+        CI on commits that never touched the network (repeatedly on 2026-09-24: the
+        MCP Registry answers `limit=1` in <1s but times out on larger or search
+        queries for minutes at a time). Only network-shaped failures are tolerated;
+        anything else (NameError, AttributeError, a broken contract) still fails, so
+        a real regression is not hidden behind a skip.
+        """
+        import time
+        from mcptoon.installer import RegistryError
+        network_errors = (OSError, RegistryError)  # OSError covers Timeout/URLError/SSL
+        last = None
+        for attempt in range(2):
+            try:
+                return fn(*args)
+            except network_errors as e:
+                last = e
+                time.sleep(1 + attempt)
+        pytest.skip(f"live registry unreachable: {type(last).__name__}: {str(last)[:80]}")
+
     def test_search_registry_returns_list(self):
         """search_registry returns a list (even on network error)."""
         from mcptoon.installer import search_registry
-        result = search_registry("nonexistent_test_keyword_xyz123")
+        result = self._live_registry(search_registry, "nonexistent_test_keyword_xyz123")
         assert isinstance(result, list)
 
     def test_search_smithery_returns_list(self):
         """_search_smithery returns a list."""
         from mcptoon.installer import _search_smithery
-        result = _search_smithery("test")
+        result = self._live_registry(_search_smithery, "test")
         assert isinstance(result, list)
 
     def test_search_mcp_registry_returns_list(self):
         """_search_mcp_registry returns a list."""
         from mcptoon.installer import _search_mcp_registry
-        result = _search_mcp_registry("test")
+        result = self._live_registry(_search_mcp_registry, "test")
         assert isinstance(result, list)
