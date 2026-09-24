@@ -36,7 +36,12 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # stale claim is the current truth. A retired-value list is a claim too — it says
 # "no surface may say this", which stops being true when the number becomes right.
 # Keep only sizes that are wrong *now*.
-RETIRED_KB = ("50KB", "250KB")
+# 2026-09-24: "206KB" joins the list — it was the truth when last measured, then the
+# footer/welcome modules grew the wheel past it while the docs kept saying 206KB.
+# "232KB" joins it the same day, a few hours after it was correct: the essentials pack
+# moved the wheel to 233KB. A number can become stale within one working session, which
+# is exactly why the guard pins a value and not a memory.
+RETIRED_KB = ("50KB", "250KB", "206KB", "232KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -55,8 +60,8 @@ TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
 # every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
-# What `pip install mcptoon` downloads: measured 2026-09-21 with
-# `python -m build --wheel --no-isolation` at 211,766 bytes (206.80 KB) -> 206KB
+# What `pip install mcptoon` downloads: measured 2026-09-24 with
+# `python -m build --wheel --no-isolation` at 239,421 bytes (233.81 KB) -> 233KB
 # (truncated, as before). The isolated build env could not be provisioned on this
 # box (the configured mirror would not serve the build requirements), so the
 # ambient setuptools 81.0.0 was used instead; that is not a free substitution, so
@@ -68,7 +73,14 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # The v0.7.21 work moved it 193KB -> 198KB -> 199KB -> 200KB -> 202KB -> 206KB across
 # the presence, reversibility, CLI-discoverability, per-turn-footer and
 # universal-surface (footer.py) rounds.
-WHEEL_KB = "206KB"
+# 2026-09-24: the same tool reported 238,233 bytes (232.65 KB) -> 232KB when the
+# skill-pack + skill-search work landed. That jump from the 206KB the docs still
+# claimed was NOT all new work — the 2026-09-22/23 footer + welcome modules
+# (footer.py, welcome.py) landed after the last re-measure, so the surfaces were
+# stale by ~21KB before this round; the skill-pack work added the remaining ~5KB.
+# Both are measured, not estimated. The same day, the `essentials` pack added a few
+# hundred bytes -> 239,421 bytes (233.81 KB) -> 233KB.
+WHEEL_KB = "233KB"
 
 
 def modules() -> list[Path]:
