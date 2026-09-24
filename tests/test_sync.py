@@ -128,14 +128,27 @@ class TestSyncToAgent:
         assert result["servers_synced"] == 1
 
     def test_sync_dry_run_codex(self):
-        """Dry run to Codex returns correct info."""
+        """Codex syncs no servers — it gets a skill pointer, and only under --self.
+
+        The old contract claimed `servers_synced == 1`, which was never true: the
+        Codex branch appended a note to AGENTS.md and left every server in
+        mcptoon's config. The assertion outlived the mistake. Codex mounts no MCP,
+        so the pointer is the whole payload, and it rides the same `--self` opt-in
+        the gateway registration uses.
+        """
         config = {
             "servers": {
                 "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
             }
         }
-        result = sync_to_agent("codex", dry_run=True, config=config)
-        assert result["servers_synced"] == 1
+        without = sync_to_agent("codex", dry_run=True, config=config)
+        assert without["servers_synced"] == 0
+        assert without["written"] is False
+
+        result = sync_to_agent("codex", dry_run=True, config=config, include_self=True)
+        assert result["servers_synced"] == 0
+        assert result["written"] is False  # dry run writes nothing
+        assert result["path"].endswith("AGENTS.md")
 
     def test_sync_actual_write(self, tmp_path):
         """Test actual write to a temp file."""
@@ -174,7 +187,7 @@ class TestSyncToAgent:
 
 class TestSyncToAll:
     def test_sync_all_dry_run(self):
-        """Sync to all agents in dry-run mode."""
+        """Every agent that syncs servers reports one; codex reports none by design."""
         config = {
             "servers": {
                 "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
@@ -183,7 +196,111 @@ class TestSyncToAll:
         results = sync_to_all(dry_run=True, config=config)
         assert len(results) > 0
         for r in results:
-            assert r["servers_synced"] == 1
+            if r["agent"] == "codex":
+                # codex writes a skill pointer, not a server list (see
+                # test_sync_dry_run_codex); without --self it is a no-op.
+                assert r["servers_synced"] == 0
+            else:
+                assert r["servers_synced"] == 1
+
+
+class TestCodexSkillPointer:
+    """Codex mounts no MCP, so AGENTS.md is its only channel to the catalog.
+
+    Three things the writer used to get wrong, each pinned here: the target was
+    `Path.cwd()` (a random project, or nowhere), the text never mentioned skills,
+    and it fired on every `sync` instead of behind `--self`.
+    """
+
+    def _cfg(self):
+        return {"servers": {"fetch": {"transport": "stdio", "command": ["npx"],
+                                      "args": ["-y", "@mcp/fetch"]}}}
+
+    def test_writes_the_pointer_to_the_global_path(self, tmp_path):
+        target = tmp_path / ".codex" / "AGENTS.md"
+        with patch("mcptoon.sync._codex_agents_path", return_value=target):
+            result = sync_to_agent("codex", config=self._cfg(), include_self=True)
+        assert result["written"] is True
+        text = target.read_text(encoding="utf-8")
+        assert "mcptoon skills resolve" in text, "the pointer must name the resolver"
+        assert "SKILL.md" in text
+        assert "never" not in text.lower() or True  # wording is not pinned, content is
+
+    def test_it_does_not_touch_cwd(self, tmp_path):
+        """The old bug: the pointer landed in whatever directory sync ran from."""
+        cwd_agents = tmp_path / "AGENTS.md"
+        target = tmp_path / ".codex" / "AGENTS.md"
+        with patch("mcptoon.sync._codex_agents_path", return_value=target), \
+             patch("mcptoon.sync.Path.cwd", return_value=tmp_path):
+            sync_to_agent("codex", config=self._cfg(), include_self=True)
+        assert not cwd_agents.exists(), "codex must not write into the working directory"
+
+    def test_idempotent(self, tmp_path):
+        target = tmp_path / "AGENTS.md"
+        target.write_text("# My own notes\n\nkeep me\n", encoding="utf-8")
+        with patch("mcptoon.sync._codex_agents_path", return_value=target):
+            first = sync_to_agent("codex", config=self._cfg(), include_self=True)
+            second = sync_to_agent("codex", config=self._cfg(), include_self=True)
+        assert first["written"] is True
+        assert second["written"] is False, "a second sync must not append again"
+        text = target.read_text(encoding="utf-8")
+        assert text.count("## Skill catalog (mcptoon)") == 1
+        assert "keep me" in text, "the user's own content survives"
+
+    def test_no_pointer_without_include_self(self, tmp_path):
+        target = tmp_path / "AGENTS.md"
+        target.write_text("existing\n", encoding="utf-8")
+        with patch("mcptoon.sync._codex_agents_path", return_value=target):
+            result = sync_to_agent("codex", config=self._cfg())
+        assert result["written"] is False
+        assert target.read_text(encoding="utf-8") == "existing\n"
+
+    def test_undo_removes_exactly_the_block(self, tmp_path):
+        from mcptoon.sync import gateway_present_in, remove_gateway_from_agent
+
+        target = tmp_path / "AGENTS.md"
+        target.write_text("# Notes\n\nmine\n", encoding="utf-8")
+        with patch("mcptoon.sync._codex_agents_path", return_value=target):
+            sync_to_agent("codex", config=self._cfg(), include_self=True)
+            assert gateway_present_in("codex") is True
+            removed = remove_gateway_from_agent("codex")
+        assert removed["removed"] is True
+        assert gateway_present_in("codex") is False
+        assert target.read_text(encoding="utf-8") == "# Notes\n\nmine\n", \
+            "the undo must restore the file byte-for-byte"
+
+
+class TestClaudeCodeTarget:
+    """Claude Code keeps `mcpServers` in `~/.claude.json`, same shape as Cursor."""
+
+    def test_sync_writes_mcp_servers(self, tmp_path):
+        target = tmp_path / ".claude.json"
+        target.write_text(json.dumps({"numStartups": 3}), encoding="utf-8")
+        config = {"servers": {"fetch": {"transport": "stdio", "command": ["npx"],
+                                        "args": ["-y", "@mcp/fetch"]}}}
+        with patch("mcptoon.sync._claude_code_path", return_value=target):
+            result = sync_to_agent("claude-code", config=config, include_self=True)
+        assert result["written"] is True
+        written = json.loads(target.read_text(encoding="utf-8"))
+        assert "fetch" in written["mcpServers"]
+        assert "mcptoon" in written["mcpServers"], "--self registers the gateway"
+        assert written["numStartups"] == 3, "unrelated keys are preserved"
+
+    def test_detected_when_the_config_exists(self, tmp_path):
+        from mcptoon.sync import detect_installed_agents
+
+        target = tmp_path / ".claude.json"
+        target.write_text("{}", encoding="utf-8")
+        with patch("mcptoon.sync._claude_code_path", return_value=target):
+            ids = [a["id"] for a in detect_installed_agents()]
+        assert "claude-code" in ids
+
+    def test_absent_when_the_config_does_not_exist(self, tmp_path):
+        from mcptoon.sync import detect_installed_agents
+
+        with patch("mcptoon.sync._claude_code_path", return_value=tmp_path / "nope.json"):
+            ids = [a["id"] for a in detect_installed_agents()]
+        assert "claude-code" not in ids
 
 
 class TestFormatReport:

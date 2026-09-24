@@ -579,13 +579,14 @@ def _skills(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform sig
     """
     from . import skills as skills_mod
 
+    skills_mod.ensure_index()  # first call builds it; a stale one is refreshed
     rows = skills_mod.catalog_rows(
         skills_mod.load_index(), include_aliases=_as_bool(arguments.get("include_aliases")))
     payload = {"skills": rows, "totalSkills": len(rows)}
     if not rows:
         payload["notice"] = (
-            "No skill index yet. Build one on the CLI with `mcptoon skills index`, "
-            "then call this tool again."
+            "No skill index yet, and no skill roots were found to build one. "
+            "Set MCPTOON_SKILLS_ROOTS or run `mcptoon skills index <path>`."
         )
     return payload
 
@@ -603,6 +604,7 @@ def _resolve_skills(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uni
     if not task:
         return {"query": "", "k": k, "shortlist": [],
                 "notice": "Pass a non-empty `task` describing what the user wants to do."}
+    skills_mod.ensure_index()  # a fresh install answers instead of erroring
     shortlist = skills_mod.resolve_shortlist(task, k)
     payload = {"query": task, "k": k, "shortlist": shortlist}
     if not shortlist:

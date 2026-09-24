@@ -52,6 +52,37 @@ ranking backs both:
   context, so the agent always knows the catalog exists.
 - **CLI** — `mcptoon skills resolve "<task>" --k 5`, the command these tools mirror.
 
+For a host that reads a global instruction file (Codex, DSH, anything AGENTS.md-
+aware), `mcptoon sync --self` writes that pointer into it for you:
+
+```markdown
+## Skill catalog (mcptoon)
+
+This machine has a skill catalog managed by mcptoon. Before acting on a task,
+find the right skill first — do not guess, and do not read the whole catalog:
+
+    mcptoon skills resolve "<the user request>" --k 5
+```
+
+The write is idempotent (heading-anchored, so a second sync appends nothing) and
+reversible: `mcptoon off` removes exactly that block and leaves the rest of the
+file byte-for-byte. `~/.codex/AGENTS.md` is the target — the global file, not the
+current directory, which is where the old writer put it.
+
+## Nothing to configure, nothing to index
+
+Two steps used to stand between "pip install" and "the catalog works":
+
+1. **`mcptoon skills index`** — `resolve` refused to answer until you ran it, and
+   a skill added afterwards stayed invisible until you ran it again. The index now
+   builds itself on first use and rebuilds when a `SKILL.md` is newer than it is.
+   The probe is a stat-only walk (0.01s for 1,200 files), so it rides every resolve
+   without a perceptible cost. `list` and `stats` stay strict readers and never
+   build an index as a side effect of being asked a question.
+2. **Finding the host** — `sync` now detects Claude Code (`~/.claude.json`) and
+   Codex (`~/.codex/AGENTS.md`) alongside the five it already knew, so
+   `mcptoon quickstart` registers the gateway wherever it will be read.
+
 ## The handshake carries the pointer
 
 Tools alone are not enough. `mcptoon_resolve_skills` shows up in `tools/list` like

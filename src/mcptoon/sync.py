@@ -57,6 +57,23 @@ def _appdata() -> Path:
 
 # ─── Agent config file paths ───
 
+def _claude_code_path() -> Path:
+    """Claude Code's user config. Same shape as the others (`mcpServers`), but the
+    file is `.claude.json` in the home dir, not a dotted config folder."""
+    return _home() / ".claude.json"
+
+
+def _codex_agents_path() -> Path:
+    """Codex's global instruction file.
+
+    Global, not `Path.cwd()`: the old writer appended to whatever directory the
+    user happened to run `sync` from, so the pointer landed in a random project's
+    AGENTS.md — or nowhere, if that directory was not a project. Codex reads
+    `$HOME/.codex/AGENTS.md` on every session, which is where a machine-wide
+    pointer belongs.
+    """
+    return _home() / ".codex" / "AGENTS.md"
+
 def _claude_desktop_path() -> Path:
     """Claude Desktop config file path."""
     if sys.platform == "win32":
@@ -181,6 +198,50 @@ def _build_mcp_servers_dict(config: dict) -> dict:
 # would already be broken.
 SELF_SERVER_NAME = "mcptoon"
 
+# The skill pointer written into a CLI-only host's global instruction file. Codex
+# (and DSH) mount no MCP, so the handshake `instructions` channel never reaches
+# them; a line in the file they already read on every session is the only way the
+# catalog becomes discoverable. Kept to one heading + a few lines so it is cheap
+# to carry on every turn, and heading-anchored so the write is idempotent.
+_SKILL_POINTER_HEADING = "## Skill catalog (mcptoon)"
+_SKILL_POINTER_BLOCK = f"""{_SKILL_POINTER_HEADING}
+
+This machine has a skill catalog managed by mcptoon. Before acting on a task,
+find the right skill first — do not guess, and do not read the whole catalog:
+
+    mcptoon skills resolve "<the user request>" --k 5
+
+Read only the SKILL.md files it returns. If it finds nothing, rephrase and try
+again, or run `mcptoon skills list` to pick a name by eye. Tools live behind the
+same gateway: `mcptoon manifest` lists them.
+"""
+
+
+def _strip_skill_pointer(text: str) -> str:
+    """Remove exactly the block `_SKILL_POINTER_BLOCK` inserted, nothing else.
+
+    Anchored on the heading and cut at the next ``## `` heading, so a user's own
+    content above and below the block survives byte-for-byte. Used by the undo
+    path (`mcptoon off`), which must leave the file as it found it.
+    """
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    skipping = False
+    for line in lines:
+        if not skipping and line.strip() == _SKILL_POINTER_HEADING:
+            skipping = True
+            # drop the blank line the writer put before the heading, if present
+            while out and out[-1].strip() == "":
+                out.pop()
+            continue
+        if skipping:
+            if line.startswith("## "):
+                skipping = False
+            else:
+                continue
+        out.append(line)
+    return "".join(out).rstrip("\n") + ("\n" if text.endswith("\n") else "")
+
 
 def _self_serve_entry() -> dict:
     """The agent-format entry that puts `mcptoon serve` in an agent's config.
@@ -224,6 +285,10 @@ def _agent_config_path(agent_id: str) -> Path | None:
         return _windsurf_path()
     if agent_id == "vscode-copilot":
         return _vscode_copilot_path()
+    if agent_id == "claude-code":
+        return _claude_code_path()
+    if agent_id == "codex":
+        return _codex_agents_path()
     return None
 
 
@@ -239,10 +304,19 @@ def _servers_section(data: dict, agent_id: str) -> dict:
 
 
 def gateway_present_in(agent_id: str) -> bool:
-    """True if the gateway entry exists in this agent's config (read-only)."""
+    """True if the gateway entry exists in this agent's config (read-only).
+
+    Codex has no JSON config; "present" there means the skill pointer is in its
+    AGENTS.md, which is the thing `sync --self` writes for it.
+    """
     path = _agent_config_path(agent_id)
     if path is None or not path.exists():
         return False
+    if agent_id == "codex":
+        try:
+            return _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8")
+        except OSError:
+            return False
     section = _servers_section(_read_json_safe(path), agent_id)
     return isinstance(section, dict) and SELF_SERVER_NAME in section
 
@@ -268,6 +342,29 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
     if not path.exists():
         return {"agent": agent_id, "path": str(path), "removed": False,
                 "written": False, "error": None}
+
+    # Codex: the undo is removing the skill-pointer block, not a JSON key. Kept
+    # to exactly the block `sync --self` wrote, so nothing else in the file moves.
+    if agent_id == "codex":
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return {"agent": agent_id, "path": str(path), "removed": False,
+                    "written": False, "error": None}
+        if _SKILL_POINTER_HEADING not in text:
+            return {"agent": agent_id, "path": str(path), "removed": False,
+                    "written": False, "error": None}
+        if dry_run:
+            return {"agent": agent_id, "path": str(path), "removed": True,
+                    "written": False, "error": None}
+        cleaned = _strip_skill_pointer(text)
+        try:
+            path.write_text(cleaned, encoding="utf-8")
+        except OSError as e:
+            return {"agent": agent_id, "path": str(path), "removed": True,
+                    "written": False, "error": str(e)}
+        return {"agent": agent_id, "path": str(path), "removed": True,
+                "written": True, "error": None}
 
     data = _read_json_safe(path)
     if not data:
@@ -373,6 +470,31 @@ def detect_installed_agents() -> list[dict]:
         "exists": path.parent.exists(),
     })
 
+    # Claude Code — detected by the config file itself, since the binary may be
+    # on PATH without any dotted folder existing yet. A machine that runs
+    # `claude` has `.claude.json`; the file is the evidence.
+    path = _claude_code_path()
+    if path.exists():
+        agents.append({
+            "id": "claude-code",
+            "name": "Claude Code",
+            "config_path": str(path),
+            "exists": True,
+        })
+
+    # Codex — the global instruction file, so a machine-wide pointer is possible.
+    # Only when the file already exists: creating `~/.codex/AGENTS.md` out of
+    # nothing would be an unasked-for write into a home the user may not use for
+    # Codex at all.
+    path = _codex_agents_path()
+    if path.exists():
+        agents.append({
+            "id": "codex",
+            "name": "Codex (AGENTS.md)",
+            "config_path": str(path),
+            "exists": True,
+        })
+
     return agents
 
 
@@ -457,7 +579,10 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
 
     mcp_servers = _build_mcp_servers_dict(config)
 
-    if not mcp_servers:
+    if not mcp_servers and agent_id != "codex":
+        # Codex writes a skill pointer, not a server list, so an empty config is
+        # not a reason to skip it — that is exactly the first-run case where the
+        # pointer matters most.
         return {
             "agent": agent_id,
             "path": "",
@@ -482,6 +607,17 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
     elif agent_id == "cursor":
         # Write to global cursor config
         path = _cursor_path()[0]
+        existing = _read_json_safe(path)
+        merged = _merge_mcp_servers(existing, mcp_servers)
+        if dry_run:
+            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
+        ok = _write_json_safe(path, merged)
+        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
+
+    elif agent_id == "claude-code":
+        # Claude Code's user config: a flat `mcpServers` map at the top level of
+        # `~/.claude.json`, same shape as Cursor's, so the same merge applies.
+        path = _claude_code_path()
         existing = _read_json_safe(path)
         merged = _merge_mcp_servers(existing, mcp_servers)
         if dry_run:
@@ -525,18 +661,44 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
 
     elif agent_id == "codex":
-        # Codex uses AGENTS.md — append a note about mcptoon
-        path = Path.cwd() / "AGENTS.md"
-        content = "\n## MCP Tools\n\nThis project uses [mcptoon](https://github.com/activeing123/mcptoon) for MCP tool management.\nRun `mcptoon manifest --compact` to see available tools.\n\n"
+        # Codex has no MCP mount; its agent context comes from AGENTS.md. So this
+        # branch does not sync *servers* — it writes the skill pointer, which is
+        # the only thing that makes a CLI-only host able to find a skill at all.
+        #
+        # Three things the old writer got wrong: it targeted `Path.cwd()` (the
+        # pointer landed in a random project, or nowhere), its text named only
+        # `mcptoon manifest` and never the catalog, and it fired on every `sync`
+        # rather than behind `--self`. Now: global path, skill pointer included,
+        # and written only when `include_self` is set — the same opt-in the MCP
+        # gateway registration uses, because both are "let this host see mcptoon".
+        path = _codex_agents_path()
+        if not include_self:
+            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                    "written": False, "error": None}
         if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
+            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                    "written": False, "error": None}
         try:
             existing_content = path.read_text(encoding="utf-8") if path.exists() else ""
-            if "mcptoon" not in existing_content:
-                path.write_text(existing_content + content, encoding="utf-8")
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": True, "error": None}
+            if _SKILL_POINTER_HEADING in existing_content:
+                return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                        "written": False, "error": None}  # already there; idempotent
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # Always a blank line before the heading, so the pointer reads as its
+            # own section instead of being glued to the user's last paragraph.
+            if not existing_content or existing_content.endswith("\n\n"):
+                sep = ""
+            elif existing_content.endswith("\n"):
+                sep = "\n"
+            else:
+                sep = "\n\n"
+            path.write_text(existing_content + sep + _SKILL_POINTER_BLOCK,
+                            encoding="utf-8")
+            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                    "written": True, "error": None}
         except OSError as e:
-            return {"agent": agent_id, "path": str(path), "servers_synced": 0, "written": False, "error": str(e)}
+            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                    "written": False, "error": str(e)}
 
     else:
         return {"agent": agent_id, "path": "", "servers_synced": 0, "written": False, "error": f"Unknown agent: {agent_id}"}
@@ -605,6 +767,13 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
             lines.append(f"  {icon} {name:25s} {count:3d} servers  {path}")
         elif err:
             lines.append(f"  ! {name:25s} skip ({err})")
+        elif r.get("config_exists") is False:
+            lines.append(f"  · {name:25s} not installed")
+        elif path:
+            # Found the host, but nothing to write (codex's pointer is opt-in via
+            # --self, or a dry run). Saying "not installed" here was wrong and
+            # confusing: the host *is* installed, we simply did not touch it.
+            lines.append(f"  · {name:25s} found, nothing to write  {path}")
         else:
             lines.append(f"  · {name:25s} not installed")
 

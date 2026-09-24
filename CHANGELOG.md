@@ -31,6 +31,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reader can never catch a torn file either. The count is what `list --usage` shows,
   so losing 29 of 30 was a visible lie about which skills earn their keep.
 
+- **The skill index no longer needs a manual step, and the CLI-only hosts now
+  actually get the pointer.** Four gaps that together meant "installed" did not
+  mean "working":
+  - `mcptoon skills index` was required before `resolve`/`route`/the MCP tools
+    would answer anything, and a skill added afterwards stayed invisible until it
+    was re-run. The index now builds itself on first use and rebuilds when a
+    `SKILL.md` on disk is newer than it is — a stat-only probe (0.01s for 1,200
+    files against 0.4s for a full scan), so it is cheap enough to run per resolve.
+    `list`/`stats` stay strict readers and never build one as a side effect.
+  - The `codex` sync target wrote to `Path.cwd()/AGENTS.md` — the pointer landed
+    in whichever project the user happened to be in, or nowhere — and its text
+    named only `mcptoon manifest`, never the catalog. It now targets
+    `~/.codex/AGENTS.md`, writes a skill pointer, is idempotent, and is gated on
+    `--self` like the gateway registration. The undo (`mcptoon off`) removes
+    exactly that block, byte-for-byte.
+  - `codex` was not in `detect_installed_agents`, so the automatic path never
+    reached it. It is now detected by the presence of its AGENTS.md.
+  - **Claude Code** was not a sync target at all, though it is the host where the
+    MCP handshake was verified working. `~/.claude.json` (flat `mcpServers`, the
+    same shape as Cursor) now syncs, and it is detected when the file exists.
+
 ### Changed
 
 - **The handshake now points at the skill tool, and costs less.** The `instructions`

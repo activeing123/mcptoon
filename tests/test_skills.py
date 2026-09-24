@@ -194,6 +194,108 @@ class IndexRoundTripTests(unittest.TestCase):
                 self.assertEqual(skills.load_index(), {})
 
 
+class AutoIndexTests(unittest.TestCase):
+    """The index keeps itself current, so `skills index` is not a required step.
+
+    Before this, a fresh install could not resolve anything until the user ran
+    `mcptoon skills index`, and a skill added afterwards stayed invisible until
+    they ran it again — the manual step that made "installed" not mean "working".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.root = self.base / "root"
+        self.env = {
+            "MCPTOON_SKILLS_INDEX": str(self.base / "idx.json"),
+            "MCPTOON_SKILLS_USAGE": str(self.base / "usage.json"),
+            "MCPTOON_SKILLS_ROOTS": str(self.root),
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_ensure_index_builds_when_missing(self):
+        write_skill(self.root, "first", "第一个技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            self.assertEqual(skills.load_index(), {}, "precondition: no index yet")
+            built = skills.ensure_index()
+            self.assertTrue(built)
+            self.assertEqual([s["slug"] for s in skills.load_index()["skills"]], ["first"])
+
+    def test_ensure_index_is_a_noop_when_current(self):
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            self.assertFalse(skills.ensure_index(), "a current index must not rebuild")
+
+    def test_a_new_skill_is_picked_up_without_a_manual_index(self):
+        """The whole promise: add a skill, ask for it, get it — no index command."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            self.assertEqual([c["slug"] for c in skills.resolve_shortlist("first", 3)],
+                             ["first"])
+
+            # A skill that appears after the index was built, with a newer mtime.
+            import time as _t
+            _t.sleep(0.02)
+            write_skill(self.root, "second", "第二个技能。触发词：second", layout="flat")
+            skills.ensure_index()  # what the resolve path calls
+
+            self.assertEqual([c["slug"] for c in skills.resolve_shortlist("second", 3)],
+                             ["second"], "a new skill must be routable without a manual index")
+
+    def test_index_is_stale_detects_a_newer_skill(self):
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            self.assertFalse(skills.index_is_stale(skills.load_index()))
+            import time as _t
+            _t.sleep(0.02)
+            write_skill(self.root, "second", "技能二。触发词：second", layout="flat")
+            self.assertTrue(skills.index_is_stale(skills.load_index()))
+
+    def test_stale_probe_is_false_when_it_cannot_see_the_disk(self):
+        """A probe that cannot stat the roots must not trigger a rebuild loop."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()  # a real index file now exists
+            idx = skills.load_index()
+            idx = dict(idx, roots=[str(self.base / "does-not-exist")])
+            self.assertFalse(skills.index_is_stale(idx),
+                             "an unreadable root reads as 0.0 mtime, i.e. not stale")
+
+    def test_missing_index_file_reads_as_stale(self):
+        """The other half: no index file at all must ask for a build."""
+        with patch.dict(os.environ, self.env):
+            self.assertTrue(skills.index_is_stale({"version": 1, "roots": [], "skills": []}))
+
+    def test_a_broken_root_never_breaks_a_resolve(self):
+        """Best-effort: a scan error is a quiet no-op, not a crash."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with patch.dict(os.environ, self.env):
+            skills.ensure_index()
+            with patch.object(skills, "scan_roots", side_effect=OSError("disk gone")):
+                self.assertFalse(skills.ensure_index())
+            self.assertTrue(skills.load_index(), "the old index must survive a failed rebuild")
+
+    def test_resolve_cli_builds_the_index_on_first_use(self):
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        self.assertFalse((self.base / "idx.json").exists())
+        out = run_cli(["mcptoon", "skills", "resolve", "first", "--k", "1"], self.env)
+        self.assertIn("first", out)
+        self.assertTrue((self.base / "idx.json").is_file(),
+                        "resolve must build the index rather than telling the user to")
+
+    def test_list_stays_a_strict_reader(self):
+        """`list` reports on the index; it must not create one as a side effect."""
+        write_skill(self.root, "first", "技能。触发词：first", layout="flat")
+        with self.assertRaises(SystemExit):
+            run_cli(["mcptoon", "skills", "list"], self.env)
+        self.assertFalse((self.base / "idx.json").exists())
+
+
 class RouteTests(unittest.TestCase):
     def _run(self, tmp, answers, models=("m1", "m2", "m3")):
         """answers: model -> raw reply (or Exception)."""
@@ -460,9 +562,14 @@ class CliTests(unittest.TestCase):
             out = self._cli(["mcptoon", "skills", "manifest"], env)
             self.assertIn("skills resolve", out)
 
-    def test_resolve_without_index_exits_nonzero(self):
+    def test_resolve_without_any_skill_roots_exits_nonzero(self):
+        """resolve builds an index itself now — but with no roots there is nothing
+        to build, and it must say so rather than exiting 0 with an empty answer."""
         with tempfile.TemporaryDirectory() as store:
-            env = {"MCPTOON_SKILLS_INDEX": str(Path(store) / "none.json")}
+            env = {
+                "MCPTOON_SKILLS_INDEX": str(Path(store) / "none.json"),
+                "MCPTOON_SKILLS_ROOTS": str(Path(store) / "no-such-root"),
+            }
             with self.assertRaises(SystemExit):
                 self._cli(["mcptoon", "skills", "resolve", "x"], env)
 

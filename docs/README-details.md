@@ -282,7 +282,7 @@ Both halves of the toolbox share one engine, one config and one index format.
 | **Add / remove** | `install` · `add` · `remove` | `skills add` · `skills remove --tombstone` |
 | **Health** | `mcptoon health` | `mcptoon skills stats` |
 
-**Runtime.** Python ≥ 3.10 (CI: 3.10–3.13 × Linux, Windows, macOS). 28 modules, 18,475
+**Runtime.** Python ≥ 3.10 (CI: 3.10–3.13 × Linux, Windows, macOS). 28 modules, 19,042
 lines of Python, a **227KB** wheel, **zero third-party dependencies**, standard library
 only, enforced in CI by `scripts/check_zero_deps.py`. No daemon, no listening port, no
 telemetry, no stored credentials.

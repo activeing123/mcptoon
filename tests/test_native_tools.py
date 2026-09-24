@@ -517,9 +517,14 @@ class TestSkillsTools(unittest.TestCase):
         (base / "skills-index.json").write_text(
             json.dumps(self.index, ensure_ascii=False), encoding="utf-8")
         self._old = {k: os.environ.get(k)
-                     for k in ("MCPTOON_SKILLS_INDEX", "MCPTOON_SKILLS_USAGE")}
+                     for k in ("MCPTOON_SKILLS_INDEX", "MCPTOON_SKILLS_USAGE",
+                               "MCPTOON_SKILLS_ROOTS")}
         os.environ["MCPTOON_SKILLS_INDEX"] = str(base / "skills-index.json")
         os.environ["MCPTOON_SKILLS_USAGE"] = str(self.usage_path)
+        # Point roots at an empty dir so a test that deletes the index does not
+        # silently rebuild it from the *real* catalog on this machine.
+        (base / "empty-roots").mkdir()
+        os.environ["MCPTOON_SKILLS_ROOTS"] = str(base / "empty-roots")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -587,6 +592,28 @@ class TestSkillsTools(unittest.TestCase):
         payload = self._call("mcptoon_skills", {})
         self.assertEqual(payload["skills"], [])
         self.assertIn("notice", payload)
+
+    def test_a_fresh_install_answers_instead_of_erroring(self):
+        """The tool must build the index on first call, not tell the user to.
+
+        A gateway that returns "run `mcptoon skills index` first" is a gateway
+        that looks broken on the one call a new user is most likely to make.
+        """
+        os.environ["MCPTOON_SKILLS_INDEX"] = str(Path(self.tmp.name) / "nope.json")
+        root = Path(self.tmp.name) / "root"
+        (root / "fresh").mkdir(parents=True)
+        (root / "fresh" / "SKILL.md").write_text(
+            "---\nname: fresh\ndescription: 全新技能。触发词：fresh\n---\n\nbody\n",
+            encoding="utf-8")
+        os.environ["MCPTOON_SKILLS_ROOTS"] = str(root)
+        try:
+            payload = self._call("mcptoon_skills", {})
+            self.assertEqual([r["slug"] for r in payload["skills"]], ["fresh"])
+            self.assertNotIn("notice", payload)
+            self.assertTrue((Path(self.tmp.name) / "nope.json").is_file(),
+                            "the first call must write an index")
+        finally:
+            os.environ.pop("MCPTOON_SKILLS_ROOTS", None)
         self.assertEqual(self._call("mcptoon_resolve_skills", {"task": "x"})["shortlist"], [])
 
 
