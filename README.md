@@ -9,7 +9,7 @@
 
 **Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
 
-**It's just a 233KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
+**It's just a 227KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -47,7 +47,7 @@ mcptoon keeps those descriptions **on disk, not in context**, and hands the agen
 
 Nothing is lost: the full schema and the full skill text stay one command away. Only the context window is spared.
 
-mcptoon is a **233KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
+mcptoon is a **227KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
 
 ## This isn't just us talking
 
@@ -170,7 +170,7 @@ Full reference: [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/mai
 ## 30 seconds up and running
 
 ```bash
-pip install mcptoon                          # pure stdlib, 233KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 227KB, zero dependencies
 
 # One command: find your MCP servers, write your config, register the gateway
 # in every agent you have, and show you what it found:
@@ -466,7 +466,7 @@ to injecting every schema, at a fraction of the cost.
 
 ## Trust and safety
 
-**It's just a 233KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
+**It's just a 227KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
 
 Three guards run on every tool result before your agent sees it:
 

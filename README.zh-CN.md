@@ -9,7 +9,7 @@
 
 **直连 17,000+ 个 MCP 工具注册表，技能按需检索安装——原生 0 预装，装什么由你定。**
 
-**它只是一个 233KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。**
+**它只是一个 227KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。**
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
@@ -47,7 +47,7 @@ mcptoon 把这些描述**留在磁盘上、不放进上下文**，只交给 Agen
 
 什么都不丢：完整 schema 和完整技能全文，永远只差一条命令。省下的只有上下文窗口。
 
-mcptoon 是一个 **233KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
+mcptoon 是一个 **227KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
 
 ## 不只我们一家这么说
 
@@ -169,7 +169,7 @@ mcptoon serve                       # 把所有已配置的服务器收在同一
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，233KB，零依赖
+pip install mcptoon                          # 纯标准库，227KB，零依赖
 
 # 一条命令：扫出你的 MCP 服务器、写好配置、把网关登记进你所有 Agent，并告诉它发现了什么：
 mcptoon quickstart
@@ -427,7 +427,7 @@ mcptoon uninstall               # 完整清理——先打印计划（--dry 预�
 
 ## 信任与安全
 
-**它只是一个 233KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
+**它只是一个 227KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
 
 每个工具结果在进入你 Agent 之前，都要过三道防护：
 
