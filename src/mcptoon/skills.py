@@ -52,6 +52,7 @@ import shutil
 import stat as _stat
 import subprocess
 import sys
+import threading
 import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -1468,6 +1469,10 @@ def _usage_path() -> Path:
         "MCPTOON_SKILLS_USAGE", str(CONFIG_DIR / "skills-usage.json")))
 
 
+# Guards the read-modify-write in record_skill_use against in-process races.
+_USAGE_LOCK = threading.Lock()
+
+
 def _load_skill_usage() -> dict:
     path = _usage_path()
     if not path.exists():
@@ -1480,21 +1485,46 @@ def _load_skill_usage() -> dict:
 
 
 def record_skill_use(slugs: list[str]) -> None:
-    """Bump the hit counter for skills a route/resolve just surfaced."""
+    """Bump the hit counter for skills a route/resolve just surfaced.
+
+    Serialized in-process, then written atomically. Two callers reach this now —
+    the CLI (`resolve`/`route`) and the MCP tool (`mcptoon_resolve_skills`) — so a
+    bare `write_text` was wrong twice over: a concurrent reader could catch a torn
+    file, and two writers could each read the old counts and write back the same
+    "+1", collapsing a burst of calls into one. Measured 2026-09-24: 30 concurrent
+    resolves recorded a count of 1. The unique tmp name is the discipline
+    `usage._save_usage` already uses; the lock covers the in-process case, which is
+    the reachable one (the HTTP transport is single-threaded, but a thread pool in
+    a host, or the CLI running beside a gateway, is not).
+
+    A cross-process lost update is still possible and accepted: the repo's other
+    counters (usage, cache) make the same trade rather than take a file lock, and
+    these counts are a floor, not a census — `list --usage` says so.
+    """
     if not slugs:
         return
-    data = _load_skill_usage()
-    for slug in slugs:
-        entry = data.get(slug) or {"count": 0}
-        entry["count"] = int(entry.get("count", 0)) + 1
-        entry["last"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        data[slug] = entry
-    path = _usage_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    except OSError:
-        pass  # a read-only home must never break a resolve
+    with _USAGE_LOCK:
+        data = _load_skill_usage()
+        for slug in slugs:
+            entry = data.get(slug) or {"count": 0}
+            entry["count"] = int(entry.get("count", 0)) + 1
+            entry["last"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            data[slug] = entry
+        path = _usage_path()
+        tmp = None
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}.{id(data)}")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False),
+                           encoding="utf-8")
+            os.replace(tmp, path)
+        except OSError:
+            if tmp is not None:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            # a read-only home must never break a resolve
 
 
 def _skills_root(source: Path, slug: str) -> Path:

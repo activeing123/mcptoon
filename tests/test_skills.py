@@ -725,6 +725,92 @@ class CatalogManagementTests(unittest.TestCase):
         rows_all = json.loads(run_cli(["mcptoon", "skills", "list", "--all", "--json"], self.env))
         self.assertEqual(sorted(r["slug"] for r in rows_all), ["archify", "tu-archify"])
 
+    def test_concurrent_uses_are_not_lost(self):
+        """A burst of resolves must not collapse into one count.
+
+        Two callers reach `record_skill_use` — the CLI and the MCP tool
+        (`mcptoon_resolve_skills`) — and it used to be a bare read-modify-write.
+        Measured 2026-09-24: 30 concurrent resolves recorded a count of 1, because
+        each thread read the old file and wrote back the same "+1". The count is
+        what `list --usage` shows and what the catalog's "which skills earn their
+        keep" claim rests on, so losing 29 of 30 is not a rounding error.
+
+        The env patch wraps the threads too: `run_cli`'s patch.dict is gone by the
+        time a worker starts, and an unpinned worker reads the *real* index.
+        """
+        import threading
+
+        write_skill(self.src, "hot", "被频繁命中的技能。触发词：hot", layout="flat")
+        run_cli(["mcptoon", "skills", "index", str(self.src)], self.env)
+
+        with patch.dict(os.environ, self.env):
+            idx = skills.load_index()
+            self.assertTrue(idx.get("skills"), "precondition: the index built")
+            self.assertIn("hot", [s["slug"] for s in idx["skills"]],
+                          "precondition: the fixture skill is indexed")
+
+            errors: list[str] = []
+
+            def worker():
+                try:
+                    skills.resolve_shortlist("hot", 1, index=idx)
+                except Exception as exc:  # a race must not raise out of a resolve
+                    errors.append(f"{type(exc).__name__}: {exc}")
+
+            threads = [threading.Thread(target=worker) for _ in range(24)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        self.assertEqual(errors, [])
+        usage = json.loads((self.base / "usage.json").read_text(encoding="utf-8"))
+        self.assertEqual(usage["hot"]["count"], 24,
+                         "concurrent resolves lost counts (read-modify-write race)")
+
+    def test_a_concurrent_writer_never_leaves_a_torn_file(self):
+        """Atomic write, not a bare write_text: readers must never see half a file."""
+        import threading
+
+        write_skill(self.src, "hot", "技能。触发词：hot", layout="flat")
+        run_cli(["mcptoon", "skills", "index", str(self.src)], self.env)
+        path = self.base / "usage.json"
+
+        with patch.dict(os.environ, self.env):
+            idx = skills.load_index()
+            self.assertIn("hot", [s["slug"] for s in idx["skills"]])
+
+            stop = [False]
+            torn: list[str] = []
+
+            def writer():
+                for _ in range(40):
+                    skills.resolve_shortlist("hot", 1, index=idx)
+
+            def reader():
+                while not stop[0]:
+                    try:
+                        raw = path.read_text(encoding="utf-8")
+                    except OSError:
+                        # os.replace swaps the file in; a reader may land between
+                        # "exists" and "open". That window is the rename, not a
+                        # torn write — a missing file is not a partial one.
+                        continue
+                    try:
+                        json.loads(raw)
+                    except ValueError:
+                        torn.append("partial JSON")
+
+            w = threading.Thread(target=writer)
+            r = threading.Thread(target=reader)
+            r.start()
+            w.start()
+            w.join()
+            stop[0] = True
+            r.join()
+
+        self.assertEqual(torn, [], "a reader saw a partially written usage file")
+
 
 class UnroutableTests(unittest.TestCase):
     """`stats` must name the skills no query can reach — that is the guarantee."""

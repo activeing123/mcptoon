@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the CLI and the tools, so the two surfaces cannot rank differently; `resolve` also
   records the same usage counts, so `mcptoon skills list --usage` reflects MCP calls.
 
+### Fixed
+
+- **Concurrent skill resolves lost their usage counts.** `record_skill_use` was a
+  bare read-modify-write, and two callers reach it now — the CLI (`resolve`/`route`)
+  and the MCP tool (`mcptoon_resolve_skills`). Measured 2026-09-24: 30 concurrent
+  resolves recorded a count of 1, each thread having read the old file and written
+  back the same `+1`. It is now serialized in-process and written atomically (unique
+  tmp name + `os.replace`), the same discipline `usage._save_usage` already used, so a
+  reader can never catch a torn file either. The count is what `list --usage` shows,
+  so losing 29 of 30 was a visible lie about which skills earn their keep.
+
 ### Changed
 
 - **The handshake now points at the skill tool, and costs less.** The `instructions`
