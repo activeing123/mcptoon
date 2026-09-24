@@ -52,6 +52,33 @@ ranking backs both:
   context, so the agent always knows the catalog exists.
 - **CLI** — `mcptoon skills resolve "<task>" --k 5`, the command these tools mirror.
 
+## The handshake carries the pointer
+
+Tools alone are not enough. `mcptoon_resolve_skills` shows up in `tools/list` like
+any other tool, but a list of tools says nothing about *when* to reach for one — an
+agent that never sees a skill list in its prompt has no reason to call a resolver.
+
+MCP has an official channel for exactly this: the `instructions` field of the
+`initialize` result, which a client hands to the model as part of its context, with
+no tool call and no system-prompt edit. mcptoon already used it (to ask for the
+savings line); it now opens by naming the resolver:
+
+> Before acting on a task, call `mcptoon_resolve_skills` with the user's request and
+> read only the SKILL.md files it returns; never load the whole catalog.
+
+The pointer names the *tool*, not the shell command, because the reader always has
+this gateway mounted and may have no shell. The rest of the paragraph was tightened
+in the same edit, so the block is 314 tokens — the pointer was paid for out of prose,
+not added on top.
+
+**Verified, not assumed.** An agent connected to the gateway was asked to name the
+skill it would use for a task, with no tool named in the prompt. It called
+`mcptoon_resolve_skills` on its own and quoted the returned shortlist. Two honest
+caveats: the channel only works in clients that honour `instructions` (Claude Code
+does; **DSH mounts no MCP, so it is unaffected**), and the field is sent once at
+connect time, so an edit needs a reconnect — unlike a system-prompt pointer, which
+survives restarts on its own.
+
 ## One ranking, two surfaces
 
 `mcptoon_skills` and `mcptoon skills list` must agree, and so must

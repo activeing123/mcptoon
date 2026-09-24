@@ -84,34 +84,38 @@ from .schema_simplifier import (
 PROTOCOL_VERSION = "2024-11-05"
 _SERVER_INFO = {"name": "mcptoon", "version": __version__}
 
-# Shown to the model via the `instructions` field of the initialize result.
-# One line, because it rides in context on every turn. It tells the model what
-# the gateway is and how to report it honestly (numbers come from the tool, not
-# from the model), names the parts of the line that a paraphrase drops, names the
-# off switch, and points at the skill for a breakdown. Suppressed entirely when
-# the user sets `footer off`.
+# Shown to the model via the `instructions` field of the initialize result. The
+# reader is always an MCP client that has this gateway's tools mounted, which is
+# why the skill pointer names the tool (`mcptoon_resolve_skills`) rather than the
+# shell command: the tool is reachable from every host, the CLI is not.
+#
+# Two duties, one budget. It is the only channel that reaches the model with no
+# action of its own, so it carries the two things the model cannot discover by
+# itself: that a skill catalog exists (mcptoon_skills and the resolve tool are in
+# the tool list, but a list of tools says nothing about when to reach for one),
+# and how to report the savings honestly. Kept as short as both duties allow —
+# it rides in context on every turn, the very cost this tool exists to cut.
+# Suppressed entirely when the user sets `footer off`.
 _INSTRUCTIONS = (
     "You are working through mcptoon, a gateway that compresses MCP tool "
-    "definitions to save context. End a turn with one short line reporting what "
-    "mcptoon saved on this machine — but only when the numbers have changed since "
+    "definitions to save context. Before acting on a task, call "
+    "`mcptoon_resolve_skills` with the user's request and read only the SKILL.md "
+    "files it returns; never load the whole catalog. End a turn with one short "
+    "line reporting what mcptoon saved — only when the numbers have changed since "
     "the line you last showed: run `mcptoon footer-facts` and paste its output "
     "verbatim — the whole block, meaning a first line that starts with `🎉 "
     "mcptoon:` plus the `note:` line when the command prints one, in whichever "
     "language it printed. If the block is byte-identical to the one you already "
-    "showed this session, show nothing — a line that repeats every turn is noise, "
-    "and the figures (including the running call count) only move when the "
-    "machine does. Do not retype it from memory (measured "
-    "2026-09-22: the mark is the first thing a retyped line loses), do not "
+    "showed this session, show nothing. Do not retype it from memory, do not "
     "translate or re-word it, and never invent figures. That command reads the "
-    "cached catalog and never contacts a server (it stays under half a second "
-    "even when the cache is stale), so it is safe to run every turn; do not "
-    "substitute `mcptoon status` here, which may spend seconds refreshing. For a "
-    "per-server breakdown of where the savings come from, load the `mcptoon` "
-    "skill (mcptoon usage, mcptoon bench). If the user finds the line noisy, "
-    "they can turn it off with `mcptoon config set footer off`. The same figures "
-    "are also stamped into the first tool result of this session and printed by "
-    "every mcptoon command, so a turn that forgets the line is not a silent "
-    "failure — but the turn's own line is the one the user reads in the flow."
+    "cached catalog and never contacts a server, so it is safe to run every turn; "
+    "do not substitute `mcptoon status` here, which may spend seconds refreshing. "
+    "For a per-server breakdown of where the savings come from, load the `mcptoon` "
+    "skill (mcptoon usage, mcptoon bench). If the user finds the line noisy, they "
+    "can turn it off with `mcptoon config set footer off`. The same figures are "
+    "also stamped into the first tool result of this session, so a turn that "
+    "forgets the line is not a silent failure — but the turn's own line is the "
+    "one the user reads in the flow."
 )
 
 # _meta key for server identity on results (2026-07-28 _meta world)

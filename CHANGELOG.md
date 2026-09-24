@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the CLI and the tools, so the two surfaces cannot rank differently; `resolve` also
   records the same usage counts, so `mcptoon skills list --usage` reflects MCP calls.
 
+### Changed
+
+- **The handshake now points at the skill tool, and costs less.** The `instructions`
+  field of the initialize result is the one channel that reaches the model without a
+  tool call, and it talked only about the savings line. It now opens by naming
+  `mcptoon_resolve_skills`: a list of tools says nothing about *when* to reach for one,
+  so an agent that never sees a skill list in its prompt had no reason to call a
+  resolver. The same edit tightened the rest of the paragraph, so the whole block went
+  from 351 to 314 tokens — the pointer was paid for out of prose, not added on top. The
+  directive names the mounted tool rather than the shell command, because the reader
+  always has this gateway and may have no shell.
+
 ## [0.7.23] - 2026-09-24
 
 ### Fixed

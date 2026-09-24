@@ -392,6 +392,38 @@ class TestFooterDisclosure(unittest.TestCase):
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         self.assertIn("never invent figures", res["instructions"])
 
+    def test_instructions_point_at_the_skill_tool(self):
+        """The model cannot discover *when* to reach for a skill from a tool list.
+
+        `mcptoon_resolve_skills` appears in `tools/list` like any other tool, but a
+        list of tools says nothing about the catalog behind them — an agent that
+        never sees a skill list in its prompt has no reason to call a resolver. The
+        handshake is the one channel that reaches the model with no action of its
+        own, so the pointer lives here. It names the *tool*, not the shell command,
+        because the reader always has this gateway mounted and may have no shell.
+        """
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res["instructions"]
+        self.assertIn("mcptoon_resolve_skills", text)
+        self.assertIn("never load the whole catalog", text,
+                      "the pointer must not invite a full-catalog dump")
+        self.assertNotIn("mcptoon skills resolve", text,
+                         "name the mounted tool, not the CLI the host may not have")
+
+    def test_instructions_stay_within_their_context_budget(self):
+        """This text rides in context on every turn — the cost mcptoon exists to cut.
+
+        The two duties (name the skill tool, report savings honestly) both need
+        room, so the budget is not tiny; it is a ceiling, not a target. Pinned so a
+        later edit cannot grow the per-turn cost of every session by accident: a
+        saving tool whose own overhead creeps is the complaint this repo was built
+        to answer. 314 tokens on the cl100k_base caliber when this was written.
+        """
+        from mcptoon import serve
+
+        self.assertLessEqual(len(serve._INSTRUCTIONS), 1400,
+                             "instructions grew past the budget it rides in")
+
     def test_instructions_pin_the_mark_and_the_note_line(self):
         """ "Quote it verbatim" was not enough, so the directive now names the parts.
 
