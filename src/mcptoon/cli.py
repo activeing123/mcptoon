@@ -994,6 +994,22 @@ def _cmd_quickstart(rest, fmt="auto"):
     # Step 4: Show summary
     print(result.summary())
 
+    # Step 4b: Build the skill index now, so the catalog is answerable the moment
+    # onboarding ends. `resolve` would build it lazily on first use anyway, but
+    # doing it here means the very next command — including one an agent runs —
+    # has a catalog to answer from, and it puts the skill count in front of the
+    # user instead of leaving it a surprise. Best-effort: a machine with no skill
+    # roots is not an onboarding failure.
+    if not is_dry:
+        try:
+            from . import skills as skills_mod
+            if skills_mod.ensure_index():
+                n_skills = len(skills_mod.load_index().get("skills") or [])
+                print(f"  ✓ Skill catalog indexed: {n_skills} skill(s) routable "
+                      f"via `mcptoon skills resolve`")
+        except Exception:
+            pass
+
     # Step 5: The "aha moment" — show slim manifest
     tool_count = None
     if not is_dry:

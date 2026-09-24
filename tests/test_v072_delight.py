@@ -136,6 +136,80 @@ class _A1QuickstartIntegration(unittest.TestCase):
         self.assertIn("mcptoon status", out)
         self.assertIn("Could not fetch tools yet", out)
 
+    def test_quickstart_indexes_the_skill_catalog(self):
+        """Onboarding ends with a catalog that can already answer.
+
+        `resolve` builds the index lazily on first use, but a user who has just
+        installed should not have to discover that — the install path does it, so
+        the very next command (including one an agent runs) has a catalog.
+        """
+        fake = _FakeResult(2)
+        root = self.tmp / "skills" / "demo"
+        root.mkdir(parents=True)
+        (root / "SKILL.md").write_text(
+            "---\nname: demo\ndescription: 演示技能。触发词：演示\n---\n\nbody\n",
+            encoding="utf-8")
+        index = self.tmp / "skills-index.json"
+        with mock.patch.dict(os.environ, {"MCPTOON_SKILLS_INDEX": str(index),
+                                          "MCPTOON_SKILLS_ROOTS": str(self.tmp / "skills")}), \
+             mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        out = buf.getvalue()
+        self.assertTrue(index.is_file(), "quickstart must leave an index behind")
+        self.assertIn("Skill catalog indexed: 1 skill(s)", out)
+
+    def test_quickstart_dry_builds_no_index(self):
+        """A preview must not write the index — same rule as the config."""
+        fake = _FakeResult(2)
+        index = self.tmp / "skills-index.json"
+        with mock.patch.dict(os.environ, {"MCPTOON_SKILLS_INDEX": str(index)}), \
+             mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart(["--dry"])
+        self.assertFalse(index.exists(), "a dry run must not write an index")
+
+    def test_quickstart_survives_an_index_failure(self):
+        """A read-only home is not an onboarding failure."""
+        fake = _FakeResult(2)
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
+             mock.patch("mcptoon.skills.ensure_index", side_effect=OSError("read-only")), \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        out = buf.getvalue()
+        self.assertIn("2 MCP servers configured", out)
+        self.assertIn("Now you can:", out)
+
     def test_quickstart_registers_the_gateway_in_agents(self):
         """quickstart is the install path that has to leave a trace: it must sync."""
         fake = _FakeResult(2)
