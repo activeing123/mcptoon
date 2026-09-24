@@ -1,5 +1,4 @@
 """Tests for v0.5.0 features: install command, installer module."""
-import json
 import os
 import sys
 import tempfile
@@ -189,30 +188,35 @@ class TestInstallHttp(unittest.TestCase):
 
 
 class TestSearchRegistry(unittest.TestCase):
-    """Test search_registry function."""
+    """Test search_registry function.
 
-    @patch("urllib.request.urlopen")
-    def test_search_success(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({
-            "servers": [
-                {"name": "test-server", "description": "A test server", "command": "npx", "args": ["-y", "test"]}
-            ]
-        }).encode("utf-8")
-        mock_urlopen.return_value = mock_resp
+    2026-09-24: these two used to patch ``urllib.request.urlopen`` and assert that a
+    network error returned an empty list. That assertion encoded the very bug that
+    silently killed ``mcptoon install <name>`` for months — a dead registry and a
+    genuine "no matches" were indistinguishable. The contract is now: an empty list
+    means "the sources answered and had nothing"; an unreachable registry raises
+    ``RegistryError``. Patched at ``_fetch_json`` so the test is offline and stable.
+    """
 
+    @patch("mcptoon.installer._fetch_json")
+    def test_search_success(self, mock_fetch):
+        mock_fetch.return_value = {
+            "servers": [{"qualifiedName": "test-server",
+                         "displayName": "Test",
+                         "description": "A test server",
+                         "verified": True, "useCount": 3}]
+        }
         result = search_registry("test")
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "test-server")
 
-    @patch("urllib.request.urlopen")
-    def test_search_network_error(self, mock_urlopen):
-        mock_urlopen.side_effect = Exception("Network error")
-        result = search_registry("test")
-        # Network errors now return empty list (graceful degradation)
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 0)
+    @patch("mcptoon.installer._fetch_json")
+    def test_search_network_error_raises(self, mock_fetch):
+        from mcptoon.installer import RegistryError
+        mock_fetch.side_effect = OSError("Network error")
+        with self.assertRaises(RegistryError):
+            search_registry("test")
 
 
 class TestCLiInstallCommand(unittest.TestCase):

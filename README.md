@@ -14,7 +14,7 @@ mcptoon is a 206KB CLI — think of it as a steward that takes over every MCP to
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1273%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1302%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#the-other-half-of-the-toolbox-skills)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -653,7 +653,7 @@ Both halves of the toolbox share one engine, one config and one index format.
 | **Health** | `mcptoon health` | `mcptoon skills stats` |
 
 **Runtime.** Python ≥ 3.10 (CI: 3.10–3.13 × Linux, Windows, macOS). 27 modules,
-17,574 lines of Python, a **206KB** wheel, **zero third-party dependencies** — standard
+18,086 lines of Python, a **206KB** wheel, **zero third-party dependencies** — standard
 library only, enforced in CI by `scripts/check_zero_deps.py`. No daemon, no listening
 port, no telemetry, no stored credentials.
 
@@ -778,14 +778,14 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1273 passed, 1 skipped
+python -m pytest tests/ -v   # 1302 passed, 1 skipped
 ```
 
-Zero dependencies is a hard rule — our test suite gates every change (1273 tests
+Zero dependencies is a hard rule — our test suite gates every change (1302 tests
 green before merge). See
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: 17,574 lines of Python across 27 modules, zero third-party dependencies.
+The codebase: 18,086 lines of Python across 27 modules, zero third-party dependencies.
 
 ---
 

@@ -2117,6 +2117,7 @@ def _cmd_install(rest, fmt):
     server_name = None
     do_list = False
     do_remove = False
+    do_search = False
 
     i = 0
     while i < len(rest):
@@ -2129,6 +2130,10 @@ def _cmd_install(rest, fmt):
             i += 2
         elif a == "--url" and i + 1 < len(rest):
             http_url = rest[i + 1]
+            i += 2
+        elif a == "--search" and i + 1 < len(rest):
+            do_search = True
+            server_name = rest[i + 1]
             i += 2
         elif a == "--list":
             do_list = True
@@ -2155,6 +2160,37 @@ def _cmd_install(rest, fmt):
         print(output.render(result, fmt=fmt))
         return
 
+    # mcptoon install --search <keyword>  → list matches, install nothing
+    if do_search:
+        from .installer import search_registry, RegistryError
+        try:
+            results = search_registry(server_name, limit=20)
+        except RegistryError as e:
+            print(f"  ❌ {e}")
+            sys.exit(1)
+        if not results:
+            print(f"  No MCP server found matching '{server_name}'.")
+            sys.exit(1)
+        print(f"  Found {len(results)} servers matching '{server_name}':\n")
+        for i, r in enumerate(results):
+            name = r.get("name", "")
+            src = r.get("source", "")
+            desc = " ".join((r.get("description", "") or "").split())[:70]
+            kind = r.get("kind") or ("hosted" if src == "smithery"
+                                     else ("remote" if r.get("url") else ""))
+            tag = f" [{kind}]" if kind else ""
+            mark = " ✓" if r.get("verified") else ""
+            uses = r.get("uses") or 0
+            uses_s = f"   {uses:,} calls" if uses else ""
+            print(f"    {i + 1:>2}. {name}{mark}{tag}  ({src}){uses_s}")
+            if desc:
+                print(f"        {desc}")
+        print(f"\n  ✓ = verified by the registry. Third-party servers are not audited"
+              f" by mcptoon — check the source before granting credentials.")
+        print(f"\n  Install one:  mcptoon install <name>")
+        print(f"  Preview only: mcptoon install --search <name>")
+        return
+
     if http_url:
         from .installer import install_http
         result = install_http(http_url, server_name)
@@ -2173,39 +2209,42 @@ def _cmd_install(rest, fmt):
         print(output.render(result, fmt=fmt))
         return
 
-    # mcptoon install --search <keyword>  → search registry
-    if server_name and server_name == "--search":
-        # This shouldn't happen (handled above), but just in case
-        pass
-
     # mcptoon install <name>  (no --npm/--pip/--url) → auto-search & install
     if server_name and not server_name.startswith("--"):
-        from .installer import install_by_name, search_registry
-        # First: show search results
-        results = search_registry(server_name)
+        from .installer import install_by_name, search_registry, RegistryError
+        # First: show what we found, so the user sees what is about to be installed.
+        try:
+            results = search_registry(server_name)
+        except RegistryError as e:
+            print(f"  ❌ {e}")
+            sys.exit(1)
         if not results:
             print(f"  ❌ No MCP server found matching '{server_name}'.")
-            print(f"  Try: mcptoon install {server_name} --npm <package>")
-            print(f"  Or:  mcptoon install {server_name} --pip <package>")
+            print(f"  Search wider: mcptoon install --search <keyword>")
+            print(f"  Or install directly: mcptoon install {server_name} --npm <package>")
             return
         # If multiple results, show them
         if len(results) > 1:
             print(f"  Found {len(results)} servers matching '{server_name}':")
             for i, r in enumerate(results[:10]):
                 name = r.get("name", "")
-                desc = r.get("description", "")[:60]
+                desc = (r.get("description", "") or "")[:60]
                 src = r.get("source", "")
                 print(f"    {i+1}. {name} ({src}) — {desc}")
             print(f"\n  Installing best match: {results[0].get('name', server_name)}")
         else:
-            print(f"  Found: {results[0].get('name', server_name)} — {results[0].get('description', '')[:80]}")
+            print(f"  Found: {results[0].get('name', server_name)} — {(results[0].get('description', '') or '')[:80]}")
 
         result = install_by_name(server_name)
         print(output.render(result, fmt=fmt))
+        from .errors import is_error
+        if is_error(result):
+            sys.exit(1)
         return
 
     print("Usage:")
     print("  mcptoon install <name>              # Auto-search & install from registry")
+    print("  mcptoon install --search <keyword>  # Search registries, install nothing")
     print("  mcptoon install <name> --npm <pkg>  # Install from npm")
     print("  mcptoon install <name> --pip <pkg>  # Install from pip")
     print("  mcptoon install <name> --url <url>  # Install HTTP/SSE MCP")

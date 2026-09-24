@@ -9,6 +9,7 @@ Features:
 
 CLI:
   mcptoon install <server-name>          # Install from registry
+  mcptoon install --search <keyword>      # Search registries, install nothing
   mcptoon install --npm <package>         # Install from npm
   mcptoon install --pip <package>         # Install from pip
   mcptoon install --url <url>             # Install HTTP/SSE MCP
@@ -24,10 +25,17 @@ import re
 from .errors import make_error
 from .client import MCPClient, MCPError
 
-# MCP Registry URLs — multiple sources for resilience
-MCP_REGISTRY_URL = "https://registry.modelcontextprotocol.org"
-SMITHERY_API_URL = "https://smithery.ai/api"
-MCP_SO_URL = "https://mcp.so/api"
+# MCP Registry URLs — multiple sources for resilience.
+#
+# Verified live 2026-09-24. The previous values had rotted: ``smithery.ai/api`` answered
+# 404 and ``registry.modelcontextprotocol.org`` no longer resolved (NXDOMAIN), and the
+# bare ``except Exception: return []`` below turned both into "no results found" — so
+# ``mcptoon install <name>`` silently stopped working and nobody noticed. Anything that
+# touches these URLs must report failure instead of swallowing it, and
+# ``scripts/check_registry_sources.py`` pings them in CI so they cannot rot unseen again.
+SMITHERY_API_URL = "https://registry.smithery.ai"
+MCP_REGISTRY_URL = "https://registry.modelcontextprotocol.io/v0"
+# Dropped: ``mcp.so/api`` (500, no public API), Glama (401, needs auth), PulseMCP (403/410).
 
 # Default npx command
 _NPX_CMD = "npx"
@@ -68,130 +76,290 @@ def _save_installed(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def search_registry(keyword):
+class RegistryError(Exception):
+    """Every configured registry source failed. Distinct from "no matches"."""
+
+
+# Words too generic to prove relevance ("mcp server" matches everything).
+_RELEVANCE_STOPWORDS = frozenset(
+    {"mcp", "server", "servers", "tool", "tools", "the", "and", "for", "with", "api"}
+)
+
+
+def _tokens(text):
+    return [t for t in re.split(r"[^a-z0-9]+", (text or "").lower())
+            if len(t) >= 3 and t not in _RELEVANCE_STOPWORDS]
+
+
+def _token_matches(a, b):
+    """Equal, or one is a prefix of the other ("postgres" ~ "postgresql")."""
+    if a == b:
+        return True
+    if len(a) >= 4 and len(b) >= 4:
+        return a.startswith(b) or b.startswith(a)
+    return False
+
+
+def _relevant(keyword, item):
+    """Does ``item`` actually look like a match for ``keyword``?
+
+    Needed because Smithery's search is fuzzy-fallback: it answers *any* query with
+    *some* servers, so a typo like ``mcptoon install githbu`` returns five unrelated
+    entries instead of nothing — and the old code would then install one of them.
+    Requiring a shared significant token keeps fuzzy good matches ("postgres" ->
+    "PostgreSQL") while turning genuine non-matches into an honest empty result.
+    """
+    wanted = _tokens(keyword)
+    if not wanted:
+        return True  # a query made only of stopwords is a browse, not a search
+    hay = _tokens(item.get("name", "")) + _tokens(item.get("description", ""))
+    return any(_token_matches(w, h) for w in wanted for h in hay)
+
+
+def _relevance_score(keyword, item):
+    """Rank a match: exact name > name contains > token overlap only."""
+    kw = (keyword or "").lower().strip()
+    name = (item.get("name") or "").lower()
+    tail = name.rstrip("/").split("/")[-1]
+    if name == kw or tail == kw:
+        return 3
+    if kw and kw in name:
+        return 2
+    return 1
+
+
+def search_registry(keyword, limit=10, strict=False):
     """Search MCP registries for available servers.
 
-    Tries Smithery API first (largest registry, 3000+ servers),
-    falls back to MCP official registry.
+    Queries both sources and merges them, best matches first — Smithery holds the
+    hosted half, the official registry the installable-package half, and a query
+    like "filesystem" has good answers in both.
 
     Returns:
-        list: [{name, description, command, args, env}, ...]
+        list: [{name, description, command, args, env, source, url}, ...]
+
+    Raises:
+        RegistryError: only when *every* source failed at the network level
+            (DNS, TLS, timeout, 5xx). A genuine "no matches" still returns [].
+            The distinction matters: the old code returned [] for both, so a dead
+            registry was indistinguishable from an empty result.
     """
-    # Try Smithery first (largest registry)
-    results = _search_smithery(keyword)
-    if results:
-        return results
+    errors = []
+    merged, seen = [], set()
 
-    # Fall back to MCP official registry
-    results = _search_mcp_registry(keyword)
-    if results:
-        return results
+    for label, fn in (("smithery", _search_smithery),
+                      ("registry", _search_mcp_registry)):
+        try:
+            results = fn(keyword, limit)
+        except Exception as e:
+            errors.append(f"{label}: {type(e).__name__}: {str(e)[:120]}")
+            continue
+        for r in results:
+            key = (r.get("name") or "").lower()
+            if not key or key in seen or not _relevant(keyword, r):
+                continue
+            seen.add(key)
+            merged.append(r)
 
-    # Last resort: return empty (no error for "no results")
+    if merged:
+        merged.sort(key=lambda r: _relevance_score(keyword, r), reverse=True)
+        return merged[:limit]
+
+    # Nothing relevant. If some source was reachable, this is a real empty result;
+    # if none was, the network is the problem and we say so.
+    if len(errors) == 2:
+        raise RegistryError(
+            "No MCP registry reachable (" + "; ".join(errors) + "). "
+            "Check your connection, or install directly with "
+            "`mcptoon install <name> --npm <pkg>`."
+        )
     return []
 
 
-def _search_smithery(keyword):
-    """Search Smithery registry."""
-    try:
-        import urllib.request
-        import urllib.parse
-        params = urllib.parse.urlencode({"q": keyword})
-        url = f"{SMITHERY_API_URL}/servers?{params}"
-        req = urllib.request.Request(url, headers={
-            "Accept": "application/json",
-            "User-Agent": "mcptoon-installer/1.0",
-        })
-        resp = urllib.request.urlopen(req, timeout=10)
-        data = json.loads(resp.read().decode("utf-8"))
+def _fetch_json(url, timeout=10):
+    """GET a JSON document. Raises on any failure — never returns a sentinel."""
+    import urllib.request
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/json",
+        "User-Agent": "mcptoon-installer/1.0",
+    })
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
-        # Smithery returns {servers: [{name, description, command, ...}]}
-        servers = data if isinstance(data, list) else data.get("servers", data.get("data", []))
-        if not isinstance(servers, list):
-            servers = []
 
-        return [{
-            "name": s.get("name", s.get("id", "")),
-            "description": (s.get("description", "") or "")[:200],
-            "command": s.get("command", "npx"),
-            "args": s.get("args", ["-y", s.get("name", "")]),
-            "env": s.get("env", {}),
+def _search_smithery(keyword, limit=10):
+    """Search the Smithery registry (hosted servers + their tool schemas)."""
+    import urllib.parse
+    params = urllib.parse.urlencode({"q": keyword, "pageSize": min(limit, 100)})
+    data = _fetch_json(f"{SMITHERY_API_URL}/servers?{params}")
+
+    # {"servers": [{id, qualifiedName, displayName, description, verified, useCount, ...}], ...}
+    servers = data.get("servers", []) if isinstance(data, dict) else []
+    out = []
+    for s in servers:
+        name = s.get("qualifiedName") or s.get("displayName") or s.get("id", "")
+        if not name:
+            continue
+        out.append({
+            "name": name,
+            "description": (s.get("description") or "")[:200],
+            # Smithery entries are hosted HTTP servers, not local packages: leave the
+            # launch command empty so the caller routes to the URL instead of npx.
+            # The URL is not in the list payload — ``_smithery_url`` fetches it on demand.
+            "command": "",
+            "args": [],
+            "env": {},
             "source": "smithery",
-            "url": s.get("url", ""),
-        } for s in servers if s.get("name") or s.get("id")]
-    except Exception:
-        return []
+            "url": "",
+            "verified": bool(s.get("verified")),
+            "uses": s.get("useCount") or 0,
+        })
+    return out
 
 
-def _search_mcp_registry(keyword):
-    """Search MCP official registry."""
+def _smithery_url(qualified_name):
+    """Fetch the hosted deployment URL for one Smithery server, or "" on failure."""
     try:
-        import urllib.request
-        url = f"{MCP_REGISTRY_URL}/servers?q={keyword}"
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=10)
-        data = json.loads(resp.read().decode("utf-8"))
-        servers = data.get("servers", [])
-        return [{
-            "name": s.get("name", ""),
-            "description": s.get("description", "")[:200],
-            "command": s.get("command", ""),
-            "args": s.get("args", []),
-            "env": s.get("env", {}),
-            "source": "registry",
-        } for s in servers if s.get("name")]
+        d = _fetch_json(f"{SMITHERY_API_URL}/servers/{qualified_name}")
     except Exception:
-        return []
+        return ""
+    return d.get("deploymentUrl") or ""
+
+
+def _search_mcp_registry(keyword, limit=10):
+    """Search the official MCP Registry (the half that ships installable packages)."""
+    import urllib.parse
+    # The registry's filter parameter is ``search`` — ``q`` is silently ignored and
+    # returns the unfiltered list, which looks like a match but is not.
+    params = urllib.parse.urlencode({"search": keyword, "limit": min(max(limit * 3, 20), 100)})
+    data = _fetch_json(f"{MCP_REGISTRY_URL}/servers?{params}")
+
+    # {"servers": [{"server": {name, description, packages[], remotes[]}, "_meta": {...}}]}
+    out, seen = [], set()
+    for entry in data.get("servers", []):
+        srv = entry.get("server", entry)
+        name = srv.get("name", "")
+        if not name or name in seen:
+            continue
+        # The registry lists one row per published version; keep only the latest.
+        meta = (entry.get("_meta") or {}).get(
+            "io.modelcontextprotocol.registry/official", {})
+        if meta and meta.get("isLatest") is False:
+            continue
+        seen.add(name)
+
+        # Prefer a local package (npm/pypi) so `install` can actually run it; fall
+        # back to a hosted remote otherwise.
+        packages = srv.get("packages") or []
+        command, args, pkg_kind = "", [], ""
+        for p in packages:
+            rt = (p.get("registryType") or "").lower()
+            ident = p.get("identifier", "")
+            if not ident:
+                continue
+            if rt == "npm":
+                command, args, pkg_kind = "npx", ["-y", ident], "npm"
+                break
+            if rt in ("pypi", "python"):
+                command, args, pkg_kind = "uvx", [ident], "pypi"
+                break
+
+        url = ""
+        for r in (srv.get("remotes") or []):
+            url = r.get("url", "")
+            if url:
+                break
+
+        out.append({
+            "name": name,
+            "description": (srv.get("description") or "")[:200],
+            "command": command,
+            "args": args,
+            "env": {},
+            "source": "registry",
+            "url": url,
+            "kind": pkg_kind,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _slug(name):
+    """Turn a registry name into a safe config key.
+
+    ``ai.adeu/adeu`` -> ``adeu``; ``@scope/pkg`` -> ``pkg``; ``GitHub`` -> ``github``.
+    """
+    tail = name.rstrip("/").split("/")[-1] or name
+    return re.sub(r"[^a-z0-9_]", "_", tail.lower()).strip("_") or "server"
+
+
+def _resolve_runner(command):
+    """Turn a bare runner name into something a subprocess can actually launch.
+
+    Registry entries say ``npx`` / ``uvx``, but on Windows a bare ``npx`` is often not
+    on the PATH a subprocess inherits — which is exactly why ``install_npm`` already
+    special-cases the full npx path. Routing must do the same, or a registry install
+    fails on Windows while ``--npm`` succeeds.
+    """
+    import shutil
+    if command == "npx":
+        return _NPX_CMD if os.path.exists(_NPX_CMD) else (shutil.which("npx") or "npx")
+    if command == "uvx":
+        return shutil.which("uvx") or "uvx"
+    return command
 
 
 def install_by_name(name, server_name=None):
-    """Install a server by name from registry (auto-discover source).
+    """Install a server by name from a registry (auto-discover source).
 
     Usage:
-        install_by_name("fetch")      # searches registry, installs best match
+        install_by_name("github")      # searches registries, installs best match
         install_by_name("filesystem")  # same pattern
 
     Returns:
-        dict: Installation result
+        dict: Installation result, or an error envelope (see ``make_error``).
     """
-    # 1. Search for the server
-    results = search_registry(name)
+    # 1. Search for the server. A RegistryError means the network is down, which
+    #    must not be reported as "no such server" — that was the old silent bug.
+    try:
+        results = search_registry(name)
+    except RegistryError as e:
+        return make_error("REGISTRY_UNREACHABLE", str(e), "installer")
+
     if not results:
         return make_error("NOT_FOUND",
             f"No MCP server found matching '{name}'. "
-            f"Try: mcptoon install --npm <package> or --pip <package>",
+            f"Try: mcptoon install {name} --npm <package>",
             "installer")
 
-    # 2. Find best match (exact name or first result)
-    match = None
-    for r in results:
-        if r.get("name", "").lower() == name.lower():
-            match = r
-            break
-    if not match:
-        match = results[0]
+    # 2. Prefer an exact name match, else the first result.
+    match = next((r for r in results if r.get("name", "").lower() == name.lower()),
+                 results[0])
 
-    # 3. Determine install method
-    command = match.get("command", "npx")
-    args = match.get("args", ["-y", match.get("name", name)])
+    key = server_name or _slug(match.get("name") or name)
+    command = match.get("command") or ""
+    args = match.get("args") or []
+    url = match.get("url") or ""
 
-    if command == "npx" or (args and "-y" in args):
-        # npm-based server
-        package = name
-        if args and len(args) > 1:
-            # Extract package name from args
-            for a in args:
-                if a.startswith("@") or (a != "-y" and not a.startswith("-")):
-                    package = a
-                    break
-        return install_npm(package, server_name or name)
-    elif command in (sys.executable, "python", "python3"):
-        return install_pip(match.get("name", name), server_name or name)
-    else:
-        # Custom command
-        if not server_name:
-            server_name = name
-        return install_custom(server_name, command, args, match.get("env", {}))
+    # Smithery's list payload omits the deployment URL, so fetch it — but only now
+    # that we know this is the entry being installed, not for every search hit.
+    if not command and not url and match.get("source") == "smithery":
+        url = _smithery_url(match.get("name") or name)
+
+    # 3. Route to the right installer.
+    #    Hosted server (Smithery and many registry remotes): no local package, just a URL.
+    if url and not command:
+        return install_http(url, key)
+    #    Local package: npx for npm, uvx for pypi (both fetch-on-first-run, no install).
+    if command:
+        return install_custom(key, _resolve_runner(command), args, match.get("env", {}))
+    #    Nothing runnable: refuse rather than write a broken config.
+    return make_error("NOT_INSTALLABLE",
+        f"'{match.get('name')}' is listed but ships no package or URL, so it cannot "
+        f"be installed automatically. Add it by hand with "
+        f"`mcptoon add {key} --stdio <command>`.",
+        "installer")
 
 
 def install_npm(package, server_name=None):
@@ -340,7 +508,7 @@ def install_http(url, server_name=None, transport="auto"):
 
 def _generate_http_handler_file(server_name, tools, url, transport):
     """Auto-generate HTTP/SSE handler file."""
-    handlers_dir = os.path.join(os.path.dirname(__file__), "handlers")
+    handlers_dir = _handlers_dir()
     safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
     handler_file = os.path.join(handlers_dir, f"{safe_name}.py")
 
@@ -470,9 +638,22 @@ def _verify_and_generate(server_name, command, args_list, env, source):
     }
 
 
+def _handlers_dir():
+    """The directory generated handler files live in, created on demand.
+
+    ``handlers/`` is gitignored (a private layer — local handlers are not part of a
+    public release), so it does not exist in a fresh clone or a PyPI install. Writing
+    to it without creating it first made ``mcptoon install`` crash with
+    FileNotFoundError on every machine that had never run it before.
+    """
+    d = os.path.join(os.path.dirname(__file__), "handlers")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def _generate_handler_file(server_name, tools, command, args_list, env_keys, source):
     """Auto-generate handler file to handlers/ directory."""
-    handlers_dir = os.path.join(os.path.dirname(__file__), "handlers")
+    handlers_dir = _handlers_dir()
     safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
     handler_file = os.path.join(handlers_dir, f"{safe_name}.py")
 
