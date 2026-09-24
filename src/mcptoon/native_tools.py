@@ -23,11 +23,18 @@ crawler) that launches it in a clean environment sees a tool-less server and
 has nothing to evaluate. The upstream count depends entirely on someone else's
 config file.
 
-These three tools are the gateway describing itself. They need no upstream
+These tools are the gateway describing itself. They need no upstream
 servers, no API keys, no network, and start no subprocesses: they read state
 the bridge already holds. They are read-only, and they are namespaced with the
 ``mcptoon_`` prefix so they never shadow an upstream tool — on a name collision
 the upstream definition wins (see :func:`native_names`).
+
+Two of them — ``mcptoon_skills`` and ``mcptoon_resolve_skills`` — expose the
+skill catalog that ``mcptoon skills`` already keeps on disk. They exist so a
+connected agent can reach the catalog *over MCP* instead of shelling out: the
+gateway is then a skill router as well as a tool gateway, and an agent that
+never sees a skill list in its prompt can still resolve one by task. Both are
+read-only; ``resolve`` records the same usage counts the CLI does.
 
 Keep the wording inside the budget enforced by ``schema_simplifier`` (descriptions
 <= 360 chars / 3 sentences, parameter docs <= 200 chars / 2 sentences) so this
@@ -44,7 +51,14 @@ from typing import Any
 from .schema_simplifier import namespaced_tool_name, simplify_tool_def
 
 # Names of the first-party tools, in listing order.
-NATIVE_NAMES = ("mcptoon_manifest", "mcptoon_servers", "mcptoon_health", "mcptoon_usage")
+NATIVE_NAMES = (
+    "mcptoon_manifest",
+    "mcptoon_servers",
+    "mcptoon_health",
+    "mcptoon_usage",
+    "mcptoon_skills",
+    "mcptoon_resolve_skills",
+)
 
 
 def native_tools() -> list[dict]:
@@ -248,6 +262,111 @@ def native_tools() -> list[dict]:
                 "openWorldHint": False,
             },
         },
+        {
+            "name": "mcptoon_skills",
+            "title": "Skill catalog",
+            "description": (
+                "List the skills mcptoon indexes on this machine: slug and one-line "
+                "description per skill. Read it once to learn what skills exist, then "
+                "resolve the one you need with mcptoon_resolve_skills. Offline and "
+                "read-only; pass include_aliases to also see alias cards."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "include_aliases": {
+                        "type": "boolean",
+                        "description": (
+                            "Include alias cards, not only canonical skills. The "
+                            "default false keeps one row per real skill."
+                        ),
+                    },
+                },
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "skills": {
+                        "type": "array",
+                        "description": "One entry per skill, sorted by slug.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "slug": {"type": "string"},
+                                "desc": {"type": "string"},
+                            },
+                            "required": ["slug", "desc"],
+                        },
+                    },
+                    "totalSkills": {"type": "integer"},
+                },
+                "required": ["skills", "totalSkills"],
+            },
+            "annotations": {
+                "title": "Skill catalog",
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
+            },
+        },
+        {
+            "name": "mcptoon_resolve_skills",
+            "title": "Resolve skills for a task",
+            "description": (
+                "Return the skills that best match a task description, best first. "
+                "Call this with the user's request before acting, then read the chosen "
+                "skill's SKILL.md. Offline BM25 ranking, no LLM."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": (
+                            "What the user wants to do, in their own words. More detail "
+                            "ranks better than a single keyword."
+                        ),
+                    },
+                    "k": {
+                        "type": "integer",
+                        "description": (
+                            "How many candidates to return. The default 5 is enough to "
+                            "pick from; larger only when the top few look wrong."
+                        ),
+                    },
+                },
+                "required": ["task"],
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "k": {"type": "integer"},
+                    "shortlist": {
+                        "type": "array",
+                        "description": "Best matches first, each with its BM25 score.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "slug": {"type": "string"},
+                                "score": {"type": "number"},
+                                "desc": {"type": "string"},
+                            },
+                            "required": ["slug", "score"],
+                        },
+                    },
+                },
+                "required": ["query", "k", "shortlist"],
+            },
+            "annotations": {
+                "title": "Resolve skills for a task",
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
+            },
+        },
     ]
 
 
@@ -284,6 +403,26 @@ def _as_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in ("1", "true", "yes", "y", "on")
     return bool(value)
+
+
+def _as_int(value: Any, default: int, minimum: int = 1) -> int:
+    """Coerce a client-supplied count, falling back rather than raising.
+
+    Agents send ``k`` as a string or a float often enough that a strict read
+    would turn a usable call into an error; a bad value is simply ignored.
+    """
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, str):
+        try:
+            value = int(value.strip())
+        except ValueError:
+            return default
+    if not isinstance(value, int) or value < minimum:
+        return default
+    return value
 
 
 def _manifest(arguments: dict, state: dict) -> dict:
@@ -432,11 +571,55 @@ def _usage(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform sign
     }
 
 
+def _skills(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform signature
+    """The skill catalog the CLI already keeps, exposed over MCP.
+
+    Read-only. Delegates the projection to :func:`skills.catalog_rows` so this
+    tool and `mcptoon skills list` can never disagree.
+    """
+    from . import skills as skills_mod
+
+    rows = skills_mod.catalog_rows(
+        skills_mod.load_index(), include_aliases=_as_bool(arguments.get("include_aliases")))
+    payload = {"skills": rows, "totalSkills": len(rows)}
+    if not rows:
+        payload["notice"] = (
+            "No skill index yet. Build one on the CLI with `mcptoon skills index`, "
+            "then call this tool again."
+        )
+    return payload
+
+
+def _resolve_skills(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform signature
+    """Best skills for a task, ranked by the same BM25 the CLI uses.
+
+    Offline and instant; records usage so `mcptoon skills list --usage` counts
+    MCP resolutions too.
+    """
+    from . import skills as skills_mod
+
+    task = _as_str(arguments.get("task"))
+    k = _as_int(arguments.get("k"), 5, minimum=1)
+    if not task:
+        return {"query": "", "k": k, "shortlist": [],
+                "notice": "Pass a non-empty `task` describing what the user wants to do."}
+    shortlist = skills_mod.resolve_shortlist(task, k)
+    payload = {"query": task, "k": k, "shortlist": shortlist}
+    if not shortlist:
+        payload["notice"] = (
+            "No skill matched. The catalog may be empty (`mcptoon skills index`) or the "
+            "wording may not match; try the user's own words, or mcptoon_skills to list."
+        )
+    return payload
+
+
 _HANDLERS = {
     "mcptoon_manifest": _manifest,
     "mcptoon_servers": _servers,
     "mcptoon_health": _health,
     "mcptoon_usage": _usage,
+    "mcptoon_skills": _skills,
+    "mcptoon_resolve_skills": _resolve_skills,
 }
 
 

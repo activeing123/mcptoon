@@ -5,6 +5,21 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The skill catalog is now reachable over MCP.** `serve` published tools and
+  `mcptoon skills` managed skills, but an agent connected to the gateway could not
+  see or resolve a skill without shelling out to the CLI. Two first-party tools close
+  that gap: `mcptoon_skills` lists the catalog (`slug` + one-line description), and
+  `mcptoon_resolve_skills` takes a task and returns the best-matching skills from the
+  same offline BM25 the CLI uses. Both are read-only and need no upstream servers, so a
+  gateway that only ever proxied tools can now answer "which skill should I load?".
+  The projection lives in `skills.catalog_rows` / `skills.resolve_shortlist`, shared by
+  the CLI and the tools, so the two surfaces cannot rank differently; `resolve` also
+  records the same usage counts, so `mcptoon skills list --usage` reflects MCP calls.
+
 ## [0.7.23] - 2026-09-24
 
 ### Fixed

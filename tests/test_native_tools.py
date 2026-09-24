@@ -456,5 +456,107 @@ class TestProtocolHygiene(unittest.TestCase):
         self.assertFalse(native_tools.is_native("alpha_health"))
 
 
+class TestSkillsTools(unittest.TestCase):
+    """mcptoon_skills / mcptoon_resolve_skills — the catalog reachable over MCP.
+
+    These exist so an agent connected to the gateway can resolve a skill without
+    a skill list in its prompt and without shelling out. The index and usage file
+    are sandboxed through the same env overrides the CLI honours.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.usage_path = base / "skills-usage.json"
+        self.index = {
+            "version": 1,
+            "roots": [str(base)],
+            "skills": [
+                {"slug": "yuyin", "name": "yuyin",
+                 "desc": "人声分离：把语音与背景音乐分开。触发词：/yuyin、人声分离",
+                 "triggers": ["人声分离", "vocal"]},
+                {"slug": "comfyui", "name": "comfyui",
+                 "desc": "ComfyUI 出图出视频。触发词：/comfyui、出图",
+                 "triggers": ["出图", "出视频"]},
+                {"slug": "sep-alias", "name": "sep-alias", "alias_of": "yuyin",
+                 "desc": "别名卡", "triggers": []},
+            ],
+        }
+        (base / "skills-index.json").write_text(
+            json.dumps(self.index, ensure_ascii=False), encoding="utf-8")
+        self._old = {k: os.environ.get(k)
+                     for k in ("MCPTOON_SKILLS_INDEX", "MCPTOON_SKILLS_USAGE")}
+        os.environ["MCPTOON_SKILLS_INDEX"] = str(base / "skills-index.json")
+        os.environ["MCPTOON_SKILLS_USAGE"] = str(self.usage_path)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        for k, v in self._old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def _call(self, name: str, arguments: dict) -> dict:
+        res = _bridge()._handle_call_tool({"name": name, "arguments": arguments})
+        self.assertFalse(res["isError"], name)
+        return res["structuredContent"]
+
+    def test_skills_lists_canonical_rows_sorted(self):
+        payload = self._call("mcptoon_skills", {})
+        self.assertEqual([r["slug"] for r in payload["skills"]], ["comfyui", "yuyin"])
+        self.assertEqual(payload["totalSkills"], 2)
+        # The trigger tail is stripped, matching `mcptoon skills list`.
+        self.assertNotIn("触发词", payload["skills"][1]["desc"])
+
+    def test_skills_hides_alias_cards_unless_asked(self):
+        self.assertEqual([r["slug"] for r in self._call("mcptoon_skills", {})["skills"]],
+                         ["comfyui", "yuyin"])
+        with_alias = self._call("mcptoon_skills", {"include_aliases": True})
+        self.assertIn("sep-alias", [r["slug"] for r in with_alias["skills"]])
+
+    def test_skills_matches_the_cli_projection(self):
+        """One projection, two surfaces: the tool must not rank or shape its own."""
+        from mcptoon import skills as skills_mod
+
+        self.assertEqual(self._call("mcptoon_skills", {})["skills"],
+                         skills_mod.catalog_rows(self.index))
+
+    def test_resolve_skills_ranks_the_task(self):
+        payload = self._call("mcptoon_resolve_skills", {"task": "人声分离"})
+        self.assertEqual(payload["shortlist"][0]["slug"], "yuyin")
+        self.assertIn("score", payload["shortlist"][0])
+
+    def test_resolve_skills_matches_the_cli_ranking(self):
+        from mcptoon import skills as skills_mod
+
+        self.assertEqual(self._call("mcptoon_resolve_skills", {"task": "人声分离"})["shortlist"],
+                         skills_mod.resolve_shortlist("人声分离", 5, index=self.index))
+
+    def test_resolve_skills_records_usage_like_the_cli(self):
+        self._call("mcptoon_resolve_skills", {"task": "人声分离"})
+        used = json.loads(self.usage_path.read_text(encoding="utf-8"))
+        self.assertGreaterEqual(used.get("yuyin", {}).get("count", 0), 1)
+
+    def test_resolve_skills_empty_task_is_graceful(self):
+        payload = self._call("mcptoon_resolve_skills", {})
+        self.assertEqual(payload["shortlist"], [])
+        self.assertIn("notice", payload)
+
+    def test_resolve_skills_bad_k_falls_back_not_raises(self):
+        for bad in ("abc", 0, -3, None, True):
+            payload = self._call("mcptoon_resolve_skills", {"task": "出图", "k": bad})
+            self.assertEqual(payload["k"], 5, bad)
+        self.assertEqual(
+            self._call("mcptoon_resolve_skills", {"task": "出图", "k": 2})["k"], 2)
+
+    def test_missing_index_is_a_result_not_a_crash(self):
+        os.environ["MCPTOON_SKILLS_INDEX"] = str(Path(self.tmp.name) / "nope.json")
+        payload = self._call("mcptoon_skills", {})
+        self.assertEqual(payload["skills"], [])
+        self.assertIn("notice", payload)
+        self.assertEqual(self._call("mcptoon_resolve_skills", {"task": "x"})["shortlist"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

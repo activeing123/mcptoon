@@ -452,6 +452,48 @@ def load_index() -> dict:
 
 
 # ═══════════════════════════════════════════════════
+# Catalog views shared by the CLI and the MCP surface
+# ═══════════════════════════════════════════════════
+#
+# `mcptoon skills list` and the `mcptoon_skills` tool must agree, and so must
+# `mcptoon skills resolve` and `mcptoon_resolve_skills`. They are separate
+# callers, so the projection lives here once rather than being re-implemented
+# per surface: two rankings that drift are how a tool loses the argument that
+# its answer is the catalog's answer.
+
+def catalog_rows(index: dict, *, include_aliases: bool = False) -> list[dict]:
+    """Canonical skill rows — ``{slug, desc}`` — sorted by slug.
+
+    Alias cards are hidden unless asked for: they are pointer stubs that would
+    otherwise compete with the skill they point at. ``desc`` is the same
+    trigger-stripped one-liner ``mcptoon skills list`` prints.
+    """
+    rows = []
+    for s in index.get("skills", []):
+        if s.get("alias_of") and not include_aliases:
+            continue
+        rows.append({"slug": s["slug"],
+                     "desc": _clean_desc(s.get("desc")).split("触发词")[0].strip()})
+    rows.sort(key=lambda r: r["slug"])
+    return rows
+
+
+def resolve_shortlist(query: str, k: int = 5, index: dict | None = None) -> list[dict]:
+    """The k best skills for ``query`` — ``[{slug, score, desc}]``, best first.
+
+    Records the same usage counts the CLI records, so ``--usage`` reflects MCP
+    calls too. ``index`` defaults to the on-disk index; an empty catalog yields
+    ``[]`` rather than raising, so a machine with no skills still answers.
+    """
+    idx = load_index() if index is None else index
+    if not idx:
+        return []
+    shortlist = _BM25(idx).search(query, k)
+    record_skill_use([c["slug"] for c in shortlist])
+    return shortlist
+
+
+# ═══════════════════════════════════════════════════
 # Retrieval (BM25, zero dependency)
 # ═══════════════════════════════════════════════════
 
@@ -1711,11 +1753,9 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         # reach for MCP servers unless asked. Declared tools come from the index
         # and cost nothing; the tool bucket is a separate, explicit budget.
         tk = _parse_k(args, "--tools-k", 0, minimum=0)
-        bm = _BM25(index)
-        shortlist = bm.search(query, k)
-        declared = bm.declared_tools(shortlist)
+        shortlist = resolve_shortlist(query, k, index=index)
+        declared = _BM25(index).declared_tools(shortlist)
         tools = tool_shortlist(query, tk) if tk > 0 else []
-        record_skill_use([c["slug"] for c in shortlist])
         if fmt == "json":
             print(json.dumps({"query": query, "k": k, "shortlist": shortlist,
                               "declared_tools": declared, "tools": tools},
