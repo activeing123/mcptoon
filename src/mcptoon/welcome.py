@@ -40,7 +40,7 @@ import shutil
 import sys
 import unicodedata
 
-__all__ = ["render", "color_enabled", "display_width"]
+__all__ = ["render", "hint", "color_enabled", "display_width"]
 
 # ─── Colour: four SGR codes, no dependency, no framework ───
 _RESET = "\x1b[0m"
@@ -316,3 +316,42 @@ def render(facts: dict, *, skills: int | None = None, lng: str = "en",
     out.append(dim(tail[1]) if paint else tail[1])
     out.append("")
     return _safe("\n".join(out), stream)
+
+
+def hint(*, lng: str = "en", stream=None) -> str:
+    """One line for a bare `mcptoon` from a returning user: present, and a next step.
+
+    The full card is once per machine; a bare `mcptoon` after that used to open
+    the help page with no sign the tool was there at all — the second half of the
+    "it installed silently" complaint. This is the smallest thing that fixes it:
+    a line naming what the tool is, what it has saved, and the one command worth
+    typing next. Not the card — a returning user does not need the pitch again,
+    and repeating it every time would be the very noise this round removes.
+
+    Figures are omitted, not guessed, when the cache has none: a hint that says
+    "0 tools" on a machine that has servers is worse than a hint without numbers.
+    """
+    from . import footer as footer_mod
+
+    zh = lng == "zh"
+    stream = stream if stream is not None else sys.stdout
+    paint = color_enabled(stream)
+    mark = _glyphs(stream)["mark"]
+
+    try:
+        facts = footer_mod.facts()
+    except Exception:
+        facts = {}
+    tools = int(facts.get("tools") or 0)
+    saved = int(facts.get("tokens_saved") or 0)
+    stats = (f" ({tools} {'个工具' if zh else 'tools'}, "
+             f"{'省' if zh else 'saved'} {saved:,} tokens)") if tools else ""
+    nxt = "mcptoon status"
+
+    if zh:
+        text = f"{mark} mcptoon 已在本机运行{stats} — 下一步：{nxt} 一屏看全部"
+    else:
+        text = f"{mark} mcptoon is running here{stats} — next: {nxt} for everything"
+    if paint:
+        text = f"{_BRAND}{text}{_RESET}"
+    return _safe(text, stream)

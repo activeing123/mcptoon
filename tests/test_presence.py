@@ -57,10 +57,18 @@ _SAMPLE_CONFIG = {
 
 
 def _run_main(argv):
-    """Run cli.main() with argv and return stdout."""
+    """Run cli.main() with argv and return stdout.
+
+    `cli.main()` re-raises the `SystemExit` a command used to leave (that is how it
+    reaches every exit path to emit the footer), so a bare `mcptoon` — which exits
+    0 after printing help — must be caught here or every such test errors.
+    """
     buf = io.StringIO()
     with patch.object(cli.sys, "argv", ["mcptoon", *argv]), contextlib.redirect_stdout(buf):
-        cli.main()
+        try:
+            cli.main()
+        except SystemExit:
+            pass
     return buf.getvalue()
 
 
@@ -174,6 +182,37 @@ class TestFirstRunWelcome(_IsolatedHome):
             out = _run_main(["list"])
         self.assertIn("首次在本机运行", out)
         self.assertIn("无常驻进程", out)
+
+    def test_bare_invocation_greets_then_still_prints_help(self):
+        """`mcptoon` with no args is how people open the tool, and it used to open
+        the help page with no sign mcptoon was installed at all — the second half
+        of "it installed silently". Now the greeting comes first and the help page
+        follows, unchanged (this is an addition, not a replacement)."""
+        out = _run_main([])
+        self.assertIn("First run on this machine", out)
+        self.assertIn("mcptoon v", out, "the help page must still follow the greeting")
+        self.assertTrue(cfg.welcome_seen())
+
+    def test_bare_invocation_hints_once_the_card_is_spent(self):
+        """A returning user does not need the pitch again. A bare `mcptoon` gets a
+        one-line hint (present + one next step), never a second full card."""
+        _run_main([])  # first run: card + help, marks seen
+        out = _run_main([])
+        self.assertNotIn("First run on this machine", out)
+        self.assertIn("mcptoon status", out, "the hint must name a next step")
+        self.assertIn("mcptoon v", out, "the help page still follows")
+
+    def test_bare_invocation_respects_the_off_setting(self):
+        cfg.set_setting("welcome", "off")
+        out = _run_main([])
+        self.assertNotIn("mcptoon is running here", out)
+        self.assertIn("mcptoon v", out, "help prints whether or not we greet")
+
+    def test_hint_omits_figures_it_does_not_have(self):
+        """A hint on a machine with no cached catalog must not claim "0 tools"."""
+        text = welcome.hint(lng="en", stream=io.StringIO())
+        self.assertIn("mcptoon is running here", text)
+        self.assertNotIn("0 tools", text, "a zero we did not measure is a false claim")
 
 
 class TestWelcomeRendering(unittest.TestCase):

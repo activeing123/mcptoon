@@ -143,10 +143,50 @@ def _maybe_welcome(command: str, fmt: str) -> None:
     cfg.mark_welcome_seen()
 
 
+def _bare_greeting() -> None:
+    """Greet on a bare `mcptoon` — the answer to "I opened it and nothing happened".
+
+    `mcptoon` with no arguments is the most natural way to open the tool, and it
+    used to print the help page with no sign mcptoon was even installed. This
+    prepends a greeting: the full once-per-machine card on a first run, a one-line
+    `welcome.hint()` afterwards, then the help page follows as before.
+
+    Best-effort throughout: the help page must still print even if the greeting
+    cannot be built, and `welcome off` silences it like every other surface.
+    """
+    try:
+        from . import config as cfg
+
+        if not cfg.welcome_enabled():
+            return
+        from . import welcome as welcome_mod
+
+        if cfg.welcome_seen():
+            print(welcome_mod.hint(lng=cfg.resolve_lang()))
+            return
+
+        from . import footer as footer_mod
+        try:
+            facts = footer_mod.facts()
+        except Exception:
+            facts = {}
+        skills_count: int | None = None
+        try:
+            from . import skills as skills_mod
+            skills_count = len(skills_mod.load_index().get("skills") or []) or None
+        except Exception:
+            skills_count = None
+        print(welcome_mod.render(facts, skills=skills_count, lng=cfg.resolve_lang()))
+        cfg.mark_welcome_seen()
+    except Exception:
+        return
+
+
 def _run(state: dict) -> None:
     args = sys.argv[1:]
 
     if not args:
+        _bare_greeting()
         _print_help()
         sys.exit(0)
 
