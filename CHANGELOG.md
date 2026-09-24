@@ -5,10 +5,17 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.23] - 2026-09-24
 
 ### Fixed
 
+- **The nix package could not build 0.7.22.** `TestInstallByName`'s three tests call
+  the real MCP Registry and Smithery APIs; the nix build sandbox has no network and no
+  CA certificates, so they failed with `CERTIFICATE_VERIFY_FAILED` / DNS errors and
+  turned `numtide/llm-agents.nix` PR #9829 red on all three platforms. The calls now
+  retry twice and skip on a network-shaped failure only (OSError/RegistryError), so the
+  suite passes offline while a genuine error still fails. 0.7.23 exists because that fix
+  landed after the v0.7.22 tag; the tag is not moved (PyPI 0.7.22 is immutable).
 - **The wheel-size sweep missed the agent-facing surfaces.** The 0.7.22 correction
   reached the READMEs, DEVELOPERS.md and two docs, but `skills/mcptoon/SKILL.md` (the
   copy published to ClawHub and read by other agents) still said 189KB, the live
@@ -18,11 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `test_footprint_claims` now covers `docs/README-details.md` and
   `skills/mcptoon/SKILL.md`, and retires every historical spelling
   (128/146/156/179/180/189/190/206/232/233KB) so none can return from an old draft.
-- **The live-registry smoke tests reddened CI at random.** `TestInstallByName`'s three
-  tests call the real MCP Registry and Smithery APIs; when the registry is slow they
-  failed on commits that never touched the network (twice on 2026-09-24, once on the
-  release commit). They now retry twice and skip on a network-shaped failure only — a
-  genuine error still fails the suite.
 
 ## [0.7.22] - 2026-09-24
 
