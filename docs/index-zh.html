@@ -30,12 +30,12 @@
   :root{
     --bg:#F7F5F0;
     --panel:#FFFFFF;
-    --ink:#0F3A57;
-    --teal:#2FB3AB;
-    --teal-wm:#1C938A;
-    --muted:#4C6478;
-    --line:rgba(15,58,87,.16);
-    --line-soft:rgba(15,58,87,.09);
+    --ink:#0F172A;
+    --teal:#6366F1;
+    --teal-wm:#4F46E5;
+    --muted:#475569;
+    --line:rgba(15,23,42,.16);
+    --line-soft:rgba(15,23,42,.09);
     --code-bg:#FFFFFF;
     --r:14px;
     --mono:Consolas,"SF Mono","Cascadia Mono",Menlo,monospace;
@@ -47,8 +47,8 @@
       --bg:#0D1117;
       --panel:#161B22;
       --ink:#E8F4F8;
-      --teal:#43C8BF;
-      --teal-wm:#43C8BF;
+      --teal:#818CF8;
+      --teal-wm:#A5B4FC;
       --muted:#9AB4BF;
       --line:rgba(232,244,248,.16);
       --line-soft:rgba(232,244,248,.08);
@@ -90,7 +90,7 @@
   .cmdline button:hover{color:var(--ink)}
   .btn{display:inline-block;text-decoration:none;font-weight:700;font-size:15px;
     padding:12px 22px;border-radius:var(--r);border:1px solid var(--line);color:var(--ink)}
-  .btn.primary{background:var(--teal);border-color:var(--teal);color:#0F3A57}
+  .btn.primary{background:var(--teal);border-color:var(--teal);color:#FFFFFF}
   .btn.ghost{background:transparent}
   section{padding:72px 0}
   h2{font-size:clamp(24px,3.4vw,34px);font-weight:800;letter-spacing:-.015em;line-height:1.2}
@@ -223,14 +223,14 @@
   /* ---------- footer ---------- */
   footer{margin-top:24px;background:#0D1117;color:#E8F4F8;position:relative;overflow:hidden}
   footer::before{content:"";position:absolute;top:0;left:0;right:0;height:8px;
-    background:linear-gradient(100deg,#43C8BF 0 50%,#0F3A57 50% 100%)}
+    background:linear-gradient(100deg,#818CF8 0 50%,#E8F4F8 50% 100%)}
   .foot-in{padding:72px 24px 56px;max-width:1080px;margin:0 auto}
   footer img.logo{height:40px;width:auto;margin-bottom:26px}
   .foot-h{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.015em;color:#E8F4F8}
-  .foot-h .t{color:#43C8BF}
+  .foot-h .t{color:#818CF8}
   .foot-cmd{margin-top:24px;max-width:560px;border-color:rgba(232,244,248,.22);background:#161B22}
   .foot-cmd code{color:#E8F4F8}
-  .foot-cmd .p{color:#43C8BF}
+  .foot-cmd .p{color:#818CF8}
   .foot-cmd button{border-left-color:rgba(232,244,248,.22);color:#9AB4BF}
   .foot-cmd button:hover{color:#E8F4F8}
   .foot-links{margin-top:30px;display:flex;gap:22px;flex-wrap:wrap;font-size:14.5px}

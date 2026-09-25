@@ -1,7 +1,10 @@
 <!-- mcp-name: io.github.activeing123/mcptoon -->
 <div align="center" markdown="1">
 
-# mcptoon
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-dark.svg">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
+</picture>
 
 **在本地装上 1,000 个技能、1,000 个 MCP 工具，也不必担心 token 上下文——统统由 mcptoon 管理。**
 

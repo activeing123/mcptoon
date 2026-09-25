@@ -1,7 +1,10 @@
 <!-- mcp-name: io.github.activeing123/mcptoon -->
 <div align="center" markdown="1">
 
-# mcptoon
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-dark.svg">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
+</picture>
 
 **Install 1,000 skills and 1,000 MCP tools locally — and don't worry about the token context. mcptoon manages it all.**
 
