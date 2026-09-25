@@ -24,6 +24,7 @@ directory crawler or a first-time user does) therefore reported an empty
 from __future__ import annotations
 
 import json
+import math
 import os
 import tempfile
 import unittest
@@ -379,6 +380,103 @@ class TestServersAndHealth(unittest.TestCase):
             "servers": {}, "tool_index": {}, "output_format": "auto",
             "initialized": False, "uptime": 0.0})
         self.assertEqual(res["structuredContent"]["status"], "starting")
+
+    def test_health_never_reports_negative_zero_uptime(self):
+        """A tiny negative elapsed time must not surface as -0.0 (issue #23).
+
+        ``round(-1e-9, 1)`` is ``-0.0``. That is legal JSON but not
+        value-preserving for a JS client: ``JSON.parse("-0.0")`` yields ``-0``,
+        which stringifies back to ``"0"``, so a client that round-trips a tool
+        result to prove it is lossless rejects the whole response.
+        """
+        res = native_tools.call_native("mcptoon_health", {}, {
+            "servers": {}, "tool_index": {}, "output_format": "auto",
+            "initialized": True, "uptime": -1e-9})
+        uptime = res["structuredContent"]["uptimeSeconds"]
+        self.assertEqual(uptime, 0.0)
+        self.assertFalse(math.copysign(1.0, uptime) < 0,
+                         "uptimeSeconds must never be negative zero")
+        self.assertNotIn("-0.0", json.dumps(res["structuredContent"]))
+
+
+class TestUpstreamEnvelopeReachesTheClient(unittest.TestCase):
+    """serve must not strip an upstream tool's structuredContent (issue #22).
+
+    A tool whose ``tools/list`` entry carries an ``outputSchema`` MUST answer
+    with matching ``structuredContent``. The bridge used ``pool.call()``, which
+    unwraps the envelope, so a strict client rejected every such result even
+    though the upstream server behaved correctly.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self._old = {k: os.environ.get(k) for k in
+                     ("MCPTOON_SETTINGS_FILE", "MCPTOON_CONFIG_FILE",
+                      "MCPTOON_CONFIG_FILE_TOML")}
+        os.environ["MCPTOON_SETTINGS_FILE"] = str(base / "settings.json")
+        os.environ["MCPTOON_CONFIG_FILE"] = str(base / "cfg.json")
+        os.environ["MCPTOON_CONFIG_FILE_TOML"] = str(base / "cfg.toml")
+        self.index = {
+            "alpha_find": {"server": "alpha", "tool": "find", "full_schema": {},
+                           "full_def": {"name": "find", "description": "Find files fast."}},
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        for k, v in self._old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_structured_content_is_preserved_for_a_schema_bearing_tool(self):
+        envelope = {
+            "content": [{"type": "text", "text": '{"rows": 7}'}],
+            "structuredContent": {"rows": 7},
+            "isError": False,
+            "resultType": "complete",
+        }
+
+        class FakePool:
+            """Mirrors the real pool: call() extracts, call_full() keeps the envelope."""
+
+            def call(self, server, tool, arguments):
+                return {"rows": 7}  # what _extract_content() reduces the envelope to
+
+            def call_full(self, server, tool, arguments):
+                return envelope
+
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
+        b._pool = FakePool()
+        res = b._handle_call_tool({"name": "alpha_find", "arguments": {}})
+        self.assertFalse(res["isError"])
+        self.assertEqual(res["structuredContent"], {"rows": 7})
+
+    def test_a_pool_without_call_full_still_works(self):
+        """A pool that only implements call() must keep working unchanged."""
+        class LegacyPool:
+            def call(self, server, tool, arguments):
+                return {"legacy": True}
+
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
+        b._pool = LegacyPool()
+        res = b._handle_call_tool({"name": "alpha_find", "arguments": {}})
+        self.assertFalse(res["isError"])
+        self.assertEqual(json.loads(res["content"][0]["text"]), {"legacy": True})
+
+    def test_a_tool_that_returns_no_structured_content_adds_none(self):
+        """Plain-text upstream results must not gain a synthetic structuredContent."""
+        class PlainPool:
+            def call_full(self, server, tool, arguments):
+                return {"content": [{"type": "text", "text": "hello"}], "isError": False}
+
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
+        b._pool = PlainPool()
+        res = b._handle_call_tool({"name": "alpha_find", "arguments": {}})
+        self.assertFalse(res["isError"])
+        self.assertNotIn("structuredContent", res)
+        self.assertIn("hello", res["content"][0]["text"])
 
 
 class TestUsageTool(unittest.TestCase):
