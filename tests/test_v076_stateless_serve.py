@@ -28,6 +28,7 @@ MCP 2026-07-28 GA server-side surface:
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -94,8 +95,15 @@ def _result(bridge, request):
 
 class TestStatelessFirst:
     def test_tools_list_without_initialize(self, bridge):
-        """A modern client skips initialize entirely."""
-        result = _result(bridge, _rpc("tools/list", _id=11))
+        """A modern client skips initialize entirely.
+
+        Pinned to `exposure=full` so the answer contains the upstream tools this
+        asserts on — the point here is that a request with no handshake still
+        resolves the real catalog, not what the listing preset happens to be.
+        Patched in memory: a test must never edit a real settings file.
+        """
+        with patch("mcptoon.serve.config.compact_exposure", return_value=False):
+            result = _result(bridge, _rpc("tools/list", _id=11))
         names = [t["name"] for t in result["tools"]]
         assert "echo_ping" in names and "echo_hello" in names
 

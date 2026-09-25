@@ -23,7 +23,25 @@ import os
 import subprocess
 import sys
 import threading
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
+
+
+@contextmanager
+def upstream_tools_listed():
+    """Run with `exposure=full`, where `tools/list` enumerates the upstream tools.
+
+    These tests measure the *index* (parallel loading, de-duplication, concurrent
+    reads) and observe it through `tools/list`. The shipped default is
+    `exposure=compact`, which deliberately withholds that enumeration — so the
+    index being invisible here is the design working, not the index breaking.
+    Pinned to the preset that does expose it, and patched rather than written
+    through `set_setting`, so a test run can never edit a real
+    `~/.mcptoon/settings.json`.
+    """
+    with patch("mcptoon.serve.config.compact_exposure", return_value=False):
+        yield
 
 
 # Add src to path
@@ -64,7 +82,8 @@ class TestParallelManifestLoading:
         bridge._initialized = True
 
         # tools/list should return 300 upstream + the gateway's own native tools
-        result = bridge._handle_list_tools({})
+        with upstream_tools_listed():
+            result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
         assert len(tools) == 300 + _NATIVE_N
         upstream = [t["name"] for t in tools if not t["name"].startswith("mcptoon_")]
@@ -88,7 +107,8 @@ class TestParallelManifestLoading:
             }
         bridge._initialized = True
 
-        result = bridge._handle_list_tools({})
+        with upstream_tools_listed():
+            result = bridge._handle_list_tools({})
         tools = result.get("tools", [])
         assert len(tools) == 5 + _NATIVE_N  # 5 upstream, no duplicates, plus ours
         names = [t["name"] for t in tools]
@@ -146,7 +166,8 @@ class TestConcurrency:
 
         results = []
         def _read():
-            results.append(len(bridge._handle_list_tools({}).get("tools", [])))
+            with upstream_tools_listed():
+                results.append(len(bridge._handle_list_tools({}).get("tools", [])))
 
         threads = [threading.Thread(target=_read) for _ in range(20)]
         for th in threads:
