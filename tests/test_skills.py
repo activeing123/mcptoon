@@ -87,12 +87,14 @@ class ScanTests(unittest.TestCase):
     def test_canonical_spelling_wins_when_both_exist(self):
         """Deterministic, not directory-order dependent.
 
-        Skipped on Windows: the two names are the same file there, so "both
-        exist" cannot be set up. The guarantee still matters on a case-sensitive
-        filesystem, where a directory really can hold both.
+        Only meaningful on a case-SENSITIVE filesystem: where the two spellings
+        resolve to one file, "both exist" cannot be set up and the assertion below
+        would be judging the wrong thing. That is NTFS *and* macOS APFS by default,
+        so the guard probes the temp dir rather than keying on `os.name` — the
+        original `os.name == "nt"` check let this run on macOS, where the second
+        write overwrote the first and the assertion failed for a reason that had
+        nothing to do with the code under test.
         """
-        if os.name == "nt":
-            self.skipTest("NTFS folds case; both spellings cannot coexist")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             d = root / "both"
@@ -103,6 +105,8 @@ class ScanTests(unittest.TestCase):
             (d / "skill.md").write_text(
                 "---\nname: both\ndescription: 别名。触发词：both\n---\n\nbody\n",
                 encoding="utf-8")
+            if len(list(d.iterdir())) < 2:
+                self.skipTest("case-insensitive filesystem; both spellings are one file")
             idx = skills.scan_roots([root])
             self.assertEqual(len(idx["skills"]), 1)
             self.assertIn("正名", idx["skills"][0]["desc"])
