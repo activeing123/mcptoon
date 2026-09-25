@@ -63,6 +63,7 @@ from . import __version__
 from . import config
 from .config import load_config, resolve_server_name
 from .client import (
+    MCPClient,
     MCPClientPool,
     MCPError,
     SUPPORTED_PROTOCOL_VERSIONS,
@@ -822,15 +823,27 @@ class MCPServerBridge:
             if not self._pool:
                 self._pool = MCPClientPool(self._servers)
 
-            # Call with timeout
+            # Call with timeout. Keep the full envelope, not just the extracted
+            # payload: a tool that advertises an outputSchema in tools/list MUST
+            # answer with matching structuredContent, or a strict client rejects
+            # the whole result (issue #22). call() would unwrap that away.
             call_timeout = _get_call_timeout()
-            result = self._call_with_timeout(self._pool, server, tool, arguments, call_timeout)
-            usage.track_call(server, tool, ok=True, payload=result)
+            envelope = self._call_with_timeout(self._pool, server, tool, arguments, call_timeout)
+
+            # Usage accounting and --format compression still run on the payload
+            # view, exactly as before — no reported number changes.
+            payload = _unwrap_envelope(envelope)
+            usage.track_call(server, tool, ok=True, payload=payload)
 
             # Compress output if format is configured
-            result = self._compress_result(result, server, tool)
+            result = _make_tool_result(self._compress_result(payload, server, tool))
 
-            return self._stamp_footer(_make_tool_result(result))
+            # Back the advertised outputSchema with data: carry the upstream's
+            # structured result through when it sent one.
+            if isinstance(envelope, dict) and envelope.get("structuredContent") is not None:
+                result["structuredContent"] = envelope["structuredContent"]
+
+            return self._stamp_footer(result)
 
         except MCPError as e:
             usage.track_call(server, tool, ok=False)
@@ -860,7 +873,7 @@ class MCPServerBridge:
             t = threading.current_thread()
             worker_thread[0] = t
             try:
-                r = pool.call(server, tool, arguments)
+                r = _call_pool_full(pool, server, tool, arguments)
                 result_container.append(r)
             except Exception as e:
                 error_container.append(e)
@@ -981,6 +994,32 @@ def _make_error_response(req_id, code: int, message: str) -> dict:
         "id": req_id,
         "error": {"code": code, "message": message},
     }
+
+
+def _call_pool_full(pool: Any, server: str, tool: str, arguments: Any) -> Any:
+    """Call a tool and return the complete MCP tools/call result envelope.
+
+    Prefers ``pool.call_full`` (keeps structuredContent, _meta, resultType,
+    isError, content). Falls back to ``pool.call`` for pools that predate it, so
+    a duck-typed or older pool keeps working.
+    """
+    call_full = getattr(pool, "call_full", None)
+    if callable(call_full):
+        return call_full(server, tool, arguments)
+    return pool.call(server, tool, arguments)
+
+
+def _unwrap_envelope(envelope: Any) -> Any:
+    """Reduce a tools/call envelope to the payload ``pool.call`` used to return.
+
+    ``pool.call`` is ``_extract_content(pool.call_full(...))`` by construction, so
+    this keeps usage accounting and --format compression seeing exactly the value
+    they saw before the envelope was preserved. Non-dict inputs pass straight
+    through (e.g. the legacy fallback pool, which already returns a payload).
+    """
+    if isinstance(envelope, dict) and ("content" in envelope or "structuredContent" in envelope):
+        return MCPClient._extract_content(envelope)
+    return envelope
 
 
 def _make_tool_result(content: Any) -> dict:

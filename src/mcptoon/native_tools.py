@@ -611,7 +611,12 @@ def _health(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform sig
         "toolsIndexed": len(index),
         "failedServers": failed,
         "outputFormat": state.get("output_format", "auto"),
-        "uptimeSeconds": round(state.get("uptime", 0.0), 1),
+        # Clamp to >= 0: right after startup the elapsed clock can be a tiny
+        # negative float, and round(-1e-9, 1) is -0.0. That is legal JSON but not
+        # value-preserving for a JS client (JSON.parse("-0.0") -> -0, which
+        # stringifies back to "0"), so a client that round-trips tool results to
+        # check they are lossless rejects the whole response (issue #23).
+        "uptimeSeconds": round(max(state.get("uptime", 0.0), 0.0), 1),
         "nativeTools": list(NATIVE_NAMES),
     }
 
