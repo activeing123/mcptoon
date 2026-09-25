@@ -40,13 +40,17 @@ import shutil
 import sys
 import unicodedata
 
-__all__ = ["render", "hint", "color_enabled", "display_width"]
+__all__ = ["render", "hint", "color_enabled", "paint", "display_width"]
 
-# ─── Colour: four SGR codes, no dependency, no framework ───
+# ─── Colour: five SGR codes, no dependency, no framework ───
 _RESET = "\x1b[0m"
 _DIM = "\x1b[2m"
 _BRAND = "\x1b[1;36m"   # bold cyan: reads as a product name, not an error
 _VALUE = "\x1b[1m"
+_WARN = "\x1b[1;31m"    # bold red: reserved for a genuine warning
+
+# Named colours, so a caller says *what* a line is and not which SGR code to use.
+_CODES = {"warn": _WARN, "brand": _BRAND, "dim": _DIM, "value": _VALUE, "reset": _RESET}
 
 _MIN_WIDTH = 52
 _MAX_WIDTH = 74
@@ -69,6 +73,20 @@ def color_enabled(stream=None) -> bool:
         return bool(stream.isatty())
     except Exception:
         return False
+
+
+def paint(text: str, color: str = "warn", stream=None) -> str:
+    """Wrap `text` in a colour, or return it untouched when colour is off.
+
+    The single choke point for colour in the CLI. A pipe, `NO_COLOR`, or a test
+    gets the plain string back, so the escape codes never reach a captured
+    transcript — the same rule `render` follows. Unknown names fall back to the
+    warning colour rather than crashing: a cosmetic helper must not be a failure
+    mode.
+    """
+    if not color_enabled(stream):
+        return text
+    return f"{_CODES.get(color, _WARN)}{text}{_RESET}"
 
 
 def _char_width(ch: str) -> int:

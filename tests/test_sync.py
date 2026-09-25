@@ -705,6 +705,105 @@ class TestTakeoverConsent:
         assert cfg.read_text() == before
 
 
+class TestQuickstartTakeoverOffer:
+    """`quickstart` stays additive, but it *offers* takeover at the one moment the
+    tradeoff is legible — and the offer is a subtraction, so it obeys Write Consent:
+    listed, confirmed once, never silent, and impossible to trigger from a pipe.
+
+    The bug this pins: alongside-mounting saves ~0 tokens (the host keeps loading
+    every upstream schema), so an install that promised savings delivered none
+    unless the user found `mcptoon sync --takeover` on their own. The offer puts
+    that choice in front of them without flipping the safe default.
+    """
+
+    _PLAN = [{"agent_id": "cursor", "agent_name": "Cursor (global)",
+              "path": "C:/x/mcp.json", "servers": ["fetch", "git"]}]
+
+    def _call(self, rest, fmt="auto", isatty=True, answer="y", plan=None,
+              env=None):
+        from mcptoon import cli
+        from mcptoon import sync as sync_mod
+        import io as _io
+        import contextlib
+        buf = _io.StringIO()
+        kwargs = {}
+        if env:
+            kwargs["new"] = env
+        with patch.dict("os.environ", kwargs.get("new", {}), clear=False), \
+             patch.object(sync_mod, "takeover_plan",
+                          return_value=self._PLAN if plan is None else plan), \
+             patch.object(cli.sys.stdin, "isatty", return_value=isatty), \
+             patch("builtins.input", return_value=answer), \
+             patch.object(cli, "_cmd_sync") as called, \
+             contextlib.redirect_stdout(buf):
+            cli._maybe_offer_takeover(rest, fmt)
+        return buf.getvalue(), called
+
+    def test_warns_in_red_and_lists_the_entries(self):
+        out, _ = self._call([])
+        assert "WARNING" in out
+        assert "not saving tokens yet" in out
+        assert "Cursor (global): fetch, git" in out          # the subtraction, listed
+
+    def test_yes_hands_off_to_takeover(self):
+        _, called = self._call([], answer="y")
+        assert called.call_args is not None
+        assert "--takeover" in called.call_args[0][0]
+        assert "--yes" in called.call_args[0][0]             # the user just answered
+
+    def test_no_keeps_the_safe_default(self):
+        out, called = self._call([], answer="n")
+        assert called.call_args is None                      # nothing applied
+        assert "Kept the safe default" in out
+
+    def test_piped_stdin_never_asks_and_never_subtracts(self):
+        out, called = self._call([], isatty=False)
+        assert called.call_args is None
+        assert "Non-interactive input" in out
+        assert "mcptoon sync --takeover" in out              # points at the manual path
+
+    def test_dry_run_is_silent(self):
+        out, called = self._call(["--dry"])
+        assert out == "" and called.call_args is None
+
+    def test_machine_format_is_silent(self):
+        out, called = self._call([], fmt="json")
+        assert out == "" and called.call_args is None
+
+    def test_no_self_is_silent(self):
+        """`--no-self` is servers-only: the user declined the gateway, so there is
+        no alongside-mount to warn about."""
+        out, called = self._call(["--no-self"])
+        assert out == "" and called.call_args is None
+
+    def test_nothing_to_remove_means_nothing_to_ask(self):
+        out, called = self._call([], plan=[])
+        assert out == "" and called.call_args is None
+
+    def test_env_var_opts_out(self):
+        out, called = self._call([], env={"MCPTOON_NO_TAKEOVER_OFFER": "1"})
+        assert out == "" and called.call_args is None
+
+    def test_warning_is_plain_text_when_captured(self):
+        """No escape codes in a transcript: the same rule `welcome.render` follows."""
+        out, _ = self._call([])
+        assert "\x1b[" not in out
+
+    def test_warning_is_red_on_a_console(self):
+        import os
+        from mcptoon import welcome as w
+        clean = {k: v for k, v in os.environ.items()
+                 if k not in ("NO_COLOR", "MCPTOON_NO_COLOR")}
+        with patch.dict(os.environ, clean, clear=True):
+            painted = w.paint("WARNING", "warn", stream=_Tty())
+        assert painted == "\x1b[1;31mWARNING\x1b[0m"
+
+
+class _Tty:
+    def isatty(self):
+        return True
+
+
 class TestWriteBackVerification:
     """A successful write is not proof the entry survived.
 

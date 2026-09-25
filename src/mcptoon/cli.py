@@ -1132,6 +1132,10 @@ def _cmd_quickstart(rest, fmt="auto"):
     print("")
     if not is_dry:
         _quickstart_celebration(tool_count, result.count)
+        # The one moment the token tradeoff is legible: the servers were just
+        # registered, the user can still say no for free, and the warning is about
+        # a number they care about. Off for --dry, machine formats and --no-self.
+        _maybe_offer_takeover(rest, fmt)
     else:
         print("Next steps (once you write the config):")
         print("  mcptoon quickstart          # write config + celebrate")
@@ -1182,6 +1186,87 @@ def _quickstart_celebration(tool_count, server_count):
         print("  Want more servers?")
         print("  mcptoon add github --stdio npx -y @modelcontextprotocol/server-github")
         print("  mcptoon add memory --stdio npx -y @modelcontextprotocol/server-memory")
+
+
+def _maybe_offer_takeover(rest, fmt):
+    """Offer to route the just-discovered servers through the gateway.
+
+    Why this exists: registering the gateway *alongside* the user's direct entries
+    (the safe default) saves almost nothing — the host still loads every upstream
+    schema, and the gateway's own copy is added on top. Measured on a 12-server /
+    96-tool machine, tiktoken cl100k_base: alongside ≈ 39,500 tokens per turn,
+    takeover ≈ 2,607. So the install that is supposed to save tokens can save
+    ~0 unless the gateway *replaces* the direct entries. Takeover does that, but
+    it is a subtraction — it removes server entries the user wrote into a host
+    config — and Write Consent (CONTEXT.md) says a subtraction is listed and
+    confirmed once, never silent. So this is an offer, not a default flip:
+    `quickstart` stays additive, and the user decides here, at the one moment the
+    tradeoff is legible.
+
+    Bounded like every other prompt in this CLI: skipped for `--dry`, machine
+    formats, `--yes`-less non-interactive stdin, an empty removal plan (nothing to
+    ask), and `--no-self` (the user asked for servers-only). The warning is red
+    when a console is attached and plain text otherwise — the same rule
+    `welcome.render` follows, so a captured transcript carries no escape codes.
+    """
+    if fmt != "auto" or "--dry" in rest or "--no-self" in rest:
+        return
+    # An explicit opt-out for scripted/CI onboarding: the offer is interactive by
+    # nature and a caller that cannot answer should not see the warning at all.
+    if os.environ.get("MCPTOON_NO_TAKEOVER_OFFER"):
+        return
+    try:
+        from .sync import takeover_plan
+        plan = takeover_plan()
+    except Exception:
+        return
+    if not plan:
+        return  # nothing mcptoon manages is registered directly — nothing to ask
+
+    from . import welcome as welcome_mod
+
+    n_servers = sum(len(row["servers"]) for row in plan)
+    n_agents = len(plan)
+
+    def _warn(text=""):
+        print(welcome_mod.paint(text, "warn") if text else "")
+
+    print("")
+    _warn("━" * 54)
+    _warn("  ⚠  WARNING — you are not saving tokens yet")
+    _warn("━" * 54)
+    print("  mcptoon just registered its gateway *alongside* your servers.")
+    print(f"  Your agents still load all {n_servers} of them directly, so the")
+    print("  compressed schema never lands — the tool list costs about the same")
+    print("  as before, plus mcptoon's own copy.")
+    print("")
+    print("  Routing them through the gateway instead removes their direct entries")
+    print(f"  from {n_agents} agent config(s) and is the mode that actually saves.")
+    print("  It is reversible: a `<config>.bak` is written first, and")
+    print("  `mcptoon off` restores the original setup.")
+    print("")
+    for row in plan:
+        print(f"    · {row['agent_name']}: {', '.join(row['servers'])}")
+    print("")
+
+    if not sys.stdin.isatty():
+        # Cannot ask, so cannot subtract (CONTEXT.md). Point at the explicit
+        # command instead of failing: the offer is a convenience, not a gate.
+        print("  (Non-interactive input — not asking.) To switch later, run:")
+        print("    mcptoon sync --takeover")
+        print("")
+        return
+    try:
+        answer = input("  Route them through the gateway now? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        answer = ""
+    if answer not in ("y", "yes"):
+        print("  Kept the safe default — your direct entries are untouched.")
+        print("  Switch any time: mcptoon sync --takeover")
+        print("")
+        return
+    print("")
+    _cmd_sync(["--takeover", "--yes"], fmt)
 
 
 def _cmd_health_check(rest, fmt):

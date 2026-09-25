@@ -102,6 +102,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scripted runs, and a declined or unanswerable prompt writes nothing. The
   additive `--self` stays silent: additions are reversible and lose nothing,
   removals are not.
+- **`quickstart` now *offers* takeover instead of quietly saving nothing.** The
+  additive default above is safe but near-worthless on a machine whose servers are
+  already registered directly — the host keeps loading every upstream schema, so the
+  install that promised savings delivers ~0. `quickstart` therefore ends onboarding
+  with a **red warning** that says so, lists exactly which direct entries it would
+  replace, and asks once: answering yes routes them through the gateway (via
+  `sync --takeover --yes`), anything else keeps the safe default. It is an offer,
+  never a default flip — the additive path is unchanged — and it obeys the same
+  consent bounds as every other prompt here: silent under `--dry`, machine formats,
+  `--no-self`, an empty removal plan, and `MCPTOON_NO_TAKEOVER_OFFER`; a
+  non-interactive stdin is never asked and is pointed at `mcptoon sync --takeover`
+  instead. The colour comes from one new choke point, `welcome.paint`, which returns
+  plain text for a pipe or `NO_COLOR`, so no escape codes reach a captured
+  transcript.
 - **The skill catalog is now reachable over MCP.** `serve` published tools and
   `mcptoon skills` managed skills, but an agent connected to the gateway could not
   see or resolve a skill without shelling out to the CLI. Two first-party tools close

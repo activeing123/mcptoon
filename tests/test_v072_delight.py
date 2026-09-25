@@ -106,9 +106,19 @@ class _A1QuickstartIntegration(unittest.TestCase):
         self.sandbox = tempfile.TemporaryDirectory()
         self.addCleanup(self.sandbox.cleanup)
         self.tmp = Path(self.sandbox.name)
+        # Sandbox BOTH roots, not just the config path. quickstart now offers
+        # takeover, and `takeover_plan()` resolves agent configs through
+        # `_home()` (USERPROFILE) *and* `_appdata()` (APPDATA) — so a test that
+        # relocates only the config file still reads — and, on a real machine,
+        # writes — the live Claude Desktop / Cline configs. An empty sandbox home
+        # means there is no plan, so the offer is silent and hermetic.
         self._env_patch = mock.patch.dict(os.environ, {
             "MCPTOON_CONFIG_FILE": str(self.tmp / "config.json"),
             "MCPTOON_CONFIG_FILE_TOML": str(self.tmp / "config.toml"),
+            "HOME": str(self.tmp),
+            "USERPROFILE": str(self.tmp),
+            "APPDATA": str(self.tmp / "AppData" / "Roaming"),
+            "LOCALAPPDATA": str(self.tmp / "AppData" / "Local"),
         })
         self._env_patch.start()
         self.addCleanup(self._env_patch.stop)
@@ -265,6 +275,59 @@ class _A1QuickstartIntegration(unittest.TestCase):
         out = buf.getvalue()
         self.assertIn("Could not sync to agents yet", out)
         self.assertIn("2 MCP servers configured", out)
+
+    def test_quickstart_offers_takeover_when_entries_are_registered_directly(self):
+        """The install path must *say* that alongside-mounting saves nothing.
+
+        With servers registered directly, quickstart keeps the additive default but
+        prints the red warning and asks — and the interactive answer is honoured.
+        """
+        fake = _FakeResult(2)
+        plan = [{"agent_id": "cursor", "agent_name": "Cursor (global)",
+                 "path": str(self.tmp / "mcp.json"), "servers": ["fetch", "git"]}]
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
+             mock.patch("mcptoon.sync.takeover_plan", return_value=plan), \
+             mock.patch.object(cli.sys.stdin, "isatty", return_value=True), \
+             mock.patch("builtins.input", return_value="y"), \
+             mock.patch.object(cli, "_cmd_sync") as handed_off, \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        out = buf.getvalue()
+        self.assertIn("WARNING", out)
+        self.assertIn("not saving tokens yet", out)
+        self.assertIn("Cursor (global): fetch, git", out)
+        self.assertEqual(handed_off.call_args[0][0], ["--takeover", "--yes"])
+
+    def test_quickstart_offer_stays_silent_without_direct_entries(self):
+        """No managed entries registered directly means nothing to warn about."""
+        fake = _FakeResult(2)
+        with mock.patch.object(disc, "auto_discover", return_value=fake), \
+             mock.patch.object(cfg, "CONFIG_FILE", self.tmp / "config.json"), \
+             mock.patch.object(cfg, "CONFIG_FILE_TOML", self.tmp / "config.toml"), \
+             mock.patch.object(cfg, "merge_servers", return_value=(2, 0, [])), \
+             mock.patch.object(cfg, "save_config"), \
+             mock.patch.object(sync_mod, "sync_to_all", return_value=[]), \
+             mock.patch("mcptoon.sync.takeover_plan", return_value=[]), \
+             mock.patch.object(cli, "_cmd_sync") as handed_off, \
+             mock.patch.object(cli.manifest_mod, "get_manifest",
+                               side_effect=RuntimeError("no servers running")):
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli._cmd_quickstart([])
+        self.assertNotIn("WARNING", buf.getvalue())
+        self.assertIsNone(handed_off.call_args)
 
     def test_quickstart_dry_has_no_celebration(self):
         fake = _FakeResult(1)
