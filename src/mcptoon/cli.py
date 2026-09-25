@@ -58,7 +58,7 @@ KNOWN_FLAGS = frozenset(
         "--self", "--pack", "--packs",
         "--slim",
         "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
-        "--version", "--version-gate", "--watch",
+        "--version", "--version-gate", "--view", "--watch",
         "--watch-mode", "--write", "--yes",
     }
 )
@@ -1007,6 +1007,17 @@ def _cmd_quickstart(rest, fmt="auto"):
                 n_skills = len(skills_mod.load_index().get("skills") or [])
                 print(f"  ✓ Skill catalog indexed: {n_skills} skill(s) routable "
                       f"via `mcptoon skills resolve`")
+            # Step 4c: give the agents mcptoon's own skill. Indexing makes the
+            # catalog answerable; this is what lets the *agent* learn what the
+            # defaults are and how to switch presets when a tool panel looks
+            # empty. Best-effort, and it only ever creates a missing entry — an
+            # existing one (a real directory, a copy, or another manager's
+            # junction) is left alone.
+            installed = skills_mod.install_self()
+            wrote = [r for r in installed if r.get("written")]
+            if wrote:
+                print(f"  ✓ mcptoon skill installed for {len(wrote)} agent(s) — "
+                      f"they can read what the defaults are")
         except Exception:
             pass
 

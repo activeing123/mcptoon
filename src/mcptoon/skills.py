@@ -172,6 +172,81 @@ def _view_roots() -> list[Path]:
 
 
 # ═══════════════════════════════════════════════════
+# mcptoon's own skill (the agent-facing explainer)
+# ═══════════════════════════════════════════════════
+
+# mcptoon ships a skill about itself, and three copies exist on purpose — each is
+# the right file for a different distribution channel. They must stay
+# byte-identical, or the channels start telling agents different things
+# (tests/test_skill_package.py pins all three, the way TestRootSkillsMirror pins
+# the frontmatter of two of them):
+#
+#   src/mcptoon/skill/SKILL.md                 packaged — what `pip install` gets,
+#                                              and what `install_self` copies out
+#   skills/mcptoon/SKILL.md                    repo root — skills.sh and other
+#                                              cross-agent readers fetch this path
+#   claude-code-plugin/skills/mcptoon/SKILL.md what the Claude Code plugin installs
+#
+# Worth more than a normal doc copy: the skill is where "what the default is, and
+# how to switch presets when the tools look like they vanished" is written down
+# (CONTEXT.md: Skill-as-Explainer). An agent that cannot read it will answer the
+# user's "my tools are gone" from guesswork.
+PACKAGED_SKILL_RELPATH = ("skill", "SKILL.md")
+
+
+def packaged_skill_path() -> Path:
+    """Where the skill lives inside the installed package."""
+    return Path(__file__).resolve().parent.joinpath(*PACKAGED_SKILL_RELPATH)
+
+
+def install_self(views: list[Path] | None = None,
+                 dry_run: bool = False) -> list[dict]:
+    """Make mcptoon's own skill visible to every agent that has a skill folder.
+
+    Why this is not `sync`: a catalog sync distributes *the user's* skills from one
+    source. This installs exactly one file — mcptoon's own — and only where an
+    agent looks. Without it a `pip install mcptoon` leaves no skill anywhere.
+    Measured 2026-09-25: every builtin pack carried ``"skills": []``, and the only
+    channel that shipped the skill was the Claude Code plugin. The user then asks
+    their agent how to use mcptoon and the agent has nothing to read.
+
+    Presence is the only thing checked. If ``<view>/mcptoon`` exists in *any* form
+    — a real directory, a copy, or a junction another manager created — it is left
+    completely alone, because "the agent can see it" is already true, and two
+    managers writing one view is how a catalog gets clobbered. Returns one row per
+    view; ``written`` is False on every skip so a caller reports real numbers.
+    """
+    source = packaged_skill_path()
+    roots = _view_roots() if views is None else list(views)
+    results: list[dict] = []
+
+    if not source.is_file():
+        return [{"view": str(v), "written": False, "skipped": False,
+                 "error": f"packaged skill missing: {source}"} for v in roots]
+
+    for view in roots:
+        target_dir = Path(view) / "mcptoon"
+        target = target_dir / "SKILL.md"
+        if target.exists():
+            results.append({"view": str(view), "path": str(target),
+                            "written": False, "skipped": True, "error": None})
+            continue
+        if dry_run:
+            results.append({"view": str(view), "path": str(target),
+                            "written": False, "skipped": False, "error": None})
+            continue
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            results.append({"view": str(view), "path": str(target),
+                            "written": True, "skipped": False, "error": None})
+        except OSError as e:
+            results.append({"view": str(view), "path": str(target),
+                            "written": False, "skipped": False, "error": str(e)})
+    return results
+
+
+# ═══════════════════════════════════════════════════
 # Scanning
 # ═══════════════════════════════════════════════════
 
@@ -1015,6 +1090,37 @@ def search_skills(query: str, limit: int = 10,
         return local, "offline"
 
 
+def _cmd_skills_install_self(args: list[str], fmt: str) -> None:
+    """`mcptoon skills install-self` — put mcptoon's own skill where agents look."""
+    dry = "--dry" in args or "--dry-run" in args
+    views = None
+    flag = _flag(args, "--view")
+    if flag:
+        views = [Path(p).expanduser() for p in flag.split(os.pathsep) if p.strip()]
+    rows = install_self(views=views, dry_run=dry)
+
+    if fmt == "json":
+        print(json.dumps({"dryRun": dry, "views": rows}, ensure_ascii=False, indent=1))
+        return
+
+    wrote = [r for r in rows if r.get("written")]
+    skipped = [r for r in rows if r.get("skipped")]
+    failed = [r for r in rows if r.get("error")]
+    for r in wrote:
+        print(f"  ✓ {r['path']}")
+    for r in failed:
+        print(f"  ! {r['view']}: {r['error']}")
+    if dry:
+        pending = [r for r in rows if not r.get("skipped") and not r.get("error")]
+        print(f"  (dry run) {len(pending)} view(s) would receive the skill")
+        return
+    print(f"  mcptoon skill: {len(wrote)} installed, {len(skipped)} already present, "
+          f"{len(failed)} failed")
+    if skipped:
+        print("  Views that already have it are never overwritten — another manager "
+              "may own that folder.")
+
+
 def _cmd_skills_search(args: list[str], fmt: str) -> None:
     query = _query_of(args)
     if not query:
@@ -1047,6 +1153,9 @@ def _skills_usage() -> str:
     return (
         "mcptoon skills — index, sync and route a skill catalog without keeping it in context\n\n"
         "  mcptoon skills index [ROOT ...]        Scan roots, build the on-disk index\n"
+        "  mcptoon skills install-self            Copy mcptoon's own skill into each agent's\n"
+        "                    [--view DIR ...]      folder (only where it is missing; never\n"
+        "                    [--dry]               overwrites one another manager owns)\n"
         "  mcptoon skills sync [SRC] [VIEW ...]   Distribute a source catalog to agent views\n"
         "                    [--copy] [--dry]      (link by default; never deletes a real dir)\n"
         "                    [--version-gate]      Block skills whose content moved but version did not\n"
@@ -1846,6 +1955,11 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
 
     if action == "manifest":
         print(MANIFEST_ENTRY)
+        return
+
+    if action in ("install-self", "install_self"):
+        # Needs no index: it ships one file, does not read the catalog.
+        _cmd_skills_install_self(args, fmt)
         return
 
     if action == "search":

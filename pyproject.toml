@@ -51,8 +51,14 @@ where = ["src"]
 # packs.json is data, not code: `mcptoon install --packs` reads it at runtime, so
 # without this the builtin skill packs vanish from the wheel and only work from a
 # source checkout. tests/test_skill_packs.py pins it.
+#
+# skill/SKILL.md is mcptoon's own skill — the file that explains the exposure
+# presets to an agent. `mcptoon skills install-self` (and `quickstart`) copies it
+# into each agent's skill folder; without it in the wheel a pip user has no skill
+# to install and the explanation never reaches the agent that needs it.
+# tests/test_skill_package.py pins it.
 [tool.setuptools.package-data]
-mcptoon = ["packs.json"]
+mcptoon = ["packs.json", "skill/SKILL.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

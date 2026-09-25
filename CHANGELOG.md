@@ -29,6 +29,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **mcptoon's own skill now ships in the wheel and installs itself.** The skill
+  that explains the exposure presets, and what to do when a tool panel looks
+  empty, existed in the repo but never reached a `pip install`: every builtin pack
+  carried `"skills": []`, `install_pack` only wrote `PROMPT.md`, and the only
+  channel that shipped it was the Claude Code plugin. `quickstart` now copies it
+  into each agent's skill folder (best-effort — never fails onboarding), and
+  `mcptoon skills install-self [--view DIR] [--dry]` repairs a machine where it is
+  missing. Presence is the only thing checked: a view that already has an
+  `mcptoon` entry is left completely alone, because another manager may own that
+  folder and two managers writing one view is how a catalog gets clobbered.
+  `tests/test_skill_package.py` pins the three distribution copies byte-identical
+  and pins `skill/SKILL.md` into `package-data`.
 - **`exposure` setting (`compact` | `full`).** `compact` is the default and the
   cheaper preset; `full` restores the previous enumeration for a host whose tool
   panel reads `tools/list`, or a model that will not ask for the manifest first.
