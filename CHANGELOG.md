@@ -5,6 +5,25 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`mcptoon serve` dropped the structured result of an upstream tool.** A tool whose
+  `tools/list` entry advertises an `outputSchema` must answer with a matching
+  `structuredContent` (MCP 2025-06-18+), but the gateway routed every call through
+  `pool.call()`, which unwraps the envelope down to the payload — so the field never
+  reached the client and strict hosts rejected the result even though the upstream
+  server behaved correctly. `serve` now keeps the complete envelope and carries
+  `structuredContent` through. Usage accounting and `--format` compression still run
+  on the payload view, so neither the reported numbers nor the compressed text
+  change; pools that predate `call_full` fall back to `call`. (issue #22)
+- **`mcptoon_health` reported `uptimeSeconds: -0.0` right after startup.** A tiny
+  negative elapsed time rounds to `-0.0`, which is legal JSON but not
+  value-preserving for a JS client — `JSON.parse("-0.0")` is `-0`, which
+  stringifies back to `"0"` — so hosts that round-trip a tool result to prove it is
+  lossless rejected the whole response. Uptime is now clamped at 0. (issue #23)
+
 ## [0.8.0] - 2026-09-25
 
 The release that makes "installed" mean "saving tokens". A mounted gateway used to
