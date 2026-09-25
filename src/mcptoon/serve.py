@@ -121,6 +121,23 @@ _INSTRUCTIONS = (
 # _meta key for server identity on results (2026-07-28 _meta world)
 _META_SERVERINFO_KEY = "io.modelcontextprotocol/serverInfo"
 
+# Rides in context ONLY while the upstream tool list is withheld
+# (setting `exposure=compact`, the default). Without it the model opens a
+# `tools/list` holding nothing but mcptoon's own tools and concludes the user's
+# MCP servers are gone — that is the failure this directive exists to prevent, and
+# it is the whole reason `compact` can be the default at all. Three short
+# sentences is deliberate: it is paid for on every turn, but it buys back roughly
+# 16,000 tokens that enumerating the upstream tools would cost. The skill
+# (`Skill-as-Explainer`) carries the long version, including how to switch back.
+_COMPACT_TOOLS_DIRECTIVE = (
+    "Your tool list here holds only mcptoon's own tools: the upstream MCP tool "
+    "definitions are deliberately withheld to save context (they would cost "
+    "thousands of tokens on every turn). They remain fully callable — call "
+    "`mcptoon_manifest` to see them by name, `mcptoon_inspect` for one tool's "
+    "parameters, then `mcptoon_call` to run it. Ask for the manifest before "
+    "concluding that a tool does not exist."
+)
+
 # CacheableResult defaults (SEP-2549) for list/read results. Env-tunable:
 # MCPTOON_LIST_TTL_MS / MCPTOON_LIST_CACHE_SCOPE.
 _LIST_TTL_DEFAULT_MS = 300_000
@@ -489,8 +506,20 @@ class MCPServerBridge:
         # honours it learns what mcptoon is without anyone editing a system
         # prompt. Kept to one sentence plus one imperative: it costs context on
         # every turn, which is the very thing this tool exists to save.
+        #
+        # The two directives are assembled separately on purpose. The savings-line
+        # duty (`_INSTRUCTIONS`) is the footer's business and goes away with
+        # `footer off`. Where the upstream tools went is NOT the footer's business:
+        # under `exposure=compact` that directive is the only thing standing between
+        # the model and "the user's MCP servers are gone". Tying it to the footer
+        # flag would silently remove the tools a second time.
+        directives = []
         if config.footer_enabled():
-            result["instructions"] = _INSTRUCTIONS
+            directives.append(_INSTRUCTIONS)
+        if config.compact_exposure():
+            directives.append(_COMPACT_TOOLS_DIRECTIVE)
+        if directives:
+            result["instructions"] = "\n\n".join(directives)
         return result
 
     def _handle_discover(self) -> dict:
@@ -627,37 +656,50 @@ class MCPServerBridge:
         }
 
     def _handle_list_tools(self, params: dict) -> dict:
-        """Return simplified tool list (ADR 0006 — layered schema return).
+        """Return the gateway's tool list.
+
+        Two exposure presets (CONTEXT.md: "Tool Exposure Preset", ADR 0012):
+
+        * ``compact`` (default) — mcptoon's own tools only. Upstream tools stay
+          reachable (`mcptoon_manifest` names them, `mcptoon_call` runs them) but
+          are not enumerated, which is what makes the gateway cost ~2.0k tokens
+          per turn instead of ~18.0k. This is the "compact manifest" ADR 0004
+          promised: "Claude Code 只看到 1 个 MCP server".
+        * ``full`` — also list every upstream tool with a simplified schema
+          (ADR 0006 layered schema). The pre-2026-09-25 behavior, kept as the
+          fallback for a host whose tool panel reads this list, or a model that
+          will not ask for the manifest.
 
         Each tool name is namespaced: {server}_{tool} (ADR 0007).
-        Schemas are simplified to fewer tokens (measured per-setup; see schema_simplifier).
         Thread-safe: reads from _tool_index under RLock.
         """
         self._ensure_initialized()
 
-        with self._tool_index_lock:
-            if not self._tool_index:
-                # No tools at all — try refreshing
-                pass
+        compact = config.compact_exposure()
 
+        with self._tool_index_lock:
             tools: list[dict] = []
-            for ns_name, info in sorted(self._tool_index.items()):
-                full_def = info.get("full_def", {})
-                simplified = simplify_tool_def(full_def)
-                simplified["name"] = ns_name  # Override with namespaced name
-                tools.append(simplified)
+            if not compact:
+                for ns_name, info in sorted(self._tool_index.items()):
+                    full_def = info.get("full_def", {})
+                    simplified = simplify_tool_def(full_def)
+                    simplified["name"] = ns_name  # Override with namespaced name
+                    tools.append(simplified)
 
             # First-party tools: published even with zero upstream servers, so a
             # gateway launched in a clean environment never reports an empty catalog
             # (a directory crawler or client that just started us would otherwise see
             # a tool-less server and have nothing to evaluate). An upstream tool that
             # happens to claim the same namespaced name wins — we skip ours.
+            # Under `compact` these are the whole list, which is exactly why the
+            # initialize directive has to say where the upstream tools went.
             for defn in native_tools.native_tools():
                 if defn["name"] in self._tool_index:
                     continue
                 tools.append(simplify_tool_def(defn))
 
-        _log(f"tools/list: returning {len(tools)} tools (simplified schemas)")
+        _log(f"tools/list: returning {len(tools)} tools "
+             f"(exposure={'compact' if compact else 'full'})")
         # SEP-2549 CacheableResult + GA resultType on list results
         result = {"tools": tools}
         result.update(_list_cache_fields())

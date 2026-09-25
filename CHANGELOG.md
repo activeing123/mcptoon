@@ -7,8 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The gateway withholds the upstream tool list by default.** `serve` used to
+  enumerate every upstream tool with a simplified schema — the cost that made a
+  mounted gateway save ~0 on this machine once the host also listed its servers
+  directly. `tools/list` now returns only mcptoon's own tools; upstream tools stay
+  fully callable (`mcptoon_manifest` names them, `mcptoon_inspect` shows one
+  schema, `mcptoon_call` runs it) but are no longer enumerated. Measured against a
+  real `mcptoon serve` handshake on a 12-server / 96-tool machine, `tiktoken
+  cl100k_base`: **18,217 → 2,138 tokens per turn (−88.3%)**. This is the "compact
+  manifest" ADR 0004 originally promised ("Claude Code 只看到 1 个 MCP server")
+  and ADR 0006's layered schemas had not delivered.
+- The handshake now explains where the tools went, in a second directive
+  independent of the savings line: `mcptoon config set footer off` no longer also
+  hides the tool-location note, since under the new default that note is the only
+  thing telling the model the user's MCP servers still exist.
+- Roll back with one command — no host config edit, no reinstall:
+  `mcptoon config set exposure full`. Both the setting's value and its default are
+  validated, so a typo fails loudly instead of persisting a mode nothing honours.
+
 ### Added
 
+- **`exposure` setting (`compact` | `full`).** `compact` is the default and the
+  cheaper preset; `full` restores the previous enumeration for a host whose tool
+  panel reads `tools/list`, or a model that will not ask for the manifest first.
+  Switching takes effect on the host's next connection.
 - **`sync --takeover`: the gateway becomes the connection, not another server.**
   `quickstart` and `sync --self` registered `mcptoon serve` *alongside* every
   upstream server, so a host that already listed its servers kept loading all of

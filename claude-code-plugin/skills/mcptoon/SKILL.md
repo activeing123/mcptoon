@@ -1,7 +1,7 @@
 ---
 name: mcptoon
 version: 1.1.0
-description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
+description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
 ---
 
 # mcptoon — MCP tool-catalog compression
@@ -70,6 +70,43 @@ cutover**, by matching it byte for byte first:
 Point mcptoon at sandbox views first with `MCPTOON_SKILLS_VIEWS` and run `--dry`
 before any real sync. Do not run two managers against one view directory: during
 a hand-over, one is the writer and the other is read-only.
+
+## Tool exposure: the default, and how to switch back
+
+When mcptoon is mounted as a gateway, it decides how much of the tool catalog it
+hands the host. **The default is `compact` — the cheapest one — and it is
+deliberate.** Know this before you tell a user something is broken:
+
+| Preset | What `tools/list` returns | Cost per turn (12 servers / 96 tools) |
+|---|---|---|
+| **`compact`** (default) | mcptoon's own tools only — **6** | **~2,138 tokens** |
+| `full` (fallback) | + every upstream tool's simplified schema (102 listed) | ~18,217 tokens |
+
+**The upstream tools are not gone under `compact`** — they are withheld from the
+*listing*, not from callability. `mcptoon_manifest` names them, `mcptoon_inspect`
+shows one schema, and `mcptoon_call` runs it. The gateway's initialize
+`instructions` say this too.
+
+### If the user says their tools disappeared
+
+1. Say plainly what happened: **the default preset withholds the tool list to save
+   ~16,000 tokens per turn; the tools still work**, and you can reach any of them
+   right now via `mcptoon_manifest` → `mcptoon_call`.
+2. Prove it on the spot — do not argue from documentation. Run
+   `mcptoon manifest` and show the user their real tool names.
+3. Offer the second preset, and name the tradeoff honestly: it lists everything
+   again (so a host's tool panel is populated, and a model that will not ask for
+   the manifest sees the tools), at ~16,000 more tokens per turn.
+
+```bash
+mcptoon config set exposure full     # second preset; takes effect on next connection
+mcptoon config set exposure compact  # back to the default
+```
+
+Do **not** edit the agent's MCP config to switch presets — it is one setting, in
+one place, and `mcptoon off` still removes the gateway entirely. If the user's
+host has an empty tool *panel* (a UI that reads `tools/list` to draw a picker),
+that is the one case where `full` is the right answer rather than a preference.
 
 ## Making mcptoon visible in a session
 

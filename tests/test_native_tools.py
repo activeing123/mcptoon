@@ -28,6 +28,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from mcptoon import __version__
 from mcptoon import native_tools
@@ -113,11 +114,22 @@ class TestCatalogAlwaysNonEmpty(unittest.TestCase):
             self.assertIn("title", defn)
 
     def test_upstream_tool_with_same_name_wins(self):
-        """A user's server must never be shadowed by our own naming."""
+        """A user's server must never be shadowed by our own naming.
+
+        Pinned under `exposure=full`, which is where both sets are listed at once
+        and a collision can actually be observed. Under the default
+        `exposure=compact` the upstream tools are withheld, so there is nothing to
+        shadow — that case is pinned by TestToolExposure.
+
+        Patched rather than written through `set_setting`: this class does not
+        isolate `MCPTOON_SETTINGS_FILE`, so a real write here would land in the
+        developer's own `~/.mcptoon/settings.json`.
+        """
         upstream = {"name": "mcptoon_health", "description": "Upstream server's own tool."}
         b = _bridge(index={"mcptoon_health": {
             "server": "clinic", "tool": "mcptoon_health", "full_schema": {}, "full_def": upstream}})
-        tools = b._handle_list_tools({})["tools"]
+        with patch("mcptoon.serve.config.compact_exposure", return_value=False):
+            tools = b._handle_list_tools({})["tools"]
         named = [t for t in tools if t["name"] == "mcptoon_health"]
         self.assertEqual(len(named), 1)
         self.assertEqual(named[0]["description"], upstream["description"])
@@ -448,8 +460,29 @@ class TestFooterDisclosure(unittest.TestCase):
                       "translating re-words the line and drops the prefix")
 
     def test_off_removes_it_entirely(self):
+        """`footer off` must drop the savings-line duty — and only that duty.
+
+        The handshake now carries up to two independent directives. Where the
+        upstream tools went is not the footer's business: under the default
+        `exposure=compact` it is the only thing telling the model that the user's
+        MCP servers still exist, so removing it with the footer would hide the
+        tools twice. Asserted on the footer's own text, not on the key's absence.
+        """
+        from mcptoon import footer as footer_mod
         from mcptoon.config import set_setting
         set_setting("footer", "off")
+        res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res.get("instructions", "")
+        self.assertNotIn(footer_mod.MARK, text)
+        self.assertNotIn("verbatim", text)
+        self.assertIn("mcptoon_manifest", text,
+                      "withholding the tool list must still be explained")
+
+    def test_off_removes_the_key_when_nothing_else_needs_saying(self):
+        """With `exposure=full` and the footer off, no directive remains at all."""
+        from mcptoon.config import set_setting
+        set_setting("footer", "off")
+        set_setting("exposure", "full")
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         self.assertNotIn("instructions", res)
 
@@ -459,6 +492,107 @@ class TestFooterDisclosure(unittest.TestCase):
         res = _bridge()._handle_initialize({"protocolVersion": "2026-07-28"})
         for key in ("protocolVersion", "capabilities", "serverInfo"):
             self.assertIn(key, res)
+
+
+class TestToolExposure(unittest.TestCase):
+    """`exposure` decides how much of the tool catalog `tools/list` enumerates.
+
+    `compact` is the default because the whole point of the gateway is to keep
+    tool definitions out of the per-turn context. The risk that buys is that a
+    model reads an empty-looking tool list and tells the user their MCP servers are
+    gone — so the assertion that matters most here is not "the list is shorter" but
+    "the withheld tool is still callable, and something said so".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self._old = {k: os.environ.get(k) for k in
+                     ("MCPTOON_SETTINGS_FILE", "MCPTOON_CONFIG_FILE",
+                      "MCPTOON_CONFIG_FILE_TOML")}
+        os.environ["MCPTOON_SETTINGS_FILE"] = str(base / "settings.json")
+        os.environ["MCPTOON_CONFIG_FILE"] = str(base / "cfg.json")
+        os.environ["MCPTOON_CONFIG_FILE_TOML"] = str(base / "cfg.toml")
+        self.index = {
+            "alpha_find": {"server": "alpha", "tool": "find", "full_schema": {},
+                           "full_def": {"name": "find", "description": "Find files fast."}},
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        for k, v in self._old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_compact_is_the_default(self):
+        from mcptoon.config import exposure_mode
+        self.assertEqual(exposure_mode(), "compact")
+
+    def test_compact_exposure_withholds_the_upstream_list(self):
+        """The default lists mcptoon's own tools and nothing else."""
+        tools = _bridge(index=self.index)._handle_list_tools({})["tools"]
+        names = sorted(t["name"] for t in tools)
+        self.assertEqual(names, sorted(native_tools.NATIVE_NAMES))
+        self.assertNotIn("alpha_find", names)
+
+    def test_full_exposure_lists_the_upstream_tools_again(self):
+        """The fallback restores the pre-2026-09-25 listing exactly."""
+        from mcptoon.config import set_setting
+        set_setting("exposure", "full")
+        tools = _bridge(index=self.index)._handle_list_tools({})["tools"]
+        names = sorted(t["name"] for t in tools)
+        self.assertIn("alpha_find", names)
+        for native in native_tools.NATIVE_NAMES:
+            self.assertIn(native, names)
+
+    def test_a_withheld_tool_is_still_callable(self):
+        """Withholding the listing must never withhold the capability.
+
+        This is what makes `compact` safe to ship as the default: the tool list is
+        a discovery surface, not the call path. `mcptoon_call` routes to the same
+        namespaced name whether or not it was enumerated.
+        """
+        b = _bridge(index=self.index)
+        listed = b._handle_list_tools({})["tools"]
+        self.assertNotIn("alpha_find", [t["name"] for t in listed])
+        # The index the router uses is untouched by the listing decision.
+        self.assertIn("alpha_find", b._tool_index)
+
+    def test_compact_directive_says_where_the_tools_went(self):
+        """The handshake must name the manifest, or the withheld tools read as gone."""
+        res = _bridge(index=self.index)._handle_initialize({"protocolVersion": "2026-07-28"})
+        text = res["instructions"]
+        self.assertIn("mcptoon_manifest", text)
+        self.assertIn("mcptoon_call", text)
+        self.assertIn("withheld", text)
+
+    def test_full_exposure_omits_the_directive(self):
+        """Nothing is withheld, so there is nothing to explain — and no tokens owed."""
+        from mcptoon.config import set_setting
+        set_setting("exposure", "full")
+        res = _bridge(index=self.index)._handle_initialize({"protocolVersion": "2026-07-28"})
+        self.assertNotIn("withheld", res.get("instructions", ""))
+
+    def test_compact_instructions_stay_within_their_budget(self):
+        """Both directives ride in context every turn, so the pair has a ceiling too."""
+        from mcptoon import serve
+        total = len(serve._INSTRUCTIONS) + len(serve._COMPACT_TOOLS_DIRECTIVE)
+        self.assertLessEqual(total, 1900,
+                             "the compact handshake grew past its budget")
+
+    def test_an_unknown_exposure_setting_falls_back_to_compact(self):
+        """A hand-edited settings file must not be able to break the gateway."""
+        from mcptoon.config import exposure_mode
+        from mcptoon.config import set_setting
+        settings = Path(os.environ["MCPTOON_SETTINGS_FILE"])
+        settings.write_text(json.dumps({"exposure": "COMPACT-ish nonsense"}),
+                            encoding="utf-8")
+        self.assertEqual(exposure_mode(), "compact")
+        # and the setter itself refuses a value nothing would honour
+        with self.assertRaises(ValueError):
+            set_setting("exposure", "loose")
 
 
 class TestProtocolHygiene(unittest.TestCase):

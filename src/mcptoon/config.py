@@ -127,12 +127,44 @@ FOOTER_STATE_FILE = Path(os.environ.get(
 # `LANG=en_US.UTF-8`. "auto" therefore means "ask the machine, in a fixed
 # order"; see `resolve_lang` for the order and for why an order — not a guess —
 # is what makes the answer stable.
-SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto"}
+SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto",
+                    "exposure": "compact"}
 
 # Languages the human-facing strings can be written in. "auto" is not a language:
 # it is the request to detect one.
 VALID_LANGS = ("auto", "zh", "en")
 DEFAULT_LANG = "en"
+
+# Tool-exposure presets — how much of the tool catalog the gateway lists in
+# `tools/list` (CONTEXT.md: "Tool Exposure Preset").
+#
+#   compact — list only mcptoon's own tools. Upstream tools are reachable
+#             (mcptoon_manifest names them, mcptoon_call runs them) but are not
+#             enumerated, which is what keeps the per-turn cost near zero.
+#   full    — also list every upstream tool with a simplified schema. This is
+#             the pre-2026-09-25 behavior and the fallback: a host whose UI
+#             reads `tools/list` to draw a tool panel shows nothing to pick from
+#             under `compact`, and a weak model may decide a tool "does not
+#             exist" instead of asking for the manifest.
+#
+# `compact` is the default because the tool exists to cut per-turn context, and
+# the fallback is one command away; see the `mcptoon` skill for when to use it.
+EXPOSURE_MODES = ("compact", "full")
+
+# Settings whose value must be one of a fixed set. Validated in `set_setting`,
+# so a typo fails loudly instead of silently persisting a value nothing honours.
+#
+# `exposure` is here and `lang` deliberately is not, because the two failures are
+# not equally bad:
+#   * a bad `lang` only affects which language one printed line speaks, and
+#     `resolve_lang` already falls through to detection — raising at write time
+#     would block a command that was going to work anyway (pinned by
+#     tests/test_lang.py::test_an_unrecognised_setting_falls_through_instead_of_raising).
+#   * a bad `exposure` silently changes what the gateway lists. Someone who types
+#     `full` and gets `compact` is told their tools are visible when they are not
+#     — a silent downgrade of exactly the kind this repo treats as a bug, so it
+#     has to fail at the keyboard instead.
+SETTING_CHOICES = {"exposure": EXPOSURE_MODES}
 
 # Windows LANGID primary-language ids worth naming. Anything unnamed falls back
 # to the locale string and then to English, so an unlisted language degrades to
@@ -368,6 +400,10 @@ def set_setting(key: str, value: str) -> None:
     if key not in SETTING_DEFAULTS:
         raise ValueError(
             f"unknown setting {key!r}; known: {', '.join(sorted(SETTING_DEFAULTS))}")
+    choices = SETTING_CHOICES.get(key)
+    if choices and value not in choices:
+        raise ValueError(
+            f"{key}={value!r} is not one of {', '.join(choices)}")
     path = _settings_file()
     current = {}
     if path.exists():
@@ -386,6 +422,22 @@ def set_setting(key: str, value: str) -> None:
 def footer_enabled() -> bool:
     """Whether the end-of-turn disclosure is on. Default: on."""
     return get_setting("footer").strip().lower() not in ("off", "0", "false", "no")
+
+
+def exposure_mode() -> str:
+    """Which tools `serve` lists: "compact" (default) or "full".
+
+    An unrecognized stored value falls back to the default rather than raising:
+    a settings file edited by hand must not be able to break the gateway, and
+    "list fewer tools" is the safe direction to fail in.
+    """
+    value = get_setting("exposure").strip().lower()
+    return value if value in EXPOSURE_MODES else EXPOSURE_MODES[0]
+
+
+def compact_exposure() -> bool:
+    """True when the gateway should withhold the upstream tool list."""
+    return exposure_mode() == "compact"
 
 
 def welcome_enabled() -> bool:
