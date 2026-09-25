@@ -6,9 +6,11 @@
 pip install mcptoon
 ```
 
-## Usage in .cursorrules
+## Usage in AGENTS.md
 
-Add `mcptoon` commands to your `.cursorrules` file:
+Add `mcptoon` commands to your `AGENTS.md` file (Cursor's current rules system
+reads `AGENTS.md` and `.cursor/rules/*.mdc`; the legacy `.cursorrules` file is no
+longer documented and may be ignored):
 
 ```
 When you need to search the web, run:

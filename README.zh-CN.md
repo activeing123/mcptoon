@@ -338,7 +338,7 @@ mcptoon 是 **CLI 工具**——是管理器，不是代理——也不是客户
 | Claude Desktop | `mcptoon sync --self` 往 `claude_desktop_config.json` 加一条 `mcptoon` 记录 |
 | Claude Code | 把 `mcptoon` 命令写进 `SKILL.md`（技能目录 `~/.claude/skills`） |
 | Codex | 写进 `AGENTS.md` |
-| Cursor | `mcptoon sync --self` 写进 Cursor 的 MCP 配置；或写进 `.cursorrules` |
+| Cursor | `mcptoon sync --self` 写进 Cursor 的 MCP 配置；或写进 `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` 写 `mcp_config.json` |
 | Cline | `mcptoon sync --self` 写 Cline 的 MCP 配置 |
 | VS Code Copilot | `mcptoon sync --self` 写 VS Code 的 MCP 配置 |

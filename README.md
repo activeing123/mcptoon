@@ -367,7 +367,7 @@ connect to MCP servers; it runs `mcptoon` commands. So the config is written onc
 | Claude Desktop | `mcptoon sync --self` adds one `mcptoon` entry to `claude_desktop_config.json` |
 | Claude Code | put the `mcptoon` command in a `SKILL.md` (skills live in `~/.claude/skills`) |
 | Codex | put it in `AGENTS.md` |
-| Cursor | `mcptoon sync --self` adds it to Cursor's MCP config; or put it in `.cursorrules` |
+| Cursor | `mcptoon sync --self` adds it to Cursor's MCP config; or put it in `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` writes `mcp_config.json` |
 | Cline | `mcptoon sync --self` writes Cline's MCP config |
 | VS Code Copilot | `mcptoon sync --self` writes VS Code's MCP config |

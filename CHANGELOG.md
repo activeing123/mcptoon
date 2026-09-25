@@ -80,6 +80,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   direct half, so the host's tool context goes **39,077 → 18,003** instead of
   growing. That is the difference between "installed" and "installed and worth
   installing".
+  Takeover is a *subtraction* — it removes server entries the user wrote into a
+  host config — so it now lists exactly what it will drop and asks once before
+  doing it. `--dry` prints the plan and stops, `--yes` skips the prompt for
+  scripted runs, and a declined or unanswerable prompt writes nothing. The
+  additive `--self` stays silent: additions are reversible and lose nothing,
+  removals are not.
 - **The skill catalog is now reachable over MCP.** `serve` published tools and
   `mcptoon skills` managed skills, but an agent connected to the gateway could not
   see or resolve a skill without shelling out to the CLI. Two first-party tools close
@@ -93,6 +99,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`skills sync` no longer mistakes an agent view for the catalog.** With no
+  source argument the command took the first default root (`~/.claude/skills` and
+  friends) as its source — but those paths are exactly where the agent *views*
+  live. On a machine whose view is a real directory rather than a link back to the
+  catalog, a sync would read the view and republish it into every view, freezing a
+  copy as if it were the truth, with nothing in the output to say so. A default
+  root now counts as a source only when it is a link to the real catalog; a plain
+  directory there is refused, and the caller is asked to name the source.
 - **21 skills were invisible to the catalog, and a deleted skill never left it.**
   Found by running the new staleness probe against this machine's real 407-skill
   catalog rather than the fixtures:
