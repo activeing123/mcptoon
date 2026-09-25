@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcptoon"
-version = "0.7.23"
+version = "0.8.0"
 description = "One hub for every AI agent: add MCP tools and skills once, and every local agent reuses them with zero config. Tool schemas 71,929 -> 581 tokens (-99.2%, measured). Zero-dependency CLI."
 readme = "README.md"
 license = {text = "Apache-2.0"}

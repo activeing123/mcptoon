@@ -5,7 +5,14 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-09-25
+
+The release that makes "installed" mean "saving tokens". A mounted gateway used to
+add itself *alongside* a host's servers and save nothing; now it withholds the
+upstream tool list by default, `sync --takeover` makes it the connection instead of
+another server, and `quickstart` offers that switch at the one moment the tradeoff
+is legible. Measured against a real `serve` handshake on a 12-server / 96-tool
+machine (tiktoken cl100k_base): **18,686 → 2,607 tokens per turn (−86.0%)**.
 
 ### Changed
 

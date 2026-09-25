@@ -3,7 +3,7 @@
   "name": "io.github.activeing123/mcptoon",
   "title": "mcptoon",
   "description": "MCP tools + agent skills in one zero-dependency CLI: 71,929 -> 581 tokens (-99.2%, measured).",
-  "version": "0.7.23",
+  "version": "0.8.0",
   "websiteUrl": "https://activeing123.github.io/mcptoon/",
   "repository": {
     "url": "https://github.com/activeing123/mcptoon",
@@ -13,7 +13,7 @@
     {
       "registryType": "pypi",
       "identifier": "mcptoon",
-      "version": "0.7.23",
+      "version": "0.8.0",
       "transport": {
         "type": "stdio"
       }
