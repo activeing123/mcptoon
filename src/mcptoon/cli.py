@@ -57,7 +57,7 @@ KNOWN_FLAGS = frozenset(
         "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
         "--self", "--pack", "--packs",
         "--slim",
-        "--stdin", "--stdio", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
+        "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
         "--version", "--version-gate", "--watch",
         "--watch-mode", "--write", "--yes",
     }
@@ -2714,6 +2714,7 @@ Usage:
     mcptoon sync --dry                    Preview without writing
     mcptoon sync --agent <id>             Sync to one agent only
     mcptoon sync --self                   Also register the mcptoon gateway itself in each agent
+    mcptoon sync --takeover               Route managed servers through the gateway (implies --self)
     mcptoon health                        Health check all MCP servers
     mcptoon health --json                 JSON output for CI/CD (exit 1 if dead)
 
@@ -2788,6 +2789,8 @@ def _cmd_sync(rest, fmt):
         mcptoon sync --agent claude-desktop
         mcptoon sync --agent windsurf
         mcptoon sync --self          # ALSO register `mcptoon serve` in each agent
+        mcptoon sync --takeover      # route managed servers through the gateway
+                                     # (removes their direct host entries; implies --self)
         mcptoon sync --no-self       # explicit servers-only (the default)
         mcptoon sync --watch         # keep syncing as configs change
         mcptoon sync --watch --interval 5 --quiet --watch-mode strict
@@ -2800,6 +2803,13 @@ def _cmd_sync(rest, fmt):
     # run would be a surprise. `--self` opts in; `quickstart` (the install path) turns
     # it on by default, and `mcptoon status` points here when the gateway is missing.
     include_self = "--self" in rest
+    # Takeover is the "the gateway *is* the connection" mode: remove each upstream
+    # server the gateway manages from the host config and reach it through mcptoon
+    # instead. Opt-in, because it edits entries the user may have written by hand —
+    # but it is the only mode that makes the compressed schema actually land.
+    takeover = "--takeover" in rest
+    if takeover:
+        include_self = True
 
     # --watch: continuous sync loop (see watch.py)
     if "--watch" in rest:
@@ -2817,17 +2827,23 @@ def _cmd_sync(rest, fmt):
             break
 
     if agent_id:
-        result = sync_to_agent(agent_id, dry_run=dry_run, include_self=include_self)
+        result = sync_to_agent(agent_id, dry_run=dry_run, include_self=include_self,
+                               takeover=takeover)
         report = format_sync_report([result], dry_run=dry_run)
     else:
-        results = sync_to_all(dry_run=dry_run, include_self=include_self)
+        results = sync_to_all(dry_run=dry_run, include_self=include_self,
+                              takeover=takeover)
         report = format_sync_report(results, dry_run=dry_run)
 
     print(report)
     if include_self and not dry_run:
         print("")
         print("  Gateway registered: agents can now see mcptoon itself (`mcptoon serve`).")
-        print("  Undo any time: mcptoon off")
+        if takeover:
+            print("  Takeover: managed servers now reach the agent through the gateway.")
+            print("  Undo any time: mcptoon off, or restore the `<config>.bak` written alongside it")
+        else:
+            print("  Undo any time: mcptoon off")
 
 
 def _cmd_health(rest, fmt):

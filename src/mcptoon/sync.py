@@ -541,21 +541,58 @@ def _write_json_safe(path: Path, data: dict) -> bool:
         return False
 
 
-def _merge_mcp_servers(existing: dict, new_servers: dict) -> dict:
+def _drop_managed_servers(section: dict, new_servers: dict) -> list[str]:
+    """Takeover helper: remove the host entries mcptoon now serves itself.
+
+    Only servers mcptoon manages (i.e. present in ``new_servers``) are dropped.
+    A host-only server mcptoon does not know about is left alone — the gateway
+    cannot serve it, so removing it would silently lose a tool the user still
+    has. Returns the names removed, so a caller can report a real count.
+    """
+    managed = set(new_servers) - {SELF_SERVER_NAME}
+    removed = [name for name in list(section) if name in managed]
+    for name in removed:
+        section.pop(name, None)
+    return removed
+
+
+def _merge_mcp_servers(existing: dict, new_servers: dict,
+                       takeover: bool = False) -> dict:
     """Merge new servers into existing config's mcpServers.
 
-    Preserves existing servers not in mcptoon, updates existing ones
-    that are in mcptoon, and adds new ones.
+    Default (``takeover=False``): preserves existing servers not in mcptoon,
+    updates existing ones that are in mcptoon, and adds new ones. The gateway,
+    when included, is added *alongside* the upstreams.
+
+    ``takeover=True`` flips the default from "add the gateway alongside the
+    upstreams" to "the gateway *is* the connection". Without it the host keeps
+    every upstream server entry it already had and simply gains one more
+    (``mcptoon``), so it still loads all the upstream tool schemas directly and
+    the gateway saves nothing — it only adds a line. With it, each server
+    mcptoon manages is removed from the host config and reached through the
+    gateway instead (only the gateway entry is written, never the upstreams
+    again), which is the only way the compressed schema actually reaches the
+    host. Servers mcptoon does not manage are left alone. The pre-change file is
+    preserved as ``<config>.bak`` by ``_write_json_safe``; that backup is the
+    undo.
     """
     result = dict(existing)
     current_servers = dict(result.get("mcpServers", {}))
-    current_servers.update(new_servers)
+    if takeover:
+        _drop_managed_servers(current_servers, new_servers)
+        # Under takeover the gateway replaces the direct entries — re-adding the
+        # managed servers here would undo the whole point. Only the gateway's own
+        # entry is written back.
+        if SELF_SERVER_NAME in new_servers:
+            current_servers[SELF_SERVER_NAME] = new_servers[SELF_SERVER_NAME]
+    else:
+        current_servers.update(new_servers)
     result["mcpServers"] = current_servers
     return result
 
 
 def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = None,
-                  include_self: bool = False) -> dict:
+                  include_self: bool = False, takeover: bool = False) -> dict:
     """Sync mcptoon config to a specific agent.
 
     Args:
@@ -564,18 +601,29 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         config: Override config (for testing). If None, loads from default.
         include_self: Also register `mcptoon serve` (the gateway's own entry) so
             the agent can see mcptoon itself, not just the servers it manages.
+        takeover: Remove the upstream server entries mcptoon manages and route
+            them through the gateway, instead of adding the gateway alongside
+            them. Without this the host keeps loading every upstream schema
+            directly and the gateway saves nothing; see `_merge_mcp_servers`.
 
     Returns:
         {
             "agent": agent_id,
             "path": str,
             "servers_synced": int,
+            "taken_over": int,   # upstream entries the gateway replaced
             "written": bool,
             "error": str | None,
         }
     """
     if config is None:
         config = load_config()
+
+    # Takeover only makes sense with the gateway present — dropping the direct
+    # entries without writing the one that replaces them would leave the host with
+    # nothing. Coupling them here means an API caller cannot ask for the footgun.
+    if takeover:
+        include_self = True
 
     mcp_servers = _build_mcp_servers_dict(config)
 
@@ -587,6 +635,7 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
             "agent": agent_id,
             "path": "",
             "servers_synced": 0,
+            "taken_over": 0,
             "written": False,
             "error": "No servers in mcptoon config. Run: mcptoon add <name> ...",
         }
@@ -594,54 +643,30 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
     if include_self:
         mcp_servers = _merge_self_entry(mcp_servers)
 
-    # Determine config file path and write logic
-    if agent_id == "claude-desktop":
-        path = _claude_desktop_path()
-        existing = _read_json_safe(path)
-        merged = _merge_mcp_servers(existing, mcp_servers)
-        if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
-        ok = _write_json_safe(path, merged)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
+    # Every JSON-config host stores servers at `mcpServers` (VS Code at
+    # `mcp.servers`) and differs only in *which file* — so one branch drives them
+    # all. `_merge_mcp_servers` already knows how to update, add, and (under
+    # takeover) drop entries; the old per-agent copies of that logic had drifted.
+    _path_fns = {
+        "claude-desktop": _claude_desktop_path,
+        "cursor": lambda: _cursor_path()[0],
+        "claude-code": _claude_code_path,
+        "cline": _cline_path,
+        "windsurf": _windsurf_path,
+    }
 
-    elif agent_id == "cursor":
-        # Write to global cursor config
-        path = _cursor_path()[0]
+    if agent_id in _path_fns:
+        path = _path_fns[agent_id]()
         existing = _read_json_safe(path)
-        merged = _merge_mcp_servers(existing, mcp_servers)
+        before = set((existing.get("mcpServers") or {}).keys())
+        merged = _merge_mcp_servers(existing, mcp_servers, takeover=takeover)
+        taken_over = len(before - set((merged.get("mcpServers") or {}).keys()))
         if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
+            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
+                    "taken_over": taken_over, "written": False, "error": None}
         ok = _write_json_safe(path, merged)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
-
-    elif agent_id == "claude-code":
-        # Claude Code's user config: a flat `mcpServers` map at the top level of
-        # `~/.claude.json`, same shape as Cursor's, so the same merge applies.
-        path = _claude_code_path()
-        existing = _read_json_safe(path)
-        merged = _merge_mcp_servers(existing, mcp_servers)
-        if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
-        ok = _write_json_safe(path, merged)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
-
-    elif agent_id == "cline":
-        path = _cline_path()
-        existing = _read_json_safe(path)
-        merged = _merge_mcp_servers(existing, mcp_servers)
-        if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
-        ok = _write_json_safe(path, merged)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
-
-    elif agent_id == "windsurf":
-        path = _windsurf_path()
-        existing = _read_json_safe(path)
-        merged = _merge_mcp_servers(existing, mcp_servers)
-        if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
-        ok = _write_json_safe(path, merged)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
+        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
+                "taken_over": taken_over, "written": ok, "error": None if ok else "Write failed"}
 
     elif agent_id == "vscode-copilot":
         path = _vscode_copilot_path()
@@ -652,13 +677,22 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         # keys and reformat comments. An existing backup is left untouched.
         mcp_section = existing.get("mcp", {})
         current_servers = dict(mcp_section.get("servers", {}))
-        current_servers.update(mcp_servers)
+        before = set(current_servers)
+        if takeover:
+            _drop_managed_servers(current_servers, mcp_servers)
+            if SELF_SERVER_NAME in mcp_servers:
+                current_servers[SELF_SERVER_NAME] = mcp_servers[SELF_SERVER_NAME]
+        else:
+            current_servers.update(mcp_servers)
+        taken_over = len(before - set(current_servers))
         mcp_section["servers"] = current_servers
         existing["mcp"] = mcp_section
         if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": False, "error": None}
+            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
+                    "taken_over": taken_over, "written": False, "error": None}
         ok = _write_json_safe(path, existing)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers), "written": ok, "error": None if ok else "Write failed"}
+        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
+                "taken_over": taken_over, "written": ok, "error": None if ok else "Write failed"}
 
     elif agent_id == "codex":
         # Codex has no MCP mount; its agent context comes from AGENTS.md. So this
@@ -674,15 +708,15 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         path = _codex_agents_path()
         if not include_self:
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "written": False, "error": None}
+                    "taken_over": 0, "written": False, "error": None}
         if dry_run:
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "written": False, "error": None}
+                    "taken_over": 0, "written": False, "error": None}
         try:
             existing_content = path.read_text(encoding="utf-8") if path.exists() else ""
             if _SKILL_POINTER_HEADING in existing_content:
                 return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                        "written": False, "error": None}  # already there; idempotent
+                        "taken_over": 0, "written": False, "error": None}  # already there; idempotent
             path.parent.mkdir(parents=True, exist_ok=True)
             # Always a blank line before the heading, so the pointer reads as its
             # own section instead of being glued to the user's last paragraph.
@@ -695,23 +729,26 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
             path.write_text(existing_content + sep + _SKILL_POINTER_BLOCK,
                             encoding="utf-8")
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "written": True, "error": None}
+                    "taken_over": 0, "written": True, "error": None}
         except OSError as e:
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "written": False, "error": str(e)}
+                    "taken_over": 0, "written": False, "error": str(e)}
 
     else:
-        return {"agent": agent_id, "path": "", "servers_synced": 0, "written": False, "error": f"Unknown agent: {agent_id}"}
+        return {"agent": agent_id, "path": "", "servers_synced": 0, "taken_over": 0,
+                "written": False, "error": f"Unknown agent: {agent_id}"}
 
 
 def sync_to_all(dry_run: bool = False, config: dict | None = None,
-                include_self: bool = False) -> list[dict]:
+                include_self: bool = False, takeover: bool = False) -> list[dict]:
     """Sync mcptoon config to all installed agents.
 
     Args:
         dry_run: If True, preview without writing
         config: Override config (for testing)
         include_self: Also register `mcptoon serve` in each agent (see sync_to_agent).
+        takeover: Route each managed server through the gateway instead of
+            leaving the host connected to it directly (see sync_to_agent).
 
     Returns:
         List of sync results, one per *config file written*.
@@ -740,7 +777,7 @@ def sync_to_all(dry_run: bool = False, config: dict | None = None,
             continue
         seen_paths.add(key)
         result = sync_to_agent(agent["id"], dry_run=dry_run, config=config,
-                               include_self=include_self)
+                               include_self=include_self, takeover=takeover)
         result["agent_name"] = agent["name"]
         result["config_exists"] = agent["exists"]
         results.append(result)
@@ -764,7 +801,12 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
         err = r.get("error", "")
 
         if count > 0:
-            lines.append(f"  {icon} {name:25s} {count:3d} servers  {path}")
+            # Under takeover the host no longer loads the upstream servers
+            # directly; naming that count is the difference between "added one
+            # more server" and "replaced N servers with the gateway".
+            taken = r.get("taken_over", 0)
+            extra = f"  (−{taken} direct, now via gateway)" if taken else ""
+            lines.append(f"  {icon} {name:25s} {count:3d} servers  {path}{extra}")
         elif err:
             lines.append(f"  ! {name:25s} skip ({err})")
         elif r.get("config_exists") is False:

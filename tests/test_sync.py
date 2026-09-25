@@ -6,6 +6,7 @@ from unittest.mock import patch
 from mcptoon.sync import (
     _mcptoon_to_agent_format,
     _build_mcp_servers_dict,
+    _merge_mcp_servers,
     sync_to_agent,
     sync_to_all,
     format_sync_report,
@@ -313,4 +314,128 @@ class TestFormatReport:
         report = format_sync_report(results, dry_run=False)
         assert "SYNC COMPLETE" in report
         assert "Cursor" in report
+        assert "2" in report
+
+
+class TestTakeover:
+    """Takeover is the difference between "add a gateway" and "the gateway is the
+    connection".
+
+    Without it the host keeps every upstream server entry and simply gains a
+    ``mcptoon`` one, so it still loads all the upstream schemas and the gateway
+    saves nothing (the gap this feature closes). Each test below pins one
+    property of the takeover path: it drops exactly the managed servers, leaves
+    unknown/host-only ones alone, reports what it removed, and is reversible via
+    the backup that the write already takes.
+    """
+
+    _CFG = {
+        "servers": {
+            "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
+            "git": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/git"]},
+        }
+    }
+
+    def test_merge_drops_managed_and_keeps_unknown(self):
+        """Only servers mcptoon manages are dropped; a host-only one survives."""
+        existing = {"mcpServers": {
+            "fetch": {"command": "old-fetch"},
+            "git": {"command": "old-git"},
+            "someone-elses": {"command": "keep-me"},
+        }}
+        new = {"fetch": {"command": "npx"}, "git": {"command": "npx"}}
+        merged = _merge_mcp_servers(existing, new, takeover=True)
+        # The gateway cannot serve a server it does not know, so it is kept …
+        assert "someone-elses" in merged["mcpServers"]
+        # … and the managed pair is gone from the direct list (not re-added).
+        assert set(merged["mcpServers"]) == {"someone-elses"}
+
+    def test_merge_takeover_writes_back_the_gateway_entry(self):
+        """With the gateway included, takeover keeps only it plus unknown servers."""
+        existing = {"mcpServers": {"fetch": {"command": "old"}}}
+        new = {"fetch": {"command": "npx"}, "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]}}
+        merged = _merge_mcp_servers(existing, new, takeover=True)
+        assert set(merged["mcpServers"]) == {"mcptoon"}
+        assert merged["mcpServers"]["mcptoon"]["args"] == ["-m", "mcptoon", "serve"]
+
+    def test_merge_without_takeover_keeps_direct_entries(self):
+        """The default stays additive — this is the pre-existing behavior, pinned."""
+        existing = {"mcpServers": {"fetch": {"command": "npx"}}}
+        merged = _merge_mcp_servers(existing, {"fetch": {"command": "npx"}}, takeover=False)
+        assert "fetch" in merged["mcpServers"]
+
+    def test_takeover_removes_direct_entries_and_adds_gateway(self, tmp_path):
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "fetch": {"command": "npx", "args": ["-y", "@mcp/fetch"]},
+            "git": {"command": "npx", "args": ["-y", "@mcp/git"]},
+            "handwritten": {"command": "mine"},
+        }}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            result = sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                                   include_self=True, takeover=True)
+        assert result["written"] is True
+        assert result["taken_over"] == 2  # fetch + git were direct, now via gateway
+        written = json.loads(cfg_path.read_text())
+        servers = written["mcpServers"]
+        assert "mcptoon" in servers                       # gateway registered
+        assert "handwritten" in servers                   # host-only kept
+        assert "fetch" not in servers and "git" not in servers  # no longer direct
+
+    def test_takeover_is_reversible_from_the_backup(self, tmp_path):
+        """The `.bak` the write takes is the undo — the original direct entries."""
+        cfg_path = tmp_path / "cursor.json"
+        original = {"mcpServers": {"fetch": {"command": "npx", "args": ["-y", "@mcp/fetch"]}}}
+        cfg_path.write_text(json.dumps(original))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+        bak = cfg_path.with_suffix(cfg_path.suffix + ".bak")
+        assert bak.exists()
+        assert json.loads(bak.read_text()) == original
+
+    def test_takeover_dry_run_writes_nothing(self, tmp_path):
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            result = sync_to_agent("cursor", dry_run=True, config=self._CFG,
+                                   include_self=True, takeover=True)
+        assert result["written"] is False
+        assert result["taken_over"] == 1
+        assert json.loads(cfg_path.read_text())["mcpServers"]["fetch"] == {"command": "npx"}
+
+    def test_takeover_implies_include_self(self, tmp_path):
+        """Asking for takeover without --self must not strip the host bare: the
+        gateway entry that replaces the direct ones is always written."""
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG, takeover=True)
+        servers = json.loads(cfg_path.read_text())["mcpServers"]
+        assert "mcptoon" in servers       # the replacement is there …
+        assert "fetch" not in servers     # … and the direct entry is gone
+
+    def test_takeover_default_off_in_sync_to_all(self, tmp_path):
+        """sync_to_all without takeover stays additive (no surprise edits)."""
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)", "config_path": str(cfg_path), "exists": True}]):
+            sync_to_all(dry_run=False, config=self._CFG, include_self=False, takeover=False)
+        servers = json.loads(cfg_path.read_text())["mcpServers"]
+        # fetch is still a *direct* entry (updated to mcptoon's definition, which
+        # is the documented default), and no gateway entry was injected.
+        assert "fetch" in servers
+        assert servers["fetch"]["args"] == ["-y", "@mcp/fetch"]
+        assert "mcptoon" not in servers
+
+    def test_report_names_the_takeover_count(self):
+        results = [
+            {"agent": "cursor", "agent_name": "Cursor (global)", "path": "/tmp/x",
+             "servers_synced": 3, "taken_over": 2, "written": True, "error": None,
+             "config_exists": True},
+        ]
+        report = format_sync_report(results, dry_run=False)
+        assert "now via gateway" in report
         assert "2" in report

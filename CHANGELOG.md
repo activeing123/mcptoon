@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`sync --takeover`: the gateway becomes the connection, not another server.**
+  `quickstart` and `sync --self` registered `mcptoon serve` *alongside* every
+  upstream server, so a host that already listed its servers kept loading all of
+  their tool schemas directly — the gateway added a line and saved nothing, which
+  is the opposite of what the tool exists for. `mcptoon sync --takeover` removes
+  each server mcptoon manages from the host config and reaches it through the
+  gateway instead (a server mcptoon does not manage is left alone, since the
+  gateway cannot serve it). Implies `--self`. The change is reversible: the
+  existing `<config>.bak` written on first change is the undo, and `mcptoon off`
+  still removes only the gateway entry. `sync --dry` and the sync report now name
+  how many direct entries were replaced (`−N direct, now via gateway`).
+
+  Measured on a real 12-server / 96-tool catalog (this repo's own dev box, same
+  tiktoken caliber `status` and `bench` use): mounting the upstreams directly
+  costs **21,074** tokens of tool schemas, and the gateway entry added on top
+  costs another **18,003** (15,955 simplified + 1,734 first-party tools + 314
+  instructions) — the same tools reaching the agent twice. Takeover drops the
+  direct half, so the host's tool context goes **39,077 → 18,003** instead of
+  growing. That is the difference between "installed" and "installed and worth
+  installing".
 - **The skill catalog is now reachable over MCP.** `serve` published tools and
   `mcptoon skills` managed skills, but an agent connected to the gateway could not
   see or resolve a skill without shelling out to the CLI. Two first-party tools close
