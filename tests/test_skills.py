@@ -833,6 +833,84 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(data["skills"], ["alpha", "beta"])
 
 
+class NoSourceGuardTests(unittest.TestCase):
+    """`skills sync` with no SRC must not treat a view folder as the source.
+
+    The default roots ARE the agent views. On a machine whose view is a real
+    directory (not a link back to the catalog), the old code silently took it as
+    the source and republished it everywhere — a view frozen as truth, with no
+    warning. `default_sync_source` now accepts a default root only when it is a
+    link to the real catalog, and refuses (asking the caller to name the source)
+    otherwise. These pin both halves and the CLI wiring.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.catalog = self.base / "catalog"
+        d = self.catalog / "alpha"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("---\nname: alpha\ndescription: d\n---\n",
+                                    encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_bare_view_directory_is_refused_as_a_source(self):
+        view = self.base / "view"
+        view.mkdir()                                   # a plain dir, not a link
+        with patch.dict(os.environ, {"MCPTOON_SKILLS_ROOTS": str(view)}):
+            source, reason = skills.default_sync_source()
+        self.assertIsNone(source)
+        self.assertIn("refusing to sync from a view", reason)
+        self.assertIn(str(view), reason)
+
+    def test_no_roots_keeps_the_original_usage_hint(self):
+        with patch.object(skills, "_default_roots", return_value=[]):
+            source, reason = skills.default_sync_source()
+        self.assertIsNone(source)
+        self.assertIn("Usage: mcptoon skills sync <source-dir>", reason)
+
+    def test_linked_view_resolves_to_the_real_catalog(self):
+        """A whole-dir junction (the normal setup) IS a valid source: its target."""
+        if os.name != "nt":
+            self.skipTest("junction creation is Windows-specific here")
+        view = self.base / "linked"
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(view), str(self.catalog)],
+                       capture_output=True, text=True, check=True)
+        with patch.dict(os.environ, {"MCPTOON_SKILLS_ROOTS": str(view)}):
+            source, reason = skills.default_sync_source()
+        self.assertEqual(reason, "")
+        self.assertEqual(source, self.catalog)
+
+    def test_cli_without_source_refuses_and_exits_nonzero(self):
+        view = self.base / "view"
+        view.mkdir()
+        err = StringIO()
+        with patch.dict(os.environ, {"MCPTOON_SKILLS_ROOTS": str(view)}), \
+             patch.object(sys, "argv", ["mcptoon", "skills", "sync"]), \
+             redirect_stdout(StringIO()), redirect_stderr(err):
+            with self.assertRaises(SystemExit):
+                cli.main()
+        self.assertIn("refusing to sync from a view", err.getvalue())
+        # The view must be untouched — a refusal is a read-only outcome.
+        self.assertEqual(list(view.iterdir()), [])
+
+    def test_cli_without_source_uses_a_linked_root(self):
+        """The linked-root path still works end to end: sync from the target."""
+        if os.name != "nt":
+            self.skipTest("junction creation is Windows-specific here")
+        linked = self.base / "linked"
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(linked), str(self.catalog)],
+                       capture_output=True, text=True, check=True)
+        dest = self.base / "dest"
+        out = run_cli(["mcptoon", "skills", "sync"],
+                      {"MCPTOON_SKILLS_ROOTS": str(linked),
+                       "MCPTOON_SKILLS_VIEWS": str(dest)})
+        self.assertIn("+1 new", out)
+        self.assertTrue(skills._is_link(dest / "alpha"))
+
+
 class CatalogManagementTests(unittest.TestCase):
     """add / remove / list --usage. Removal archives; it never deletes."""
 

@@ -696,6 +696,53 @@ def _merge_mcp_servers(existing: dict, new_servers: dict,
     return result
 
 
+def takeover_plan(agent_id: str | None = None, config: dict | None = None) -> list[dict]:
+    """Read-only preview of what `sync --takeover` would remove, per host.
+
+    Write Consent (CONTEXT.md) splits mcptoon's config edits in two: the additions
+    (writing our own entry, a pointer, a skill) may be silent, but the subtraction —
+    takeover dropping server entries the user wrote into a host config — must be
+    listed and confirmed once first. A wrong call there loses a tool for real.
+
+    This computes exactly the names `_merge_mcp_servers(..., takeover=True)` would
+    drop, without writing anything: only servers mcptoon manages (present in the
+    config) are candidates, so a host-only server the gateway cannot serve is never
+    listed. Returns one row per config file that actually has something to drop —
+    an empty list means takeover would remove nothing and there is nothing to ask.
+
+    ``agent_id`` limits the preview to one host; ``None`` walks every installed host,
+    de-duplicated on the file that would really be written (the same rule
+    ``sync_to_all`` uses, so Cursor's global/project rows do not double-count).
+    """
+    if config is None:
+        config = load_config()
+    managed = set(_build_mcp_servers_dict(config)) - {SELF_SERVER_NAME}
+    if not managed:
+        return []
+
+    hosts = ([{"id": agent_id, "name": agent_id}] if agent_id is not None
+             else detect_installed_agents())
+    plan: list[dict] = []
+    seen_paths: set[str] = set()
+    for host in hosts:
+        target = _agent_config_path(host["id"])
+        if target is None or not target.exists():
+            continue
+        try:
+            key = str(target.resolve()).lower()
+        except OSError:  # unreachable drive, malformed path
+            key = str(target).lower()
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        section = _servers_section(_read_json_safe(target), host["id"])
+        servers = sorted(name for name in section if name in managed)
+        if servers:
+            plan.append({"agent": host["id"], "agent_name": host.get("name", host["id"]),
+                         "path": str(target), "servers": servers})
+    return plan
+
+
 def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = None,
                   include_self: bool = False, takeover: bool = False) -> dict:
     """Sync mcptoon config to a specific agent.

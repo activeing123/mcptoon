@@ -2790,6 +2790,29 @@ def _cmd_demo_server(rest):
     run_demo_server(rest)
 
 
+def _print_takeover_plan(plan):
+    """Show the entries `--takeover` is about to remove, before it removes them.
+
+    This is the subtraction half of Write Consent (CONTEXT.md): additions — our own
+    entry, a pointer, a skill — may be silent, but takeover deletes server entries
+    the user wrote into a host config, so it is listed and confirmed once first.
+    Nothing has been written when this prints; it is a plan, not a result.
+    """
+    line = "─" * 54
+    print(line)
+    print("  mcptoon sync --takeover")
+    print(line)
+    print("  This will remove these server entries from your agent configs and")
+    print("  route them through the mcptoon gateway instead:")
+    for row in plan:
+        print(f"    · {row['agent_name']}: {', '.join(row['servers'])}")
+        print(f"        {row['path']}")
+    print("")
+    print("  A `<config>.bak` is written alongside each file first, so this is")
+    print("  reversible: restore the backup, or run `mcptoon off`.")
+    print(line)
+
+
 def _cmd_sync(rest, fmt):
     """Sync mcptoon config to AI agent config files.
 
@@ -2802,11 +2825,15 @@ def _cmd_sync(rest, fmt):
         mcptoon sync --self          # ALSO register `mcptoon serve` in each agent
         mcptoon sync --takeover      # route managed servers through the gateway
                                      # (removes their direct host entries; implies --self)
+                                     # lists what it will remove and asks first
+        mcptoon sync --takeover --dry # preview the removal plan, change nothing
+        mcptoon sync --takeover --yes # skip the confirmation (scripted runs)
         mcptoon sync --no-self       # explicit servers-only (the default)
         mcptoon sync --watch         # keep syncing as configs change
         mcptoon sync --watch --interval 5 --quiet --watch-mode strict
     """
-    from .sync import sync_to_all, sync_to_agent, format_sync_report
+    from .sync import (sync_to_all, sync_to_agent, format_sync_report,
+                       takeover_plan)
 
     dry_run = "--dry" in rest or "--dry-run" in rest
     # Default OFF, unlike `quickstart`: `sync` is a routine, repeatable command, and
@@ -2836,6 +2863,42 @@ def _cmd_sync(rest, fmt):
         elif a.startswith("--agent="):
             agent_id = a.split("=", 1)[1]
             break
+
+    # Takeover is the one subtraction in `sync`: it removes server entries the user
+    # wrote into a host config, so — unlike the additive `--self` — it lists what it
+    # will drop and confirms once (CONTEXT.md: Write Consent). `--dry` prints the
+    # same plan and stops; `--yes` is the explicit opt-in for scripted runs. An empty
+    # plan means there is nothing to remove, so there is nothing to ask.
+    if takeover:
+        plan = takeover_plan(agent_id)
+        if plan:
+            _print_takeover_plan(plan)
+        else:
+            print("  mcptoon sync --takeover: nothing to remove — no agent config "
+                  "carries an entry mcptoon manages.")
+        print("")
+        if dry_run:
+            print("  Dry run — nothing was removed. Re-run without --dry to apply.")
+            print("")
+            return
+        if plan and not ("--yes" in rest or "-y" in rest):
+            # Non-interactive stdin (CI, piped) cannot answer: refuse rather than
+            # remove silently. --yes is the opt-in. Same guard as `uninstall`, for
+            # the same reason: a Windows NUL stdin reports isatty() True, so the
+            # prompt below is reached and an EOF answer is simply not "yes".
+            if not sys.stdin.isatty():
+                print("  Refusing to remove entries without confirmation. Re-run with --yes.")
+                print("")
+                return
+            try:
+                answer = input("  Remove the entries above? [y/N] ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+            if answer not in ("y", "yes"):
+                print("  Cancelled — nothing was removed.")
+                print("")
+                return
+            print("")
 
     if agent_id:
         result = sync_to_agent(agent_id, dry_run=dry_run, include_self=include_self,

@@ -171,6 +171,38 @@ def _view_roots() -> list[Path]:
     ]
 
 
+def default_sync_source() -> tuple[Path | None, str]:
+    """The source `mcptoon skills sync` uses when the caller names none.
+
+    The footgun this closes: with no source argument the command used to take the
+    first *default root* (`~/.claude/skills` and friends) as its source — but those
+    paths are exactly where the agent *views* live. On a machine whose view is a
+    real directory rather than a link back to the catalog, a sync would then read
+    the view and publish it into every view, freezing a copy as if it were the
+    truth, with nothing in the output to say so.
+
+    A default root therefore counts as a source only when it is a link whose target
+    is the real catalog — which is the whole point of a view. A plain directory in a
+    view location is a view, not a source, and cannot be told apart from a
+    standalone catalog, so this refuses and makes the caller name the source.
+
+    Returns ``(source, "")`` when one is found, ``(None, reason)`` otherwise.
+    """
+    roots = _default_roots()
+    if not roots:
+        return None, "no source. Usage: mcptoon skills sync <source-dir>"
+    for root in roots:
+        if _is_link(root):
+            target = _link_target(root)
+            if target:
+                return Path(target), ""
+    named = ", ".join(str(r) for r in roots)
+    return None, (
+        f"refusing to sync from a view: {named}\n"
+        "  these are agent skill folders, not the catalog. Pass the real source:\n"
+        "    mcptoon skills sync <source-dir>   (or set MCPTOON_SKILLS_ROOTS)")
+
+
 # ═══════════════════════════════════════════════════
 # mcptoon's own skill (the agent-facing explainer)
 # ═══════════════════════════════════════════════════
@@ -1158,6 +1190,8 @@ def _skills_usage() -> str:
         "                    [--dry]               overwrites one another manager owns)\n"
         "  mcptoon skills sync [SRC] [VIEW ...]   Distribute a source catalog to agent views\n"
         "                    [--copy] [--dry]      (link by default; never deletes a real dir)\n"
+        "                                          With no SRC it uses a default root only when that\n"
+        "                                          is a link to the catalog — never a bare view.\n"
         "                    [--version-gate]      Block skills whose content moved but version did not\n"
         "                    [--derived roo|opencode|all]  Regenerate the flat .md views\n"
         "                    [--archive DIR]       Where drift/removals are parked (default <src>/../_archive)\n"
@@ -1973,12 +2007,10 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
         positional = [a for a in args if not a.startswith("-")]
         source = Path(positional[0]).expanduser() if positional else None
         if source is None:
-            roots = _default_roots()
-            if not roots:
-                print("mcptoon: no source. Usage: mcptoon skills sync <source-dir>",
-                      file=sys.stderr)
+            source, reason = default_sync_source()
+            if source is None:
+                print(f"mcptoon: {reason}", file=sys.stderr)
                 sys.exit(1)
-            source = roots[0]
         if not source.is_dir():
             print(f"mcptoon: source is not a directory: {source}", file=sys.stderr)
             sys.exit(1)

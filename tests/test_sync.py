@@ -583,3 +583,120 @@ class TestTakeover:
         report = format_sync_report(results, dry_run=False)
         assert "now via gateway" in report
         assert "2" in report
+
+
+class TestTakeoverConsent:
+    """The subtraction half of Write Consent: takeover lists what it will drop and
+    asks once before doing it.
+
+    Additions (`--self`, the pointer) may be silent; removing a server entry the
+    user wrote is not the same act. These tests pin the *plan* the CLI shows, the
+    `--dry`/`--yes`/prompt branches, and — the safety property — that a declined or
+    unanswerable prompt writes nothing.
+    """
+
+    _CFG = TestTakeover._CFG  # fetch + git, both managed
+
+    def _write_host(self, tmp_path):
+        cfg = tmp_path / "cursor.json"
+        cfg.write_text(json.dumps({"mcpServers": {
+            "fetch": {"command": "npx", "args": ["-y", "@mcp/fetch"]},
+            "git": {"command": "npx", "args": ["-y", "@mcp/git"]},
+            "handwritten": {"command": "mine"},
+        }}))
+        return cfg
+
+    def test_plan_lists_managed_servers_and_skips_host_only(self, tmp_path):
+        from mcptoon.sync import takeover_plan
+        cfg = self._write_host(tmp_path)
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]):
+            plan = takeover_plan("cursor", config=self._CFG)
+        assert len(plan) == 1
+        assert plan[0]["servers"] == ["fetch", "git"]   # managed …
+        assert "handwritten" not in plan[0]["servers"]  # … never the host's own
+        assert plan[0]["path"] == str(cfg)
+
+    def test_plan_is_empty_when_nothing_would_be_dropped(self, tmp_path):
+        from mcptoon.sync import takeover_plan
+        cfg = tmp_path / "cursor.json"
+        cfg.write_text(json.dumps({"mcpServers": {"handwritten": {"command": "mine"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]):
+            plan = takeover_plan("cursor", config=self._CFG)
+        assert plan == []
+
+    def test_plan_writes_nothing(self, tmp_path):
+        """A plan is a read. The config must be byte-identical after computing it."""
+        from mcptoon.sync import takeover_plan
+        cfg = self._write_host(tmp_path)
+        before = cfg.read_text()
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]):
+            takeover_plan("cursor", config=self._CFG)
+        assert cfg.read_text() == before
+
+    def test_cli_dry_run_prints_the_plan_and_writes_nothing(self, tmp_path, capsys):
+        from mcptoon import cli
+        from mcptoon import sync as sync_mod
+        cfg = self._write_host(tmp_path)
+        before = cfg.read_text()
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]), \
+             patch.object(sync_mod, "detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)", "config_path": str(cfg),
+                  "exists": True}]), \
+             patch.object(sync_mod, "load_config", return_value=self._CFG):
+            cli._cmd_sync(["--takeover", "--dry"], "auto")
+        out = capsys.readouterr().out
+        assert "fetch" in out and "git" in out      # the plan names them …
+        assert "Dry run" in out
+        assert cfg.read_text() == before            # … and nothing was removed
+
+    def test_cli_declined_prompt_removes_nothing(self, tmp_path, capsys):
+        """The safety property: an answer that is not yes leaves the config alone."""
+        from mcptoon import cli
+        from mcptoon import sync as sync_mod
+        cfg = self._write_host(tmp_path)
+        before = cfg.read_text()
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]), \
+             patch.object(sync_mod, "detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)", "config_path": str(cfg),
+                  "exists": True}]), \
+             patch.object(sync_mod, "load_config", return_value=self._CFG), \
+             patch.object(cli.sys.stdin, "isatty", return_value=True), \
+             patch("builtins.input", return_value="n"):
+            cli._cmd_sync(["--takeover"], "auto")
+        out = capsys.readouterr().out
+        assert "Cancelled" in out
+        assert cfg.read_text() == before
+
+    def test_cli_yes_flag_skips_the_prompt(self, tmp_path, capsys):
+        """--yes is the scripted path: it applies without an interactive answer."""
+        from mcptoon import cli
+        from mcptoon import sync as sync_mod
+        cfg = self._write_host(tmp_path)
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]), \
+             patch.object(sync_mod, "detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)", "config_path": str(cfg),
+                  "exists": True}]), \
+             patch.object(sync_mod, "load_config", return_value=self._CFG), \
+             patch.object(cli.sys.stdin, "isatty", return_value=False):
+            cli._cmd_sync(["--takeover", "--yes"], "auto")
+        servers = json.loads(cfg.read_text())["mcpServers"]
+        assert "mcptoon" in servers                    # gateway is the connection now
+        assert "fetch" not in servers and "git" not in servers
+        assert "handwritten" in servers                # host-only entry survives
+
+    def test_cli_non_interactive_stdin_refuses_without_yes(self, tmp_path, capsys):
+        """Piped/CI stdin cannot answer, so takeover refuses rather than removing."""
+        from mcptoon import cli
+        from mcptoon import sync as sync_mod
+        cfg = self._write_host(tmp_path)
+        before = cfg.read_text()
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg]), \
+             patch.object(sync_mod, "detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)", "config_path": str(cfg),
+                  "exists": True}]), \
+             patch.object(sync_mod, "load_config", return_value=self._CFG), \
+             patch.object(cli.sys.stdin, "isatty", return_value=False):
+            cli._cmd_sync(["--takeover"], "auto")
+        out = capsys.readouterr().out
+        assert "Refusing" in out
+        assert cfg.read_text() == before
