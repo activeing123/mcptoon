@@ -38,6 +38,7 @@ from unittest.mock import patch
 
 from mcptoon import cli
 from mcptoon import config as cfg
+from mcptoon import skills as skills_mod
 from mcptoon import sync as sync_mod
 from mcptoon import welcome
 from mcptoon.sync import (
@@ -54,6 +55,14 @@ _SAMPLE_CONFIG = {
         "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
     }
 }
+
+
+def _write_pkg_skill(home, text):
+    """A stand-in "next release" of the packaged skill, written under ``home``."""
+    path = home / "pkg" / "mcptoon" / "SKILL.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 def _run_main(argv):
@@ -260,6 +269,46 @@ class TestFirstRunSelfHeal(_IsolatedHome):
         second = self._run(["list"])
         self.assertNotIn("mcptoon skill installed", second,
                          "the self-heal must not repeat on every command")
+
+    def test_a_new_skill_fingerprint_heals_again(self):
+        """The marker names the skill version, so an upgrade is not a no-op.
+
+        A plain "done" flag would suppress the refresh after the first release, and
+        the agent would keep reading the previous release's explanation of the
+        defaults. Simulate the upgrade by changing the packaged skill's content —
+        the next command must notice and refresh the view.
+        """
+        self._run(["list"])
+        view = self.home / "views" / "mcptoon" / "SKILL.md"
+        self.assertTrue(view.is_file())
+        first = view.read_bytes()
+
+        # A newer release: same `name`, different bytes.
+        new_text = ("---\nname: mcptoon\ndescription: the new release\n---\n\nnew body\n")
+        with patch.object(skills_mod, "packaged_skill_path",
+                          lambda: _write_pkg_skill(self.home, new_text)):
+            second = self._run(["list"])
+
+        self.assertNotEqual(view.read_bytes(), first)
+        self.assertEqual(view.read_text(encoding="utf-8"), new_text)
+        self.assertIn("mcptoon skill updated", second)
+
+    def test_an_unchanged_skill_does_not_heal_again(self):
+        """Same release, second command: the fingerprint matches, so nothing runs."""
+        self._run(["list"])
+        again = self._run(["list"])
+        self.assertNotIn("mcptoon skill", again)
+
+    def test_a_marker_from_an_older_version_heals_once_more(self):
+        """A marker written before fingerprints existed means "unknown version".
+
+        The safe reading is *not* done: heal once more, refresh the view, and write
+        a fingerprinted marker. The lenient form (no fingerprint asked about) still
+        treats any marker as done, which is what "has this ever run" callers want.
+        """
+        (self.home / ".selfheal").write_text("", encoding="utf-8")
+        self.assertFalse(cfg.selfheal_done("a-fingerprint"))
+        self.assertTrue(cfg.selfheal_done())
 
     def test_it_never_overwrites_a_view_another_manager_owns(self):
         existing = self.home / "views" / "mcptoon"

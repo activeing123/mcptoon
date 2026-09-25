@@ -200,13 +200,14 @@ def _first_run_self_heal() -> None:
     the agent-visible skill the docs promise ("pip install, then just use it").
 
     Why this is allowed to write where a normal command is read-only: it is an
-    *addition* — copy one file into a folder that lacks it, build an index if none
-    exists — and additions are the silent, reversible half of the write-consent
-    rule (CONTEXT.md). It never overwrites: `install_self` leaves any existing
-    `<view>/mcptoon` alone (another manager may own it), and `ensure_index` leaves
-    a current index alone. Bounded exactly like the welcome: once per machine, off
-    for pipes and machine formats, never inside `serve`. Best-effort throughout —
-    a read-only home must not turn a normal command into a crash.
+    *addition* — copy one file into a folder that lacks it, refresh our own stale
+    copy, build an index if none exists — and additions are the silent, reversible
+    half of the write-consent rule (CONTEXT.md). It only ever writes *our* file: a
+    `<view>/mcptoon` that declares a different `name` (another manager's skill, or
+    a user's) is left alone, and `ensure_index` leaves a current index alone.
+    Bounded exactly like the welcome: once per machine, off for pipes and machine
+    formats, never inside `serve`. Best-effort throughout — a read-only home must
+    not turn a normal command into a crash.
     """
     try:
         if os.environ.get("MCPTOON_SKIP_SELF_HEAL"):
@@ -223,20 +224,31 @@ def _first_run_self_heal() -> None:
         # welcome is turned off, and the welcome must still show on a machine where
         # the self-heal already ran. Cleared by `uninstall`, so a clean reinstall
         # self-heals again — right, since the skill views may have been cleaned too.
-        if cfg.selfheal_done():
-            return
+        # The marker carries the skill's fingerprint, so a release that ships a new
+        # skill heals once more (the views hold a stale copy); otherwise an upgrade
+        # would be a no-op and the agent would keep reading the old explanation.
         from . import skills as skills_mod
 
-        wrote = [r for r in skills_mod.install_self() if r.get("written")]
-        if wrote:
-            print(f"  ✓ mcptoon skill installed for {len(wrote)} agent(s) — "
+        fingerprint = skills_mod.self_fingerprint()
+        if cfg.selfheal_done(fingerprint):
+            return
+
+        rows = skills_mod.install_self()
+        wrote = [r for r in rows if r.get("written")]
+        refreshed = [r for r in wrote if r.get("updated")]
+        fresh = len(wrote) - len(refreshed)
+        if fresh:
+            print(f"  ✓ mcptoon skill installed for {fresh} agent(s) — "
                   f"they can read what the defaults are")
+        if refreshed:
+            print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent(s) — "
+                  f"they now read the current defaults")
         if skills_mod.ensure_index():
             n = len(skills_mod.load_index().get("skills") or [])
             if n:
                 print(f"  ✓ Skill catalog indexed: {n} skill(s) routable "
                       f"via `mcptoon skills resolve`")
-        cfg.mark_selfheal_done()
+        cfg.mark_selfheal_done(fingerprint)
     except Exception:
         return
 
@@ -1074,14 +1086,28 @@ def _cmd_quickstart(rest, fmt="auto"):
             # Step 4c: give the agents mcptoon's own skill. Indexing makes the
             # catalog answerable; this is what lets the *agent* learn what the
             # defaults are and how to switch presets when a tool panel looks
-            # empty. Best-effort, and it only ever creates a missing entry — an
-            # existing one (a real directory, a copy, or another manager's
-            # junction) is left alone.
+            # empty. Best-effort, and it only ever writes our own file — a missing
+            # entry is created, and our own stale copy is refreshed; an entry that
+            # declares a different `name` (another manager's, or a user's) is left
+            # alone.
             installed = skills_mod.install_self()
             wrote = [r for r in installed if r.get("written")]
-            if wrote:
-                print(f"  ✓ mcptoon skill installed for {len(wrote)} agent(s) — "
+            refreshed = [r for r in wrote if r.get("updated")]
+            fresh = len(wrote) - len(refreshed)
+            if fresh:
+                print(f"  ✓ mcptoon skill installed for {fresh} agent(s) — "
                       f"they can read what the defaults are")
+            if refreshed:
+                print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent(s) — "
+                      f"they now read the current defaults")
+            # Record the same marker the first-run self-heal uses, so onboarding
+            # does not leave a machine that heals all over again on the next
+            # command. Best-effort like the rest of this block.
+            try:
+                from . import config as _cfg
+                _cfg.mark_selfheal_done(skills_mod.self_fingerprint())
+            except Exception:
+                pass
         except Exception:
             pass
 

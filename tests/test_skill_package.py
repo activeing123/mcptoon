@@ -103,12 +103,13 @@ class TestInstallSelf:
         for v in views:
             assert (v / "mcptoon" / "SKILL.md").is_file()
 
-    def test_never_overwrites_a_view_that_already_has_it(self, tmp_path):
-        """Another manager may own that folder — presence means done.
+    def test_never_overwrites_a_skill_that_is_not_ours(self, tmp_path):
+        """Another manager may own that folder — a foreign skill stays put.
 
         The realistic case: tongbu-skills junctions `<view>/mcptoon` at a source
-        directory. Writing through it would edit a file mcptoon does not own, and
-        this machine's own skill views are exactly that shape.
+        directory. A file with no `name: mcptoon` frontmatter is not ours to edit,
+        so it is left byte-for-byte alone. (Our *own* stale copy is a different
+        case — see TestInstallSelfRefreshesOurOwnCopy.)
         """
         view = self._view(tmp_path)
         existing = view / "mcptoon"
@@ -153,6 +154,66 @@ class TestInstallSelf:
     def test_json_report_is_serializable(self, tmp_path):
         view = self._view(tmp_path)
         json.dumps(skills.install_self(views=[view]))
+
+
+class TestInstallSelfRefreshesOurOwnCopy:
+    """An upgrade must reach a user who already has the skill.
+
+    Presence was the original test, and it is right for *someone else's* folder —
+    but wrong for our own file. A user who installed an older release keeps that
+    copy forever, so a newer explanation (a new default, a new tool, a new preset)
+    never reaches the agent that needs it. The refresh is keyed on the frontmatter
+    `name`: only a file that declares `name: mcptoon` is ours to update.
+    """
+
+    def _view_with(self, tmp_path, body):
+        view = tmp_path / "skills"
+        (view / "mcptoon").mkdir(parents=True)
+        (view / "mcptoon" / "SKILL.md").write_text(body, encoding="utf-8")
+        return view
+
+    def test_our_stale_copy_is_refreshed(self, tmp_path):
+        stale = ("---\nname: mcptoon\ndescription: an old copy\n---\n\nold body\n")
+        view = self._view_with(tmp_path, stale)
+        rows = skills.install_self(views=[view])
+        assert rows[0]["written"] is True
+        assert rows[0]["updated"] is True
+        assert (view / "mcptoon" / "SKILL.md").read_bytes() == \
+            skills.packaged_skill_path().read_bytes()
+
+    def test_a_current_copy_is_left_alone(self, tmp_path):
+        view = tmp_path / "skills"
+        (view / "mcptoon").mkdir(parents=True)
+        (view / "mcptoon" / "SKILL.md").write_bytes(
+            skills.packaged_skill_path().read_bytes())
+        rows = skills.install_self(views=[view])
+        assert rows[0]["written"] is False
+        assert rows[0]["skipped"] is True
+        assert rows[0]["updated"] is False
+
+    def test_someone_elses_named_skill_is_never_touched(self, tmp_path):
+        """A different `name` is a different skill, even in a `mcptoon` folder."""
+        other = "---\nname: not-mcptoon\ndescription: someone else\n---\n\nbody\n"
+        view = self._view_with(tmp_path, other)
+        rows = skills.install_self(views=[view])
+        assert rows[0]["written"] is False
+        assert rows[0]["skipped"] is True
+        assert (view / "mcptoon" / "SKILL.md").read_text(encoding="utf-8") == other
+
+    def test_a_dry_run_reports_a_refresh_but_writes_nothing(self, tmp_path):
+        stale = "---\nname: mcptoon\ndescription: old\n---\n\nold\n"
+        view = self._view_with(tmp_path, stale)
+        rows = skills.install_self(views=[view], dry_run=True)
+        assert rows[0]["updated"] is True
+        assert rows[0]["written"] is False
+        assert (view / "mcptoon" / "SKILL.md").read_text(encoding="utf-8") == stale
+
+    def test_an_unreadable_existing_file_is_left_alone(self, tmp_path):
+        """No name read back means "not ours" — the safe direction."""
+        view = self._view_with(tmp_path, "")  # empty: parses to no name
+        rows = skills.install_self(views=[view])
+        assert rows[0]["written"] is False
+        assert rows[0]["skipped"] is True
 
 
 class TestExposureSettingRoundTrip:

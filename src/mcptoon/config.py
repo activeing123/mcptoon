@@ -478,13 +478,35 @@ def mark_welcome_seen() -> None:
         pass
 
 
-def selfheal_done() -> bool:
-    """True once the first-run self-heal has run (marker file exists)."""
-    return _selfheal_file().exists()
+def selfheal_done(fingerprint: str = "") -> bool:
+    """True when the first-run self-heal has nothing left to do on this machine.
+
+    The marker records the fingerprint of the skill that was installed, not merely
+    that *a* self-heal ran. That distinction is the whole point: a plain "done" flag
+    would make an upgrade a no-op — the marker from the previous release would
+    suppress the refresh, and the agent would keep reading an outdated explanation
+    of the defaults forever. So a marker whose fingerprint no longer matches the
+    packaged skill reads as *not* done, and the next command heals again.
+
+    ``fingerprint=""`` keeps the lenient form (any marker counts as done), which is
+    what callers that only need "has this ever run" want.
+    """
+    try:
+        path = _selfheal_file()
+        if not path.exists():
+            return False
+        if not fingerprint:
+            return True
+        return path.read_text(encoding="utf-8").strip() == fingerprint
+    except OSError:
+        # An unreadable marker must not crash a normal command. Assume done: the
+        # cost of being wrong is one skipped refresh, versus re-healing on every
+        # single run if we assumed the opposite.
+        return True
 
 
-def mark_selfheal_done() -> None:
-    """Record that the first-run self-heal ran, so it never runs again.
+def mark_selfheal_done(fingerprint: str = "") -> None:
+    """Record that the first-run self-heal ran, and for which skill.
 
     Best-effort for the same reason `mark_welcome_seen` is: a read-only home must
     not turn a normal command into a crash, and the worst case (the self-heal
@@ -493,7 +515,7 @@ def mark_selfheal_done() -> None:
     try:
         path = _selfheal_file()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("", encoding="utf-8")
+        path.write_text(fingerprint, encoding="utf-8")
     except OSError:
         pass
 

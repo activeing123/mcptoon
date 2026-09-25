@@ -51,9 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   channel that shipped it was the Claude Code plugin. `quickstart` now copies it
   into each agent's skill folder (best-effort — never fails onboarding), and
   `mcptoon skills install-self [--view DIR] [--dry]` repairs a machine where it is
-  missing. Presence is the only thing checked: a view that already has an
-  `mcptoon` entry is left completely alone, because another manager may own that
-  folder and two managers writing one view is how a catalog gets clobbered.
+  missing. Only a file whose frontmatter declares `name: mcptoon` is treated as
+  ours: a missing one is created, and our own **stale** one is refreshed — otherwise
+  an upgrading user keeps the copy from the release they first installed and never
+  reads the new defaults. A view holding a *different* skill is still left
+  completely alone, because another manager may own that folder and two managers
+  writing one view is how a catalog gets clobbered.
   `tests/test_skill_package.py` pins the three distribution copies byte-identical
   and pins `skill/SKILL.md` into `package-data`.
 - **The first command on a machine finishes the install `pip` could not.** A
@@ -62,11 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user who never ran `quickstart` stayed half-installed while the docs promised
   "pip install, then just use it". Now the first real command (anything but
   `serve`/`off`/`uninstall`/`demo`) installs the agent-visible skill and builds
-  the skill index once per machine, then never again. It is the *additive* half of
-  the write-consent rule: it copies one file into a folder that lacks it and never
-  overwrites (`install_self` leaves an existing `<view>/mcptoon` alone), and it is
-  silent for pipes and machine formats, like the welcome it rides beside.
-  `uninstall` clears its marker, so a clean reinstall self-heals again.
+  the skill index, then stops. It is the *additive* half of the write-consent
+  rule: it creates a missing skill, refreshes our own stale copy, and never touches
+  a skill that is not ours; it is silent for pipes and machine formats, like the
+  welcome it rides beside. The marker records the installed skill's fingerprint, so
+  a release that ships a new skill heals once more instead of being suppressed by
+  the previous release's marker. `uninstall` clears the marker, so a clean
+  reinstall self-heals again.
 - **`exposure` setting (`compact` | `full`).** `compact` is the default and the
   cheaper preset; `full` restores the previous enumeration for a host whose tool
   panel reads `tools/list`, or a model that will not ask for the manifest first.

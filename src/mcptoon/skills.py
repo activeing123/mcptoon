@@ -231,6 +231,35 @@ def packaged_skill_path() -> Path:
     return Path(__file__).resolve().parent.joinpath(*PACKAGED_SKILL_RELPATH)
 
 
+def self_fingerprint() -> str:
+    """A short content fingerprint of the packaged skill, or "" if unreadable.
+
+    The self-heal marker stores this so a *release that changes the skill* is seen
+    as "not yet installed here" and heals again — without it, the marker from the
+    previous release would suppress the refresh and the agent would keep reading an
+    outdated explanation of the defaults. Opaque; never shown to the user.
+    """
+    try:
+        return hashlib.sha256(packaged_skill_path().read_bytes()).hexdigest()[:16]
+    except OSError:
+        return ""
+
+
+def _skill_declared_name(path: Path) -> str | None:
+    """The frontmatter ``name`` of a SKILL.md, or None when it cannot be read.
+
+    Used to tell *our* skill from someone else's: only a file that declares
+    ``name: mcptoon`` is ours to refresh. Anything unreadable or unnamed returns
+    None, which callers treat as "not ours" — the safe direction, since the cost
+    of guessing wrong is editing a file mcptoon does not own.
+    """
+    try:
+        from .plugin import parse_skill_frontmatter  # local: import-light
+        return (parse_skill_frontmatter(path).get("name") or "").strip() or None
+    except Exception:
+        return None
+
+
 def install_self(views: list[Path] | None = None,
                  dry_run: bool = False) -> list[dict]:
     """Make mcptoon's own skill visible to every agent that has a skill folder.
@@ -242,11 +271,19 @@ def install_self(views: list[Path] | None = None,
     channel that shipped the skill was the Claude Code plugin. The user then asks
     their agent how to use mcptoon and the agent has nothing to read.
 
-    Presence is the only thing checked. If ``<view>/mcptoon`` exists in *any* form
-    — a real directory, a copy, or a junction another manager created — it is left
-    completely alone, because "the agent can see it" is already true, and two
-    managers writing one view is how a catalog gets clobbered. Returns one row per
-    view; ``written`` is False on every skip so a caller reports real numbers.
+    Presence alone is not enough, though: a view that already holds *our* skill is
+    **refreshed when its content differs**. Otherwise an upgrading user keeps the
+    copy from the release they first installed, and a newer explanation — a new
+    default, a new tool, a new preset — never reaches them. A view that holds a
+    *different* skill (a real directory, a copy, or a junction another manager
+    owns) is still left completely alone: only a file whose frontmatter declares
+    ``name: mcptoon`` is treated as ours. That keeps the refresh from ever
+    clobbering a skill mcptoon did not write, which was the whole reason presence
+    was the original test.
+
+    Returns one row per view. ``written`` is True when the file was created or
+    refreshed; ``updated`` distinguishes the refresh from a fresh install;
+    ``skipped`` is True when the view was deliberately left alone.
     """
     source = packaged_skill_path()
     roots = _view_roots() if views is None else list(views)
@@ -256,25 +293,55 @@ def install_self(views: list[Path] | None = None,
         return [{"view": str(v), "written": False, "skipped": False,
                  "error": f"packaged skill missing: {source}"} for v in roots]
 
+    ours = _skill_declared_name(source)
+    try:
+        source_bytes = source.read_bytes()
+    except OSError:
+        source_bytes = None
+
+    def _row(view, path, *, written, skipped, updated=False, error=None):
+        return {"view": str(view), "path": str(path), "written": written,
+                "skipped": skipped, "updated": updated, "error": error}
+
     for view in roots:
         target_dir = Path(view) / "mcptoon"
         target = target_dir / "SKILL.md"
+
         if target.exists():
-            results.append({"view": str(view), "path": str(target),
-                            "written": False, "skipped": True, "error": None})
+            existing = _skill_declared_name(target)
+            if not ours or existing != ours:
+                results.append(_row(view, target, written=False, skipped=True))
+                continue
+            try:
+                same = source_bytes is not None and target.read_bytes() == source_bytes
+            except OSError:
+                same = False
+            if same:
+                results.append(_row(view, target, written=False, skipped=True))
+                continue
+            if dry_run:
+                results.append(_row(view, target, written=False, skipped=False,
+                                    updated=True))
+                continue
+            try:
+                shutil.copyfile(source, target)
+                results.append(_row(view, target, written=True, skipped=False,
+                                    updated=True))
+            except OSError as e:
+                results.append(_row(view, target, written=False, skipped=False,
+                                    error=str(e)))
             continue
+
         if dry_run:
-            results.append({"view": str(view), "path": str(target),
-                            "written": False, "skipped": False, "error": None})
+            results.append(_row(view, target, written=False, skipped=False))
             continue
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-            results.append({"view": str(view), "path": str(target),
-                            "written": True, "skipped": False, "error": None})
+            results.append(_row(view, target, written=True, skipped=False))
         except OSError as e:
-            results.append({"view": str(view), "path": str(target),
-                            "written": False, "skipped": False, "error": str(e)})
+            results.append(_row(view, target, written=False, skipped=False,
+                                error=str(e)))
     return results
 
 
@@ -1136,21 +1203,29 @@ def _cmd_skills_install_self(args: list[str], fmt: str) -> None:
         return
 
     wrote = [r for r in rows if r.get("written")]
+    created = [r for r in wrote if not r.get("updated")]
+    refreshed = [r for r in wrote if r.get("updated")]
     skipped = [r for r in rows if r.get("skipped")]
     failed = [r for r in rows if r.get("error")]
-    for r in wrote:
-        print(f"  ✓ {r['path']}")
+    for r in created:
+        print(f"  ✓ installed  {r['path']}")
+    for r in refreshed:
+        print(f"  ↻ refreshed  {r['path']}")
     for r in failed:
         print(f"  ! {r['view']}: {r['error']}")
     if dry:
-        pending = [r for r in rows if not r.get("skipped") and not r.get("error")]
-        print(f"  (dry run) {len(pending)} view(s) would receive the skill")
+        pending_new = [r for r in rows
+                       if not r.get("skipped") and not r.get("error")
+                       and not r.get("updated")]
+        pending_up = [r for r in rows if r.get("updated")]
+        print(f"  (dry run) {len(pending_new)} view(s) would receive the skill, "
+              f"{len(pending_up)} would be refreshed")
         return
-    print(f"  mcptoon skill: {len(wrote)} installed, {len(skipped)} already present, "
-          f"{len(failed)} failed")
+    print(f"  mcptoon skill: {len(created)} installed, {len(refreshed)} refreshed, "
+          f"{len(skipped)} left alone, {len(failed)} failed")
     if skipped:
-        print("  Views that already have it are never overwritten — another manager "
-              "may own that folder.")
+        print("  A view is left alone when it already holds our current skill, or "
+              "when it holds a different one (another manager may own that folder).")
 
 
 def _cmd_skills_search(args: list[str], fmt: str) -> None:
