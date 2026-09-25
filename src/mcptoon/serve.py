@@ -835,13 +835,24 @@ class MCPServerBridge:
             payload = _unwrap_envelope(envelope)
             usage.track_call(server, tool, ok=True, payload=payload)
 
-            # Compress output if format is configured
-            result = _make_tool_result(self._compress_result(payload, server, tool))
-
-            # Back the advertised outputSchema with data: carry the upstream's
-            # structured result through when it sent one.
             if isinstance(envelope, dict) and envelope.get("structuredContent") is not None:
-                result["structuredContent"] = envelope["structuredContent"]
+                # Build the response from the envelope explicitly. Passing the
+                # payload to _make_tool_result() would misread one that carries a
+                # "content" key (filesystem's list_directory declares exactly that)
+                # as an already-wrapped result and return that same object, so
+                # attaching structuredContent would nest the result inside itself.
+                result = dict(envelope)
+                compressed = self._compress_result(payload, server, tool)
+                if compressed is not payload or not isinstance(result.get("content"), list):
+                    # A compression format re-renders the text view; otherwise keep
+                    # the upstream content blocks and only synthesise them if absent.
+                    result["content"] = [{"type": "text", "text": (
+                        compressed if isinstance(compressed, str)
+                        else json.dumps(compressed, ensure_ascii=False))}]
+                result.setdefault("isError", False)
+                result.setdefault("resultType", "complete")
+            else:
+                result = _make_tool_result(self._compress_result(payload, server, tool))
 
             return self._stamp_footer(result)
 
