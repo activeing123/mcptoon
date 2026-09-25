@@ -1814,19 +1814,22 @@ def _cmd_config(rest, fmt):
     if action == "set":
         if len(rest) < 3:
             print("Usage: mcptoon config set <key> <value>")
-            return
+            sys.exit(1)
         key, value = rest[1].lower(), rest[2].lower()
         if key == "footer" and value not in ("on", "off"):
             print("footer accepts only: on | off")
-            return
+            sys.exit(1)
         if key == "lang" and value not in VALID_LANGS:
             print("lang accepts only: auto | zh | en")
-            return
+            sys.exit(1)
         try:
             set_setting(key, value)
         except ValueError as e:
+            # A rejected value changes nothing, so the exit code must say so —
+            # otherwise `mcptoon config set exposure compakt && restart` reads as
+            # success and the user never learns the preset is unchanged.
             print(str(e))
-            return
+            sys.exit(1)
         print(f"{key}: {value}   (saved)")
         if key == "footer" and value == "off":
             print("The gateway will stop adding the savings line on the next connection.")

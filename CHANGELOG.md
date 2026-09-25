@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fully callable (`mcptoon_manifest` names them, `mcptoon_inspect` shows one
   schema, `mcptoon_call` runs it) but are no longer enumerated. Measured against a
   real `mcptoon serve` handshake on a 12-server / 96-tool machine, `tiktoken
-  cl100k_base`: **18,217 → 2,138 tokens per turn (−88.3%)**. This is the "compact
+  cl100k_base`: **18,686 → 2,607 tokens per turn (−86.0%)**. This is the "compact
   manifest" ADR 0004 originally promised ("Claude Code 只看到 1 个 MCP server")
   and ADR 0006's layered schemas had not delivered.
 - The handshake now explains where the tools went, in a second directive
@@ -75,9 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Measured on a real 12-server / 96-tool catalog (this repo's own dev box, same
   tiktoken caliber `status` and `bench` use): mounting the upstreams directly
   costs **21,074** tokens of tool schemas, and the gateway entry added on top
-  costs another **18,003** (15,955 simplified + 1,734 first-party tools + 314
-  instructions) — the same tools reaching the agent twice. Takeover drops the
-  direct half, so the host's tool context goes **39,077 → 18,003** instead of
+  costs another **2,607** under the default compact exposure (**18,686** if
+  `exposure=full`) — the same tools reaching the agent twice. Takeover drops the
+  direct half, so the host's tool context goes **23,681 → 2,607** instead of
   growing. That is the difference between "installed" and "installed and worth
   installing".
   Takeover is a *subtraction* — it removes server entries the user wrote into a
@@ -99,6 +99,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`mcptoon_inspect` and `mcptoon_call` now actually exist.** The compact
+  exposure's whole safety argument is that withholding the tool list withholds
+  *visibility*, not *capability* — "`mcptoon_manifest` names them,
+  `mcptoon_inspect` shows one schema, and `mcptoon_call` runs it". The last two
+  were named in the handshake directive, in the skill, and in ADR 0012, but had
+  never been implemented: a real `tools/call` for either returned `Unknown tool`.
+  Under the default preset an agent could therefore learn an upstream tool's
+  *name* but not its *parameters*, so "the tools still work" held only if it
+  guessed the arguments. Both are implemented now — `mcptoon_inspect` returns one
+  upstream tool's full input schema, and `mcptoon_call` routes `{name, arguments}`
+  back through the bridge's own call path, so it inherits schema validation,
+  danger checks, output compression and usage tracking rather than forking them.
+  The lesson is the test that was missing, not the code: the old test asserted the
+  tool *index* still held the tool and never called one, so a green suite proved
+  nothing about callability. `tests/test_native_tools.py::TestCallBridge` now
+  performs real calls. The two tools cost **469** tokens per turn on the default
+  path (2,138 → 2,607), which is why the skill and the ADR quote the new number.
+- **`mcptoon config set` now exits non-zero when it rejects a value.** A bad value
+  left the setting unchanged but still exited 0, so
+  `mcptoon config set exposure compakt && restart` read as a successful preset
+  change. A refusal is a failure and now reports like one.
+- **`sync` verifies the gateway entry survived its own write.** A successful
+  `write_text` is not proof the entry is there: Claude Code rewrites
+  `~/.claude.json` on its own schedule, and an observed race dropped the
+  `mcptoon` entry back out seconds after a sync that reported success. The write
+  is now read back, and a lost gateway entry returns `written: False` with a
+  warning naming the file — a silent loss only surfaces later, as a user
+  wondering why their tools vanished.
 - **`skills sync` no longer mistakes an agent view for the catalog.** With no
   source argument the command took the first default root (`~/.claude/skills` and
   friends) as its source — but those paths are exactly where the agent *views*

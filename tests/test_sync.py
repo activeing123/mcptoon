@@ -1,5 +1,6 @@
 # Tests for mcptoon sync — config sync to AI agent formats
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -7,9 +8,11 @@ from mcptoon.sync import (
     _mcptoon_to_agent_format,
     _build_mcp_servers_dict,
     _merge_mcp_servers,
+    _write_json_safe,
     sync_to_agent,
     sync_to_all,
     format_sync_report,
+    SELF_SERVER_NAME,
 )
 
 
@@ -700,3 +703,44 @@ class TestTakeoverConsent:
         out = capsys.readouterr().out
         assert "Refusing" in out
         assert cfg.read_text() == before
+
+
+class TestWriteBackVerification:
+    """A successful write is not proof the entry survived.
+
+    Claude Code's `~/.claude.json` is a live state store the host rewrites on its
+    own schedule; a writer that races mcptoon can drop the gateway entry straight
+    back out. `_write_json_safe` therefore reads its own write back and reports a
+    loss instead of returning a green `written: True` over an absent entry.
+    """
+
+    def _gateway_payload(self):
+        return {"mcpServers": {SELF_SERVER_NAME: {"command": "python"}}}
+
+    def test_a_surviving_entry_verifies_true(self, tmp_path):
+        target = tmp_path / "config.json"
+        assert _write_json_safe(target, self._gateway_payload()) is True
+        assert SELF_SERVER_NAME in json.loads(target.read_text())["mcpServers"]
+
+    def test_a_lost_entry_is_reported_false(self, tmp_path, capsys):
+        """Simulate a host rewriting the file between our write and our read-back."""
+        target = tmp_path / "config.json"
+        real_write = Path.write_text
+
+        def clobbering_write(self_path, text, *a, **k):
+            real_write(self_path, text, *a, **k)
+            if self_path == target:
+                # A competing writer drops the gateway entry right after we write.
+                real_write(self_path, json.dumps({"mcpServers": {"other": {}}}), encoding="utf-8")
+
+        with patch.object(Path, "write_text", clobbering_write):
+            ok = _write_json_safe(target, self._gateway_payload())
+        assert ok is False
+        err = capsys.readouterr().err
+        assert "lost" in err and SELF_SERVER_NAME in err
+
+    def test_no_warning_when_the_gateway_is_not_in_the_payload(self, tmp_path, capsys):
+        """A non-gateway write has nothing to verify — it must not cry wolf."""
+        target = tmp_path / "config.json"
+        assert _write_json_safe(target, {"mcpServers": {"fetch": {}}}) is True
+        assert capsys.readouterr().err == ""

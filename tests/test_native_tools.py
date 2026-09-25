@@ -104,14 +104,25 @@ class TestCatalogAlwaysNonEmpty(unittest.TestCase):
                 self.assertLessEqual(len(_split_sentences(desc)), _MAX_PARAM_DESC_SENTENCES,
                                      f"{defn['name']}.{pname}")
 
-    def test_every_native_tool_is_declared_read_only(self):
+    def test_every_native_tool_declares_honest_annotations(self):
+        """Every tool but the call bridge is read-only; the bridge must say it is not.
+
+        `mcptoon_call` is the one first-party tool that runs an upstream tool, so
+        claiming it read-only would be a lie a host could act on. The rest are pure
+        reads and must say so.
+        """
         for defn in native_tools.native_tools():
             ann = defn["annotations"]
-            self.assertTrue(ann["readOnlyHint"], defn["name"])
-            self.assertFalse(ann["destructiveHint"], defn["name"])
-            self.assertFalse(ann["openWorldHint"], defn["name"])
             self.assertIn("outputSchema", defn)
             self.assertIn("title", defn)
+            if defn["name"] == "mcptoon_call":
+                self.assertFalse(ann["readOnlyHint"], defn["name"])
+                self.assertTrue(ann["destructiveHint"], defn["name"])
+                self.assertTrue(ann["openWorldHint"], defn["name"])
+            else:
+                self.assertTrue(ann["readOnlyHint"], defn["name"])
+                self.assertFalse(ann["destructiveHint"], defn["name"])
+                self.assertFalse(ann["openWorldHint"], defn["name"])
 
     def test_upstream_tool_with_same_name_wins(self):
         """A user's server must never be shadowed by our own naming.
@@ -193,6 +204,125 @@ class TestManifestTool(unittest.TestCase):
         p = self._payload({}, index={})
         self.assertEqual(p["totalTools"], 0)
         self.assertIn("mcptoon add", p["notice"])
+
+
+class TestInspectTool(unittest.TestCase):
+    """mcptoon_inspect: the arguments half of the compact-exposure contract.
+
+    `mcptoon_manifest` gives names; this gives the parameters a withheld tool needs.
+    It is read-only and must resolve both the namespaced form and a bare tool name.
+    """
+
+    def setUp(self):
+        self.index = {
+            "alpha_find": {"server": "alpha", "tool": "find",
+                           "full_schema": {"type": "object",
+                                           "properties": {"q": {"type": "string"}},
+                                           "required": ["q"]},
+                           "full_def": {"name": "find",
+                                        "description": "Find files fast. Second sentence.",
+                                        "inputSchema": {"type": "object",
+                                                        "properties": {"q": {"type": "string"}}}}},
+            "beta_find": {"server": "beta", "tool": "find", "full_schema": {},
+                          "full_def": {"name": "find", "description": "Beta's own find."}},
+        }
+
+    def _call(self, args):
+        b = _bridge(servers={"alpha": {"command": "x"}, "beta": {"url": "http://y"}},
+                    index=self.index)
+        return b._handle_call_tool({"name": "mcptoon_inspect", "arguments": args})
+
+    def _payload(self, args):
+        res = self._call(args)
+        self.assertFalse(res["isError"])
+        return res["structuredContent"]
+
+    def test_returns_the_full_input_schema(self):
+        p = self._payload({"tool": "alpha_find"})
+        self.assertEqual(p["server"], "alpha")
+        self.assertEqual(p["inputSchema"]["required"], ["q"])
+        self.assertEqual(p["description"], "Find files fast.")  # first sentence only
+
+    def test_bare_tool_name_resolves_when_unique(self):
+        index = {"solo_greet": {"server": "solo", "tool": "greet", "full_schema": {},
+                                "full_def": {"name": "greet", "description": "Hi."}}}
+        b = _bridge(index=index)
+        p = b._handle_call_tool({"name": "mcptoon_inspect",
+                                 "arguments": {"tool": "greet"}})["structuredContent"]
+        self.assertEqual(p["tool"], "solo_greet")
+        self.assertEqual(p["server"], "solo")
+
+    def test_ambiguous_bare_name_is_a_graceful_notice(self):
+        p = self._payload({"tool": "find"})  # owned by alpha and beta
+        self.assertIn("notice", p)
+        self.assertEqual(p["inputSchema"], {})
+
+    def test_server_disambiguates_a_bare_name(self):
+        p = self._payload({"tool": "find", "server": "beta"})
+        self.assertEqual(p["tool"], "beta_find")
+        self.assertEqual(p["server"], "beta")
+
+    def test_missing_tool_argument_asks_for_one(self):
+        p = self._payload({})
+        self.assertIn("notice", p)
+        self.assertEqual(p["inputSchema"], {})
+
+
+class TestCallBridge(unittest.TestCase):
+    """mcptoon_call: the gateway's escape hatch for compact exposure.
+
+    Its whole job is to route to an upstream tool by namespaced name and reuse the
+    bridge's validation, danger checks and result shaping — not a parallel path
+    that can drift. These pin that reuse, not just that a dict comes back.
+    """
+
+    def setUp(self):
+        self.index = {
+            "alpha_find": {"server": "alpha", "tool": "find",
+                           "full_schema": {"type": "object",
+                                           "properties": {"q": {"type": "string"}},
+                                           "required": ["q"]},
+                           "full_def": {"name": "find", "description": "Find files fast."}},
+            "alpha_delete": {"server": "alpha", "tool": "delete", "full_schema": {},
+                             "full_def": {"name": "delete", "description": "Delete things."}},
+        }
+
+    def _bridge_with_pool(self):
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
+        calls = []
+
+        class FakePool:
+            def call(self, server, tool, arguments):
+                calls.append((server, tool, arguments))
+                return {"ran": [server, tool]}
+
+        b._pool = FakePool()
+        return b, calls
+
+    def test_routes_to_the_upstream_tool(self):
+        b, calls = self._bridge_with_pool()
+        res = b._handle_call_tool({"name": "mcptoon_call",
+                                   "arguments": {"name": "alpha_find",
+                                                 "arguments": {"q": "x"}}})
+        self.assertFalse(res["isError"])
+        self.assertEqual(calls, [("alpha", "find", {"q": "x"})])
+
+    def test_validation_still_applies(self):
+        """The bridge validates against the real schema — the escape hatch is not a bypass."""
+        b, calls = self._bridge_with_pool()
+        res = b._handle_call_tool({"name": "mcptoon_call",
+                                   "arguments": {"name": "alpha_find", "arguments": {}}})
+        self.assertTrue(res["isError"])
+        self.assertIn("validation failed", res["content"][0]["text"])
+        self.assertEqual(calls, [], "an invalid call must never reach the upstream")
+
+    def test_dangerous_tools_are_still_blocked(self):
+        b, calls = self._bridge_with_pool()
+        res = b._handle_call_tool({"name": "mcptoon_call",
+                                   "arguments": {"name": "alpha_delete", "arguments": {}}})
+        self.assertTrue(res["isError"])
+        self.assertIn("Blocked", res["content"][0]["text"])
+        self.assertEqual(calls, [])
 
 
 class TestServersAndHealth(unittest.TestCase):
@@ -547,18 +677,73 @@ class TestToolExposure(unittest.TestCase):
         for native in native_tools.NATIVE_NAMES:
             self.assertIn(native, names)
 
-    def test_a_withheld_tool_is_still_callable(self):
+    def test_a_withheld_tool_is_still_callable_by_its_namespaced_name(self):
         """Withholding the listing must never withhold the capability.
 
         This is what makes `compact` safe to ship as the default: the tool list is
-        a discovery surface, not the call path. `mcptoon_call` routes to the same
-        namespaced name whether or not it was enumerated.
+        a discovery surface, not the call path. The namespaced name routes whether
+        or not it was enumerated — pinned here by actually calling it, because a
+        green test that only inspected `_tool_index` is how `mcptoon_call` came to
+        be documented for months without existing.
         """
-        b = _bridge(index=self.index)
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
         listed = b._handle_list_tools({})["tools"]
         self.assertNotIn("alpha_find", [t["name"] for t in listed])
-        # The index the router uses is untouched by the listing decision.
-        self.assertIn("alpha_find", b._tool_index)
+
+        calls = []
+
+        class FakePool:
+            def call(self, server, tool, arguments):
+                calls.append((server, tool, arguments))
+                return {"ok": True}
+
+        b._pool = FakePool()
+        res = b._handle_call_tool({"name": "alpha_find", "arguments": {}})
+        self.assertFalse(res["isError"])
+        self.assertEqual(calls, [("alpha", "find", {})])
+
+    def test_the_advertised_meta_tools_actually_exist_and_work(self):
+        """The compact handshake names `mcptoon_inspect` and `mcptoon_call`; both
+        must exist, and both must be usable in the mode that advertises them."""
+        b = _bridge(servers={"alpha": {"command": "x"}}, index=self.index)
+        listed = {t["name"] for t in b._handle_list_tools({})["tools"]}
+        self.assertIn("mcptoon_inspect", listed)
+        self.assertIn("mcptoon_call", listed)
+
+        ins = b._handle_call_tool({"name": "mcptoon_inspect", "arguments": {"tool": "alpha_find"}})
+        self.assertFalse(ins["isError"])
+        self.assertEqual(ins["structuredContent"]["tool"], "alpha_find")
+        self.assertEqual(ins["structuredContent"]["server"], "alpha")
+
+        calls = []
+
+        class FakePool:
+            def call(self, server, tool, arguments):
+                calls.append((server, tool, arguments))
+                return {"ran": True}
+
+        b._pool = FakePool()
+        out = b._handle_call_tool({"name": "mcptoon_call",
+                                   "arguments": {"name": "alpha_find", "arguments": {}}})
+        self.assertFalse(out["isError"])
+        self.assertEqual(calls, [("alpha", "find", {})])
+
+    def test_call_bridge_refuses_without_a_target_and_never_recurses(self):
+        b = _bridge(index=self.index)
+        no_target = b._handle_call_tool({"name": "mcptoon_call", "arguments": {}})
+        self.assertTrue(no_target["isError"])
+        self.assertIn("name", no_target["content"][0]["text"])
+        self_loop = b._handle_call_tool({"name": "mcptoon_call",
+                                         "arguments": {"name": "mcptoon_call"}})
+        self.assertTrue(self_loop["isError"])
+        self.assertIn("itself", self_loop["content"][0]["text"])
+
+    def test_inspect_unknown_tool_is_a_graceful_notice(self):
+        b = _bridge(index=self.index)
+        res = b._handle_call_tool({"name": "mcptoon_inspect", "arguments": {"tool": "ghost"}})
+        self.assertFalse(res["isError"])
+        self.assertIn("notice", res["structuredContent"])
+        self.assertEqual(res["structuredContent"]["inputSchema"], {})
 
     def test_compact_directive_says_where_the_tools_went(self):
         """The handshake must name the manifest, or the withheld tools read as gone."""
@@ -600,6 +785,14 @@ class TestProtocolHygiene(unittest.TestCase):
         """A malformed call must come back as a tool result, not a crash."""
         b = _bridge()
         for name in native_tools.NATIVE_NAMES:
+            if name == "mcptoon_call":
+                # The bridge delegates it; a missing/garbage target must still be a
+                # tool result, never an exception.
+                for args in ({}, {"name": 123}, {"name": "x", "arguments": 5},
+                             {"name": "mcptoon_nope"}):
+                    res = b._handle_call_tool({"name": name, "arguments": args})
+                    self.assertIn("content", res, f"{name} {args}")
+                continue
             for args in ({"server": 123}, {"include_descriptions": "yes"}, {"server": None}, {}):
                 res = b._handle_call_tool({"name": name, "arguments": args})
                 self.assertIn("content", res, f"{name} {args}")
@@ -608,6 +801,8 @@ class TestProtocolHygiene(unittest.TestCase):
     def test_results_carry_structured_content_matching_text(self):
         b = _bridge(servers={"alpha": {"command": "x"}})
         for name in native_tools.NATIVE_NAMES:
+            if name == "mcptoon_call":
+                continue  # it forwards an upstream result, not a first-party payload
             res = b._handle_call_tool({"name": name, "arguments": {}})
             self.assertEqual(json.loads(res["content"][0]["text"]), res["structuredContent"], name)
 

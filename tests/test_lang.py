@@ -283,6 +283,34 @@ class TestSurfacesFollowTheSetting(_IsolatedState):
         out = _run_main(["config", "set", "lang", "fr"])
         self.assertIn("lang accepts only: auto | zh | en", out)
 
+    def test_config_set_rejects_a_bad_value_with_a_nonzero_exit(self):
+        """A refused value changes nothing, so the exit code must not say success.
+
+        Otherwise `mcptoon config set exposure compakt && restart` reads as a
+        successful preset change and the user never learns it did not take.
+        """
+        buf = io.StringIO()
+        code = 0
+        with patch.object(cli.sys, "argv", ["mcptoon", "config", "set", "exposure", "compakt"]), \
+                redirect_stdout(buf):
+            try:
+                cli.main()
+            except SystemExit as e:
+                code = e.code
+        self.assertNotEqual(code, 0)
+        self.assertIn("not one of", buf.getvalue())
+
+    def test_config_set_unknown_key_exits_nonzero(self):
+        buf = io.StringIO()
+        code = 0
+        with patch.object(cli.sys, "argv", ["mcptoon", "config", "set", "nonsense", "x"]), \
+                redirect_stdout(buf):
+            try:
+                cli.main()
+            except SystemExit as e:
+                code = e.code
+        self.assertNotEqual(code, 0)
+
     def test_config_set_lang_saves_and_reports_what_it_resolved_to(self):
         out = _run_main(["config", "set", "lang", "zh"])
         self.assertIn("lang: zh", out)

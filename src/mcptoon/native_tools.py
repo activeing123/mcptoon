@@ -58,6 +58,8 @@ NATIVE_NAMES = (
     "mcptoon_usage",
     "mcptoon_skills",
     "mcptoon_resolve_skills",
+    "mcptoon_inspect",
+    "mcptoon_call",
 )
 
 
@@ -367,6 +369,88 @@ def native_tools() -> list[dict]:
                 "openWorldHint": False,
             },
         },
+        {
+            "name": "mcptoon_inspect",
+            "title": "Inspect one tool's parameters",
+            "description": (
+                "Show one upstream tool's full input schema — the parameters to call it "
+                "with. Read-only; nothing runs. Use it after mcptoon_manifest names a tool."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tool": {
+                        "type": "string",
+                        "description": (
+                            "Namespaced name from mcptoon_manifest, e.g. fetch_fetch. A "
+                            "bare name works when only one server owns it."
+                        ),
+                    },
+                    "server": {
+                        "type": "string",
+                        "description": (
+                            "Server that owns the tool; disambiguates a shared bare name."
+                        ),
+                    },
+                },
+                "required": ["tool"],
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string"},
+                    "server": {"type": "string"},
+                    "inputSchema": {"type": "object"},
+                },
+                "required": ["tool", "server", "inputSchema"],
+            },
+            "annotations": {
+                "title": "Inspect one tool's parameters",
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
+            },
+        },
+        {
+            "name": "mcptoon_call",
+            "title": "Call any upstream tool",
+            "description": (
+                "Run any upstream tool by its namespaced name (server_tool). Under the "
+                "default compact exposure the tool list is withheld, so this is how you "
+                "run one found via mcptoon_manifest. Arguments are validated first."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Namespaced name in server_tool form, e.g. fetch_fetch.",
+                    },
+                    "arguments": {
+                        "type": "object",
+                        "description": "Arguments object for the tool; see mcptoon_inspect.",
+                    },
+                },
+                "required": ["name"],
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string"},
+                    "server": {"type": "string"},
+                    "result": {},
+                },
+                "required": ["tool", "server"],
+            },
+            "annotations": {
+                "title": "Call any upstream tool",
+                "readOnlyHint": False,
+                "destructiveHint": True,
+                "idempotentHint": False,
+                "openWorldHint": True,
+            },
+        },
     ]
 
 
@@ -615,6 +699,53 @@ def _resolve_skills(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uni
     return payload
 
 
+def _inspect(arguments: dict, state: dict) -> dict:
+    """One upstream tool's real input schema — the parameters to call it with.
+
+    The discovery half of the compact-exposure contract: `mcptoon_manifest` gives
+    names, this gives the arguments, and the tool is then called by its namespaced
+    name. Read-only — nothing is executed here.
+    """
+    index = state["tool_index"]
+    want_server = _as_str(arguments.get("server"))
+    want_tool = _as_str(arguments.get("tool"))
+
+    if not want_tool:
+        return {"tool": "", "server": "", "inputSchema": {},
+                "notice": "Pass `tool` — a namespaced name like fetch_fetch, or a bare "
+                          "tool name when only one server owns it."}
+
+    def _resolve() -> tuple[str, str]:
+        if want_tool in index:  # exact namespaced hit
+            return want_tool, index[want_tool].get("server", "")
+        if want_server:
+            ns = namespaced_tool_name(want_server, want_tool)
+            if ns in index:
+                return ns, want_server
+        matches = [ns for ns, info in index.items()
+                   if info.get("tool") == want_tool and (not want_server or info.get("server") == want_server)]
+        if len(matches) == 1:
+            return matches[0], index[matches[0]].get("server", "")
+        return "", ""
+
+    ns_name, server = _resolve()
+    if not ns_name:
+        known = [ns for ns in index][:10]
+        return {"tool": want_tool, "server": want_server, "inputSchema": {},
+                "notice": f"Unknown tool: '{want_tool}'. Call mcptoon_manifest to list what "
+                          f"is loaded" + (f". A few: {', '.join(known)}" if known else ".")}
+
+    info = index[ns_name]
+    full_def = info.get("full_def") or {}
+    schema = info.get("full_schema") or full_def.get("inputSchema") or {}
+    return {
+        "tool": ns_name,
+        "server": server,
+        "description": _first_sentence(full_def.get("description", "") or ""),
+        "inputSchema": schema,
+    }
+
+
 _HANDLERS = {
     "mcptoon_manifest": _manifest,
     "mcptoon_servers": _servers,
@@ -622,6 +753,10 @@ _HANDLERS = {
     "mcptoon_usage": _usage,
     "mcptoon_skills": _skills,
     "mcptoon_resolve_skills": _resolve_skills,
+    "mcptoon_inspect": _inspect,
+    # "mcptoon_call" is routed by the bridge to the upstream tool; it has no
+    # handler here because it must reuse the bridge's pool, validation and
+    # compression rather than duplicate them (see serve._handle_call_tool).
 }
 
 

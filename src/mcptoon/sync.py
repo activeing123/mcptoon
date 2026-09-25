@@ -624,6 +624,13 @@ def _write_json_safe(path: Path, data: dict) -> bool:
     routine sync, and it means the very first `sync` that adds the gateway leaves
     a one-command undo: copy `<config>.bak` back, or delete the `mcptoon` entry.
     A failed backup does not block the write; the write is what the user asked for.
+
+    A successful `write_text` is not proof the entry survived: some host state
+    files (Claude Code's `~/.claude.json` is one) are rewritten by the host
+    process itself, and a writer that races us can drop the entry back out. So
+    the write is read back and the gateway's own entry is looked for. Returns
+    False when the entry is gone, and reports that on stderr — a silent loss
+    would otherwise only surface when a user notices their tools vanished.
     """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -641,9 +648,25 @@ def _write_json_safe(path: Path, data: dict) -> bool:
                     except OSError:
                         pass
         path.write_text(new_text, encoding="utf-8")
-        return True
     except OSError:
         return False
+
+    # Read-back verification (only meaningful when we wrote the gateway entry).
+    if SELF_SERVER_NAME in _servers_section(data, "claude-code"):
+        try:
+            written_back = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            written_back = None  # cannot tell — do not cry wolf
+        if (isinstance(written_back, dict)
+                and SELF_SERVER_NAME not in _servers_section(written_back, "claude-code")):
+            print(
+                f"warning: {path} lost the '{SELF_SERVER_NAME}' entry right after it was "
+                f"written. Another program is rewriting this file; re-run the sync, or add "
+                f"the entry by hand.",
+                file=sys.stderr,
+            )
+            return False
+    return True
 
 
 def _drop_managed_servers(section: dict, new_servers: dict) -> list[str]:

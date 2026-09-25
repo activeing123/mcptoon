@@ -79,8 +79,8 @@ deliberate.** Know this before you tell a user something is broken:
 
 | Preset | What `tools/list` returns | Cost per turn (12 servers / 96 tools) |
 |---|---|---|
-| **`compact`** (default) | mcptoon's own tools only — **6** | **~2,138 tokens** |
-| `full` (fallback) | + every upstream tool's simplified schema (102 listed) | ~18,217 tokens |
+| **`compact`** (default) | mcptoon's own tools only — **8** | **~2,607 tokens** |
+| `full` (fallback) | + every upstream tool's simplified schema (104 listed) | ~18,686 tokens |
 
 **The upstream tools are not gone under `compact`** — they are withheld from the
 *listing*, not from callability. `mcptoon_manifest` names them, `mcptoon_inspect`
@@ -91,7 +91,7 @@ shows one schema, and `mcptoon_call` runs it. The gateway's initialize
 
 1. Say plainly what happened: **the default preset withholds the tool list to save
    ~16,000 tokens per turn; the tools still work**, and you can reach any of them
-   right now via `mcptoon_manifest` → `mcptoon_call`.
+   right now via `mcptoon_manifest` → `mcptoon_inspect` → `mcptoon_call`.
 2. Prove it on the spot — do not argue from documentation. Run
    `mcptoon manifest` and show the user their real tool names.
 3. Offer the second preset, and name the tradeoff honestly: it lists everything

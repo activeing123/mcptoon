@@ -738,6 +738,29 @@ class MCPServerBridge:
             with self._tool_index_lock:
                 owned_upstream = name in self._tool_index
             if not owned_upstream:
+                if name == "mcptoon_call":
+                    # The bridge's own escape hatch for `exposure=compact`: unwrap
+                    # {name, arguments} and re-enter the very path a direct call
+                    # takes, so validation, danger checks, compression and usage
+                    # tracking are shared rather than duplicated. This is what makes
+                    # withholding the tool list safe — the listing is gone, the
+                    # capability is not.
+                    inner = arguments if isinstance(arguments, dict) else {}
+                    target = inner.get("name", "")
+                    target = target.strip() if isinstance(target, str) else ""
+                    if not target:
+                        return _make_tool_error(
+                            "mcptoon_call needs `name` — the namespaced upstream tool to "
+                            "run (server_tool, e.g. fetch_fetch). Call mcptoon_manifest "
+                            "to list what is loaded.")
+                    if target == "mcptoon_call":
+                        return _make_tool_error(
+                            "mcptoon_call cannot call itself; pass the upstream tool name.")
+                    target_args = inner.get("arguments", {})
+                    if not isinstance(target_args, dict):
+                        target_args = {}
+                    return self._handle_call_tool(
+                        {"name": target, "arguments": target_args})
                 return self._stamp_footer(
                     native_tools.call_native(name, arguments, self._native_state()))
         elif name.startswith("mcptoon_"):
