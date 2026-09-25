@@ -1,6 +1,6 @@
 {
   "name": "mcptoon",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Zero-dependency CLI for MCP tools and agent skills: compact manifests, TOON-compressed results, and one synced config for every agent; doubles as a single stdio bridge.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {

@@ -5,7 +5,13 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.1] - 2026-09-25
+
+A patch for two bugs found by people running mcptoon against real clients. Both
+made a whole class of tools unusable rather than merely wrong, and neither was
+visible from inside the repo: one only shows up when a client validates a
+declared `outputSchema`, the other only when a client checks that a result
+survives a JSON round trip.
 
 ### Fixed
 
@@ -23,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value-preserving for a JS client — `JSON.parse("-0.0")` is `-0`, which
   stringifies back to `"0"` — so hosts that round-trip a tool result to prove it is
   lossless rejected the whole response. Uptime is now clamped at 0. (issue #23)
+
+Both were reported by `GIGIGIGIbaby` running mcptoon 0.7.23 under DSH 0.1.7-rc.1,
+where #22 left **5 of 12** upstream tools callable — every failure was a tool that
+declares an `outputSchema` — and #23 failed `mcptoon_health` on every call.
+
+Worth recording: fixing #22 was not a one-line change. A payload that itself carries
+a `content` key — which is what `filesystem`'s `list_directory` declares as its
+output schema, and one of the reporter's own tools — is read by `_make_tool_result()`
+as an already-wrapped result and returned as that same object, so attaching
+`structuredContent` nested the result inside itself. The unit tests, which fake the
+pool, could not reach that; an end-to-end test driving a real stdio MCP server did.
 
 ## [0.8.0] - 2026-09-25
 
