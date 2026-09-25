@@ -304,6 +304,110 @@ class TestClaudeCodeTarget:
         assert "claude-code" not in ids
 
 
+class TestTwoLegs:
+    """Both legs reach a host at once: an MCP mount AND a pointer in its memory file.
+
+    Claude Code is the host that carries both, so it is the case pinned here. The
+    point of two legs (CONTEXT.md) is that the user never has to choose between
+    "native tools with a tool panel" and "near-zero context" — each leg covers what
+    the other cannot. A host with no instruction file gets the MCP leg alone, and
+    that must not be an error.
+    """
+
+    _CFG = {
+        "servers": {
+            "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
+        }
+    }
+
+    def _paths(self, tmp_path):
+        return tmp_path / ".claude.json", tmp_path / ".claude" / "CLAUDE.md"
+
+    def test_claude_code_gets_the_mount_and_the_pointer(self, tmp_path):
+        json_path, memory = self._paths(tmp_path)
+        memory.parent.mkdir(parents=True, exist_ok=True)
+        memory.write_text("# My own rules\n\nkeep me\n", encoding="utf-8")
+        with patch("mcptoon.sync._claude_code_path", return_value=json_path), \
+             patch("mcptoon.sync._claude_code_memory_path", return_value=memory):
+            result = sync_to_agent("claude-code", dry_run=False, config=self._CFG,
+                                   include_self=True)
+        assert result["written"] is True
+        assert "mcptoon" in json.loads(json_path.read_text())["mcpServers"]
+        text = memory.read_text(encoding="utf-8")
+        assert "## Skill catalog (mcptoon)" in text
+        assert text.startswith("# My own rules\n\nkeep me\n"), \
+            "the user's own content must survive byte for byte"
+
+    def test_the_pointer_is_idempotent(self, tmp_path):
+        json_path, memory = self._paths(tmp_path)
+        with patch("mcptoon.sync._claude_code_path", return_value=json_path), \
+             patch("mcptoon.sync._claude_code_memory_path", return_value=memory):
+            first = sync_to_agent("claude-code", config=self._CFG, include_self=True)
+            second = sync_to_agent("claude-code", config=self._CFG, include_self=True)
+        assert first["pointer"]["written"] is True
+        assert second["pointer"]["written"] is False
+        assert memory.read_text(encoding="utf-8").count("## Skill catalog (mcptoon)") == 1
+
+    def test_no_pointer_without_self(self, tmp_path):
+        """`sync` is routine; the pointer belongs to "let this host see mcptoon"."""
+        json_path, memory = self._paths(tmp_path)
+        with patch("mcptoon.sync._claude_code_path", return_value=json_path), \
+             patch("mcptoon.sync._claude_code_memory_path", return_value=memory):
+            result = sync_to_agent("claude-code", config=self._CFG, include_self=False)
+        assert result["pointer"] is None
+        assert not memory.exists()
+
+    def test_dry_run_writes_no_pointer(self, tmp_path):
+        json_path, memory = self._paths(tmp_path)
+        with patch("mcptoon.sync._claude_code_path", return_value=json_path), \
+             patch("mcptoon.sync._claude_code_memory_path", return_value=memory):
+            result = sync_to_agent("claude-code", dry_run=True, config=self._CFG,
+                                   include_self=True)
+        assert result["pointer"]["would_write"] is True
+        assert not memory.exists()
+        assert not json_path.exists()
+
+    def test_off_removes_both_legs_and_restores_the_memory_file(self, tmp_path):
+        """`off` must not leave a pointer telling an agent about an absent gateway."""
+        from mcptoon.sync import remove_gateway_from_agent
+        json_path, memory = self._paths(tmp_path)
+        memory.parent.mkdir(parents=True, exist_ok=True)
+        original = "# My own rules\n\nkeep me\n"
+        memory.write_text(original, encoding="utf-8")
+        with patch("mcptoon.sync._claude_code_path", return_value=json_path), \
+             patch("mcptoon.sync._claude_code_memory_path", return_value=memory):
+            sync_to_agent("claude-code", config=self._CFG, include_self=True)
+            assert "## Skill catalog (mcptoon)" in memory.read_text(encoding="utf-8")
+            result = remove_gateway_from_agent("claude-code")
+        assert result["removed"] is True
+        assert result["pointer_removed"] is True
+        assert "mcptoon" not in json.loads(json_path.read_text())["mcpServers"]
+        assert memory.read_text(encoding="utf-8") == original, \
+            "the memory file must come back exactly as it was"
+
+    def test_a_host_without_an_instruction_file_is_mcp_only(self):
+        """Windsurf has no global instruction file — that is not an error."""
+        from mcptoon.sync import pointer_path
+        for agent in ("windsurf", "cline", "claude-desktop", "vscode-copilot"):
+            assert pointer_path(agent) is None, agent
+
+    def test_pointer_paths_are_machine_wide(self):
+        from pathlib import Path
+        from mcptoon.sync import pointer_path
+        for agent in ("codex", "claude-code"):
+            p = pointer_path(agent)
+            assert p is not None and p.is_absolute(), (agent, p)
+            assert Path.cwd() not in p.parents, "a pointer must not be project-bound"
+
+    def test_a_pointer_write_failure_is_reported_not_raised(self, tmp_path):
+        from mcptoon.sync import _write_skill_pointer
+        blocked = tmp_path / "nope" / "SKILL.md"
+        blocked.parent.write_text("not a directory", encoding="utf-8")
+        out = _write_skill_pointer(blocked)
+        assert out["written"] is False
+        assert out["error"]
+
+
 class TestFormatReport:
     def test_report_format(self):
         """Report contains key info."""
@@ -315,6 +419,46 @@ class TestFormatReport:
         assert "SYNC COMPLETE" in report
         assert "Cursor" in report
         assert "2" in report
+
+    def test_report_names_the_pointer_leg(self):
+        """A host reached by the pointer alone must not read as "nothing to write"."""
+        results = [
+            {"agent": "codex", "agent_name": "Codex (AGENTS.md)",
+             "path": "C:/Users/x/.codex/AGENTS.md", "servers_synced": 0,
+             "taken_over": 0, "written": False, "error": None, "config_exists": True,
+             "pointer": {"path": "C:/Users/x/.codex/AGENTS.md", "written": True,
+                         "error": None}},
+        ]
+        report = format_sync_report(results, dry_run=False)
+        assert "skill pointer" in report
+        assert "1 skill pointer(s)" in report
+        assert "nothing to write" not in report
+
+    def test_report_shows_both_legs_on_one_host(self):
+        """Claude Code carries a mount and a pointer; the report shows both."""
+        results = [
+            {"agent": "claude-code", "agent_name": "Claude Code",
+             "path": "C:/Users/x/.claude.json", "servers_synced": 13,
+             "taken_over": 0, "written": True, "error": None, "config_exists": True,
+             "pointer": {"path": "C:/Users/x/.claude/CLAUDE.md", "written": True,
+                         "error": None}},
+        ]
+        report = format_sync_report(results, dry_run=False)
+        assert "13 servers" in report
+        assert "skill pointer" in report
+        assert "C:/Users/x/.claude/CLAUDE.md" in report
+
+    def test_report_counts_a_previewed_pointer(self):
+        """A dry run has written nothing, yet the preview still says what would happen."""
+        results = [
+            {"agent": "codex", "agent_name": "Codex (AGENTS.md)",
+             "path": "C:/Users/x/.codex/AGENTS.md", "servers_synced": 0,
+             "taken_over": 0, "written": False, "error": None, "config_exists": True,
+             "pointer": {"path": "C:/Users/x/.codex/AGENTS.md", "written": False,
+                         "would_write": True, "error": None}},
+        ]
+        report = format_sync_report(results, dry_run=True)
+        assert "1 skill pointer(s)" in report
 
 
 class TestTakeover:

@@ -29,6 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Both legs now land on a host that can carry them.** `sync --self` already
+  mounted `mcptoon serve` in every agent whose config holds MCP servers, and wrote
+  a skill pointer for Codex. Claude Code can do both — it mounts servers in
+  `~/.claude.json` *and* reads `~/.claude/CLAUDE.md` as machine-wide context on
+  every session — so it now gets the mount and the pointer. The two are
+  independent: the mount gives the host native tools, the pointer gives it the
+  catalog in words, and neither is as good alone. `mcptoon off` removes both,
+  restoring the memory file byte for byte (the block is heading-anchored and cut at
+  the next `## `).
+  A host is included only on evidence that its file is read **every** session:
+  Codex (`AGENTS.md`) and Claude Code (`CLAUDE.md`). Cursor is deliberately left
+  out — `~/.cursorrules` is the legacy form, so a pointer there could be a silent
+  no-op, which is worse than not writing one. Windsurf, Cline and VS Code Copilot
+  expose no dedicated global instruction file and stay MCP-only rather than risk
+  editing a file the user shares with everything else.
 - **mcptoon's own skill now ships in the wheel and installs itself.** The skill
   that explains the exposure presets, and what to do when a tool panel looks
   empty, existed in the repo but never reached a `pip install`: every builtin pack

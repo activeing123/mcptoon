@@ -74,6 +74,100 @@ def _codex_agents_path() -> Path:
     """
     return _home() / ".codex" / "AGENTS.md"
 
+
+def _claude_code_memory_path() -> Path:
+    """Claude Code's global memory file.
+
+    `~/.claude/CLAUDE.md` is what Claude Code loads as machine-wide context on
+    every session — its own state keys in `~/.claude.json` (e.g.
+    `hasClaudeMdExternalIncludesApproved`) are about exactly this file's handling.
+    That is what makes it a valid CLI-leg channel: a pointer nobody reads
+    unprompted is not a channel at all.
+    """
+    return _home() / ".claude" / "CLAUDE.md"
+
+
+# Hosts whose agent reads a machine-wide instruction file every session: the hosts
+# the CLI leg can actually reach (CONTEXT.md: Two Legs Always On). Every other host
+# reaches mcptoon through MCP alone.
+#
+# The list is short and evidence-based rather than aspirational:
+# * `codex` — AGENTS.md is Codex's documented channel, and mcptoon already used it.
+# * `claude-code` — CLAUDE.md, evidenced by Claude Code's own config state.
+# * Cursor is NOT here on purpose. `~/.cursorrules` exists on some machines but is
+#   the legacy form (current Cursor uses `.cursor/rules`), so writing there risks a
+#   pointer into a file the host no longer reads — a silent no-op, which is worse
+#   than not writing at all.
+# * Windsurf, Cline and VS Code Copilot expose no dedicated global instruction file
+#   (Cline's instructions live inside the shared VS Code settings JSON), so they
+#   stay MCP-only rather than risk editing a file the user shares with everything
+#   else on the machine.
+#
+# `pointer_path` dispatches by name rather than holding a table of function objects:
+# that table would capture the *original* functions at import time, so a test (or a
+# future refactor) patching `_claude_code_memory_path` would silently keep writing
+# to the real home directory. This repo has already been bitten once by a pointer
+# landing somewhere unexpected — see the note on `_codex_agents_path`.
+_SKILL_POINTER_HOSTS = ("codex", "claude-code")
+
+
+def pointer_path(agent_id: str) -> Path | None:
+    """The instruction file `agent_id` reads every session, if it has one."""
+    if agent_id == "codex":
+        return _codex_agents_path()
+    if agent_id == "claude-code":
+        return _claude_code_memory_path()
+    return None
+
+
+def _write_skill_pointer(path: Path) -> dict:
+    """Append the skill-pointer block to a host's global instruction file.
+
+    Idempotent and byte-reversible: the block is anchored on its heading and cut at
+    the next ``## `` heading by `_strip_skill_pointer`, so the user's own content
+    above and below survives unchanged and `mcptoon off` puts the file back as it
+    found it. Returns ``{"path", "written", "error"}``.
+    """
+    try:
+        existing_content = path.read_text(encoding="utf-8") if path.exists() else ""
+    except OSError as e:
+        return {"path": str(path), "written": False, "error": str(e)}
+    if _SKILL_POINTER_HEADING in existing_content:
+        return {"path": str(path), "written": False, "error": None}  # already there
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Always a blank line before the heading, so the pointer reads as its own
+        # section instead of being glued to the user's last paragraph.
+        if not existing_content or existing_content.endswith("\n\n"):
+            sep = ""
+        elif existing_content.endswith("\n"):
+            sep = "\n"
+        else:
+            sep = "\n\n"
+        path.write_text(existing_content + sep + _SKILL_POINTER_BLOCK,
+                        encoding="utf-8")
+        return {"path": str(path), "written": True, "error": None}
+    except OSError as e:
+        return {"path": str(path), "written": False, "error": str(e)}
+
+
+def _remove_skill_pointer(path: Path) -> dict:
+    """Remove exactly the block `_write_skill_pointer` inserted, nothing else."""
+    if not path.exists():
+        return {"path": str(path), "removed": False, "written": False, "error": None}
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {"path": str(path), "removed": False, "written": False, "error": None}
+    if _SKILL_POINTER_HEADING not in text:
+        return {"path": str(path), "removed": False, "written": False, "error": None}
+    try:
+        path.write_text(_strip_skill_pointer(text), encoding="utf-8")
+    except OSError as e:
+        return {"path": str(path), "removed": True, "written": False, "error": str(e)}
+    return {"path": str(path), "removed": True, "written": True, "error": None}
+
+
 def _claude_desktop_path() -> Path:
     """Claude Desktop config file path."""
     if sys.platform == "win32":
@@ -346,25 +440,15 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
     # Codex: the undo is removing the skill-pointer block, not a JSON key. Kept
     # to exactly the block `sync --self` wrote, so nothing else in the file moves.
     if agent_id == "codex":
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            return {"agent": agent_id, "path": str(path), "removed": False,
-                    "written": False, "error": None}
-        if _SKILL_POINTER_HEADING not in text:
-            return {"agent": agent_id, "path": str(path), "removed": False,
-                    "written": False, "error": None}
         if dry_run:
-            return {"agent": agent_id, "path": str(path), "removed": True,
+            if path.exists() and _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8"):
+                return {"agent": agent_id, "path": str(path), "removed": True,
+                        "written": False, "error": None}
+            return {"agent": agent_id, "path": str(path), "removed": False,
                     "written": False, "error": None}
-        cleaned = _strip_skill_pointer(text)
-        try:
-            path.write_text(cleaned, encoding="utf-8")
-        except OSError as e:
-            return {"agent": agent_id, "path": str(path), "removed": True,
-                    "written": False, "error": str(e)}
-        return {"agent": agent_id, "path": str(path), "removed": True,
-                "written": True, "error": None}
+        out = _remove_skill_pointer(path)
+        return {"agent": agent_id, "path": out["path"], "removed": out["removed"],
+                "written": out["written"], "error": out["error"]}
 
     data = _read_json_safe(path)
     if not data:
@@ -375,17 +459,38 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
         section = (data.get("mcp") or {}).get("servers")
     else:
         section = data.get("mcpServers")
-    if not isinstance(section, dict) or SELF_SERVER_NAME not in section:
+    has_gateway = isinstance(section, dict) and SELF_SERVER_NAME in section
+
+    # A host can carry both legs, so `off` has to undo both or it leaves a pointer
+    # telling an agent to use a catalog that is no longer mounted. Claude Code is
+    # the case that exists today: an entry in `~/.claude.json` and a block in
+    # `~/.claude/CLAUDE.md`. Codex is handled above because it has no JSON entry.
+    ppath = pointer_path(agent_id)
+    pointer_removed = False
+    if ppath is not None and ppath.exists():
+        try:
+            pointer_removed = _SKILL_POINTER_HEADING in ppath.read_text(encoding="utf-8")
+        except OSError:
+            pointer_removed = False
+
+    if not has_gateway and not pointer_removed:
         return {"agent": agent_id, "path": str(path), "removed": False,
                 "written": False, "error": None}
 
-    section.pop(SELF_SERVER_NAME, None)
     if dry_run:
         return {"agent": agent_id, "path": str(path), "removed": True,
-                "written": False, "error": None}
-    ok = _write_json_safe(path, data)
+                "written": False, "error": None,
+                "pointer_removed": pointer_removed}
+
+    ok = True
+    if has_gateway:
+        section.pop(SELF_SERVER_NAME, None)
+        ok = _write_json_safe(path, data)
+    if pointer_removed and ppath is not None:
+        _remove_skill_pointer(ppath)
     return {"agent": agent_id, "path": str(path), "removed": True, "written": ok,
-            "error": None if ok else "Write failed"}
+            "error": None if ok else "Write failed",
+            "pointer_removed": pointer_removed}
 
 
 def remove_gateway_from_all(dry_run: bool = False) -> list[dict]:
@@ -661,12 +766,26 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         before = set((existing.get("mcpServers") or {}).keys())
         merged = _merge_mcp_servers(existing, mcp_servers, takeover=takeover)
         taken_over = len(before - set((merged.get("mcpServers") or {}).keys()))
+        # The MCP leg and the CLI leg are independent, and this host can carry
+        # both: Claude Code reads `~/.claude/CLAUDE.md` every session, so it can be
+        # told about the catalog in words as well as handed a gateway to mount.
+        # Non-destructive and idempotent, so a routine `sync --self` is safe.
+        pointer = None
+        ppath = pointer_path(agent_id)
+        if include_self and ppath is not None:
+            if dry_run:
+                pointer = {"path": str(ppath), "written": False, "error": None,
+                           "would_write": True}
+            else:
+                pointer = _write_skill_pointer(ppath)
         if dry_run:
             return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
-                    "taken_over": taken_over, "written": False, "error": None}
+                    "taken_over": taken_over, "written": False, "error": None,
+                    "pointer": pointer}
         ok = _write_json_safe(path, merged)
         return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
-                "taken_over": taken_over, "written": ok, "error": None if ok else "Write failed"}
+                "taken_over": taken_over, "written": ok,
+                "error": None if ok else "Write failed", "pointer": pointer}
 
     elif agent_id == "vscode-copilot":
         path = _vscode_copilot_path()
@@ -710,29 +829,22 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
                     "taken_over": 0, "written": False, "error": None}
         if dry_run:
+            # Report the pointer honestly in a preview: Codex's whole delivery *is*
+            # the pointer, so "nothing to write" would be a lie about the one host
+            # this branch exists for.
+            try:
+                already = (path.exists() and
+                           _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8"))
+            except OSError:
+                already = False
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "taken_over": 0, "written": False, "error": None}
-        try:
-            existing_content = path.read_text(encoding="utf-8") if path.exists() else ""
-            if _SKILL_POINTER_HEADING in existing_content:
-                return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                        "taken_over": 0, "written": False, "error": None}  # already there; idempotent
-            path.parent.mkdir(parents=True, exist_ok=True)
-            # Always a blank line before the heading, so the pointer reads as its
-            # own section instead of being glued to the user's last paragraph.
-            if not existing_content or existing_content.endswith("\n\n"):
-                sep = ""
-            elif existing_content.endswith("\n"):
-                sep = "\n"
-            else:
-                sep = "\n\n"
-            path.write_text(existing_content + sep + _SKILL_POINTER_BLOCK,
-                            encoding="utf-8")
-            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "taken_over": 0, "written": True, "error": None}
-        except OSError as e:
-            return {"agent": agent_id, "path": str(path), "servers_synced": 0,
-                    "taken_over": 0, "written": False, "error": str(e)}
+                    "taken_over": 0, "written": False, "error": None,
+                    "pointer": {"path": str(path), "written": False,
+                                "would_write": not already, "error": None}}
+        pointer = _write_skill_pointer(path)
+        return {"agent": agent_id, "path": str(path), "servers_synced": 0,
+                "taken_over": 0, "written": pointer["written"],
+                "error": pointer["error"], "pointer": pointer}
 
     else:
         return {"agent": agent_id, "path": "", "servers_synced": 0, "taken_over": 0,
@@ -792,6 +904,9 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
     written_count = sum(1 for r in results if r.get("written"))
     total_servers = sum(r.get("servers_synced", 0) for r in results)
     error_count = sum(1 for r in results if r.get("error"))
+    pointer_count = sum(1 for r in results
+                        if (r.get("pointer") or {}).get("written")
+                        or (r.get("pointer") or {}).get("would_write"))
 
     for r in results:
         icon = "✓" if r.get("written") else ("→" if dry_run and r.get("servers_synced", 0) > 0 else "·")
@@ -799,6 +914,7 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
         count = r.get("servers_synced", 0)
         path = r.get("path", "")
         err = r.get("error", "")
+        pointer = r.get("pointer") or {}
 
         if count > 0:
             # Under takeover the host no longer loads the upstream servers
@@ -807,6 +923,13 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
             taken = r.get("taken_over", 0)
             extra = f"  (−{taken} direct, now via gateway)" if taken else ""
             lines.append(f"  {icon} {name:25s} {count:3d} servers  {path}{extra}")
+            if pointer.get("written") or pointer.get("would_write"):
+                # Both legs on one host: the mount above, plus a pointer in the
+                # file this agent reads every session.
+                lines.append(f"      + skill pointer  {pointer.get('path', '')}")
+        elif pointer.get("written") or pointer.get("would_write"):
+            # Codex: no MCP mount at all, the pointer is the whole delivery.
+            lines.append(f"  {icon} {name:25s} skill pointer  {pointer.get('path', '')}")
         elif err:
             lines.append(f"  ! {name:25s} skip ({err})")
         elif r.get("config_exists") is False:
@@ -820,9 +943,10 @@ def format_sync_report(results: list[dict], dry_run: bool = False) -> str:
             lines.append(f"  · {name:25s} not installed")
 
     lines.append("")
+    suffix = f", {pointer_count} skill pointer(s)" if pointer_count else ""
     if dry_run:
-        lines.append(f"  Preview: {written_count + sum(1 for r in results if r.get('servers_synced', 0) > 0)} agents would be updated, {total_servers} servers total")
+        lines.append(f"  Preview: {written_count + sum(1 for r in results if r.get('servers_synced', 0) > 0)} agents would be updated, {total_servers} servers total{suffix}")
     else:
-        lines.append(f"  Done: {written_count} agents updated, {total_servers} servers synced, {error_count} errors")
+        lines.append(f"  Done: {written_count} agents updated, {total_servers} servers synced, {error_count} errors{suffix}")
 
     return "\n".join(lines)
