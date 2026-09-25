@@ -182,6 +182,65 @@ def _bare_greeting() -> None:
         return
 
 
+# Commands that must never self-heal: `serve` speaks JSON-RPC over stdio (stdout
+# must stay clean, and it is spawned per host connection, so a write there would
+# be a write on every reconnect); `off`/`uninstall` are taking things away.
+_SELF_HEAL_EXEMPT = frozenset({"serve", "off", "uninstall", "demo", "demo-server",
+                               "completion", "help"})
+
+
+def _first_run_self_heal() -> None:
+    """On a machine's very first command, finish the install that pip could not.
+
+    A `pip install` cannot run code, so it lands the *package* and nothing else:
+    the skill sits in site-packages where no agent reads it, and no skill index
+    exists, so `mcptoon skills resolve` answers from an empty catalog until
+    `quickstart` happens to run. The fix is one write, once per machine, on the
+    first real command — so a user who never runs `quickstart` still ends up with
+    the agent-visible skill the docs promise ("pip install, then just use it").
+
+    Why this is allowed to write where a normal command is read-only: it is an
+    *addition* — copy one file into a folder that lacks it, build an index if none
+    exists — and additions are the silent, reversible half of the write-consent
+    rule (CONTEXT.md). It never overwrites: `install_self` leaves any existing
+    `<view>/mcptoon` alone (another manager may own it), and `ensure_index` leaves
+    a current index alone. Bounded exactly like the welcome: once per machine, off
+    for pipes and machine formats, never inside `serve`. Best-effort throughout —
+    a read-only home must not turn a normal command into a crash.
+    """
+    try:
+        if os.environ.get("MCPTOON_SKIP_SELF_HEAL"):
+            return
+        # Hermetic by default under pytest: a test that runs a command in-process
+        # would otherwise write into whatever `_view_roots()` / `_default_roots()`
+        # resolve to. The dedicated self-heal tests opt back in with
+        # MCPTOON_FORCE_SELF_HEAL and redirect every path they can touch.
+        if "pytest" in sys.modules and not os.environ.get("MCPTOON_FORCE_SELF_HEAL"):
+            return
+        from . import config as cfg
+
+        # Own marker, not the welcome's: the self-heal must run once even when the
+        # welcome is turned off, and the welcome must still show on a machine where
+        # the self-heal already ran. Cleared by `uninstall`, so a clean reinstall
+        # self-heals again — right, since the skill views may have been cleaned too.
+        if cfg.selfheal_done():
+            return
+        from . import skills as skills_mod
+
+        wrote = [r for r in skills_mod.install_self() if r.get("written")]
+        if wrote:
+            print(f"  ✓ mcptoon skill installed for {len(wrote)} agent(s) — "
+                  f"they can read what the defaults are")
+        if skills_mod.ensure_index():
+            n = len(skills_mod.load_index().get("skills") or [])
+            if n:
+                print(f"  ✓ Skill catalog indexed: {n} skill(s) routable "
+                      f"via `mcptoon skills resolve`")
+        cfg.mark_selfheal_done()
+    except Exception:
+        return
+
+
 def _run(state: dict) -> None:
     args = sys.argv[1:]
 
@@ -278,6 +337,11 @@ def _run(state: dict) -> None:
 
     # First real command on this machine introduces mcptoon once (see _maybe_welcome).
     _maybe_welcome(command, fmt)
+
+    # ...and, on that same first command, finishes the install pip could not: the
+    # agent-visible skill + a skill index. Once per machine; additions only.
+    if fmt == "auto" and command not in _SELF_HEAL_EXEMPT:
+        _first_run_self_heal()
 
     # ─── Dispatch ───
     if command in ("list", "servers"):

@@ -88,6 +88,7 @@ class _FakeHome:
             "MCPTOON_CONFIG_FILE_TOML": str(self.home / ".mcptoon" / "config.toml"),
             "MCPTOON_SETTINGS_FILE": str(self.settings),
             "MCPTOON_WELCOME_FILE": str(self.welcome),
+            "MCPTOON_SELFHEAL_FILE": str(self.home / ".mcptoon" / ".selfheal"),
             "MCPTOON_FOOTER_STATE_FILE": str(self.home / ".mcptoon" / "footer-state.json"),
             "MCPTOON_TOGGLE_FILE": str(self.home / ".mcptoon" / "toggles.json"),
             "MCPTOON_COMPRESSION_FILE": str(self.home / ".mcptoon" / "compression.json"),

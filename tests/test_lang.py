@@ -73,6 +73,7 @@ class _IsolatedState(unittest.TestCase):
             "MCPTOON_CONFIG_FILE_TOML": str(root / "config.toml"),
             "MCPTOON_CACHE_DIR": str(root / "cache"),
             "MCPTOON_WELCOME_FILE": str(root / ".welcome"),
+            "MCPTOON_SELFHEAL_FILE": str(root / ".selfheal"),
             "MCPTOON_FOOTER_STATE_FILE": str(root / "footer-state.json"),
         }
         patcher = patch.dict(os.environ, env, clear=False)

@@ -14,7 +14,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1438%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1445%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -111,6 +111,8 @@ You have a desktop AI — Claude, Codex, Cursor, Windsurf, Cline, VS Code Copilo
    pip install mcptoon && mcptoon quickstart
    ```
    `quickstart` finds your MCP servers, writes your config, and registers mcptoon in every agent it detects.
+   (Skip `quickstart` and the first command you run still self-heals: it installs
+   mcptoon's own skill into each agent and builds the skill index, once per machine.)
 
 2. **Add tools and skills in one place** — here, not in each agent.
    ```bash
@@ -511,7 +513,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1438 passed, 1 skipped
+python -m pytest tests/ -v   # 1445 passed, 1 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows
@@ -519,7 +521,7 @@ is a first-class target. New here? Start with
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: **19,520 lines of Python across 28 modules**, zero third-party dependencies.
+The codebase: **19,944 lines of Python across 28 modules**, zero third-party dependencies.
 
 ---
 

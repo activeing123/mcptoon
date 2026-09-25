@@ -83,6 +83,7 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_CONFIG_FILE": str(self.home / "config.json"),
             "MCPTOON_SETTINGS_FILE": str(self.home / "settings.json"),
             "MCPTOON_WELCOME_FILE": str(self.home / ".welcome"),
+            "MCPTOON_SELFHEAL_FILE": str(self.home / ".selfheal"),
             "MCPTOON_FOOTER_STATE_FILE": str(self.home / "footer-state.json"),
             # Pin the language. `resolve_lang()` falls back to the OS UI language,
             # so without this the greeting is Chinese on a Chinese Windows box and
@@ -213,6 +214,89 @@ class TestFirstRunWelcome(_IsolatedHome):
         text = welcome.hint(lng="en", stream=io.StringIO())
         self.assertIn("mcptoon is running here", text)
         self.assertNotIn("0 tools", text, "a zero we did not measure is a false claim")
+
+
+class TestFirstRunSelfHeal(_IsolatedHome):
+    """Channel A′: the first real command finishes what `pip install` could not.
+
+    `pip` runs no code, so it lands the package only: the agent-visible skill
+    stays in site-packages and no skill index exists. Before this, only
+    `quickstart` closed that gap, so a user who ran anything else ended up
+    half-installed while the docs promised "pip install, then just use it". These
+    tests pin that the very first command self-heals — once, additively, and only
+    when a human is watching.
+    """
+
+    def _run(self, argv):
+        """Run a command with self-heal forced on and every touched path sandboxed."""
+        views = self.home / "views"
+        roots = self.home / "skills"
+        env = {
+            "MCPTOON_FORCE_SELF_HEAL": "1",
+            "MCPTOON_SKILLS_VIEWS": str(views),
+            "MCPTOON_SKILLS_ROOTS": str(roots),
+            "MCPTOON_SKILLS_INDEX": str(self.home / "index.json"),
+            "MCPTOON_SKILLS_USAGE": str(self.home / "usage.json"),
+        }
+        with patch.dict(os.environ, env):
+            return _run_main(argv)
+
+    def test_first_command_installs_the_skill_and_builds_the_index(self):
+        roots = self.home / "skills" / "demo"
+        roots.mkdir(parents=True)
+        (roots / "SKILL.md").write_text(
+            "---\nname: demo\ndescription: a demo skill\n---\n\nbody\n", encoding="utf-8")
+
+        out = self._run(["list"])
+
+        installed = self.home / "views" / "mcptoon" / "SKILL.md"
+        self.assertTrue(installed.is_file(), "the agent-visible skill was not written")
+        self.assertIn("mcptoon skill installed", out)
+        self.assertIn("Skill catalog indexed", out)
+        self.assertTrue(cfg.selfheal_done())
+
+    def test_it_runs_once_per_machine(self):
+        self._run(["list"])
+        second = self._run(["list"])
+        self.assertNotIn("mcptoon skill installed", second,
+                         "the self-heal must not repeat on every command")
+
+    def test_it_never_overwrites_a_view_another_manager_owns(self):
+        existing = self.home / "views" / "mcptoon"
+        existing.mkdir(parents=True)
+        marker = existing / "SKILL.md"
+        marker.write_text("someone else's skill\n", encoding="utf-8")
+
+        self._run(["list"])
+
+        self.assertEqual(marker.read_text(encoding="utf-8"), "someone else's skill\n",
+                         "an existing view must be left alone")
+
+    def test_it_skips_machine_readable_formats(self):
+        """A JSON consumer must get clean JSON, and the marker must survive."""
+        out = self._run(["list", "--json"])
+        self.assertNotIn("mcptoon skill installed", out)
+        self.assertFalse(cfg.selfheal_done(), "a suppressed self-heal must not burn the marker")
+
+    def test_it_skips_the_commands_that_are_leaving_or_speaking_stdio(self):
+        for command in ("serve", "off", "uninstall", "demo", "demo-server", "completion", "help"):
+            self.assertIn(command, cli._SELF_HEAL_EXEMPT)
+
+    def test_it_is_off_under_pytest_unless_forced(self):
+        """The default test process must not write into real skill folders.
+
+        A test that runs a command in-process has no sandbox for the view roots,
+        so the guard is what keeps the suite from touching the developer's own
+        `~/.claude/skills`. The tests above opt back in explicitly.
+        """
+        with patch.dict(os.environ, {"MCPTOON_SKILLS_VIEWS": str(self.home / "views")}):
+            _run_main(["list"])  # no MCPTOON_FORCE_SELF_HEAL
+        self.assertFalse(cfg.selfheal_done())
+        self.assertFalse((self.home / "views").exists())
+
+    def test_a_read_only_home_does_not_crash(self):
+        with patch.object(cfg, "_selfheal_file", side_effect=OSError("read-only")):
+            cfg.mark_selfheal_done()  # must swallow the OSError, not raise
 
 
 class TestWelcomeRendering(unittest.TestCase):
@@ -543,6 +627,7 @@ class TestCatalogCountConsistency(unittest.TestCase):
             "MCPTOON_SKILLS_ROOTS": str(self.root),
             "MCPTOON_SKILLS_USAGE": str(base / "usage.json"),
             "MCPTOON_WELCOME_FILE": str(base / ".welcome"),
+            "MCPTOON_SELFHEAL_FILE": str(base / ".selfheal"),
             "MCPTOON_FOOTER_STATE_FILE": str(base / "footer-state.json"),
             "MCPTOON_LANG": "en",
         }

@@ -14,7 +14,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1438%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1445%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -110,6 +110,7 @@ mcptoon 是今天就能用、一次覆盖所有 Agent 的那个。
    pip install mcptoon && mcptoon quickstart
    ```
    `quickstart` 会找到你的 MCP 服务器、写好配置，并在它检测到的每个 Agent 里注册 mcptoon。
+   （不跑 `quickstart` 也没关系：你跑的第一条命令会自愈——把 mcptoon 自己的技能装进每个 Agent 并建好技能索引，每台机器只做一次。）
 
 2. **工具和技能只在一个地方加**——这里，不是每个 Agent 里。
    ```bash
@@ -465,12 +466,12 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1438 passed, 1 skipped
+python -m pytest tests/ -v   # 1445 passed, 1 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-代码规模：**28 个模块、19,520 行 Python**，零第三方依赖。
+代码规模：**28 个模块、19,944 行 Python**，零第三方依赖。
 
 ---
 

@@ -84,6 +84,7 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_CONFIG_FILE_TOML": str(self.home / "config.toml"),
             "MCPTOON_SETTINGS_FILE": str(self.home / "settings.json"),
             "MCPTOON_WELCOME_FILE": str(self.home / ".welcome"),
+            "MCPTOON_SELFHEAL_FILE": str(self.home / ".selfheal"),
             "MCPTOON_FOOTER_STATE_FILE": str(self.home / "footer-state.json"),
             "MCPTOON_TOGGLE_FILE": str(self.home / "toggles.json"),
             "MCPTOON_COMPRESSION_FILE": str(self.home / "compression.json"),
@@ -585,8 +586,8 @@ class TestDestructiveCommandsReadPathsLate(unittest.TestCase):
 
     # Every path constant config.py freezes at import time.
     IMPORT_TIME_PATHS = ("CONFIG_DIR", "CONFIG_FILE", "CONFIG_FILE_TOML", "SETTINGS_FILE",
-                         "WELCOME_FILE", "FOOTER_STATE_FILE", "TOGGLE_FILE", "POLICY_FILE",
-                         "CACHE_DIR", "HOME_DIR")
+                         "WELCOME_FILE", "SELFHEAL_FILE", "FOOTER_STATE_FILE", "TOGGLE_FILE",
+                         "POLICY_FILE", "CACHE_DIR", "HOME_DIR")
 
     def _assert_reads_late(self, fn, allow=()):
         src = inspect.getsource(fn)

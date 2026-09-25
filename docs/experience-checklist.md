@@ -62,10 +62,16 @@ a state file, and give the user a switch.
 
 *Where it lives:* `config.welcome_seen()` / `mark_welcome_seen()` (marker file) and
 `mcptoon config set welcome off`. `mcptoon config set footer off` does the same for
-the per-turn line.
+the per-turn line. The first-run **self-heal** (install the agent-visible skill +
+build the skill index) keeps its own marker, `config.selfheal_done()` /
+`mark_selfheal_done()` — one marker cannot serve both, because the self-heal must run
+once even when the welcome is off, and the welcome must still show where the
+self-heal already ran.
 
 *Gotcha:* do not burn the marker when the message was suppressed (a `--json` run, a
-read-only home). A suppressed greeting must still be able to greet later.
+read-only home). A suppressed greeting must still be able to greet later. The
+self-heal follows the same rule: a machine-readable format gets clean output and
+keeps its marker for the next real run.
 
 ### 4. Opening the tool produces a response
 

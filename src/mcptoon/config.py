@@ -91,7 +91,7 @@ def state_paths() -> dict:
     """
     return {
         "bookkeeping": [_settings_file(), _welcome_file(), _footer_state_file(),
-                        _toggle_file(), _policy_file()],
+                        _selfheal_file(), _toggle_file(), _policy_file()],
         "servers": [_config_file(), _config_file_toml()],
         "cache": [_cache_dir()],
     }
@@ -108,6 +108,16 @@ SETTINGS_FILE = Path(os.environ.get(
 # cli._maybe_welcome). Resolved at CALL time for the same test-isolation reason.
 WELCOME_FILE = Path(os.environ.get(
     "MCPTOON_WELCOME_FILE", str(CONFIG_DIR / ".welcome")))
+
+# First-run self-heal marker, deliberately separate from the welcome marker: the
+# self-heal (install the agent-visible skill + build the skill index) must run
+# once even when the welcome is turned off, and the welcome must still show on a
+# machine where the self-heal already ran. One marker cannot serve both without
+# coupling them. Cleared by `uninstall`, so a clean reinstall self-heals again —
+# correct, since the skill views may have been cleaned too. Call-time resolution
+# for the same test-isolation reason as the other state files.
+SELFHEAL_FILE = Path(os.environ.get(
+    "MCPTOON_SELFHEAL_FILE", str(CONFIG_DIR / ".selfheal")))
 
 # What the savings line said the last time it was shown. The per-turn footer
 # compares against this so an unchanged line is not repeated verbatim every turn
@@ -178,6 +188,10 @@ def _settings_file() -> Path:
 
 def _welcome_file() -> Path:
     return Path(os.environ.get("MCPTOON_WELCOME_FILE", str(WELCOME_FILE)))
+
+
+def _selfheal_file() -> Path:
+    return Path(os.environ.get("MCPTOON_SELFHEAL_FILE", str(SELFHEAL_FILE)))
 
 
 def _footer_state_file() -> Path:
@@ -458,6 +472,26 @@ def mark_welcome_seen() -> None:
     """
     try:
         path = _welcome_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def selfheal_done() -> bool:
+    """True once the first-run self-heal has run (marker file exists)."""
+    return _selfheal_file().exists()
+
+
+def mark_selfheal_done() -> None:
+    """Record that the first-run self-heal ran, so it never runs again.
+
+    Best-effort for the same reason `mark_welcome_seen` is: a read-only home must
+    not turn a normal command into a crash, and the worst case (the self-heal
+    repeats) is a harmless no-op write of an already-present file.
+    """
+    try:
+        path = _selfheal_file()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("", encoding="utf-8")
     except OSError:

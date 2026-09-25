@@ -56,6 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder and two managers writing one view is how a catalog gets clobbered.
   `tests/test_skill_package.py` pins the three distribution copies byte-identical
   and pins `skill/SKILL.md` into `package-data`.
+- **The first command on a machine finishes the install `pip` could not.** A
+  `pip install` runs no code, so it landed the package and nothing else: the skill
+  sat in site-packages where no agent reads it, and no skill index existed, so a
+  user who never ran `quickstart` stayed half-installed while the docs promised
+  "pip install, then just use it". Now the first real command (anything but
+  `serve`/`off`/`uninstall`/`demo`) installs the agent-visible skill and builds
+  the skill index once per machine, then never again. It is the *additive* half of
+  the write-consent rule: it copies one file into a folder that lacks it and never
+  overwrites (`install_self` leaves an existing `<view>/mcptoon` alone), and it is
+  silent for pipes and machine formats, like the welcome it rides beside.
+  `uninstall` clears its marker, so a clean reinstall self-heals again.
 - **`exposure` setting (`compact` | `full`).** `compact` is the default and the
   cheaper preset; `full` restores the previous enumeration for a host whose tool
   panel reads `tools/list`, or a model that will not ask for the manifest first.
