@@ -28,6 +28,43 @@ COPIES = {
 }
 
 
+def yaml_frontmatter_error(frontmatter: str) -> str | None:
+    """The first *real* YAML error in a frontmatter block, or None when it parses.
+
+    Zero-dependency by design (AGENTS.md rule 1): this does not reimplement YAML,
+    it pins the one rule that shipped broken. Inside a **plain** (unquoted) scalar
+    a colon followed by a space opens a nested mapping, so
+
+        description: tools seem to have gone missing: a gateway is mounted ...
+
+    is invalid YAML. Real parsers (PyYAML, the ``yaml`` package a skill host uses)
+    reject the whole block — and a host that cannot parse the frontmatter *drops
+    the skill silently*: it ships, installs, and never loads.
+
+    Why a dedicated guard instead of trusting ``plugin.parse_skill_frontmatter``:
+    that home-grown reader splits each line on the *first* colon and is happy to
+    return the broken description above, so mcptoon's own tooling (and the three-
+    copies test) saw nothing wrong while every downstream agent saw no skill at
+    all. A lenient reader cannot police the format it is lenient about.
+    """
+    for line in frontmatter.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0] in (" ", "\t", "-"):        # nested map / list item, not a key
+            continue
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        value = value.strip()
+        # Quoted, block (|, >), or flow ([, {) scalars carry their own syntax.
+        if value[:1] in ("'", '"', "|", ">", "[", "{"):
+            continue
+        if ": " in value or value.endswith(":"):
+            return (f"{key.strip()}: a plain scalar cannot contain ': ' "
+                    f"(opens a nested mapping) -> {value[:60]!r}")
+    return None
+
+
 class TestThreeCopiesAgree:
     def test_every_copy_exists(self):
         for name, path in COPIES.items():
@@ -80,6 +117,41 @@ class TestThreeCopiesAgree:
             "the trigger for 'my tools vanished' must be in the frontmatter "
             "description, where routing can see it"
         )
+
+
+class TestFrontmatterIsRealYaml:
+    """Every shipped copy's frontmatter must parse as *actual* YAML.
+
+    Regression guard for v0.8.2: the ``description`` was written unquoted and
+    contained ``: `` (``tools seem to have gone missing: a gateway …``). The
+    three-copies test passed and mcptoon's own lenient reader was happy, but
+    every host that parses frontmatter with a real YAML parser — Claude Code,
+    DSH, Codex — dropped the skill with a warning nobody reads. The skill
+    shipped, installed, and never loaded. This is the check that would have
+    caught it before the release.
+    """
+
+    def test_every_copy_frontmatter_parses(self):
+        for name, path in COPIES.items():
+            body = path.read_text(encoding="utf-8")
+            assert body.startswith("---"), f"{name} copy has no frontmatter"
+            frontmatter = body.split("---", 2)[1]
+            err = yaml_frontmatter_error(frontmatter)
+            assert err is None, f"{name} copy has invalid YAML frontmatter: {err}"
+
+    def test_the_guard_rejects_the_shape_that_shipped_broken(self):
+        """The guard must actually fire on the v0.8.2 bug, not just pass."""
+        broken = ("name: mcptoon\n"
+                  "description: route here when the user's MCP tools seem to "
+                  "have gone missing: a gateway is mounted in COMPACT\n")
+        assert yaml_frontmatter_error(broken) is not None
+
+    def test_the_guard_accepts_a_quoted_description_with_colons(self):
+        """The fix must pass: a quoted scalar may hold ``: `` safely."""
+        fixed = ('name: mcptoon\n'
+                 'description: "tools seem to have gone missing: a gateway '
+                 'is mounted"\n')
+        assert yaml_frontmatter_error(fixed) is None
 
 
 class TestInstallSelf:
