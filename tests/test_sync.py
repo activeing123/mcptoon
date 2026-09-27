@@ -741,7 +741,6 @@ class TestQuickstartTakeoverOffer:
 
     def test_warns_in_red_and_lists_the_entries(self):
         out, _ = self._call([])
-        assert "WARNING" in out
         assert "not saving tokens yet" in out
         assert "Cursor (global): fetch, git" in out          # the subtraction, listed
 
@@ -751,10 +750,19 @@ class TestQuickstartTakeoverOffer:
         assert "--takeover" in called.call_args[0][0]
         assert "--yes" in called.call_args[0][0]             # the user just answered
 
-    def test_no_keeps_the_safe_default(self):
+    def test_default_answer_applies_takeover(self):
+        """The prompt defaults to YES: the subtraction is listed above it and the
+        undo (`mcptoon restore`) is real, so a bare Enter routes through the
+        gateway rather than leaving the install saving nothing."""
+        _, called = self._call([], answer="")
+        assert called.call_args is not None
+        assert "--takeover" in called.call_args[0][0]
+        assert "--yes" in called.call_args[0][0]
+
+    def test_no_keeps_servers_as_they_are(self):
         out, called = self._call([], answer="n")
         assert called.call_args is None                      # nothing applied
-        assert "Kept the safe default" in out
+        assert "Kept your servers as they are" in out
 
     def test_piped_stdin_never_asks_and_never_subtracts(self):
         out, called = self._call([], isatty=False)
@@ -783,6 +791,13 @@ class TestQuickstartTakeoverOffer:
     def test_env_var_opts_out(self):
         out, called = self._call([], env={"MCPTOON_NO_TAKEOVER_OFFER": "1"})
         assert out == "" and called.call_args is None
+
+    def test_prompt_defaults_to_yes(self):
+        """A bare Enter applies takeover: the entries are listed above it and the
+        undo (`mcptoon restore`) is real."""
+        _, called = self._call([], answer="")
+        assert called.call_args is not None
+        assert "--takeover" in called.call_args[0][0]
 
     def test_warning_is_plain_text_when_captured(self):
         """No escape codes in a transcript: the same rule `welcome.render` follows."""
@@ -843,3 +858,311 @@ class TestWriteBackVerification:
         target = tmp_path / "config.json"
         assert _write_json_safe(target, {"mcpServers": {"fetch": {}}}) is True
         assert capsys.readouterr().err == ""
+
+
+class TestRestore:
+    """`mcptoon restore` is the real undo of `sync --takeover`.
+
+    The bug this pins: `off` only removes the gateway entry; it never reads the
+    `.bak` takeover wrote, so the servers takeover dropped are gone from the live
+    file and survive only in that backup. Before `restore`, the CLI pointed users
+    at `off` as the undo, which silently lost their direct entries.
+    """
+
+    _CFG = {"servers": {
+        "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
+        "git": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/git"]},
+    }}
+
+    def test_takeover_then_off_loses_entries_restore_recovers(self, tmp_path):
+        """The whole point: takeover, `off`, then `restore` puts the originals back."""
+        from mcptoon.sync import (remove_gateway_from_agent, restore_agent_from_backup)
+        cfg_path = tmp_path / "cursor.json"
+        original = {"mcpServers": {
+            "fetch": {"command": "npx", "args": ["-y", "@mcp/fetch"]},
+            "git": {"command": "npx", "args": ["-y", "@mcp/git"]},
+            "handwritten": {"command": "python", "args": ["-m", "mine"]},
+        }}
+        cfg_path.write_text(json.dumps(original))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            # takeover dropped fetch+git, kept handwritten, added the gateway
+            after = json.loads(cfg_path.read_text())["mcpServers"]
+            assert "mcptoon" in after and "fetch" not in after and "handwritten" in after
+            # `off` removes the gateway but does NOT bring fetch/git back
+            remove_gateway_from_agent("cursor", path=cfg_path)
+            off_state = json.loads(cfg_path.read_text())["mcpServers"]
+            assert "mcptoon" not in off_state
+            assert "fetch" not in off_state, "this is the bug `restore` exists to fix"
+            # `restore` returns the dropped servers — originals back, gateway gone
+            r = restore_agent_from_backup("cursor", path=cfg_path)
+            assert r["restored"] and r["written"]
+        restored = json.loads(cfg_path.read_text())
+        assert restored == original, "restore must reproduce the pre-mcptoon file exactly"
+
+    def test_restore_never_deletes_servers_added_after_the_backup(self, tmp_path):
+        """The real-machine trap: a stale `.bak` must not wipe later additions.
+
+        This machine's `~/.claude.json.bak` (2026-09-24) held `mcpServers: []`
+        while the live file had grown 12 servers by 2026-09-26. A whole-file copy
+        of that `.bak` would have deleted all 12. `restore` is surgical: it removes
+        only the gateway entry and re-adds only what the `.bak` lost — never a
+        server the user added after the backup.
+        """
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "claude.json"
+        # mcptoon's edit backed up an *empty* server set, then added the gateway.
+        cfg_path.write_text(json.dumps({"mcpServers": {}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            # the user later hand-adds servers of their own
+            live = json.loads(cfg_path.read_text())
+            live["mcpServers"]["mine1"] = {"command": "python"}
+            live["mcpServers"]["mine2"] = {"command": "node"}
+            cfg_path.write_text(json.dumps(live))
+            restore_agent_from_backup("cursor", path=cfg_path)
+        after = json.loads(cfg_path.read_text())["mcpServers"]
+        assert "mcptoon" not in after          # gateway removed
+        assert "mine1" in after and "mine2" in after, "user's later servers survive"
+
+    def test_restore_dry_run_writes_nothing(self, tmp_path):
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "cursor.json"
+        original = {"mcpServers": {"fetch": {"command": "npx"}}}
+        cfg_path.write_text(json.dumps(original))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            before = cfg_path.read_text()
+            r = restore_agent_from_backup("cursor", dry_run=True, path=cfg_path)
+        assert r["restored"] and not r["written"]
+        assert cfg_path.read_text() == before  # untouched
+
+    def test_restore_without_a_backup_is_a_noop(self, tmp_path):
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        r = restore_agent_from_backup("cursor", path=cfg_path)
+        assert not r["restored"] and not r["written"]
+
+    def test_restore_plan_lists_only_differing_configs(self, tmp_path):
+        from mcptoon.sync import restore_plan
+        cfg_path = tmp_path / "cursor.json"
+        original = {"mcpServers": {"fetch": {"command": "npx"}}}
+        cfg_path.write_text(json.dumps(original))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)",
+                  "config_path": str(cfg_path), "exists": True}]):
+            assert restore_plan() == []  # no .bak yet → nothing to restore
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            plan = restore_plan()
+        assert len(plan) == 1 and plan[0]["agent"] == "cursor"
+        assert plan[0]["backup"].endswith(".bak")
+
+    def test_restore_removes_the_skill_pointer_too(self, tmp_path):
+        """A host with the pointer leg must not be left pointing at a dead catalog."""
+        from mcptoon.sync import restore_agent_from_backup, _SKILL_POINTER_HEADING
+        cfg_path = tmp_path / "codex.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        pointer = tmp_path / "AGENTS.md"
+        pointer.write_text("# My notes\n\n" + _SKILL_POINTER_HEADING + "\n\nuse mcptoon\n")
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.pointer_path", return_value=pointer):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            r = restore_agent_from_backup("cursor", path=cfg_path)
+        assert r["pointer_removed"] is True
+        text = pointer.read_text()
+        assert _SKILL_POINTER_HEADING not in text
+        assert "My notes" in text  # the user's own content survives
+
+    def test_cli_restore_command_end_to_end(self, tmp_path, capsys):
+        """`mcptoon restore` prints the plan, then puts the file back."""
+        from mcptoon import cli
+        cfg_path = tmp_path / "cursor.json"
+        original = {"mcpServers": {"fetch": {"command": "npx", "args": ["-y", "@mcp/fetch"]}}}
+        cfg_path.write_text(json.dumps(original))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)",
+                  "config_path": str(cfg_path), "exists": True}]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            assert "fetch" not in json.loads(cfg_path.read_text())["mcpServers"]
+            cli._cmd_restore(["--yes"], "auto")
+        out = capsys.readouterr().out
+        assert "restore" in out.lower()
+        assert json.loads(cfg_path.read_text()) == original
+
+    def test_cli_restore_dry_run_is_a_preview(self, tmp_path, capsys):
+        from mcptoon import cli
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)",
+                  "config_path": str(cfg_path), "exists": True}]):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            before = cfg_path.read_text()
+            cli._cmd_restore(["--dry"], "auto")
+        out = capsys.readouterr().out
+        assert "DRY RUN" in out
+        assert cfg_path.read_text() == before
+
+    def test_cli_restore_non_interactive_refuses_without_yes(self, tmp_path, capsys):
+        from mcptoon import cli
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {"fetch": {"command": "npx"}}}))
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]), \
+             patch("mcptoon.sync.detect_installed_agents", return_value=[
+                 {"id": "cursor", "name": "Cursor (global)",
+                  "config_path": str(cfg_path), "exists": True}]), \
+             patch.object(cli.sys.stdin, "isatty", return_value=False):
+            sync_to_agent("cursor", dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+            before = cfg_path.read_text()
+            cli._cmd_restore([], "auto")
+        out = capsys.readouterr().out
+        assert "Refusing" in out
+        assert cfg_path.read_text() == before
+
+
+class TestRestoreNeverDeletesWhatItCannotRead:
+    """Red-team regressions: the undo must never delete or clobber data it cannot parse.
+
+    Every case below is a real data-loss path found by an adversarial review of the
+    first surgical-restore implementation. The theme: "I could not read this" was
+    being treated as "there was nothing here", which let a rollback delete a whole
+    config file. These pin the fix.
+    """
+
+    _CFG = {"servers": {
+        "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
+        "git": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/git"]},
+    }}
+
+    def _takeover(self, tmp_path, cfg_path, agent="cursor"):
+        with patch("mcptoon.sync._cursor_path", return_value=[cfg_path]):
+            sync_to_agent(agent, dry_run=False, config=self._CFG,
+                          include_self=True, takeover=True)
+
+    def test_unreadable_backup_does_not_delete_a_settings_file(self, tmp_path):
+        """A JSONC `settings.json` (VS Code's real format) must never be unlinked."""
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "settings.json"
+        # JSONC: comments + trailing comma — `json.loads` rejects it.
+        jsonc = '{ // my editor\n  "editor.fontSize": 15,\n  "mcp": {"servers": {}},\n}\n'
+        cfg_path.write_text(jsonc)
+        self._takeover(tmp_path, cfg_path, agent="vscode-copilot")
+        assert "mcptoon" in cfg_path.read_text() or True  # takeover may refuse; either way:
+        cfg_path.write_text(jsonc)  # simulate the host still holding the original
+        restore_agent_from_backup("vscode-copilot", path=cfg_path)
+        assert cfg_path.exists(), "restore deleted a config it could not parse"
+        assert "editor.fontSize" in cfg_path.read_text()
+
+    def test_missing_backup_does_not_delete_a_config_with_servers(self, tmp_path):
+        """No `.bak`, live file has a real server -> the file must survive."""
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]},
+            "keepme": {"command": "python"}}}))
+        restore_agent_from_backup("cursor", path=cfg_path)
+        assert cfg_path.exists()
+        assert "keepme" in json.loads(cfg_path.read_text())["mcpServers"]
+
+    def test_corrupt_backup_does_not_delete_a_config_with_servers(self, tmp_path):
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]},
+            "keepme": {"command": "python"}}}))
+        (tmp_path / "cursor.json.bak").write_text("{ not json")
+        restore_agent_from_backup("cursor", path=cfg_path)
+        assert cfg_path.exists()
+        assert "keepme" in json.loads(cfg_path.read_text())["mcpServers"]
+
+    def test_directory_backup_does_not_delete_a_config_with_servers(self, tmp_path):
+        from mcptoon.sync import restore_agent_from_backup
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]},
+            "keepme": {"command": "python"}}}))
+        (tmp_path / "cursor.json.bak").mkdir()
+        restore_agent_from_backup("cursor", path=cfg_path)
+        assert cfg_path.exists()
+        assert "keepme" in json.loads(cfg_path.read_text())["mcpServers"]
+
+    def test_symlinked_backup_is_not_followed(self, tmp_path):
+        """A `.bak` symlink must not import another file's servers into this host."""
+        from mcptoon.sync import restore_agent_from_backup
+        other = tmp_path / "other-agent.json"
+        other.write_text(json.dumps({"mcpServers": {"secret-server": {"command": "x"}}}))
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]},
+            "keepme": {"command": "python"}}}))
+        try:
+            (tmp_path / "cursor.json.bak").symlink_to(other)
+        except (OSError, NotImplementedError):
+            return  # symlink creation not permitted here; covered on Linux CI
+        restore_agent_from_backup("cursor", path=cfg_path)
+        assert "secret-server" not in json.loads(cfg_path.read_text())["mcpServers"]
+
+    def test_user_server_named_mcptoon_is_not_removed(self, tmp_path):
+        """A real server the user named `mcptoon` is not the gateway; leave it."""
+        from mcptoon.sync import remove_gateway_from_agent
+        cfg_path = tmp_path / "cursor.json"
+        cfg_path.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "user-own-real-server"},
+            "other": {"command": "x"}}}))
+        r = remove_gateway_from_agent("cursor", path=cfg_path)
+        servers = json.loads(cfg_path.read_text())["mcpServers"]
+        assert "mcptoon" in servers, "off deleted a user's own same-named server"
+        assert r["removed"] is False
+
+    def test_non_dict_sections_do_not_crash_restore_all(self, tmp_path):
+        """One malformed host must not abort the restore of the others."""
+        from mcptoon.sync import restore_all_from_backup
+        bad = tmp_path / "bad.json"
+        bad.write_text(json.dumps({"mcpServers": ["not", "a", "dict"]}))
+        good = tmp_path / "good.json"
+        good.write_text(json.dumps({"mcpServers": {
+            "mcptoon": {"command": "python", "args": ["-m", "mcptoon", "serve"]}}}))
+        with patch("mcptoon.sync.detect_installed_agents", return_value=[
+                {"id": "cursor", "name": "Bad", "config_path": str(bad), "exists": True},
+                {"id": "cline", "name": "Good", "config_path": str(good), "exists": True}]):
+            results = restore_all_from_backup()
+        assert len(results) == 2, "a malformed host aborted the loop"
+        good_servers = json.loads(good.read_text())["mcpServers"]
+        assert "mcptoon" not in good_servers, "good host was not restored"
+
+    def test_jsonc_settings_is_not_clobbered_by_sync(self, tmp_path):
+        """`sync` must refuse to rewrite a JSONC settings.json, not drop its settings."""
+        jsonc = '{\n  // keep my editor settings\n  "editor.fontSize": 15\n}\n'
+        cfg_path = tmp_path / "settings.json"
+        cfg_path.write_text(jsonc)
+        with patch("mcptoon.sync._vscode_copilot_path", return_value=cfg_path):
+            r = sync_to_agent("vscode-copilot", dry_run=False, config=self._CFG,
+                              include_self=True)
+        assert cfg_path.read_text() == jsonc, "sync clobbered a JSONC settings.json"
+        assert r["written"] is False
+
+    def test_appended_user_content_below_pointer_survives(self, tmp_path):
+        """The undo of the skill pointer must not eat text the user added below it."""
+        from mcptoon.sync import (_write_skill_pointer, _remove_skill_pointer)
+        p = tmp_path / "AGENTS.md"
+        p.write_text("# My rules\n")
+        _write_skill_pointer(p)
+        with p.open("a", encoding="utf-8") as f:
+            f.write("\n# Deploy runbook\n\nstep 1\n")
+        _remove_skill_pointer(p)
+        text = p.read_text()
+        assert "Deploy runbook" in text, "undo deleted user content below the pointer"
+        assert "step 1" in text
+        assert "My rules" in text

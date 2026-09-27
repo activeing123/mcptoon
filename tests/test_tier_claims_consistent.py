@@ -16,6 +16,7 @@ FILES = [
     "README.zh-CN.md",
     "docs/integrations/codex.md",
     "docs/tiktoken-benchmarks.md",
+    "docs/calibers.md",
     "scripts/make_demo_gif.py",
 ]
 # 档位名 -> 允许出现在同一行的数字（None = 该行不许出现任何档位的标志数）

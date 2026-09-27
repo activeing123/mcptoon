@@ -287,10 +287,39 @@ def _build_mcp_servers_dict(config: dict) -> dict:
     return result
 
 
-# Reserved name for the gateway's own entry. It cannot collide with a real MCP
-# server in practice: `mcptoon` is this package, and a config that shadowed it
-# would already be broken.
+# Reserved name for the gateway's own entry.
 SELF_SERVER_NAME = "mcptoon"
+
+
+def _is_gateway_entry(cfg: object) -> bool:
+    """True if this server entry is (or could be) mcptoon's own gateway.
+
+    The entry mcptoon writes is ``<python> -m mcptoon serve``. Removal is gated on
+    the entry not looking like some *other* server the user happens to have named
+    ``mcptoon`` — the name is not magic to any host, and a user's own server under
+    that name must not be deleted by `off`/`restore`.
+
+    Lenient by design, so it stays compatible with entries mcptoon has written in
+    the past (a different interpreter path, or an empty stub): only an entry that
+    clearly declares a non-gateway command (or an HTTP URL) is refused. ``{}`` and
+    anything without a command/url is treated as the gateway.
+    """
+    if not isinstance(cfg, dict):
+        return False
+    if not cfg:
+        return True  # empty entry: no evidence it is anything else
+    command = cfg.get("command")
+    args = cfg.get("args")
+    if isinstance(command, list):
+        words = [str(p) for p in command] + ([str(a) for a in args] if isinstance(args, list) else [])
+    else:
+        words = ([str(command)] if command is not None else []) + \
+                ([str(a) for a in args] if isinstance(args, list) else [])
+    if any("mcptoon" in w for w in words) and "serve" in words:
+        return True
+    if command or cfg.get("url"):
+        return False  # a real command/url that is not `mcptoon ... serve`
+    return True
 
 # The skill pointer written into a CLI-only host's global instruction file. Codex
 # (and DSH) mount no MCP, so the handshake `instructions` channel never reaches
@@ -314,17 +343,40 @@ same gateway: `mcptoon manifest` lists them.
 def _strip_skill_pointer(text: str) -> str:
     """Remove exactly the block `_SKILL_POINTER_BLOCK` inserted, nothing else.
 
-    Anchored on the heading and cut at the next ``## `` heading, so a user's own
-    content above and below the block survives byte-for-byte. Used by the undo
-    path (`mcptoon off`), which must leave the file as it found it.
+    Two cases:
+
+    1. The block's exact text is present (the writer appends it verbatim) — remove
+       that span plus the one blank-line separator before it. Anything the user
+       wrote *after* the block survives, because only the block itself is cut.
+       This is what makes `off`/`restore` safe when the user appends their own
+       content below the pointer.
+    2. The heading is present but the body has drifted (an older block format):
+       fall back to cutting from the heading to the next ``## `` heading (or EOF) —
+       never mid-line. Case 1 already covers the real, current block, so this only
+       fires for a block this code did not write.
+
+    Deliberately **not** "cut until the next `## ` heading" as the *primary* rule:
+    the user may append `## `-less content (a paragraph, a `#` heading) below the
+    pointer after install, and a next-heading scan would swallow it. Byte-
+    reversible for `_write_skill_pointer`; used by the undo path (`off`/`restore`).
     """
+    if _SKILL_POINTER_BLOCK in text:
+        idx = text.find(_SKILL_POINTER_BLOCK)
+        before = text[:idx]
+        after = text[idx + len(_SKILL_POINTER_BLOCK):]
+        # Drop the one blank-line separator the writer inserted before the heading.
+        # `after` is kept verbatim: anything the user wrote below the block comes
+        # back exactly.
+        if before.endswith("\n\n"):
+            before = before[:-1]
+        return before + after
+
     lines = text.splitlines(keepends=True)
     out: list[str] = []
     skipping = False
     for line in lines:
         if not skipping and line.strip() == _SKILL_POINTER_HEADING:
             skipping = True
-            # drop the blank line the writer put before the heading, if present
             while out and out[-1].strip() == "":
                 out.pop()
             continue
@@ -391,10 +443,21 @@ def _servers_section(data: dict, agent_id: str) -> dict:
 
     Cursor/Claude/Cline/Windsurf keep servers at ``mcpServers``; VS Code keeps
     them at ``mcp.servers`` inside its shared settings.json.
+
+    Type-safe by construction: a config whose ``mcpServers`` / ``mcp`` / ``servers``
+    is not a mapping (a list, a string, ``null``) yields ``{}`` rather than raising
+    — a hand-edited or third-party file must never crash discovery or the undo.
     """
+    if not isinstance(data, dict):
+        return {}
     if agent_id == "vscode-copilot":
-        return (data.get("mcp") or {}).get("servers", {}) or {}
-    return data.get("mcpServers", {}) or {}
+        mcp = data.get("mcp")
+        if not isinstance(mcp, dict):
+            return {}
+        servers = mcp.get("servers")
+        return servers if isinstance(servers, dict) else {}
+    servers = data.get("mcpServers")
+    return servers if isinstance(servers, dict) else {}
 
 
 def gateway_present_in(agent_id: str) -> bool:
@@ -450,7 +513,7 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
         return {"agent": agent_id, "path": out["path"], "removed": out["removed"],
                 "written": out["written"], "error": out["error"]}
 
-    data = _read_json_safe(path)
+    data = _read_json_obj(path)
     if not data:
         return {"agent": agent_id, "path": str(path), "removed": False,
                 "written": False, "error": None}
@@ -459,7 +522,8 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
         section = (data.get("mcp") or {}).get("servers")
     else:
         section = data.get("mcpServers")
-    has_gateway = isinstance(section, dict) and SELF_SERVER_NAME in section
+    has_gateway = (isinstance(section, dict) and SELF_SERVER_NAME in section
+                   and _is_gateway_entry(section.get(SELF_SERVER_NAME)))
 
     # A host can carry both legs, so `off` has to undo both or it leaves a pointer
     # telling an agent to use a catalog that is no longer mounted. Claude Code is
@@ -515,6 +579,259 @@ def remove_gateway_from_all(dry_run: bool = False) -> list[dict]:
             continue
         seen_paths.add(key)
         r = remove_gateway_from_agent(agent["id"], dry_run=dry_run, path=target)
+        r["agent_name"] = agent["name"]
+        r["config_exists"] = agent["exists"]
+        results.append(r)
+    return results
+
+
+# ─── Restore (put a config back to the state before mcptoon touched it) ───
+#
+# `sync --takeover` is a subtraction: it removes the host entries mcptoon now
+# serves itself and writes a `<config>.bak` holding the pre-mcptoon original
+# first. `mcptoon off` removes the *gateway* entry but never reads that backup,
+# so a user who takes over and then runs `off` ends up with neither the original
+# servers nor the gateway — the entries takeover dropped are gone from the live
+# file and survive only in the `.bak`. The CLI used to print "Undo any time:
+# mcptoon off, or restore the `<config>.bak`", which implied `off` was enough.
+# It is not. This is the missing verb.
+#
+# It is *surgical*, not a file copy: it drops the gateway entry and puts back only
+# the servers the `.bak` holds that the live file has lost. The `.bak` is the
+# pre-mcptoon file, but the user keeps editing their config afterwards — a byte
+# copy of the `.bak` would silently revert (or delete) everything they added
+# since, which is exactly the data loss this command exists to prevent. The
+# reverse of a subtraction is to re-add what was removed, nothing more.
+
+def _backup_path(path: Path) -> Path:
+    """The `.bak` mcptoon writes alongside a config before changing its content."""
+    return path.with_suffix(path.suffix + ".bak")
+
+
+def _restore_view(agent_id: str, path: Path) -> dict | None:
+    """What `restore` would do to one config — computed read-only. None = nothing.
+
+    A host needs undoing when the gateway entry is present (the alongside-mount, or
+    a takeover whose gateway is still there) **or** when the `.bak` holds servers
+    the live file has lost (a takeover followed by `off`, which removed the gateway
+    but not the dropped servers). ``add_back`` names the servers the `.bak` can
+    return; ``remove`` is the gateway entry; ``pointer`` is the skill-pointer leg
+    for codex/claude-code.
+
+    ``add_back`` is derived from the ``.bak`` itself — the servers it holds that the
+    live file no longer has, minus the gateway — not from the current mcptoon
+    config. The ``.bak`` *is* "your original servers", so this is purely additive:
+    it can only put entries back, never take one away. (Deriving it from the live
+    config instead would make restore a no-op the moment a user tidied their mcptoon
+    config, and a whole-file copy of the ``.bak`` would be far worse — see the
+    delete-stub guard in ``restore_agent_from_backup``.)
+
+    Deliberately NOT a whole-file comparison: the ``.bak`` is the *pre-mcptoon*
+    file, but the user keeps editing their config afterwards, so a byte copy would
+    also revert (or delete) everything they added since. Only the two edits mcptoon
+    made are undone.
+    """
+    live = _read_json_obj(path)
+    if live is None:
+        # Unreadable / not an object: we cannot safely compute or perform an undo.
+        return None
+    section = _servers_section(live, agent_id)
+    gateway = (agent_id != "codex"
+               and SELF_SERVER_NAME in section
+               and _is_gateway_entry(section.get(SELF_SERVER_NAME)))
+
+    pointer = False
+    ppath = pointer_path(agent_id)
+    if ppath is not None:
+        ptxt = _read_text_safe(ppath)
+        pointer = bool(ptxt and _SKILL_POINTER_HEADING in ptxt)
+
+    add_back: list[str] = []
+    bak = _backup_path(path)
+    # A `.bak` that is a symlink or not a regular file is not one mcptoon wrote —
+    # refuse it rather than import another file's servers into this config.
+    if bak.is_file() and not bak.is_symlink():
+        bak_section = _servers_section(_read_json_obj(bak) or {}, agent_id)
+        add_back = sorted(n for n in bak_section
+                          if n != SELF_SERVER_NAME and n not in section)
+
+    if not gateway and not add_back and not pointer:
+        return None
+    return {"agent": agent_id, "path": str(path), "backup": str(bak),
+            "remove": SELF_SERVER_NAME if gateway else None,
+            "add_back": add_back, "pointer": pointer}
+
+
+def _restore_candidates(agent_id: str | None = None) -> list[dict]:
+    """Every host config that `restore` would change, de-duplicated.
+
+    De-duplicated on the *resolved* path for the same reason
+    ``remove_gateway_from_all`` is: Cursor lists a global and a project-level
+    config that can resolve to one file. ``agent_id`` narrows to one host; ``None``
+    walks every installed host.
+    """
+    if agent_id is not None:
+        target = _agent_config_path(agent_id)
+        hosts = [{"id": agent_id, "name": agent_id,
+                  "config_path": str(target) if target is not None else ""}]
+    else:
+        hosts = detect_installed_agents()
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for host in hosts:
+        raw = host.get("config_path") or ""
+        if not raw:
+            continue
+        target = Path(raw)
+        try:
+            key = str(target.resolve()).lower()
+        except OSError:  # unreachable drive, malformed path
+            key = str(target).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        view = _restore_view(host.get("id", ""), target)
+        if view is None:
+            continue
+        out.append({"agent": host.get("id", ""),
+                    "agent_name": host.get("name", host.get("id", "")),
+                    "path": str(target), "backup": view["backup"],
+                    "remove": view["remove"], "add_back": view["add_back"],
+                    "pointer": view["pointer"]})
+    return out
+
+
+def restore_plan(agent_id: str | None = None) -> list[dict]:
+    """Read-only preview of what `mcptoon restore` would put back, per host.
+
+    One row per config file `restore` would change — a host mcptoon edited and has
+    not been restored since. An empty list means there is nothing to restore.
+    Nothing is written; this is the plan, not the result.
+    """
+    return _restore_candidates(agent_id)
+
+
+def restore_agent_from_backup(agent_id: str, dry_run: bool = False,
+                              path: Path | None = None) -> dict:
+    """Undo mcptoon's edits to one host: drop the gateway, return its servers.
+
+    Surgical, not a file copy. It removes only the ``mcptoon`` gateway entry and
+    re-adds only the servers the `.bak` holds that mcptoon manages and the live
+    file has lost. Everything the user added to their config after mcptoon's edit
+    is left exactly where it is — a byte-for-byte copy of the `.bak` would silently
+    delete those, which is the failure this command exists to prevent.
+
+    ``path`` overrides the file to restore (same reason ``remove_gateway_from_agent``
+    takes one: a host id does not always map to a single file — Cursor keeps a
+    project-level config next to its global one).
+
+    A host that also carries the skill-pointer leg (Claude Code's ``CLAUDE.md``,
+    Codex's ``AGENTS.md``) has that block removed too: restoring the original means
+    the pointer must go as well, or the restored file still tells an agent to use a
+    catalog that is no longer mounted. The pointer removal is the same
+    byte-reversible ``_remove_skill_pointer`` `off` uses, so the user's own content
+    in that file is untouched.
+
+    Returns a sync-shaped result; ``restored`` is True when there was something to
+    undo, ``written`` when a file actually changed.
+    """
+    target = path if path is not None else _agent_config_path(agent_id)
+    if target is None:
+        return {"agent": agent_id, "path": "", "restored": False, "written": False,
+                "error": f"Unknown agent: {agent_id}"}
+    view = _restore_view(agent_id, target)
+    if view is None:
+        return {"agent": agent_id, "path": str(target), "restored": False,
+                "written": False, "error": None}
+
+    if dry_run:
+        return {"agent": agent_id, "path": str(target), "restored": True,
+                "written": False, "error": None, "removed": view["remove"],
+                "add_back": view["add_back"], "pointer_removed": view["pointer"]}
+
+    changed = False
+    if agent_id != "codex" and (view["remove"] or view["add_back"]):
+        live = _read_json_obj(target)
+        if live is None:
+            # Between the plan and the write the file became unreadable. Do not
+            # guess — report nothing written rather than risk clobbering it.
+            return {"agent": agent_id, "path": str(target), "restored": True,
+                    "written": False, "error": "config unreadable; left unchanged",
+                    "removed": None, "add_back": [], "pointer_removed": False}
+        section = dict(_servers_section(live, agent_id))
+        if view["remove"]:
+            section.pop(view["remove"], None)
+        if view["add_back"]:
+            bak = _backup_path(target)
+            bak_section = _servers_section(_read_json_obj(bak) or {}, agent_id)
+            for name in view["add_back"]:
+                if name not in section and name in bak_section:
+                    section[name] = bak_section[name]
+        if agent_id == "vscode-copilot":
+            mcp = live.get("mcp")
+            if not isinstance(mcp, dict):
+                mcp = {}
+            mcp["servers"] = section
+            live["mcp"] = mcp
+        else:
+            live["mcpServers"] = section
+
+        # Delete an empty stub ONLY when the file was mcptoon's own creation: the
+        # `.bak` must be a readable object whose server section is empty, proving
+        # the file had no servers before mcptoon added the gateway. An *unreadable*
+        # `.bak` (missing / corrupt / JSONC / a directory) proves nothing, so it is
+        # never grounds for deletion — that is how a rollback would otherwise
+        # delete a config it failed to parse. The live file must also have nothing
+        # but the (now-empty) server section.
+        bak_obj = _read_json_obj(_backup_path(target))
+        bak_was_empty = isinstance(bak_obj, dict) and not _servers_section(bak_obj, agent_id)
+        if not section and bak_was_empty and set(live.keys()) <= {"mcpServers", "mcp"}:
+            try:
+                target.unlink(missing_ok=True)
+                changed = True
+            except OSError:
+                changed = False
+        else:
+            changed = _write_json_safe(target, live)
+
+    pointer_removed = False
+    if view["pointer"]:
+        ppath = pointer_path(agent_id)
+        if ppath is not None and ppath.exists():
+            res = _remove_skill_pointer(ppath)
+            pointer_removed = bool(res.get("removed"))
+    return {"agent": agent_id, "path": str(target), "restored": True,
+            "written": bool(changed) or pointer_removed, "error": None,
+            "removed": view["remove"], "add_back": view["add_back"],
+            "pointer_removed": pointer_removed}
+
+
+def restore_all_from_backup(dry_run: bool = False) -> list[dict]:
+    """Restore every detected host that has an mcptoon edit to undo.
+
+    Each host is restored independently and wrapped: a single malformed config
+    (a non-dict section, an unreadable file, a hostile `.bak`) must not abort the
+    others — otherwise one bad file would leave the gateway on every remaining
+    host and print a traceback. A failing host is reported with ``error`` set.
+    """
+    agents = detect_installed_agents()
+    results = []
+    seen: set[str] = set()
+    for agent in agents:
+        target = Path(agent["config_path"])
+        try:
+            key = str(target.resolve()).lower()
+        except OSError:
+            key = str(target).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            r = restore_agent_from_backup(agent["id"], dry_run=dry_run, path=target)
+        except Exception as e:  # never let one host abort the whole restore
+            r = {"agent": agent["id"], "path": str(target), "restored": False,
+                 "written": False, "error": f"{type(e).__name__}: {e}"}
         r["agent_name"] = agent["name"]
         r["config_exists"] = agent["exists"]
         results.append(r)
@@ -605,14 +922,54 @@ def detect_installed_agents() -> list[dict]:
 
 # ─── Sync functions ───
 
-def _read_json_safe(path: Path) -> dict:
-    """Read JSON file, return empty dict on error."""
-    if not path.exists():
-        return {}
+def _read_text_safe(path: Path) -> str | None:
+    """File text, or None if it cannot be read as a regular file.
+
+    ``None`` is deliberately distinct from ``""``: a missing, unreadable, or
+    non-file path (a directory, a broken symlink) is *unknown*, not *empty*. The
+    undo path must never treat "I could not read this" as "there was nothing
+    here" — that is how a rollback deletes a config it failed to parse.
+    """
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _parse_json(text: str | None) -> object | None:
+    """Parse JSON text; ``None`` means *could not parse* (missing or malformed).
+
+    Used where the difference between "empty object" and "unparseable" changes a
+    decision. Note the ``None`` return also covers JSONC (VS Code's real
+    ``settings.json`` has comments and trailing commas, which ``json`` rejects) —
+    an unparseable file is treated as *opaque*, never as empty.
+    """
+    if text is None:
+        return None
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def _read_json_obj(path: Path) -> dict | None:
+    """Read a config file as a dict, or ``None`` if absent/unparseable/not an object."""
+    data = _parse_json(_read_text_safe(path))
+    return data if isinstance(data, dict) else None
+
+
+def _read_json_safe(path: Path) -> dict:
+    """Read JSON file, return empty dict on error.
+
+    Convenience wrapper for the *non-destructive* read paths (discovery, status,
+    dry-run previews) where a missing or malformed file should simply read as "no
+    data". Code that *writes* or *deletes* must use ``_read_json_obj`` /
+    ``_read_text_safe`` instead, so it can tell "empty" from "could not read".
+    """
+    data = _read_json_obj(path)
+    return data if data is not None else {}
 
 
 def _write_json_safe(path: Path, data: dict) -> bool:
@@ -622,8 +979,12 @@ def _write_json_safe(path: Path, data: dict) -> bool:
     taken *only when the content actually changes* — that keeps the backup
     meaningful (it is the pre-mcptoon state) instead of littering one file per
     routine sync, and it means the very first `sync` that adds the gateway leaves
-    a one-command undo: copy `<config>.bak` back, or delete the `mcptoon` entry.
+    a real undo: `mcptoon restore` reads the `.bak` and puts the servers back.
     A failed backup does not block the write; the write is what the user asked for.
+
+    A file that is not a plain JSON object (JSONC, a syntax error, a non-object
+    root) is refused rather than overwritten — the caller merged into an empty dict
+    for such a file, so writing would silently drop its contents.
 
     A successful `write_text` is not proof the entry survived: some host state
     files (Claude Code's `~/.claude.json` is one) are rewritten by the host
@@ -640,6 +1001,23 @@ def _write_json_safe(path: Path, data: dict) -> bool:
                 old_text = path.read_text(encoding="utf-8")
             except OSError:
                 old_text = None
+            # Refuse to overwrite a file we could not parse, or whose top level is
+            # not a JSON object (JSONC with comments, a hand-edited file with a
+            # trailing comma, a partial write, a bare list). The caller merged into
+            # an *empty* dict in that case, so writing would silently drop whatever
+            # is already in the file — VS Code's settings.json is JSONC by default,
+            # which makes this the likeliest real-world loss.
+            if old_text:
+                parsed = _parse_json(old_text)
+                if not isinstance(parsed, dict):
+                    print(
+                        f"warning: {path} is not a plain JSON object (comments, a syntax "
+                        f"issue, or a non-object root); leaving it unchanged rather than "
+                        f"risk dropping settings mcptoon cannot parse. Add the mcptoon "
+                        f"entry by hand, or convert the file to JSON first.",
+                        file=sys.stderr,
+                    )
+                    return False
             if old_text is not None and old_text != new_text:
                 bak = path.with_suffix(path.suffix + ".bak")
                 if not bak.exists():  # never overwrite an existing backup
@@ -652,20 +1030,26 @@ def _write_json_safe(path: Path, data: dict) -> bool:
         return False
 
     # Read-back verification (only meaningful when we wrote the gateway entry).
-    if SELF_SERVER_NAME in _servers_section(data, "claude-code"):
+    # Check both config shapes, not just the Claude Code one — a clobbered VS Code
+    # `mcp.servers` write must be caught too, or it is reported as success.
+    wrote_gateway = (SELF_SERVER_NAME in _servers_section(data, "claude-code")
+                     or SELF_SERVER_NAME in _servers_section(data, "vscode-copilot"))
+    if wrote_gateway:
         try:
             written_back = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             written_back = None  # cannot tell — do not cry wolf
-        if (isinstance(written_back, dict)
-                and SELF_SERVER_NAME not in _servers_section(written_back, "claude-code")):
-            print(
-                f"warning: {path} lost the '{SELF_SERVER_NAME}' entry right after it was "
-                f"written. Another program is rewriting this file; re-run the sync, or add "
-                f"the entry by hand.",
-                file=sys.stderr,
-            )
-            return False
+        if isinstance(written_back, dict):
+            survived = (SELF_SERVER_NAME in _servers_section(written_back, "claude-code")
+                        or SELF_SERVER_NAME in _servers_section(written_back, "vscode-copilot"))
+            if not survived:
+                print(
+                    f"warning: {path} lost the '{SELF_SERVER_NAME}' entry right after it was "
+                    f"written. Another program is rewriting this file; re-run the sync, or add "
+                    f"the entry by hand.",
+                    file=sys.stderr,
+                )
+                return False
     return True
 
 
@@ -705,7 +1089,8 @@ def _merge_mcp_servers(existing: dict, new_servers: dict,
     undo.
     """
     result = dict(existing)
-    current_servers = dict(result.get("mcpServers", {}))
+    existing_section = result.get("mcpServers")
+    current_servers = dict(existing_section) if isinstance(existing_section, dict) else {}
     if takeover:
         _drop_managed_servers(current_servers, new_servers)
         # Under takeover the gateway replaces the direct entries — re-adding the
@@ -833,9 +1218,9 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
     if agent_id in _path_fns:
         path = _path_fns[agent_id]()
         existing = _read_json_safe(path)
-        before = set((existing.get("mcpServers") or {}).keys())
+        before = set(_servers_section(existing, agent_id))
         merged = _merge_mcp_servers(existing, mcp_servers, takeover=takeover)
-        taken_over = len(before - set((merged.get("mcpServers") or {}).keys()))
+        taken_over = len(before - set(_servers_section(merged, agent_id)))
         # The MCP leg and the CLI leg are independent, and this host can carry
         # both: Claude Code reads `~/.claude/CLAUDE.md` every session, so it can be
         # told about the catalog in words as well as handed a gateway to mount.
@@ -864,8 +1249,12 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
         # The user's settings.json is a large shared file, so this one is edited
         # in place rather than rewritten: a full re-serialisation would reorder
         # keys and reformat comments. An existing backup is left untouched.
-        mcp_section = existing.get("mcp", {})
-        current_servers = dict(mcp_section.get("servers", {}))
+        # (`_write_json_safe` additionally refuses to write if the file is JSONC
+        # or otherwise not a plain object, so a shared settings.json survives.)
+        mcp_section = existing.get("mcp")
+        if not isinstance(mcp_section, dict):
+            mcp_section = {}
+        current_servers = dict(_servers_section(existing, "vscode-copilot"))
         before = set(current_servers)
         if takeover:
             _drop_managed_servers(current_servers, mcp_servers)

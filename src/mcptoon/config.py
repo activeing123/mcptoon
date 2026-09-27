@@ -138,7 +138,7 @@ FOOTER_STATE_FILE = Path(os.environ.get(
 # order"; see `resolve_lang` for the order and for why an order — not a guess —
 # is what makes the answer stable.
 SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto",
-                    "exposure": "compact"}
+                    "exposure": "compact", "compress": "smart"}
 
 # Languages the human-facing strings can be written in. "auto" is not a language:
 # it is the request to detect one.
@@ -161,6 +161,20 @@ DEFAULT_LANG = "en"
 # the fallback is one command away; see the `mcptoon` skill for when to use it.
 EXPOSURE_MODES = ("compact", "full")
 
+# Result-compression modes — what happens to a tool *result* on its way back.
+#
+#   smart — structure-aware compression on by default (compressor.py): redundant
+#           shapes (search results, directory trees, repeated logs) are shrunk
+#           with every key kept, and the untruncated original is cached so
+#           `mcptoon_retrieve` can hand it back. Unsafe shapes (a lone source
+#           file, one long prose answer, binary) are passed through untouched —
+#           see compressor.is_compressible. This is the default because the
+#           whole point of the gateway is to cost less without being asked.
+#   off   — results pass through verbatim. The pre-feature behavior, and the
+#           escape hatch for anyone who wants byte-identical output.
+#   toon  — the older, lossless re-encoding (JSON→TOON, ~8-34% fewer tokens).
+COMPRESS_MODES = ("smart", "off", "toon")
+
 # Settings whose value must be one of a fixed set. Validated in `set_setting`,
 # so a typo fails loudly instead of silently persisting a value nothing honours.
 #
@@ -174,7 +188,7 @@ EXPOSURE_MODES = ("compact", "full")
 #     `full` and gets `compact` is told their tools are visible when they are not
 #     — a silent downgrade of exactly the kind this repo treats as a bug, so it
 #     has to fail at the keyboard instead.
-SETTING_CHOICES = {"exposure": EXPOSURE_MODES}
+SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES}
 
 # Windows LANGID primary-language ids worth naming. Anything unnamed falls back
 # to the locale string and then to English, so an unlisted language degrades to
@@ -454,6 +468,27 @@ def compact_exposure() -> bool:
     return exposure_mode() == "compact"
 
 
+def compression_mode() -> str:
+    """How tool results are compressed by default: "smart" (default) or "off".
+
+    An unrecognized stored value falls back to the default rather than raising —
+    a hand-edited settings file must not break the gateway, and "compress the
+    redundant shapes" is the intended default.
+    """
+    value = get_setting("compress").strip().lower()
+    return value if value in COMPRESS_MODES else COMPRESS_MODES[0]
+
+
+def auto_smart_enabled() -> bool:
+    """True when results should be compressed without being asked (`--smart`).
+
+    The "install and it just works" half: a fresh install compresses redundant
+    results by default. A per-tool policy still overrides this either way, and
+    `mcptoon config set compress off` turns it off entirely.
+    """
+    return compression_mode() == "smart"
+
+
 def welcome_enabled() -> bool:
     """Whether the one-time first-run welcome may print. Default: on."""
     return get_setting("welcome").strip().lower() not in ("off", "0", "false", "no")
@@ -684,7 +719,7 @@ def list_disabled_tools() -> list[str]:
 # question MuleSoft's gateway made table stakes: *this* tool's results must
 # not be compressed (raw) or must always arrive as a specific shape.
 
-VALID_POLICIES = ("raw", "json", "auto", "toon", "compact", "slim")
+VALID_POLICIES = ("raw", "json", "auto", "toon", "compact", "slim", "smart")
 POLICY_FILE = CONFIG_DIR / "compression.json"
 
 
@@ -736,11 +771,20 @@ def resolve_output_format(server: str, tool: str, base_fmt: str) -> str:
     """Effective output format: the tool's policy if configured, else base_fmt.
 
     A policy of "auto" means "default behaviour" — identical to no policy.
+
+    When nothing pins a format and the caller asked for the default
+    (``base_fmt == "auto"``), the result-compression setting decides: a fresh
+    install resolves to ``smart`` so results are compressed without anyone
+    typing a flag, and ``config set compress off`` restores verbatim output.
+    Explicit formats (``--json``, ``--toon``) always win, so this only changes
+    the *default*, never a deliberate choice.
     """
     policy = get_compression_policy(server, tool)
-    if policy is None or policy == "auto":
-        return base_fmt
-    return policy
+    if policy is not None and policy != "auto":
+        return policy
+    if base_fmt == "auto" and auto_smart_enabled():
+        return "smart"
+    return base_fmt
 
 
 def set_compression_policy(server: str, tool: str, policy: str | None) -> bool:

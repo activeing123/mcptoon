@@ -228,13 +228,27 @@ def _rows_and_tail(facts: dict, skills: int | None, lng: str, stream) -> tuple[l
         "还没发现 MCP 服务器" if zh else "no MCP servers yet")
 
     # What it saves, on the same caliber as every other surface.
+    #
+    # 2026-09-26: this row used to quote the *slim-schema* saving (24%) as "the"
+    # saving — the same defect the footer had, so the greeting and the footer
+    # agreed on the wrong number. The gateway figure (full schemas vs what the
+    # agent actually loads under the default `compact` exposure) is the honest
+    # headline, and it comes from the same helper the footer uses.
     full = int(facts.get("tokens_full") or 0)
     slim = int(facts.get("tokens_slim") or 0)
     saved = int(facts.get("tokens_saved") or 0)
     pct = float(facts.get("savings_pct") or 0.0)
-    context = (f"{full:,} {arrow} {slim:,} tokens"
-               + (f"（省 {saved:,}，{pct:.0f}%）" if zh else f" (saved {saved:,}, {pct:.0f}%)")
-               ) if full else ("尚未缓存" if zh else "catalog not cached yet")
+    gw_pct = facts.get("gateway_pct")
+    gw_tok = facts.get("gateway_tokens")
+    if full and gw_tok and gw_pct is not None:
+        context = (f"{full:,} {arrow} {gw_tok:,} tokens"
+                   + (f"（网关省 {gw_pct:.0f}%；仅瘦身 schema 省 {pct:.0f}%）" if zh
+                      else f" (gateway saves {gw_pct:.0f}%; slim schemas alone {pct:.0f}%)")
+                   )
+    else:
+        context = (f"{full:,} {arrow} {slim:,} tokens"
+                   + (f"（省 {saved:,}，{pct:.0f}%）" if zh else f" (saved {saved:,}, {pct:.0f}%)")
+                   ) if full else ("尚未缓存" if zh else "catalog not cached yet")
 
     rows = [
         ("本机已有" if zh else "Found", found, ""),

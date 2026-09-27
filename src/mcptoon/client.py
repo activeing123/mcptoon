@@ -700,7 +700,21 @@ class MCPClient:
         # "Python-urllib/3.x" signature (Cloudflare error 1010); announce
         # ourselves instead — unless the caller already set a User-Agent.
         req.add_header("User-Agent", DEFAULT_USER_AGENT)
-        for k, v in self._headers.items():
+        # Resolve `${NAME}` header values here, at request time (issue #24). This
+        # is the single funnel both the generated handler and the gateway reach,
+        # so one call site keeps `install --url` verification and later calls in
+        # step: a server cannot install with a working header and then fail every
+        # call because a second code path forgot to expand. Nothing is written
+        # back — `self._headers` keeps the `${NAME}` template, so the secret never
+        # reaches the config file, the handler or any output, and rotating the
+        # variable takes effect on the next call with no reinstall.
+        from . import headers as headers_mod
+
+        try:
+            resolved = headers_mod.resolve_headers(self._headers)
+        except headers_mod.HeaderEnvError as e:
+            raise MCPError("HEADER_ENV_MISSING", str(e)) from e
+        for k, v in resolved.items():
             req.add_header(k, v)
         if extra_headers:
             for k, v in extra_headers.items():
@@ -751,7 +765,12 @@ class MCPClient:
             req = urllib.request.Request(self._http_url, data=payload, method="POST")
             req.add_header("Content-Type", "application/json")
             req.add_header("User-Agent", DEFAULT_USER_AGENT)
-            for k, v in self._headers.items():
+            # Same request-time resolution as `_http_request` (issue #24): a
+            # notification must not carry a different Authorization than the call
+            # it belongs to. Best-effort — the whole method is fire-and-forget.
+            from . import headers as headers_mod
+
+            for k, v in headers_mod.resolve_headers(self._headers).items():
                 req.add_header(k, v)
             if self._session_id:
                 req.add_header("Mcp-Session-Id", self._session_id)

@@ -60,6 +60,7 @@ NATIVE_NAMES = (
     "mcptoon_resolve_skills",
     "mcptoon_inspect",
     "mcptoon_call",
+    "mcptoon_retrieve",
 )
 
 
@@ -451,6 +452,44 @@ def native_tools() -> list[dict]:
                 "openWorldHint": True,
             },
         },
+        {
+            "name": "mcptoon_retrieve",
+            "title": "Retrieve a compressed result",
+            "description": (
+                "Get back the full, uncompressed text of a tool result mcptoon "
+                "compressed. When a result ends with a line naming a handle, call "
+                "this if the summary lacks a detail you need."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string",
+                        "description": (
+                            "The handle from a result's 'mcptoon_retrieve handle=...' "
+                            "line, e.g. ab12cd34ef56."
+                        ),
+                    },
+                },
+                "required": ["handle"],
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "found": {"type": "boolean"},
+                    "handle": {"type": "string"},
+                    "original": {},
+                },
+                "required": ["found", "handle"],
+            },
+            "annotations": {
+                "title": "Retrieve a compressed result",
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
+            },
+        },
     ]
 
 
@@ -751,6 +790,30 @@ def _inspect(arguments: dict, state: dict) -> dict:
     }
 
 
+def _retrieve(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform signature
+    """Fetch the original behind a compression handle (the CCR read half).
+
+    The write half lives in ``serve._smart_compress``: it stores the untruncated
+    result and puts the handle in a notice line. This handler is the model's way
+    back to that original, which is what makes compression reversible rather
+    than a dead end. Unknown or expired handles answer ``found: false`` — not an
+    error, because "that summary is all there is now" is a valid outcome.
+    """
+    handle = _as_str(arguments.get("handle"))
+    if not handle:
+        return {"found": False, "handle": "", "notice": "Pass the handle from a "
+                "result's 'mcptoon_retrieve handle=...' line."}
+    from . import ccr as _ccr
+    try:
+        original = _ccr.retrieve(handle)
+    except Exception:  # pragma: no cover - defensive
+        original = None
+    if original is None:
+        return {"found": False, "handle": handle, "notice": "No stored result for "
+                "that handle (expired, or the result was never compressed)."}
+    return {"found": True, "handle": handle, "original": original}
+
+
 _HANDLERS = {
     "mcptoon_manifest": _manifest,
     "mcptoon_servers": _servers,
@@ -759,6 +822,7 @@ _HANDLERS = {
     "mcptoon_skills": _skills,
     "mcptoon_resolve_skills": _resolve_skills,
     "mcptoon_inspect": _inspect,
+    "mcptoon_retrieve": _retrieve,
     # "mcptoon_call" is routed by the bridge to the upstream tool; it has no
     # handler here because it must reuse the bridge's pool, validation and
     # compression rather than duplicate them (see serve._handle_call_tool).

@@ -193,6 +193,34 @@ class TestFirstRunWelcome(_IsolatedHome):
         self.assertIn("首次在本机运行", out)
         self.assertIn("无常驻进程", out)
 
+    def test_welcome_quotes_the_gateway_caliber_like_the_footer(self):
+        """The greeting is the first number a user ever sees, so it must not be the
+        understated one. On 2026-09-26 this row and the footer both quoted the
+        slim-schema saving (24%) as "the" saving while the real gateway saving was
+        89% — two surfaces agreeing on the wrong figure. When the facts carry a
+        gateway measurement, the greeting leads with it too.
+        """
+        facts = {"servers": 12, "tools": 96, "tokens_full": 21074,
+                 "tokens_slim": 15955, "tokens_saved": 5119, "savings_pct": 24.3,
+                 "gateway_tokens": 2291, "gateway_saved": 18783, "gateway_pct": 89.1,
+                 "token_caliber": "tiktoken cl100k_base"}
+        buf = io.StringIO()
+        out = welcome.render(facts, skills=None, lng="en", stream=buf)
+        self.assertIn("21,074", out)
+        self.assertIn("2,291", out)
+        self.assertIn("gateway saves 89%", out)
+
+    def test_welcome_falls_back_when_the_gateway_is_unknown(self):
+        """A legacy fact set without the gateway keys still renders the old row."""
+        facts = {"servers": 3, "tools": 40, "tokens_full": 900, "tokens_slim": 300,
+                 "tokens_saved": 600, "savings_pct": 66.7,
+                 "token_caliber": "tiktoken cl100k_base"}
+        buf = io.StringIO()
+        out = welcome.render(facts, skills=None, lng="en", stream=buf)
+        self.assertIn("900", out)
+        self.assertIn("300", out)
+        self.assertIn("saved 600", out)
+
     def test_bare_invocation_greets_then_still_prints_help(self):
         """`mcptoon` with no args is how people open the tool, and it used to open
         the help page with no sign mcptoon was installed at all — the second half
@@ -636,6 +664,33 @@ class TestTokenAccounting(unittest.TestCase):
         usage.reset_usage()
         usage.track_call("echo", "echo", ok=False)
         self.assertEqual(usage.get_usage_stats()["total_tokens_est"], 0)
+
+    def test_the_lifetime_count_does_not_freeze_at_the_window_size(self):
+        """The bug found in the 2026-09-26 audit: `total_calls` read the capped
+        window, so every surface — `usage`, `status`, `stats` and the footer's
+        live figure — froze at exactly 1000 and could never climb again. The real
+        count on the author's machine was 3,896 while all four said 1,000.
+
+        A usage file whose window is full but whose counter is higher must report
+        the counter, while `window_calls` (what the breakdowns and success rate
+        are computed over) stays at the window size."""
+        from mcptoon import usage
+        window = [{"server": "s", "tool": "t", "ok": True, "tokens": 1, "ts": 0.0}
+                  for _ in range(1000)]
+        usage._save_usage({"calls": window, "total": 3896})
+        stats = usage.get_usage_stats()
+        self.assertEqual(stats["total_calls"], 3896)
+        self.assertEqual(stats["window_calls"], 1000)
+        # The success rate is measured against the window, not the lifetime.
+        self.assertEqual(stats["success_rate"], "1000/1000")
+
+    def test_a_legacy_file_without_a_counter_falls_back_to_the_window(self):
+        """A file written before `total` existed must still answer honestly, and
+        must never report more calls than it has records for."""
+        from mcptoon import usage
+        usage._save_usage({"calls": [{"server": "s", "tool": "t", "ok": True,
+                                      "tokens": 1, "ts": 0.0}]})
+        self.assertEqual(usage.get_usage_stats()["total_calls"], 1)
 
 
 class TestCatalogCountConsistency(unittest.TestCase):

@@ -8,16 +8,16 @@
 
 **在本地装上 1,000 个技能、1,000 个 MCP 工具，也不必担心 token 上下文——统统由 mcptoon 管理。**
 
-**独有的紧凑格式省下 99.2% token；无需为任意桌面 Agent、命令行 Agent 写一行配置。**
+**独有的紧凑格式把工具上下文砍掉约 90%（255 工具样本上 99.2%；你自己的数看 `mcptoon status`）；无需为任意桌面 Agent、命令行 Agent 写一行配置。**
 
 **直连 17,000+ 个 MCP 工具注册表，技能按需检索安装——原生 0 预装，装什么由你定。**
 
-**它只是一个 227KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。**
+**它只是一个 297KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。**
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1471%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1626%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -50,7 +50,7 @@ mcptoon 把这些描述**留在磁盘上、不放进上下文**，只交给 Agen
 
 什么都不丢：完整 schema 和完整技能全文，永远只差一条命令。省下的只有上下文窗口。
 
-mcptoon 是一个 **227KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
+mcptoon 是一个 **297KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
 
 ## 不只我们一家这么说
 
@@ -90,7 +90,7 @@ mcptoon 是今天就能用、一次覆盖所有 Agent 的那个。
 </tr>
 </table>
 
-自己复现这些数字：`pip install mcptoon && mcptoon bench`
+量你自己的数字：`pip install mcptoon && mcptoon bench` —— 它报的是你本机的目录，不是下面这份固定的 255 工具样本。
 
 | | 没有 mcptoon | 用 mcptoon |
 |---|---|---|
@@ -173,7 +173,7 @@ mcptoon serve                       # 把所有已配置的服务器收在同一
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，227KB，零依赖
+pip install mcptoon                          # 纯标准库，297KB，零依赖
 
 # 一条命令：扫出你的 MCP 服务器、写好配置、把网关登记进你所有 Agent，并告诉它发现了什么：
 mcptoon quickstart
@@ -187,7 +187,7 @@ mcptoon call everything echo '{"message":"hi"}'
 
 `quickstart` 也是让 mcptoon **被看见**的那一步：它把 `mcptoon serve` 作为一个名为 `mcptoon` 的保留服务器写进每个 Agent 的配置，于是你的 Agent 能看见 mcptoon 本身。已经同步过？用 `mcptoon sync --self` 重新登记（不带 `--self` 的 `mcptoon sync` 只写你自己的服务器）；任何时候用 `mcptoon status` 看状态。
 
-**而且它完全可逆。** `mcptoon sync --self` 只往某个 Agent 的配置里加一条记录，别的都不碰。随时用 `mcptoon off` 摘掉它（你自己的服务器原样不动，每个被改的文件都留 `.bak`）；用 `mcptoon uninstall --dry` 预览完整移除计划。你的服务器定义原样保留，`uninstall` 动手前会先打印清楚要删什么。
+**而且它完全可逆。** 安装会登记网关，默认还会「接管」——把你已有的服务器改走网关、摘掉它们原来的直连记录（这才是真正省 token 的模式）。这一步会列清单、要你确认一次，而且能撤销：**`mcptoon restore` 摘掉网关记录、把你的服务器原样放回去**；你之后往配置里加的东西一概不动。`mcptoon off` 是更轻的开关——只摘网关记录，服务器留在原地。两者都能加 `--dry` 预览；`mcptoon uninstall --dry` 会先打印完整移除计划。
 
 还不想装？那就先看它干活（需要 Node）：
 
@@ -268,6 +268,8 @@ mcptoon manifest      # 看全部工具（名字索引，最省 token）
 
 mcptoon 省下的 token 分三处，混在一起比数字没有意义。
 
+「省了多少」有两个读法，回答的是两个不同的问题。**网关口径**——完整 schema 对比 agent 默认 `compact` 暴露下真正加载的东西——才是装上 mcptoon 买到的那个数，是诚实的头条（本机实测 89%）。**瘦身 schema 口径**（同一批工具、描述更短）是更小的次要口径（24%），对应 `manifest --slim`。`mcptoon status` 把两者并排打印，来自同一次测量，因此永远不会各说各话。
+
 ### 第一笔 · 工具发现（`manifest`）：默认省 99.2%
 
 `mcptoon manifest` 不带参数就是这一档。想要更多：`--slim`（名字加参数类型，8,282 token，−88.5%）或 `--full`（完整 schema）。
@@ -294,7 +296,7 @@ mcptoon skills resolve "做个 PDF" --k 5      # 501 token，返回最相关的 
 | | `skills manifest`（指针） | 39 | 100.0% |
 | | `skills resolve --k 5` | 501 | 99.9% |
 
-固定口径的头条基准——255 个工具、50 个服务器、`tiktoken cl100k_base`：
+固定口径的头条基准——一份**合成样本**（255 个工具、50 个服务器，`tiktoken cl100k_base`）。它不是你的目录；你自己的数看 `mcptoon status`：
 
 | 格式 | token | 省 |
 |---|---:|---:|
@@ -303,7 +305,7 @@ mcptoon skills resolve "做个 PDF" --k 5      # 501 token，返回最相关的 
 | SLIM | 8,282 | 88.5% |
 | Compact | 581 | 99.2% |
 
-自己复现：`mcptoon bench`（随 wheel 一起发）。方法学见 [docs/tiktoken-benchmarks.md](https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md)。
+用 `mcptoon bench` 量你自己的目录（报的是你的工具，不是这份固定样本）。方法学见 [docs/tiktoken-benchmarks.md](https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md)。
 
 ---
 
@@ -400,6 +402,7 @@ mcptoon demo-server             # 同样的自证，零下载（11 个标准库�
 mcptoon doctor                  # 自检：Python、配置、连通性
 mcptoon status                  # 一屏：配了什么、网关通没通、省了多少
 mcptoon stats                   # token 省量看板（对比原始 JSON）
+mcptoon report                  # 省量总账：工具 + 技能 + 累计
 mcptoon usage                   # 本地调用统计
 mcptoon footer-facts            # 一行省量，供聊天页脚用（永不阻塞）
 mcptoon config                  # 查看网关设置（footer、welcome、lang）
@@ -407,6 +410,7 @@ mcptoon toggle <server> <tool>  # 启用/停用单个工具（--list 全列）
 mcptoon policy                  # 逐工具的压缩策略（raw / toon / slim）
 mcptoon completion ps           # shell 补全（bash/zsh/fish/powershell）
 mcptoon off                     # 从你的 Agent 里摘掉网关记录（可逆）
+mcptoon restore                 # 摘网关、把你的服务器放回去
 mcptoon uninstall               # 完整清理——先打印计划（--dry 预览）
 ```
 
@@ -431,7 +435,7 @@ mcptoon uninstall               # 完整清理——先打印计划（--dry 预�
 
 ## 信任与安全
 
-**它只是一个 227KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
+**它只是一个 297KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
 
 每个工具结果在进入你 Agent 之前，都要过三道防护：
 
@@ -441,7 +445,7 @@ mcptoon uninstall               # 完整清理——先打印计划（--dry 预�
 | **提示注入防护** | 扫描结果里的注入模式（如 "ignore previous instructions"）并拦截 |
 | **凭据泄露检测** | 结果里带 API key 或 token，会在进入上下文之前被拦下 |
 
-- **可逆。** `mcptoon off` 摘掉它加的那一条记录；`mcptoon uninstall --dry` 先打印完整移除计划。你的服务器不会被删，除非你显式要求。
+- **可逆。** `mcptoon restore` 撤销接管（摘网关、还你服务器）；`mcptoon off` 只摘网关记录；`mcptoon uninstall --dry` 先打印完整移除计划。你的服务器不会被删，除非你显式要求。
 - **没有遥测。** 没有分析、没有崩溃报告、没有回传。
 - **本地优先。** 你的工具、技能和文件都留在你机器上。唯一出门的是 `install --search`，它向注册表要一份目录清单——从不发送你的数据。
 - **不存凭证。** API key 从你的配置或环境变量直接传递。
@@ -469,12 +473,12 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1471 passed, 1 skipped
+python -m pytest tests/ -v   # 1626 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-代码规模：**28 个模块、20,170 行 Python**，零第三方依赖。
+代码规模：**32 个模块、22,789 行 Python**，零第三方依赖。
 
 ---
 

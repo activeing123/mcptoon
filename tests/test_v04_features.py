@@ -62,7 +62,9 @@ class TestFixSuggestions:
     def test_config_missing(self):
         from mcptoon.cli import _fix_suggestion
         result = _fix_suggestion("CONFIG_MISSING")
-        assert "mcptoon init" in result
+        # `quickstart` is the first command every other surface names; the hint
+        # must not send a new user to a different door (2026-09-26 polish pass).
+        assert "mcptoon quickstart" in result
 
     def test_tool_not_found(self):
         from mcptoon.cli import _fix_suggestion

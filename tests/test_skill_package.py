@@ -216,6 +216,84 @@ class TestInstallSelfRefreshesOurOwnCopy:
         assert rows[0]["skipped"] is True
 
 
+class TestFreshInstallCountsTheSkillOnce:
+    """The whole first-run path: install into every view, then read the catalog.
+
+    Why this class exists: `TestInstallSelf` always passed an explicit ``views=``
+    list and `RealPathDedupTests` always used *junctions*. Neither covered the
+    layout a real ``pip install`` produces — the packaged skill **copied** into
+    six agent folders — so the index counted it six times, printed six identical
+    `skills list` rows, emitted a bogus ``SKILL_DUPLICATE``, and quoted 12,163
+    tokens for one 3,130-token file. The tool's own savings numbers were 4x
+    inflated on exactly the machine that had just installed it.
+    """
+
+    VIEW_NAMES = ("claude", "agents", "codex", "cursor", "catpaw",
+                  "codeium/windsurf")
+
+    def _installed(self, tmp_path):
+        views = [tmp_path / n / "skills" for n in self.VIEW_NAMES]
+        skills.install_self(views=views)
+        return views
+
+    def test_the_index_reports_one_skill_not_six(self, tmp_path):
+        views = self._installed(tmp_path)
+        idx = skills.scan_roots(views)
+        assert [s["slug"] for s in idx["skills"]] == ["mcptoon"]
+
+    def test_no_duplicate_warning_for_identical_copies(self, tmp_path):
+        """Copies are the *same* skill; warning about them is noise, not signal."""
+        idx = skills.scan_roots(self._installed(tmp_path))
+        assert [w for w in idx["warnings"] if w["code"] == "SKILL_DUPLICATE"] == []
+
+    def test_the_token_figure_is_not_multiplied_by_the_copy_count(self, tmp_path):
+        """One 3,130-token file must read as ~3,130, never 6 x that."""
+        from mcptoon import bench
+
+        views = self._installed(tmp_path)
+        files, _dupes = bench._unique_skill_files(views)
+        assert len(files) == 1
+        figs = skills.skill_token_figures(roots=views)
+        single = skills.packaged_skill_path().read_text(encoding="utf-8")
+        encode, _cal, _exact = bench._tokenizer()
+        assert figs["count"] == 1
+        assert figs["native_tokens"] == encode("\n" + single)
+
+    def test_a_real_conflict_still_warns(self, tmp_path):
+        """Same slug, *different* bytes is two skills fighting for one name — the
+        collapse must not swallow that case."""
+        views = self._installed(tmp_path)
+        clash = views[1] / "mcptoon" / "SKILL.md"
+        clash.write_text("---\nname: mcptoon\ndescription: different\n---\n\nx\n",
+                         encoding="utf-8")
+        idx = skills.scan_roots(views)
+        assert "SKILL_DUPLICATE" in {w["code"] for w in idx["warnings"]}
+
+
+class TestDefaultRootsCoverEveryView:
+    """A root the catalog installs into but never scans is a skill it hides.
+
+    The bug this pins: ``_view_roots`` (where ``install_self`` writes) listed six
+    folders while ``_default_roots`` (what the index scans) listed four, so on a
+    fresh machine the two views that only ``_view_roots`` knew about were written
+    to and then never read back. The two lists are now the same set.
+    """
+
+    def test_default_roots_match_the_view_roots_that_exist(self, monkeypatch, tmp_path):
+        home = tmp_path / "home"
+        for name in (".claude", ".agents", ".codex", ".cursor", ".catpaw",
+                     ".codeium/windsurf"):
+            (home / name / "skills").mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("USERPROFILE", str(home))
+        monkeypatch.delenv("MCPTOON_SKILLS_ROOTS", raising=False)
+        monkeypatch.delenv("MCPTOON_SKILLS_VIEWS", raising=False)
+        if Path.home() != home:
+            pytest.skip("Path.home() did not follow the patched HOME on this box")
+        assert set(skills._default_roots()) == set(skills._view_roots())
+        assert len(skills._default_roots()) == 6
+
+
 class TestExposureSettingRoundTrip:
     """The rollback path the skill tells users to run, end to end on disk."""
 

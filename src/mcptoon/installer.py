@@ -437,13 +437,17 @@ def install_custom(server_name, command, args_list, env=None):
     return _verify_and_generate(server_name, command, args_list, env or {}, "custom")
 
 
-def install_http(url, server_name=None, transport="auto"):
+def install_http(url, server_name=None, transport="auto", headers=None):
     """Install HTTP/SSE MCP server.
 
     Args:
         url: MCP server URL (e.g. https://example.com/sse)
         server_name: Custom server name
         transport: Transport mode (auto / sse / http)
+        headers: HTTP headers for the server. Values may name environment
+            variables as ``${NAME}``; they are resolved at request time (issue
+            #24), so the token is never written into the config, the generated
+            handler or any output.
 
     Returns:
         dict: Installation result
@@ -455,9 +459,27 @@ def install_http(url, server_name=None, transport="auto"):
         server_name = parsed.path.rstrip("/").split("/")[-1] or parsed.hostname
         server_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
 
-    # Verify connection
-    client = MCPClient(http=url)
-    init_result = client.initialize()
+    headers = dict(headers or {})
+
+    # Verify connection. The client resolves any `${NAME}` at request time, so
+    # this proves the same header mapping the later calls will use — the
+    # install-then-401 split the issue asks us to avoid.
+    #
+    # A failed handshake must come back as an error envelope, never as a Python
+    # traceback: this is the first command a new user runs against a remote
+    # endpoint, and `MCPClient.initialize` raises `MCPError` for the common
+    # cases (connection refused, HTTP 405, a missing `${NAME}`). The sibling
+    # stdio path (`_verify_and_generate`) already caught it; this one did not,
+    # so `install --url <bad endpoint>` printed a full stack instead of a
+    # sentence (found in the 2026-09-26 audit).
+    client = MCPClient(http=url, headers=headers)
+    try:
+        init_result = client.initialize()
+    except MCPError as e:
+        client.close()
+        return make_error("VERIFY_FAILED",
+            f"HTTP/SSE MCP server '{server_name}' connection failed: {str(e)[:200]}",
+            "installer")
 
     if isinstance(init_result, Exception):
         client.close()
@@ -473,8 +495,9 @@ def install_http(url, server_name=None, transport="auto"):
 
     client.close()
 
-    # Generate handler file
-    _generate_http_handler_file(server_name, tools, url, transport)
+    # Generate handler file — carries the same header mapping, so a call routed
+    # through the handler resolves exactly what verification resolved.
+    _generate_http_handler_file(server_name, tools, url, transport, headers)
 
     # Record to installed.json
     tools_with_schema = [
@@ -488,6 +511,7 @@ def install_http(url, server_name=None, transport="auto"):
         "url": url,
         "transport": transport,
         "source": "http",
+        "headers": headers,
         "tools": [t.get("name", "") for t in tools],
         "tools_with_schema": tools_with_schema,
         "tool_count": len(tools),
@@ -503,10 +527,11 @@ def install_http(url, server_name=None, transport="auto"):
         "source": "http",
         "url": url,
         "transport": transport,
+        "header_names": sorted(headers),
     }
 
 
-def _generate_http_handler_file(server_name, tools, url, transport):
+def _generate_http_handler_file(server_name, tools, url, transport, headers=None):
     """Auto-generate HTTP/SSE handler file."""
     handlers_dir = _handlers_dir()
     safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
@@ -521,6 +546,12 @@ def _generate_http_handler_file(server_name, tools, url, transport):
         schema_lines.append(f'    {{"name": {name_str}, "description": {desc_str}, "inputSchema": {repr(input_schema)}}},')
 
     schema_str = "\n".join(schema_lines) if schema_lines else "    # Tool list will be fetched from HTTP on first call"
+
+    # `repr` of a dict of str→str is a valid Python literal and, because the
+    # values are templates (`${NAME}`), it never contains a secret. `headers` is
+    # not interpolated as f-string text: a header value with braces must not be
+    # able to break the generated file.
+    headers_repr = repr({str(k): str(v) for k, v in (headers or {}).items()})
 
     handler_code = f'''# -*- coding: utf-8 -*-
 """Auto-generated HTTP/SSE handler for {server_name}"""
@@ -553,6 +584,11 @@ SCHEMA = [
 MCP_URL = "{url}"
 MCP_TRANSPORT = "{transport}"
 
+# Header templates. A value may name an environment variable as ${{NAME}}; the
+# client resolves it at request time (issue #24), so no token is ever written
+# into this file.
+MCP_HEADERS = {headers_repr}
+
 
 @register(SERVER_NAME, *ALIASES)
 def handle(tool, args):
@@ -562,17 +598,12 @@ def handle(tool, args):
     except ImportError:
         from client import MCPClient
 
-    client = MCPClient(http=MCP_URL)
+    client = MCPClient(http=MCP_URL, headers=MCP_HEADERS)
     client.initialize()
     result = client.call_tool(tool, args or {{}})
     client.close()
     return result
 '''
-
-    with open(handler_file, "w", encoding="utf-8") as f:
-        f.write(handler_code)
-
-    log.info("installer", f"Generated HTTP handler: {handler_file}")
 
     with open(handler_file, "w", encoding="utf-8") as f:
         f.write(handler_code)

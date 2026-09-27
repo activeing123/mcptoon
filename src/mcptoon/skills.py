@@ -53,6 +53,7 @@ import stat as _stat
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -131,23 +132,67 @@ def _clean_desc(desc: str) -> str:
     return desc
 
 
+def _same_file_bytes(a: Path, b: Path) -> bool:
+    """True when two ``SKILL.md`` files hold byte-identical content.
+
+    The size check short-circuits the common case (a real conflict has different
+    text, so its size almost always differs) and keeps the full read for the case
+    that actually needs it. Any I/O failure reads as "not the same", which keeps
+    an unreadable copy visible instead of silently dropping a skill.
+    """
+    try:
+        if a.stat().st_size != b.stat().st_size:
+            return False
+        return a.read_bytes() == b.read_bytes()
+    except OSError:
+        return False
+
+
+def _collapse_identical_copies(pairs):
+    """Collapse byte-identical copies of one skill to a single ``(slug, path)``.
+
+    Agent skill folders are not only *junctioned* onto one catalog (handled by
+    the real-path dedup); they are also **copied**. A copy is byte-identical to
+    its original, so it is the same skill seen twice, not two skills. Counting
+    both inflates every skill figure the tool prints: on a fresh
+    ``pip install`` mcptoon's own skill lands in six agent folders, and the
+    catalog read 12,163 tokens for one 3,130-token file.
+
+    Only files that share a slug are compared. Hashing every file would turn the
+    cheap stat-walk into a full read of the whole catalog on each footer render;
+    a slug collision is the only situation in which a copy can exist, and it is
+    rare. Returns ``(kept, dropped)``.
+    """
+    kept: list[tuple[str, Path]] = []
+    first: dict[str, Path] = {}
+    dropped = 0
+    for slug, md in pairs:
+        key = slug.lower()
+        prev = first.get(key)
+        if prev is not None and _same_file_bytes(prev, md):
+            dropped += 1
+            continue
+        first.setdefault(key, md)
+        kept.append((slug, md))
+    return kept, dropped
+
+
 def _default_roots() -> list[Path]:
     """Common agent skill roots, most-specific first.
 
     Override with ``MCPTOON_SKILLS_ROOTS`` (``os.pathsep``-separated) or pass
     explicit roots to ``skills index``.
+
+    The candidate list is deliberately the *same* set :func:`_view_roots` writes
+    into — a root the catalog installs to but never scans is a skill the index
+    silently omits, so ``skills list`` would not show a file mcptoon itself put
+    there. Only the existence filter differs: a scan skips a folder that is not
+    there (nothing to miss), while a sync creates it.
     """
     env = os.environ.get("MCPTOON_SKILLS_ROOTS", "")
     if env:
         return [Path(p).expanduser() for p in env.split(os.pathsep) if p.strip()]
-    home = Path.home()
-    candidates = [
-        home / ".claude" / "skills",
-        home / ".agents" / "skills",
-        home / ".codex" / "skills",
-        home / ".cursor" / "skills",
-    ]
-    return [p for p in candidates if p.is_dir()]
+    return [p for p in _view_roots() if p.is_dir()]
 
 
 def _view_roots() -> list[Path]:
@@ -580,6 +625,12 @@ def scan_roots(roots: list[Path]) -> dict:
     a naive walk would index the catalog once per alias and emit a
     ``SKILL_DUPLICATE`` per file — noise, not a real conflict. A machine with no
     aliases sees no change, because distinct roots keep distinct real paths.
+
+    Real paths do not catch a **copy**, though: a view that holds its own byte
+    copy of a skill (rather than a junction) has a distinct real path, so the
+    walk reaches it and, before this, indexed it a second time. A copy carries
+    the same slug and the same bytes, so it is the same skill seen twice; only a
+    same-slug file with *different* bytes is a real conflict worth a warning.
     """
     from .plugin import parse_skill_frontmatter, parse_skill_md  # local: import-light
 
@@ -619,7 +670,14 @@ def scan_roots(roots: list[Path]) -> dict:
                     "message": f"{slug}: empty description — routing will miss it",
                 })
             key = slug.lower()
-            if key in seen:
+            prev = seen.get(key)
+            if prev is not None:
+                # A second file with the same slug is either a byte-identical
+                # copy of the first (agent folders get *copied*, not only
+                # junctioned — the same skill, so index it once) or genuinely
+                # different text (two skills competing for one name — warn).
+                if _same_file_bytes(Path(prev), md):
+                    continue
                 warnings.append({
                     "code": "SKILL_DUPLICATE",
                     "message": f"{slug}: also found at {seen[key]} — duplicates dilute retrieval",
@@ -648,6 +706,136 @@ def scan_roots(roots: list[Path]) -> dict:
         "skills": skills,
         "warnings": warnings,
     }
+
+
+def skill_token_figures(roots: list[Path] | None = None) -> dict:
+    """The skills half of the savings story, tokenized once and cached.
+
+    The per-turn broadcast wants "how many skills, and what do they cost an
+    agent?" — but the honest answer needs the *full text* of every ``SKILL.md``
+    tokenized, and on the reference machine that is 481 ms and 1,029,257 tokens
+    (2026-09-26). Doing that on every command would cost more than the footer
+    saves, so the figure is computed once here and stored in the index beside the
+    ``signature`` that already proves when the catalog changed.
+
+    ``native_tokens`` is the whole catalog concatenated the way ``bench`` does it
+    (a ``"\\n"`` before every body, not just between), so this and `mcptoon bench`
+    cannot quote two different numbers for one machine. ``pointer_tokens`` is the
+    one-line manifest entry the agent gets instead. Read-only and best-effort:
+    any failure returns ``{}`` and the caller omits the skills figure rather than
+    inventing one.
+    """
+    try:
+        from .bench import _tokenizer, _roots_from, _unique_skill_files
+
+        enc, caliber, exact = _tokenizer()
+        if roots is None:
+            roots = _roots_from([])
+        files, _dupes = _unique_skill_files(roots)
+        if not files:
+            return {}
+        bodies = []
+        for _slug, md in files:
+            try:
+                bodies.append(md.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                continue
+        if not bodies:
+            return {}
+        native = max(1, int(enc("\n" + "\n".join(bodies))))
+        pointer = max(1, int(enc(MANIFEST_ENTRY)))
+        return {
+            "count": len(files),
+            "native_tokens": native,
+            "pointer_tokens": pointer,
+            "caliber": caliber,
+            "exact": exact,
+        }
+    except Exception:
+        return {}
+
+
+def cached_skill_token_figures() -> dict:
+    """The cached skills figures, revalidated at most once per TTL.
+
+    The path the per-turn footer uses, and the reason the skills half is
+    affordable at all. Measuring the catalog means tokenizing ~1,030,628 tokens
+    (~481 ms here); *validating* a cached measurement means a stat walk over every
+    ``SKILL.md`` (~400 ms, because the skill roots are symlink farms with ~9,800
+    files to traverse). Neither belongs on a path that every mcptoon command now
+    pays for its footer.
+
+    So the sidecar records when its signature was last checked, and inside
+    ``_SKILLS_FIGURE_TTL`` seconds the walk is skipped entirely: the common turn
+    reads one small JSON file (~1 ms). Past the TTL the signature is recomputed,
+    a changed catalog misses the cache and is re-measured once, and an unchanged
+    one refreshes its timestamp. The window is the same 5 minutes the schema cache
+    uses, so "how stale can the footer be?" has one answer, not two.
+
+    Returns ``{}`` when there is no catalog yet — the footer then omits the skills
+    line instead of guessing.
+    """
+    try:
+        from .bench import _roots_from
+
+        roots = _roots_from([])
+        now = time.time()
+        store = _load_skill_token_cache()
+        cached = store.get("figures")
+        checked = store.get("checked_at")
+        if (isinstance(cached, dict) and cached.get("count")
+                and isinstance(checked, (int, float))
+                and now - checked < _SKILLS_FIGURE_TTL):
+            return cached
+        sig = catalog_signature(roots)
+        if isinstance(cached, dict) and cached.get("count") and store.get("signature") == sig:
+            _store_skill_token_figures(sig, cached, now)
+            return cached
+        fresh = skill_token_figures(roots)
+        if fresh:
+            _store_skill_token_figures(sig, fresh, now)
+        return fresh
+    except Exception:
+        return {}
+
+
+# How long a cached skills measurement is trusted without re-walking the catalog.
+# Same 5 minutes as the schema cache (`cache_mod._get_ttl`), deliberately: two
+# different staleness windows in one footer would make its `note:` ambiguous.
+_SKILLS_FIGURE_TTL = 300.0
+
+
+def _skill_token_cache_file() -> Path:
+    return _index_path().with_name("skills-tokens.json")
+
+
+def _load_skill_token_cache() -> dict:
+    path = _skill_token_cache_file()
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _store_skill_token_figures(signature: str, figures: dict, checked_at: float) -> None:
+    """Record the figures, their catalog signature and when it was verified.
+
+    The timestamp is what lets the next run skip the walk. Best-effort: a
+    read-only home must not break a footer.
+    """
+    try:
+        path = _skill_token_cache_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+        tmp.write_text(json.dumps(
+            {"signature": signature, "checked_at": checked_at, "figures": figures},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        pass
 
 
 def build_and_save(roots: list[Path]) -> tuple[dict, Path]:

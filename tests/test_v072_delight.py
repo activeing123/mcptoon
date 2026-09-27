@@ -75,8 +75,18 @@ class _A1Celebration(unittest.TestCase):
         self.assertNotIn("Want more servers?", buf.getvalue())
 
     def test_manifest_tool_count_shapes(self):
+        # `get_manifest()` returns {server: [tool, ...]}, so the count must sum
+        # the per-server lists — not count the servers. The 2026-09-26 audit
+        # caught the celebration printing "12 tools" (the server count) above a
+        # manifest that named 96.
         self.assertEqual(cli._manifest_tool_count({"tools": [1, 2, 3]}), 3)
-        self.assertEqual(cli._manifest_tool_count({"a": 1, "b": 2}), 2)
+        self.assertEqual(cli._manifest_tool_count(
+            {"server_a": [{"name": "x"}, {"name": "y"}], "server_b": [{"name": "z"}]}), 3)
+        # A server whose cached entry is an error contributes no tools.
+        self.assertEqual(cli._manifest_tool_count(
+            {"server_a": [{"name": "x"}, {"error": "boom"}]}), 1)
+        # Values that are not tool lists are not tools; counting the keys was the bug.
+        self.assertEqual(cli._manifest_tool_count({"a": 1, "b": 2}), 0)
         self.assertEqual(cli._manifest_tool_count([1, 2]), 2)
         self.assertEqual(cli._manifest_tool_count(None), 0)
         self.assertEqual(cli._manifest_tool_count("x"), 0)
@@ -279,8 +289,9 @@ class _A1QuickstartIntegration(unittest.TestCase):
     def test_quickstart_offers_takeover_when_entries_are_registered_directly(self):
         """The install path must *say* that alongside-mounting saves nothing.
 
-        With servers registered directly, quickstart keeps the additive default but
-        prints the red warning and asks — and the interactive answer is honoured.
+        With servers registered directly, quickstart prints the alert, lists the
+        entries it would route through the gateway, and asks — and the interactive
+        answer is honoured.
         """
         fake = _FakeResult(2)
         plan = [{"agent_id": "cursor", "agent_name": "Cursor (global)",
@@ -303,7 +314,6 @@ class _A1QuickstartIntegration(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 cli._cmd_quickstart([])
         out = buf.getvalue()
-        self.assertIn("WARNING", out)
         self.assertIn("not saving tokens yet", out)
         self.assertIn("Cursor (global): fetch, git", out)
         self.assertEqual(handed_off.call_args[0][0], ["--takeover", "--yes"])

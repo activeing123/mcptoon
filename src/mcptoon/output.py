@@ -877,7 +877,7 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
 
     Args:
         obj: Any Python object to render
-        fmt: "json" | "compact" | "toon" | "mcptoon" | "slim" | "auto" | "raw"
+        fmt: "json" | "compact" | "toon" | "mcptoon" | "slim" | "smart" | "auto" | "raw"
         compact_mode: Use compact JSON (no indent) when fmt=json
         head_n: Take first N items of arrays
         max_chars: Truncate output to N chars (0 = use default 4000)
@@ -885,6 +885,15 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
     """
     if fmt == "auto":
         fmt = _auto_format()
+
+    if fmt == "smart":
+        # Structure-aware compression (compressor.py): keep navigation, compress
+        # payload. Never char-truncated — that would cut valid JSON mid-object.
+        # The CCR handle + notice are attached by the caller (serve knows the
+        # server:tool; this pure formatter does not).
+        from . import compressor as _compressor
+        crushed, _stats = _compressor.compress(obj)
+        return json.dumps(crushed, ensure_ascii=False, separators=(",", ":"))
 
     # Truncation threshold
     if full:

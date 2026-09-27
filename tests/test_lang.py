@@ -179,14 +179,14 @@ _FACTS = {
 
 
 class TestRendering(_IsolatedState):
-    def test_the_english_line_is_byte_identical_apart_from_the_live_figure(self):
-        """The catalog figures and the `[caliber]` suffix stay byte-identical; the
-        only addition is the live call count between them, so a parser keying on
-        the old substrings still finds every one of them."""
+    def test_the_fallback_line_shares_the_gateway_line_shape(self):
+        """With no gateway measurement the line keeps the headline's *shape*:
+        count, rate, live count, caliber. It no longer prints the raw token pair,
+        which is what pushed it to 143 display columns and made it wrap every turn
+        on the machines that never had a gateway figure (2026-09-26, third pass)."""
         self.assertEqual(
             footer_mod.line(_FACTS, "en"),
-            "🎉 mcptoon: 95 tools in 12 servers — 20,914 → 15,719 tokens "
-            "(saved 5,195, 25%) · 0 calls routed [tiktoken cl100k_base]")
+            "🎉 mcptoon: tools 95 (saves 25%) · 0 calls [tiktoken cl100k_base]")
 
     def test_the_line_carries_a_figure_that_moves(self):
         """The catalog figures are a fixed property of the machine; the running
@@ -194,38 +194,35 @@ class TestRendering(_IsolatedState):
         instead of a badge that says the same thing every turn."""
         busy = dict(_FACTS, calls_recorded=1234)
         out = footer_mod.line(busy, "en")
-        self.assertIn("1,234 calls routed", out)
+        self.assertIn("1,234 calls", out)
         self.assertIn("1,234", footer_mod.line(busy, "zh"))
 
-    def test_a_dict_without_the_live_figure_yields_the_old_string(self):
+    def test_a_dict_without_the_live_figure_yields_the_same_line(self):
         """A hand-built or older `--json`-shaped dict must not grow the field."""
         legacy = dict(_FACTS)
         legacy.pop("calls_recorded")
         self.assertEqual(
             footer_mod.line(legacy, "en"),
-            "🎉 mcptoon: 95 tools in 12 servers — 20,914 → 15,719 tokens "
-            "(saved 5,195, 25%) [tiktoken cl100k_base]")
+            "🎉 mcptoon: tools 95 (saves 25%) [tiktoken cl100k_base]")
 
     def test_the_chinese_line_says_the_same_thing(self):
         out = footer_mod.line(_FACTS, "zh")
-        self.assertIn("95 个工具", out)
-        self.assertIn("12 个服务器", out)
-        self.assertIn("省 5,195", out)
+        self.assertIn("工具 95", out)
+        self.assertIn("省 25%", out)
 
     def test_both_languages_keep_the_machine_readable_handles(self):
-        """`mcptoon:`, the word `tokens` and `[caliber]` are load-bearing.
+        """`mcptoon:` and `[caliber]` are load-bearing.
 
         Every other suite and every downstream parser keys on them; a handle that
         changes with the language hands a parsing problem to someone who never
-        asked for one.
+        asked for one. (The word `tokens` rode the raw pair, which now lives in
+        `mcptoon report`; `bench` still prints it.)
         """
         for lng in ("en", "zh"):
             out = footer_mod.line(_FACTS, lng)
             self.assertTrue(out.startswith(footer_mod.MARK + " mcptoon:"), out)
-            self.assertIn("tokens", out)
             self.assertTrue(out.endswith("[tiktoken cl100k_base]"), out)
-            self.assertIn("20,914", out)
-            self.assertIn("15,719", out)
+            self.assertIn("95", out)
 
     def test_the_note_carries_both_caveats_in_both_languages(self):
         stale = dict(_FACTS, servers_uncached=1, cache_age_seconds=99999.0)
@@ -252,8 +249,12 @@ class TestRendering(_IsolatedState):
         stale = dict(_FACTS, servers_uncached=1, cache_age_seconds=99999.0)
         for lng in ("en", "zh"):
             out = footer_mod.block(stale, lng)
-            self.assertIn("\nnote: ", out)
-            self.assertEqual(len(out.splitlines()), 2, out)
+            lines = out.splitlines()
+            # The `note: ` label is on the last line and nowhere else, whatever the
+            # number of figure lines above it (tools, and — with a catalog — skills,
+            # plus the compression line, which always prints).
+            self.assertTrue(lines[-1].startswith("note: "), out)
+            self.assertEqual(sum(1 for ln in lines if ln.startswith("note: ")), 1, out)
 
     def test_a_hand_built_dict_without_caveat_inputs_keeps_its_own_note(self):
         """A caller passing a `--json`-shaped dict must not get a re-render."""
@@ -262,17 +263,47 @@ class TestRendering(_IsolatedState):
         self.assertEqual(footer_mod.note(carried, "zh"),
                          "catalog is 5 min old (cache TTL 1 min)")
 
+    def test_the_gateway_figure_becomes_the_headline_when_present(self):
+        """The 2026-09-26 audit: the line reported the *slim-schema* saving
+        (24.3% here) as if it were the product's headline, understating the
+        gateway the agent actually loads (87.6%) by ~3.6x while looking like the
+        more conservative number. When the facts carry a gateway measurement it
+        leads: the reduction a user experiences, the rate, and the *cumulative*
+        saving since install (the per-turn figure moved to `mcptoon report` in the
+        second pass, because a per-turn constant is the same number every turn and
+        a badge that never moves stops being read)."""
+        facts = dict(_FACTS, gateway_tokens=2607, gateway_saved=18307,
+                     gateway_pct=87.6, calls_recorded=1234)
+        out = footer_mod.line(facts, "en")
+        self.assertIn("saves 88%", out)
+        self.assertIn("≈", out)  # the cumulative estimate (needs calls > 0)
+        self.assertIn("1,234c", out, "the moving call count rides beside it")
+        self.assertNotIn("20,914 →", out, "the raw pair now lives in `report`")
+        self.assertTrue(out.startswith(footer_mod.MARK + " mcptoon:"), out)
+        self.assertTrue(out.endswith("[tiktoken cl100k_base]"), out)
+        zh = footer_mod.line(facts, "zh")
+        self.assertIn("省 88%", zh)
+        self.assertIn("≈省", zh)
+
+    def test_a_dict_without_the_gateway_key_keeps_the_headline_shape(self):
+        """Every legacy `--json` payload and hand-built dict renders the same
+        shape as the gateway headline — count, rate, live count, caliber — rather
+        than the pre-2026-09-26 raw pair that wrapped at 143 columns."""
+        self.assertEqual(
+            footer_mod.line(_FACTS, "en"),
+            "🎉 mcptoon: tools 95 (saves 25%) · 0 calls [tiktoken cl100k_base]")
+
 
 class TestSurfacesFollowTheSetting(_IsolatedState):
     def test_the_footer_facts_command_speaks_the_setting(self):
         cfg.set_setting("lang", "zh")
         out = _run_main(["footer-facts"])
-        self.assertIn("0 个工具", out)
+        self.assertIn("工具 0", out)
         self.assertIn("mcptoon:", out, "the ASCII handle must survive translation")
 
         cfg.set_setting("lang", "en")
         out = _run_main(["footer-facts"])
-        self.assertIn("0 tools in 0 servers", out)
+        self.assertIn("tools 0", out)
 
     def test_the_json_payload_stays_english(self):
         """`--json` is a machine channel: its note is data, not a message to a person."""

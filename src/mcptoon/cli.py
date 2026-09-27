@@ -56,7 +56,7 @@ KNOWN_FLAGS = frozenset(
         "--no-env", "--no-local", "--no-network", "--no-self", "--no-sync", "--npm", "--pip",
         "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
         "--self", "--pack", "--packs",
-        "--slim",
+        "--slim", "--smart",
         "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
         "--version", "--version-gate", "--view", "--watch",
         "--watch-mode", "--write", "--yes",
@@ -95,7 +95,7 @@ def unknown_flag_warnings(args):
 # preceded by "hi, here's what I configured for you" — greeting someone on the way
 # out is the same obliviousness this release is about.
 _WELCOME_EXEMPT = frozenset({"serve", "demo", "demo-server", "completion",
-                             "help", "-h", "--help", "off", "uninstall"})
+                             "help", "-h", "--help", "off", "restore", "uninstall"})
 
 
 def _maybe_welcome(command: str, fmt: str) -> None:
@@ -184,9 +184,11 @@ def _bare_greeting() -> None:
 
 # Commands that must never self-heal: `serve` speaks JSON-RPC over stdio (stdout
 # must stay clean, and it is spawned per host connection, so a write there would
-# be a write on every reconnect); `off`/`uninstall` are taking things away.
-_SELF_HEAL_EXEMPT = frozenset({"serve", "off", "uninstall", "demo", "demo-server",
-                               "completion", "help"})
+# be a write on every reconnect); `off`/`restore`/`uninstall` are taking things away
+# (and `restore` in particular must not immediately re-add a skill right after the
+# user asked to go back to the pre-mcptoon state).
+_SELF_HEAL_EXEMPT = frozenset({"serve", "off", "restore", "uninstall", "demo",
+                               "demo-server", "completion", "help"})
 
 
 def _first_run_self_heal() -> None:
@@ -256,6 +258,17 @@ def _first_run_self_heal() -> None:
 def _run(state: dict) -> None:
     args = sys.argv[1:]
 
+    # One command per process, so the "did this run compress anything?" flag must
+    # start clear. The footer reads it to decide whether to add the recovery hint;
+    # an embedding process that reuses this module (a REPL, a test harness) would
+    # otherwise inherit the previous run's True and print the hint unprompted.
+    try:
+        from . import compressor as _comp
+
+        _comp.reset_compressed_this_run()
+    except Exception:
+        pass
+
     if not args:
         _bare_greeting()
         _print_help()
@@ -288,6 +301,8 @@ def _run(state: dict) -> None:
             fmt = "mcptoon"
         elif a == "--slim":
             fmt = "slim"
+        elif a == "--smart":
+            fmt = "smart"
         elif a == "--raw":
             fmt = "raw"
         elif a == "--full":
@@ -380,6 +395,9 @@ def _run(state: dict) -> None:
         _cmd_status(rest, fmt)
     elif command == "stats":
         _cmd_stats(rest, fmt)
+    elif command == "report":
+        from . import report as report_mod
+        report_mod.run(rest, fmt)
     elif command == "footer-facts":
         _cmd_footer_facts(rest, fmt)
     elif command == "toggle":
@@ -409,6 +427,8 @@ def _run(state: dict) -> None:
         _cmd_sync(rest, fmt)
     elif command == "off":
         _cmd_off(rest, fmt)
+    elif command == "restore":
+        _cmd_restore(rest, fmt)
     elif command == "uninstall":
         _cmd_uninstall(rest, fmt)
     elif command == "health":
@@ -460,7 +480,7 @@ def main() -> None:
 
 # Commands whose streams are a protocol, not a human terminal, plus the one
 # command that has already printed the same block.
-_FOOTER_SILENT_COMMANDS = frozenset({"serve", "demo-server", "footer-facts"})
+_FOOTER_SILENT_COMMANDS = frozenset({"serve", "demo-server", "footer-facts", "report"})
 
 
 def _emit_footer(command: str) -> None:
@@ -512,7 +532,12 @@ def _emit_footer(command: str) -> None:
 
 _FIX_SUGGESTIONS = {
     "SERVER_NOT_FOUND": "Try: mcptoon list    | mcptoon add <name> --stdio npx -y <package>    | mcptoon doctor",
-    "CONFIG_MISSING": "Try: mcptoon init",
+    # `quickstart` leads, not `init`: it is the designed entry point (the one the
+    # README, the welcome card and `status` all push), and an error hint that
+    # names a *different* first command than every other surface sends a new user
+    # down a fork on their very first failure. `init --auto` stays as the explicit
+    # alternative. (2026-09-26 polish pass.)
+    "CONFIG_MISSING": "Try: mcptoon quickstart    | mcptoon init --auto",
     "TOOL_NOT_FOUND": "Try: mcptoon manifest    | mcptoon inspect <server>",
     "UNKNOWN_TOOL": "Try: mcptoon inspect <server>    | mcptoon manifest --slim",
     "CONNECTION_FAILED": "Try: mcptoon doctor    | check if npx/node is installed and in PATH",
@@ -542,7 +567,7 @@ def _cmd_list(_rest):
     """List configured servers."""
     servers = cfg.list_servers()
     if not servers:
-        print("No servers configured. Run: mcptoon init")
+        print("No servers configured. Run: mcptoon quickstart")
         return
     print(f"Configured servers ({len(servers)}):")
     for name in servers:
@@ -565,7 +590,7 @@ def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
 
     manifest = manifest_mod.get_manifest(use_cache=True)
     if not manifest:
-        print("No tools found. Run: mcptoon init")
+        print("No tools found. Run: mcptoon quickstart")
         return
 
     # Export format takes priority
@@ -800,15 +825,29 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
         sys.exit(1)
 
     _render_result(result, _effective_fmt(server, tool, fmt),
-                   head_n, max_chars, full, fallback_json)
+                   head_n, max_chars, full, fallback_json, server=server, tool=tool)
 
 
-def _render_result(result, fmt, head_n, max_chars, full, fallback_json=False):
+def _render_result(result, fmt, head_n, max_chars, full, fallback_json=False,
+                   server="", tool=""):
     """Render tool call result with optional fallback-json.
 
     If fallback_json is True and the chosen format (toon/mcptoon/slim) fails
     to encode the result, automatically fall back to JSON output.
+
+    ``smart`` goes through the shared compressor pipeline so the CLI and the MCP
+    bridge agree: the result is compressed *and* its original is stored, with a
+    retrieve handle in the tail — otherwise a CLI caller would see a lossy
+    summary with no way back.
     """
+    if fmt == "smart":
+        from . import compressor as _compressor
+        text, _stats = _compressor.compress_with_ccr(result, server=server, tool=tool)
+        if text is not None:
+            print(text)
+            return
+        fmt = "json"  # nothing to compress — show it whole rather than a stub
+
     if not fallback_json or fmt in ("json", "auto", "raw"):
         print(output.render(result, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
         return
@@ -855,6 +894,7 @@ def _cmd_policy(rest, fmt):
     Policies:
         raw|json              never compress (images, base64, binary)
         toon|compact|slim     force this format regardless of the default
+        smart                 structure-aware compression (keep keys, cut payload)
         auto                  remove the policy (back to default)
     """
     if not rest or rest[0] in ("--list", "list"):
@@ -865,6 +905,7 @@ def _cmd_policy(rest, fmt):
             print("Set one:")
             print("  mcptoon policy set <server> <tool> raw   # never compress (images, base64)")
             print("  mcptoon policy set <server> <tool> toon  # always render as TOON")
+            print("  mcptoon policy set <server> <tool> smart # structure-aware compression")
             return
         print("Per-tool compression policies:")
         for key, policy in policies.items():
@@ -874,7 +915,7 @@ def _cmd_policy(rest, fmt):
     sub = rest[0]
     if sub == "set":
         if len(rest) < 4:
-            print("Usage: mcptoon policy set <server> <tool-or-*> <raw|json|auto|toon|compact|slim>")
+            print("Usage: mcptoon policy set <server> <tool-or-*> <raw|json|auto|toon|compact|slim|smart>")
             sys.exit(1)
         server, tool, policy = rest[1], rest[2], rest[3]
         if cfg.set_compression_policy(server, tool, policy):
@@ -980,6 +1021,7 @@ def _cmd_quickstart(rest, fmt="auto"):
         mcptoon quickstart --http URL    # include HTTP MCP endpoint
         mcptoon quickstart --dry        # don't write config, just show
         mcptoon quickstart --no-self    # sync servers only, don't register the gateway
+        mcptoon quickstart --takeover   # route servers through the gateway (scripted; no prompt)
     """
     is_dry = "--dry" in rest
     include_self = "--no-self" not in rest
@@ -1023,6 +1065,14 @@ def _cmd_quickstart(rest, fmt="auto"):
         print("    # Call a tool:")
         print("    mcptoon call fetch fetch '{\"url\":\"https://example.com\"}'")
         print("")
+        # The takeover warning at the end of a successful run never fires here
+        # (there is nothing to take over), so on this path the token story would
+        # otherwise never be told at all — the one thing a new user is deciding
+        # about. One line, pointing at the command that shows the real numbers
+        # (2026-09-26 polish pass).
+        print("  Once you add servers: routing them through mcptoon is what saves")
+        print("  tokens (not just listing them). `mcptoon status` shows both numbers.")
+        print("")
         print("  Or browse MCP servers:")
         print("    https://github.com/modelcontextprotocol/servers")
         return
@@ -1039,7 +1089,14 @@ def _cmd_quickstart(rest, fmt="auto"):
             cfg.save_config(result.servers)
             print(f"  ✓ Config created: {cfg.CONFIG_FILE}")
     else:
-        print("  (--dry mode: config not written)")
+        # `--dry` means "don't change your server list or your agents", not "touch
+        # nothing on disk": the once-per-machine self-heal (copy our skill into the
+        # agent views, build the skill index) runs before command dispatch, so it
+        # still writes. Saying just "config not written" was technically true of the
+        # server config and misleading about everything else (2026-09-26 polish pass).
+        print("  (--dry mode: no config written, no agent touched)")
+        print("  (the one-time skill install/index still runs — it is an addition, "
+              "not a change to your servers)")
 
     print("")
 
@@ -1135,7 +1192,13 @@ def _cmd_quickstart(rest, fmt="auto"):
         # The one moment the token tradeoff is legible: the servers were just
         # registered, the user can still say no for free, and the warning is about
         # a number they care about. Off for --dry, machine formats and --no-self.
-        _maybe_offer_takeover(rest, fmt)
+        #
+        # `--takeover` is the scripted form of the same choice: it skips the prompt
+        # and applies takeover directly, for CI/automation that cannot answer.
+        if "--takeover" in rest:
+            _cmd_sync(["--takeover", "--yes"], fmt)
+        else:
+            _maybe_offer_takeover(rest, fmt)
     else:
         print("Next steps (once you write the config):")
         print("  mcptoon quickstart          # write config + celebrate")
@@ -1144,13 +1207,30 @@ def _cmd_quickstart(rest, fmt="auto"):
 
 
 def _manifest_tool_count(manifest) -> int:
-    """Best-effort tool count from a get_manifest() result."""
+    """Best-effort **tool** count from a `get_manifest()` result.
+
+    `get_manifest()` returns ``{server_name: [tool, ...]}``, so counting the top
+    level counts *servers*. The quickstart celebration printed that as "N tools
+    ready" right above a slim manifest that named the real tools — two numbers
+    for one machine on one screen (12 vs 96 on the author's, found in the
+    2026-09-26 audit). Sum the per-server lists, skipping error entries, to match
+    every other surface.
+    """
     try:
         if isinstance(manifest, dict):
             tools = manifest.get("tools")
             if isinstance(tools, list):
+                # A pre-summarised shape (kept for callers that pass one).
                 return len(tools)
-            return len(manifest)
+            total = 0
+            for value in manifest.values():
+                if not isinstance(value, list):
+                    continue
+                for t in value:
+                    if isinstance(t, dict) and "error" in t:
+                        continue
+                    total += 1
+            return total
         if isinstance(manifest, list):
             return len(manifest)
     except Exception:
@@ -1192,16 +1272,18 @@ def _maybe_offer_takeover(rest, fmt):
     """Offer to route the just-discovered servers through the gateway.
 
     Why this exists: registering the gateway *alongside* the user's direct entries
-    (the safe default) saves almost nothing — the host still loads every upstream
+    (the old safe default) saves almost nothing — the host still loads every upstream
     schema, and the gateway's own copy is added on top. Measured on a 12-server /
     96-tool machine, tiktoken cl100k_base: alongside ≈ 39,500 tokens per turn,
     takeover ≈ 2,607. So the install that is supposed to save tokens can save
     ~0 unless the gateway *replaces* the direct entries. Takeover does that, but
     it is a subtraction — it removes server entries the user wrote into a host
     config — and Write Consent (CONTEXT.md) says a subtraction is listed and
-    confirmed once, never silent. So this is an offer, not a default flip:
-    `quickstart` stays additive, and the user decides here, at the one moment the
-    tradeoff is legible.
+    confirmed once, never silent. So this is an offer, not a silent flip: the
+    entries it will drop are listed right above the prompt, and the prompt
+    defaults to YES because the subtraction is legible and the undo is real
+    (`mcptoon restore` drops the gateway and puts the servers back). Only an
+    explicit "n" keeps the alongside-mount.
 
     Bounded like every other prompt in this CLI: skipped for `--dry`, machine
     formats, `--yes`-less non-interactive stdin, an empty removal plan (nothing to
@@ -1233,7 +1315,7 @@ def _maybe_offer_takeover(rest, fmt):
 
     print("")
     _warn("━" * 54)
-    _warn("  ⚠  WARNING — you are not saving tokens yet")
+    _warn("  ⚠  mcptoon is not saving tokens yet")
     _warn("━" * 54)
     print("  mcptoon just registered its gateway *alongside* your servers.")
     print(f"  Your agents still load all {n_servers} of them directly, so the")
@@ -1243,7 +1325,7 @@ def _maybe_offer_takeover(rest, fmt):
     print("  Routing them through the gateway instead removes their direct entries")
     print(f"  from {n_agents} agent config(s) and is the mode that actually saves.")
     print("  It is reversible: a `<config>.bak` is written first, and")
-    print("  `mcptoon off` restores the original setup.")
+    print("  `mcptoon restore` puts your original servers back.")
     print("")
     for row in plan:
         print(f"    · {row['agent_name']}: {', '.join(row['servers'])}")
@@ -1257,11 +1339,21 @@ def _maybe_offer_takeover(rest, fmt):
         print("")
         return
     try:
-        answer = input("  Route them through the gateway now? [y/N] ").strip().lower()
+        answer = input("  Route them through the gateway now? [Y/n] ").strip().lower()
     except (EOFError, KeyboardInterrupt):
-        answer = ""
-    if answer not in ("y", "yes"):
-        print("  Kept the safe default — your direct entries are untouched.")
+        # No answer is not a yes: a subtraction must never be applied on an
+        # interrupt or a closed stdin. (Windows reports NUL stdin as a tty, so a
+        # scripted run reaches this prompt and hits EOF here — it must decline.)
+        print("")
+        print("  Kept your servers as they are — nothing was removed.")
+        print("  Switch any time: mcptoon sync --takeover")
+        print("")
+        return
+    # Default is YES: the offer is the one moment the tradeoff is legible, the
+    # subtraction is listed right above, and the undo (`mcptoon restore`) is real.
+    # Only an explicit "n"/"no" keeps the alongside-mount.
+    if answer in ("n", "no"):
+        print("  Kept your servers as they are — nothing was removed.")
         print("  Switch any time: mcptoon sync --takeover")
         print("")
         return
@@ -1278,7 +1370,7 @@ def _cmd_health_check(rest, fmt):
     """
     servers = cfg.list_servers()
     if not servers:
-        print("No servers configured. Run: mcptoon init --auto")
+        print("No servers configured. Run: mcptoon quickstart")
         return
 
     filter_name = rest[0] if rest else None
@@ -1481,8 +1573,13 @@ def _cmd_usage(_rest, fmt):
     if fmt in ("toon", "mcptoon", "compact"):
         print(output.render(stats, fmt=fmt))
     else:
-        print(f"Total calls: {stats['total_calls']}")
-        print(f"Success rate: {stats['success_rate']}")
+        calls = int(stats.get("total_calls") or 0)
+        print(f"Total calls: {calls}")
+        # On a machine that has not routed anything yet, "0/0" reads as a broken
+        # metric rather than an empty one. Show a dash until there is a call to
+        # divide by. (2026-09-26 polish pass.)
+        rate = stats.get("success_rate") or ""
+        print(f"Success rate: {rate}" if calls else "Success rate: —")
         print(f"Tokens (est): {stats['total_tokens_est']}")
         if stats["by_server"]:
             print("\nBy server:")
@@ -1525,7 +1622,12 @@ def _cmd_footer_facts(_rest, fmt):
         return
 
     # Human line — the whole point is that this is pasteable into a turn.
+    # Tools line, then the skills and compression lines, then the note. Order
+    # matches `footer.block()`, so "quote it verbatim" stays true.
     print(footer_mod.line(f))
+    for extra in (footer_mod.skills_line(f), footer_mod.compression_line(f)):
+        if extra:
+            print(extra)
     n = footer_mod.note(f)
     if n:
         print(f"note: {n}")
@@ -1591,6 +1693,10 @@ def _cmd_stats(_rest, fmt):
     # one that matches both.
     saved = total_full_tokens - total_slim_tokens
     pct = (saved / total_full_tokens * 100) if total_full_tokens > 0 else 0
+    # Same gateway figure the footer and `status` report, from the one helper —
+    # three surfaces, one number (2026-09-26 audit).
+    from . import footer as footer_mod
+    gw_tokens, gw_pct = footer_mod.gateway_savings(total_full_tokens)
     disabled = cfg.list_disabled_tools()
 
     if fmt == "json":
@@ -1603,6 +1709,9 @@ def _cmd_stats(_rest, fmt):
             "slim_tokens_est": total_slim_tokens,
             "tokens_saved": saved,
             "savings_pct": round(pct, 1),
+            "gateway_tokens": gw_tokens,
+            "gateway_saved": (total_full_tokens - gw_tokens) if gw_tokens else None,
+            "gateway_pct": gw_pct,
             "token_caliber": caliber,
             "total_calls": usage["total_calls"],
             "success_rate": usage["success_rate"],
@@ -1618,8 +1727,16 @@ def _cmd_stats(_rest, fmt):
         print(f"  Tools discovered:     {total_tools}")
         print(f"  Full JSON tokens:     {total_full_tokens:,}")
         print(f"  Slim manifest tokens: {total_slim_tokens:,}")
+        if gw_tokens and gw_pct is not None:
+            print(f"  Gateway tokens:       {gw_tokens:,}  "
+                  f"← what the agent loads by default")
         print(f"  ─────────────────────────────────")
-        print(f"  Tokens SAVED:         {saved:,} ({pct:.1f}%)")
+        if gw_tokens and gw_pct is not None:
+            print(f"  Tokens SAVED:         {total_full_tokens - gw_tokens:,} "
+                  f"({gw_pct:.1f}%) via the gateway")
+            print(f"                        {saved:,} ({pct:.1f}%) slim schemas only")
+        else:
+            print(f"  Tokens SAVED:         {saved:,} ({pct:.1f}%)")
         print(f"  Disabled tools:       {len(disabled)}")
         print(f"  Caliber:              {caliber}")
         print()
@@ -1631,7 +1748,11 @@ def _cmd_stats(_rest, fmt):
                     print(f"    {s:20s} {c} calls")
         print()
         if by_server_full:
-            print("  Per-server token savings:")
+            # These rows are the slim-schema caliber, not the gateway one — the
+            # gateway withholds upstream schemas wholesale, so there is no honest
+            # per-server split of it. Label it so the number under the gateway
+            # headline is not read as the same thing (2026-09-26 polish pass).
+            print("  Per-server token savings (slim schemas only):")
             for s in sorted(by_server_full):
                 sf = by_server_full[s]
                 ss = by_server_slim.get(s, 0)
@@ -1683,6 +1804,12 @@ def _cmd_status(_rest, fmt):
     saved = max(0, full_tokens - slim_tokens)
     pct = round(saved / full_tokens * 100, 1) if full_tokens else 0.0
 
+    # The number a user actually wants — what installing mcptoon removes from the
+    # agent's context — is the compact gateway, not the slim-schema saving. Same
+    # helper the footer uses, so the two surfaces cannot disagree (2026-09-26).
+    from . import footer as footer_mod
+    gw_tokens, gw_pct = footer_mod.gateway_savings(full_tokens)
+
     try:
         stats = usage_mod.get_usage_stats()
         calls = int(stats.get("total_calls", 0))
@@ -1713,6 +1840,8 @@ def _cmd_status(_rest, fmt):
             "tokens_slim": slim_tokens,
             "tokens_saved_est": saved,
             "savings_pct": pct,
+            "gateway_tokens": gw_tokens,
+            "gateway_pct": gw_pct,
             "token_caliber": caliber,
             "calls_recorded": calls,
             "gateway_registered": wired,
@@ -1731,8 +1860,14 @@ def _cmd_status(_rest, fmt):
     if n_skills:
         print(f"  Skills in catalog  : {n_skills} (recursive, deduped)  [skills index]")
     if total_tools:
-        print(f"  Tool definitions   : {full_tokens:,} → {slim_tokens:,} tokens "
-              f"(saved {saved:,}, {pct:.0f}%)  [{caliber}]")
+        if gw_tokens and gw_pct is not None:
+            print(f"  Tool definitions   : {full_tokens:,} → {gw_tokens:,} tokens "
+                  f"via the gateway (saved {gw_pct:.0f}%)  [{caliber}]")
+            print(f"                       (slim schemas alone: {slim_tokens:,}, "
+                  f"{pct:.0f}%)")
+        else:
+            print(f"  Tool definitions   : {full_tokens:,} → {slim_tokens:,} tokens "
+                  f"(saved {saved:,}, {pct:.0f}%)  [{caliber}]")
     print(f"  Calls recorded     : {calls}")
     if wired:
         print("  Gateway in agents  : yes — agents can see mcptoon itself")
@@ -1741,6 +1876,7 @@ def _cmd_status(_rest, fmt):
     print(line)
     print("  Take it back any time:")
     print("    mcptoon off          remove the gateway from your agents")
+    print("    mcptoon restore      drop the gateway and put your servers back")
     print("    mcptoon uninstall    full cleanup (preview with --dry)")
     print("  Prove the numbers: mcptoon bench   ·   what it did: mcptoon usage")
     print("")
@@ -1786,7 +1922,17 @@ def _cmd_off(rest, fmt):
             print(f"  Preview: {len(present)} agent(s) would lose the gateway entry.")
         else:
             print(f"  Done: {len(present)} agent(s) no longer see mcptoon. Your servers are untouched.")
-            print("  Put it back with: mcptoon sync --self")
+            print("  Put the gateway back with: mcptoon sync --self")
+            # `off` only removes the gateway. If a takeover dropped the user's
+            # direct server entries, they are NOT back yet — point at the command
+            # that actually returns them, so `off` is not mistaken for the undo.
+            try:
+                from .sync import restore_plan
+                if restore_plan():
+                    print("  If a takeover removed your own server entries, bring them")
+                    print("  back with: mcptoon restore")
+            except Exception:
+                pass
     print(line)
     print("")
 
@@ -1809,6 +1955,102 @@ def _safe_rmtree(path) -> bool:
 
     shutil.rmtree(p, ignore_errors=True)
     return not p.exists()
+
+
+def _cmd_restore(rest, fmt):
+    """Put every agent config back to the state before mcptoon edited it.
+
+    This is the real "undo the takeover". `mcptoon off` only removes the gateway
+    entry; it does not bring back the servers `sync --takeover` dropped, because
+    those were removed from the live file and survive only in the `<config>.bak`
+    mcptoon wrote first. `restore` copies that backup back, so the original
+    servers return and the gateway entry is gone — the pre-install state.
+
+    Usage:
+        mcptoon restore
+        mcptoon restore --dry            preview without writing
+        mcptoon restore --agent cursor   one host only
+        mcptoon restore --yes            skip the interactive confirmation
+    """
+    from .sync import restore_all_from_backup, restore_agent_from_backup, restore_plan
+
+    dry_run = "--dry" in rest or "--dry-run" in rest
+    assume_yes = "--yes" in rest or "-y" in rest
+    agent_id = None
+    for i, a in enumerate(rest):
+        if a == "--agent" and i + 1 < len(rest):
+            agent_id = rest[i + 1]
+            break
+        elif a.startswith("--agent="):
+            agent_id = a.split("=", 1)[1]
+            break
+
+    plan = restore_plan(agent_id)
+    line = "─" * 54
+    if fmt == "json":
+        if dry_run:
+            print(json.dumps({"dry_run": True, "plan": plan}, indent=2, ensure_ascii=False))
+            return
+        results = (restore_agent_from_backup(agent_id, dry_run=False)
+                   if agent_id else restore_all_from_backup(dry_run=False))
+        present = [r for r in results if r.get("restored")]
+        print(json.dumps({
+            "restored": [r.get("agent") for r in present],
+            "count": len(present),
+        }, indent=2, ensure_ascii=False))
+        return
+
+    print(line)
+    print("  mcptoon restore" + ("  (DRY RUN — nothing written)" if dry_run else ""))
+    print(line)
+    if not plan:
+        print("  Nothing to restore — no config has a differing `.bak`.")
+        print("  (If mcptoon has never edited a config, there is nothing to undo.)")
+        print(line)
+        print("")
+        return
+    print("  This drops the mcptoon gateway entry and puts back the servers it")
+    print("  removed. Anything you added since is left alone:")
+    for row in plan:
+        print(f"    · {row['agent_name']}")
+        print(f"        {row['path']}")
+    print("")
+    if dry_run:
+        print(f"  Preview: {len(plan)} config(s) would be restored.")
+        print(line)
+        print("")
+        return
+    if not assume_yes:
+        if not sys.stdin.isatty():
+            print("  Refusing to overwrite configs without confirmation. Re-run with --yes.")
+            print(line)
+            print("")
+            return
+        try:
+            answer = input("  Restore them from backup? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = ""
+        if answer not in ("y", "yes"):
+            print("  Cancelled — nothing was restored.")
+            print(line)
+            print("")
+            return
+        print("")
+
+    results = (restore_agent_from_backup(agent_id, dry_run=False)
+               if agent_id else restore_all_from_backup(dry_run=False))
+    present = [r for r in results if r.get("restored") and r.get("written")]
+    failed = [r for r in results if r.get("restored") and r.get("error")]
+    for r in present:
+        print(f"  ✓ {r.get('agent_name', r.get('agent')):25s} restored from backup")
+    if failed:
+        for r in failed:
+            print(f"  ✗ {r.get('agent_name', r.get('agent')):25s} {r.get('error')}")
+    print("")
+    print(f"  Done: {len(present)} config(s) put back. Re-run `mcptoon quickstart`")
+    print("  to re-register the gateway when you want mcptoon on again.")
+    print(line)
+    print("")
 
 
 def _cmd_uninstall(rest, fmt):
@@ -1973,6 +2215,8 @@ def _cmd_config(rest, fmt):
         print("  footer on|off controls the one-line token-savings disclosure.")
         print("  lang auto|zh|en picks the language of that line;"
               " auto follows the OS language.")
+        print("  compress smart|off|toon controls result compression;"
+              " smart (default) shrinks redundant results.")
         return
 
     if action == "get":
@@ -2155,7 +2399,7 @@ def _cmd_doctor(_rest):
         servers = cfg.load_config()
         print(f"  ✓ Config: {cfg.CONFIG_FILE} ({len(servers)} servers)")
     else:
-        print("  ✗ No config found. Run: mcptoon init")
+        print("  ✗ No config found. Run: mcptoon quickstart")
         issues += 1
         print()
         print(f"  {checks} checks, {issues} issue(s)")
@@ -2376,6 +2620,11 @@ def _cmd_install(rest, fmt):
         mcptoon install <name> --npm <package>   Install from npm (npx)
         mcptoon install <name> --pip <package>   Install from pip
         mcptoon install <name> --url <url>       Install HTTP/SSE MCP
+        mcptoon install <name> --url <url> --header 'Authorization: Bearer ${TOKEN}'
+                                                 Same, for a server that needs a header.
+                                                 `${TOKEN}` names an environment
+                                                 variable, read at call time — the
+                                                 secret is never written to disk.
         mcptoon install --list                   List installed servers
         mcptoon install --remove <name>           Remove an installed server
     """
@@ -2389,6 +2638,7 @@ def _cmd_install(rest, fmt):
     do_packs = False
     pack_name = None
     dry_run = False
+    http_headers = {}
 
     i = 0
     while i < len(rest):
@@ -2401,6 +2651,14 @@ def _cmd_install(rest, fmt):
             i += 2
         elif a == "--url" and i + 1 < len(rest):
             http_url = rest[i + 1]
+            i += 2
+        elif a == "--header" and i + 1 < len(rest):
+            # Same shape as `add --http --header 'Key: Value'` (issue #24): one
+            # parser, so `install --url` and `add --http` cannot drift.
+            h = rest[i + 1]
+            if ":" in h:
+                k, v = h.split(":", 1)
+                http_headers[k.strip()] = v.strip()
             i += 2
         elif a == "--search" and i + 1 < len(rest):
             do_search = True
@@ -2478,7 +2736,7 @@ def _cmd_install(rest, fmt):
 
     if http_url:
         from .installer import install_http
-        result = install_http(http_url, server_name)
+        result = install_http(http_url, server_name, headers=http_headers)
         print(output.render(result, fmt=fmt))
         return
 
@@ -2565,7 +2823,7 @@ _mcptoon_complete() {
         --format)
             COMPREPLY=( $(compgen -W "openai openapi mcp json human" -- $cur) )
             ;;
-        --toon|--mcptoon|--slim|--json|--compact|--raw|--full|--stdin)
+        --toon|--mcptoon|--slim|--smart|--json|--compact|--raw|--full|--stdin)
             COMPREPLY=()
             ;;
     esac
@@ -2846,6 +3104,7 @@ Start here:
     mcptoon quickstart                    One-command setup (discover + config + wire agents)
     mcptoon status                        What's here, what it saves, how to undo it
     mcptoon off                           Remove the gateway from your agents (reversible)
+    mcptoon restore                       Drop the gateway and put your servers back
     mcptoon uninstall                     Full cleanup (--dry to preview)
 
 Usage:
@@ -2873,11 +3132,12 @@ Usage:
     mcptoon usage                         Show usage stats
     mcptoon status                        One-screen: what's here and what it saves
     mcptoon stats                         Token-savings dashboard (vs raw JSON)
+    mcptoon report                        Whole savings account on one screen
     mcptoon footer-facts                  One line of savings for a chat footer
     mcptoon config                        Show gateway settings (footer, welcome)
     mcptoon config set footer off         Silence the per-turn savings line
     mcptoon toggle <server> <tool>        Enable/disable one tool (--list to show)
-    mcptoon policy                        Per-tool compression policy (raw/toon/slim)
+    mcptoon policy                        Per-tool compression policy (raw/toon/slim/smart)
     mcptoon doctor                        Self-diagnose config + connectivity
     mcptoon completion <shell>            Generate shell completion (bash|zsh|fish|ps)
     mcptoon install <name> --npm <pkg>    Install MCP server from npm
@@ -2919,6 +3179,7 @@ Output flags:
     --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
     --slim         Ultra-compact tool manifests (saves 88.5% tokens, measured)
+    --smart        Structure-aware result compression (keeps keys, cuts payload)
     --json         JSON output
     --compact      Names only
     --stdin        Read JSON args from stdin (for large payloads)
@@ -2987,7 +3248,7 @@ def _print_takeover_plan(plan):
         print(f"        {row['path']}")
     print("")
     print("  A `<config>.bak` is written alongside each file first, so this is")
-    print("  reversible: restore the backup, or run `mcptoon off`.")
+    print("  reversible: `mcptoon restore` puts your original servers back.")
     print(line)
 
 
@@ -3069,10 +3330,10 @@ def _cmd_sync(rest, fmt):
                 print("")
                 return
             try:
-                answer = input("  Remove the entries above? [y/N] ").strip().lower()
+                answer = input("  Remove the entries above? [Y/n] ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 answer = ""
-            if answer not in ("y", "yes"):
+            if answer in ("n", "no"):
                 print("  Cancelled — nothing was removed.")
                 print("")
                 return
@@ -3093,7 +3354,7 @@ def _cmd_sync(rest, fmt):
         print("  Gateway registered: agents can now see mcptoon itself (`mcptoon serve`).")
         if takeover:
             print("  Takeover: managed servers now reach the agent through the gateway.")
-            print("  Undo any time: mcptoon off, or restore the `<config>.bak` written alongside it")
+            print("  Undo any time: `mcptoon restore` (puts your original servers back)")
         else:
             print("  Undo any time: mcptoon off")
 

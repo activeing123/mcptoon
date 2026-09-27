@@ -976,6 +976,9 @@ class MCPServerBridge:
         if effective in ("raw", "json", "auto"):
             return result
 
+        if effective == "smart":
+            return self._smart_compress(result, server, tool)
+
         try:
             from . import output as output_mod
             compressed = output_mod.render(result, fmt=effective)
@@ -985,6 +988,23 @@ class MCPServerBridge:
             pass
 
         return result
+
+    def _smart_compress(self, result: Any, server: str, tool: str) -> Any:
+        """Structure-aware compression + CCR (see compressor.py / ccr.py).
+
+        The compressed payload is the summary; the *original* goes to the CCR
+        store and its handle rides along in a one-line notice, so a model that
+        needs a dropped detail can call ``mcptoon_retrieve`` instead of being
+        stuck. Anything that cannot be stored or was not shrunk is returned
+        untouched — compression must never cost a caller information it cannot
+        get back.
+        """
+        try:
+            from . import compressor as _compressor
+            text, _stats = _compressor.compress_with_ccr(result, server=server, tool=tool)
+            return text if text is not None else result
+        except Exception:
+            return result
 
 
 # ═══════════════════════════════════════════════════
@@ -1060,7 +1080,6 @@ def _make_tool_error(message: str) -> dict:
         "isError": True,
         "resultType": "complete",
     }
-
 
 def _find_server_for_tool(tool_name: str, tool_index: dict) -> str:
     """Try to find which server owns a tool by name (fuzzy fallback)."""
@@ -1150,6 +1169,8 @@ def _parse_serve_args(args: list[str]) -> tuple[str, str | None, str | None]:
             output_format = "raw"
         elif a in ("--json",):
             output_format = "json"
+        elif a in ("--smart",):
+            output_format = "smart"
         elif a == "--listen" and i + 1 < len(args):
             listen_addr = args[i + 1]
             i += 1
@@ -1189,7 +1210,7 @@ def run_serve(args: list[str]):
 
     Args:
         args: Command line args after 'serve'
-              --format toon|slim|compact|json|raw|auto  (default: auto)
+              --format toon|slim|compact|smart|json|raw|auto  (default: auto)
               --listen <addr>  HTTP mode: listen on addr (e.g. :8080)
               --http            Shorthand for --listen :8080 (binds 127.0.0.1)
               --auth [token]    Bearer token; bare --auth generates one
@@ -1590,10 +1611,11 @@ Modes:
   HTTP (--listen)    Multi-agent, remote access — for teams, K8s, cloud
 
 Options:
-  --format <fmt>   Output format: auto|toon|slim|compact|json|raw (default: auto)
+  --format <fmt>   Output format: auto|toon|slim|compact|smart|json|raw (default: auto)
   --toon           Shorthand for --format toon
   --slim           Shorthand for --format slim
   --compact        Shorthand for --format compact
+  --smart          Shorthand for --format smart (structure-aware compression)
   --raw            Shorthand for --format raw (no compression)
   --listen <addr>  HTTP mode: listen on addr (default bind 127.0.0.1)
   --http           Shorthand for --listen :8080
@@ -1603,6 +1625,8 @@ Options:
 Environment:
   MCPTOON_CALL_TIMEOUT    Per-call timeout in seconds (default: 30)
   MCPTOON_CACHE_TTL       Manifest cache TTL in seconds (default: 300)
+  MCPTOON_CCR_TTL         Smart-compression retrieve TTL in seconds (default: 300)
+  MCPTOON_CCR_DIR         Where compressed originals are stored (default: ~/.mcptoon/ccr)
   MCPTOON_AUTH_TOKEN      HTTP mode bearer token (same as --auth)
   MCPTOON_ALLOWED_HOSTS   Extra hostnames accepted in Origin/Host checks
   MCPTOON_LIST_TTL_MS     CacheableResult ttlMs on list/read results (default: 300000)

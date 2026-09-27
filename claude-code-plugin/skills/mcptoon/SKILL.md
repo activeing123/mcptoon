@@ -1,13 +1,13 @@
 ---
 name: mcptoon
 version: 1.2.0
-description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
+description: Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. Also route here when a tool *result* looks truncated, compressed, or "lost data": result compression is on by default, originals come back via `mcptoon_retrieve handle=<id>`, and it turns off with `mcptoon config set compress off`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge.
 ---
 
 # mcptoon — MCP tool-catalog compression
 
 mcptoon is a zero-dependency CLI. If it is not installed yet, one command sets
-it up: `pip install mcptoon` (227KB, installs in seconds, nothing else pulled
+it up: `pip install mcptoon` (297KB, installs in seconds, nothing else pulled
 in). It gives you a compressed view of the user's MCP tools and calls them
 back.
 
@@ -23,6 +23,7 @@ back.
 | Huge JSON argument | `mcptoon call <server> <tool> --stdin` |
 | Tool returns images/base64 that must never be compressed | `mcptoon policy set <server> <tool> raw` (one-time; applies to every later call) |
 | Prove the token savings on this machine (tools + skills, one table) | `mcptoon bench` (`--roots DIR` for any catalog; `--json` for scripts) |
+| One screen with every saving added up (tools + skills + cumulative) | `mcptoon report` |
 | Diagnose connectivity/config | `mcptoon doctor` |
 
 ## Managing a skill catalog (mcptoon as the skill center)
@@ -108,6 +109,79 @@ one place, and `mcptoon off` still removes the gateway entirely. If the user's
 host has an empty tool *panel* (a UI that reads `tools/list` to draw a picker),
 that is the one case where `full` is the right answer rather than a preference.
 
+## Install-time: takeover, and how to undo it
+
+When `mcptoon quickstart` runs it finds the MCP servers already on the machine and
+registers the gateway. By default it then **routes those servers through the
+gateway** — it removes their direct entries from each agent config and reaches them
+via mcptoon instead. This is the step that actually saves tokens: registering the
+gateway *alongside* the direct entries saves ~nothing (the host keeps loading every
+upstream schema). Measured on 12 servers / 96 tools: alongside ≈ 39,500 tokens per
+turn, takeover ≈ 2,607.
+
+**What takeover touches, and what it never touches.** It removes only servers
+mcptoon manages — the ones in the user's mcptoon config. A server the user wrote by
+hand that mcptoon does not know about is left exactly where it is. Before editing
+any config file, mcptoon writes a `<config>.bak` holding the pre-mcptoon original.
+
+**If the user asks "how do I put it back / undo this / get my old setup":**
+
+```bash
+mcptoon restore          # undo mcptoon's edits: drop the gateway, return your servers
+mcptoon restore --dry    # preview which files would change
+mcptoon off              # only removes the gateway entry; servers stay routed
+```
+
+`restore` is the true undo: it removes the gateway entry **and** puts back the
+servers takeover dropped — the machine looks like it did before mcptoon. It is
+surgical, not a file copy: anything the user added to a config after mcptoon's edit
+is left exactly where it is. `off` is different: it removes only the gateway entry,
+so the servers takeover dropped are **not** brought back. If a user says "I turned
+it off and my servers didn't come back", that is expected — run `mcptoon restore`.
+
+A host with an empty tool *panel* after install is the one case where `full`
+exposure (above) is right rather than a preference.
+
+## Result compression: on by default, and how to get the original back
+
+Besides shrinking the *catalog* (the schemas), mcptoon shrinks the *results* a
+tool returns. **It is on by default (`compress = smart`)** — a fresh install
+compresses redundant results with nobody typing a flag. The footer's third line
+reads `结果压缩（对话）— 已启用（自动）` when it is on.
+
+**What it compresses, and what it never touches.** The safety gate keeps keys,
+structure and scalars and only cuts payload from shapes that are repetitive:
+lists of records, search results, directory trees, repeated log lines, many-key
+objects. It **leaves alone** a single source file, one long prose answer, an
+image/base64 blob, and any lone short value — those pass through byte-for-byte.
+A compressed result is *reversible*: the full original is cached and the result
+carries `full text: mcptoon_retrieve handle=<id>`; call the `mcptoon_retrieve`
+tool with that handle to get it back exactly. Cache TTL is 300 s
+(`MCPTOON_CCR_TTL` / `MCPTOON_CCR_DIR`).
+
+**When a user says a result looks wrong, cut short, or "it lost my data":**
+
+1. First, get the original back — that is the whole answer to "it lost my data":
+   `mcptoon_retrieve handle=<id from the result>` returns the untouched payload.
+   There is no data loss to repair; the original was never destroyed.
+2. If the shape was one that should not have been compressed, pin that one tool
+   to pass through: `mcptoon policy set <server> <tool> raw`.
+3. If they want result compression off entirely: `mcptoon config set compress off`
+   (back on: `mcptoon config set compress smart`).
+
+```bash
+mcptoon config set compress off      # no result compression at all
+mcptoon config set compress smart    # the default
+mcptoon policy set fs read_text_file raw   # keep one tool verbatim
+```
+
+**Be honest about the limit.** mcptoon cannot *detect* a bad compression: it
+compresses before the model reads the result, so "did this hurt the answer?" is
+not something it can observe. What it guarantees is the three layers above —
+only safe shapes are compressed, the original is always retrievable, and one
+setting turns it off. Do not promise the user automatic detection; offer the
+retrieve handle and the off switch.
+
 ## Making mcptoon visible in a session
 
 `mcptoon serve` returns an `instructions` field from the MCP initialize
@@ -143,7 +217,7 @@ and only when `mcptoon serve` is actually registered with that agent.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  227KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  297KB, installs in seconds). Confirm the upgrade before running it — pinning a
   version here would only go stale, but a bare `--upgrade` should be your call,
   not an automatic one.
 - Source: this package is published to PyPI by GitHub Actions from

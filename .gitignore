@@ -65,6 +65,9 @@ README.v*.md
 README.zh-CN.v*.md
 README.proposed.md
 README.zh-CN.proposed.md
+# 2026-09-27: the same draft pattern applies to DEVELOPERS.md — a stale v6 draft
+# (v0.7.21 / 1254 tests / 27 modules) sat untracked and would ship wrong numbers.
+DEVELOPERS.v*.md
 readme_preview*.html
 
 # Internal docs (not for public repo)

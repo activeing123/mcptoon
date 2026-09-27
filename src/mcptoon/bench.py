@@ -114,6 +114,12 @@ def _unique_skill_files(roots: list[Path]):
                 continue
             seen_files.add(key)
             out.append((slug, md))
+    # A real path is unique per file, so the loop above still counts a *copy* of
+    # a skill twice — the layout a fresh install creates, because the packaged
+    # skill is written into every agent view. Collapse byte-identical copies so
+    # this and `skills index` (which does the same) cannot quote two figures for
+    # one machine. Reuses the catalog's helper rather than a second definition.
+    out, _copies = sk._collapse_identical_copies(out)
     return out, dupes
 
 
@@ -126,13 +132,21 @@ def _tokenizer():
 
     ``exact`` is False for the fallback so callers can label the numbers instead
     of letting an estimate pass as a measurement.
+
+    The fallback's *name* is the string that rides the footer's ``[caliber]``
+    suffix, so it is kept short on purpose: the older
+    ``"chars/4 estimate (pip install tiktoken for the README caliber)"`` is 59
+    characters and pushed line 1 past the 80-column budget on every machine
+    without tiktoken — i.e. on a plain ``pip install``, where the fallback is
+    always the active caliber. The install hint still reaches the user from
+    ``mcptoon bench``, which prints it as its own line when ``exact`` is False.
     """
     try:
         import tiktoken  # optional: never a hard dependency
     except ImportError:
         def encode(text: str) -> int:
             return max(1, round(len(text) / 4))
-        return encode, "chars/4 estimate (pip install tiktoken for the README caliber)", False
+        return encode, "chars/4 estimate", False
 
     enc = tiktoken.get_encoding("cl100k_base")
     return (lambda text: len(enc.encode(text))), "tiktoken cl100k_base", True
@@ -150,12 +164,19 @@ def _pct(part: int, whole: int):
 # ═══════════════════════════════════════════════════
 
 def _load_cached_tools() -> dict:
-    """Read the on-disk schema cache directly.
+    """Read the on-disk schema cache, keeping only servers still configured.
 
     Deliberately not ``cache.get_cached_tools()``: a measurement must see the
-    schemas actually on disk, not obey the runtime freshness TTL.
+    schemas actually on disk, not obey the runtime freshness TTL. But it must
+    still agree with what the user *has*: the cache file keeps an entry for a
+    server that was later removed from the config, and counting it inflates the
+    bench. Measured on the author's box 2026-09-26: the file held a fossil
+    ``mcptoon`` entry with 461 tools that `status` (config-based) did not count,
+    so `bench` said 557 tools while `status` said 96 — the exact "same machine,
+    two numbers" the product is supposed to have stopped doing. The config is the
+    source of truth for "what servers exist"; the cache supplies their schemas.
     """
-    from .config import CACHE_DIR
+    from .config import CACHE_DIR, list_servers
 
     cache_file = CACHE_DIR / "schema_cache.json"
     if not cache_file.exists():
@@ -164,7 +185,19 @@ def _load_cached_tools() -> dict:
         cache = json.loads(cache_file.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return {name: entry["tools"] for name, entry in cache.items() if entry.get("tools")}
+    try:
+        configured = set(list_servers())
+    except Exception:
+        configured = None
+    out = {}
+    for name, entry in cache.items():
+        tools = entry.get("tools")
+        if not tools:
+            continue
+        if configured is not None and name not in configured:
+            continue  # a server the user removed — its schemas are not their catalog
+        out[name] = tools
+    return out
 
 
 def _tool_rows(encode):
@@ -176,16 +209,13 @@ def _tool_rows(encode):
     if not flat:
         return [], 0, 0
 
-    native = json.dumps(
-        [
-            {
-                "name": t.get("name"),
-                "description": t.get("description", ""),
-                "inputSchema": t.get("inputSchema") or t.get("parameters") or {},
-            }
-            for t in flat
-        ],
-        ensure_ascii=False,
+    # Per-tool sum of the **full** schema, the exact caliber `status` and the
+    # footer report. It used to strip to name/description/inputSchema (dropping
+    # `annotations`), which made this row 16,641 against `status`'s 21,074 on the
+    # same machine — a third "same machine, two numbers" (2026-09-26).
+    native = sum(
+        encode(json.dumps(t, ensure_ascii=False))
+        for t in flat
     )
     # compact() on a *list* truncates to 30 names, which would understate the
     # saving by orders of magnitude; the manifest shape has no such limit.
@@ -194,7 +224,7 @@ def _tool_rows(encode):
          for s, ts in tools.items() if any("error" not in t for t in ts)}
     )
     rows = [
-        ("native: every full schema", encode(native)),
+        ("native: every full schema", native),
         ("manifest (name index)", encode(names)),
         ("manifest --slim", encode(slim_toon(flat))),
     ]
@@ -260,7 +290,11 @@ def _render(tokname, exact, tool_rows, n_tools,
             skill_rows, n_skills, dupes, note, query, roots):
     lines = [f"mcptoon bench — {tokname}", ""]
     if not exact:
-        lines += ["  ! these are estimates, not the README's tiktoken numbers", ""]
+        lines += [
+            "  ! these are estimates, not the README's tiktoken numbers",
+            "    pip install tiktoken for the README caliber",
+            "",
+        ]
 
     header = (f"  {'half':<13} {'what the agent loads':<38} {'tokens':>11} {'vs native':>11}")
     rule = "  " + "-" * (len(header) - 2)

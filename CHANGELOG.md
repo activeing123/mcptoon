@@ -5,6 +5,239 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-09-27
+
+### Added
+
+- **`mcptoon restore` — the real undo of a takeover.** `sync --takeover` is a
+  subtraction: it removes the server entries mcptoon now serves itself and writes a
+  `<config>.bak` holding the pre-mcptoon original first. `mcptoon off` removes the
+  *gateway* entry but never reads that backup, so a user who took over and then ran
+  `off` ended up with **neither** their original servers nor the gateway — the
+  dropped entries survived only in the `.bak`. `restore` is the missing verb: it
+  drops the gateway entry and puts the dropped servers back. `--dry` previews which
+  files would change, `--agent <id>` narrows to one host, `--yes` skips the
+  confirmation, and a host that also carries the skill-pointer leg has that block
+  removed too (the same byte-reversible removal `off` uses). The CLI no longer tells
+  users `off` is the undo — it was not.
+- **`mcptoon restore` is surgical, never a file copy.** It removes only the gateway
+  entry and re-adds only the servers the `.bak` holds that the live config has lost
+  — never a server the user added *after* mcptoon's edit. A whole-file restore would
+  have been a data-loss bug: this machine's own `~/.claude.json.bak` (written
+  2026-09-24, when the file had no servers) sat next to a live file that had grown
+  12 servers by 2026-09-26, so copying the `.bak` back would have deleted all 12. A
+  file mcptoon created only to hold the gateway is deleted on restore (guarded on
+  the `.bak`'s own evidence that the file was empty beforehand), so a host that had
+  no config gets none back.
+- **`mcptoon quickstart --takeover`.** The scripted form of the install-time offer:
+  skips the prompt and applies takeover directly, for CI/automation that cannot
+  answer.
+
+
+- **`--format smart` — structure-aware result compression, and a way back.** The
+  existing formats only *re-encode* a payload: JSON becomes TOON and the same
+  content costs ~8-34% fewer tokens. `smart` compresses the *content*: it keeps
+  every dict key, every scalar type and the top-ranked items, and cuts the payload
+  (long string values, redundant array tails, repeated log lines, low-relevance
+  search rows). Measured on this machine, a 25-row search result drops from 6,327
+  to 973 tokens (−85%); a real `filesystem directory_tree` result drops 95%. The
+  model still sees the shape of the data, so it can reason about what it has.
+- **`mcptoon_retrieve` — compression that is reversible.** A compressed result
+  carries a handle (`… full text: mcptoon_retrieve handle=ab12cd34ef56`); the
+  untruncated original is cached locally under a 5-minute TTL (`MCPTOON_CCR_TTL`,
+  `MCPTOON_CCR_DIR`) and can be fetched back with the new ninth first-party tool.
+  Compression is therefore lazy loading, not data loss — which is what makes it
+  safe to leave on. Handles are content-addressed, so the store self-dedupes.
+- **`smart` is a per-tool policy.** `mcptoon policy set <server> <tool> smart`
+  pins it for one chatty tool without changing the bridge-wide default, exactly
+  like the existing `raw`/`toon`/`slim` policies. Binary and base64 payloads are
+  refused and passed through untouched.
+- Two new modules (`compressor.py`, `ccr.py`) and three test files, all standard
+  library — the zero-dependency rule is intact. The design follows
+  `headroomlabs-ai/headroom` (Apache-2.0); Tree-sitter and the trained text model
+  are deliberately left out, since both would break that rule.
+
+- **The per-turn broadcast is three lines now, and it counts all three savings
+  axes.** The footer counted the tool catalog and never mentioned skills — so the
+  product's own headline (it manages both halves of a session's toolbox) was
+  invisible on the surface users read most. The second line carries the skill
+  count, the full-text cost, and what the agent gets instead (`1,030,628 → 39
+  tokens`); the third carries result compression, the one *opt-in* axis. The
+  skills line is omitted rather than zeroed when a machine has no skill catalog;
+  the compression line always prints, because "off" is itself the fact the reader
+  needs — the feature saves nothing until they turn it on, and a line that vanished
+  when disabled would hide their only lever.
+- **The tool line says how many tools the agent ends up with** (`96→9`)
+  — the reduction a user actually experiences, where before the line only had the
+  token pair, which is the same fact in a unit many readers do not think in.
+- **`≈ saved so far` on the skills line.** Calls routed × the per-turn saving. This
+  is the only *estimate* on any surface and it always carries `≈`, because it rests
+  on an assumption (every routed call stands in for a turn that would have carried
+  the full catalog) that makes it a **lower bound**. It rides on line 2 rather than
+  line 1 since the 80-column redesign. See
+  `docs/experience-checklist.md` §6b.
+- **The skills figures are cached and revalidated at most once per TTL.** Measuring
+  the catalog means tokenizing ~1,030,628 tokens (~481 ms here), and *validating*
+  a cached measurement means a stat walk over ~9,800 files (~400 ms, because the
+  skill roots are symlink farms). Neither belongs on a path every mcptoon command
+  now pays for its footer, so the sidecar (`skills-tokens.json`) records when its
+  signature was last checked and inside the 5-minute window the walk is skipped
+  entirely: the common turn reads one small JSON file (~1 ms). Same window as the
+  schema cache, so "how stale can the footer be?" has one answer.
+
+
+### Changed
+
+- **The install-time takeover offer now defaults to YES (`[Y/n]`).** The offer is
+  the one moment the tradeoff is legible, the entries it will drop are listed right
+  above the prompt, and the undo is now real (`mcptoon restore`) — so a bare Enter
+  routes the servers through the gateway instead of leaving the install saving
+  nothing. Only an explicit `n` keeps the alongside-mount. This does not weaken
+  Write Consent (CONTEXT.md): the subtraction is still listed and still confirmed
+  once, never silent; only the default answer moved, and it moved because the
+  reverse gear now exists. `sync --takeover`'s own confirmation moved to `[Y/n]` to
+  match; `sync` without `--takeover` and `--no-self` still add only.
+- **`mcptoon sync --takeover` and the takeover plan no longer point at `off` as the
+  undo.** They named `off` (or "restore the backup") where the working command is
+  `mcptoon restore`.
+- **The `/mcptoon` skill documents takeover and how to undo it.** The skill's
+  install story stopped at "register the gateway"; it now has a "Install-time:
+  takeover, and how to undo it" section — what takeover touches (only managed
+  servers, never a hand-written one), that a `<config>.bak` is written first, and
+  the difference between `off` (gateway entry only) and `restore` (pre-mcptoon
+  state). This is the Skill-as-Explainer leg of the fix: the agent can now answer
+  "how do I put it back" without the user reading docs.
+
+
+- **Every broadcast line now fits 80 display columns.** The first three-line
+  footer packed the raw token pair, two percentages and the running call count
+  onto line 1; measured at **166 display columns** it wrapped to three terminal
+  rows on every turn, which is what made the broadcast read as noise. Line 1 now
+  carries one figure per unit — the reduction (`96→9`), the rate (`省 88%`), and
+  the **cumulative** estimate with the running call count (`≈省 82M·4,407次`) — and
+  the figures that no longer fit moved down a line or into `mcptoon report`.
+  Nothing is lost: the raw token pair, the slim-schema percentage, the per-turn
+  saving and the per-server split are all in `mcptoon report`. The cumulative
+  estimate and its call counter replaced the per-turn constant on line 1 because
+  a per-turn figure is the same number every turn, while the counter moves with
+  every routed call — the line is meant to be *seen moving* turn over turn. Line 2
+  now ends with two entry points (`mcptoon report` and `/mcptoon 技能`). The `≤80`
+  budget is enforced mechanically by
+  `tests/test_footer_broadcast.py::TestLineWidthBudget` across every state
+  (normal, uncached, stale, no skills, no calls, fresh, and a grown catalog) in
+  both languages.
+- **The footer now says when it just compressed something.** Line 3 read the same
+  "originals via `mcptoon_retrieve`" every turn regardless of whether anything was
+  compressed. When *this run* actually compressed a result it changes to
+  `本轮已压缩，失真问 /mcptoon 技能` / `compressed this turn; ask /mcptoon skill`,
+  pointing at the explanation and the way back (the result itself already carries
+  the retrieve handle, so repeating it there would spend columns on what the
+  reader just saw). The two states are alternatives, not a base plus an append.
+- **`/mcptoon` skill documents result compression and the way back.** The skill
+  was stale on the whole result axis: no `smart`, no `mcptoon_retrieve`, no CCR,
+  no off switch. It now has a "Result compression: on by default, and how to get
+  the original back" section, and its frontmatter `description` gained the trigger
+  phrase so the router can actually find it when a result looks truncated.
+- **Result compression is now on by default (`compress = smart`).** A fresh
+  install shrinks redundant tool results without anyone typing a flag — the
+  point of a gateway is to cost less unprompted. `mcptoon config set compress
+  off` restores verbatim output; an explicit `--json`/`--toon` and a per-tool
+  `policy` still win. A safety gate (`compressor.is_compressible`) decides what
+  is fair game: lists of records, nested JSON, repeated logs and many-key
+  objects are compressed, while a lone source file, one long prose answer, or a
+  binary/base64 blob passes through untouched. The footer's third line now reads
+  "已启用（自动）" and names the retrieve path.
+- **The line that had no gateway figure fits the budget too.** The `≤80` rule
+  above was only ever *tested* on the gateway branch, and the fallback branch —
+  a catalog smaller than the gateway footprint, a legacy `--json` dict, i.e. a
+  fresh install — still printed the old `95 tools in 12 servers — 20,914 →
+  15,719 tokens (saved 5,195, 25%) · 0 calls routed` string, measured at **143
+  display columns**. It now renders the same shape as the gateway line (count,
+  rate, live count, `[caliber]`) and keeps the omitted raw pair in
+  `mcptoon report`.
+- **The no-tiktoken caliber name is short again.** `chars/4 estimate (pip install
+  tiktoken for the README caliber)` is 59 characters and pushed line 1 over
+  budget on every machine without tiktoken — which is the default state of a
+  plain `pip install`, where the fallback is always the active caliber. The
+  suffix is now `chars/4 estimate`; the `pip install tiktoken` hint moved to
+  `mcptoon bench`, where there is room to print it as its own line.
+
+
+- **`mcptoon bench` counted a cache entry for a server that was no longer
+  configured.** The schema cache keeps an entry after a server is removed, and
+  `bench` read the file directly — so on the author's box it reported **557 tools
+  while `status` reported 96**, the exact "same machine, two numbers" the product
+  is supposed to have stopped doing. `_load_cached_tools()` now keeps only servers
+  still in the config: the config is the source of truth for *what servers exist*,
+  the cache only supplies their schemas.
+- **`mcptoon bench`'s "native" row used a different caliber than `status`.** It
+  stripped each tool down to name/description/inputSchema, dropping `annotations`,
+  so it printed **16,641** where `status` printed **21,074**. It now counts the full
+  schema, the same caliber the footer and `status` use, so the two commands cannot
+  disagree about the same machine.
+- **README and `docs/calibers.md` no longer attribute the 255-tool synthetic table
+  to `mcptoon bench`.** `bench` measures *your* catalog; the fixed sample is recorded
+  in `assets/benchmark_tiktoken.json` and reproduced by `scripts/bench_tokens.py`.
+
+
+### Fixed
+
+- **The undo no longer deletes a config it could not read.** `restore`/`off` would
+  delete a host config when its `.bak` was missing, corrupt, JSONC, 0-byte, or a
+  directory — the "delete an empty stub" guard inferred *"the `.bak` was empty"* from
+  *"the `.bak` was unreadable"*, so a JSONC VS Code `settings.json` (its real format)
+  was removed on restore. "Could not read" is now distinct from "empty": an
+  unreadable `.bak` is never grounds for deletion, and a `.bak` that is a symlink or
+  not a regular file is refused outright rather than importing another file's servers.
+- **`sync` no longer clobbers a JSONC `settings.json`.** `_write_json_safe` merged
+  into an empty dict for any file `json` could not parse and then rewrote it, dropping
+  every editor setting and comment in VS Code's (JSONC) `settings.json`. It now
+  refuses to overwrite a file that is not a plain JSON object and reports why.
+- **The skill-pointer undo no longer eats user content appended below it.** Removing
+  the pointer cut "until the next `## ` heading", so anything a user wrote *after*
+  mcptoon's block (a paragraph, a `#` heading) was deleted. It now removes the block's
+  exact text and leaves the rest — including a following section — untouched.
+- **The undo no longer crashes on a malformed config.** A non-dict `mcpServers` /
+  `mcp` / `servers`, or a top-level array, raised and aborted the whole restore run
+  (leaving the gateway on every remaining host). Sections are now type-checked, and
+  each host is restored independently so one bad file cannot stop the others.
+- **A user's own server named `mcptoon` is no longer deleted.** `off`/`restore` removed
+  the `mcptoon` key unconditionally; removal is now gated on the entry actually being
+  the gateway (`<python> -m mcptoon serve`), so a user's own same-named server survives.
+- **An interrupt or closed stdin at the takeover prompt no longer means "yes".** Ctrl-C
+  / EOF (and Windows NUL stdin, which reports as a tty) fell through to applying the
+  subtraction silently; an unanswered prompt now declines, like the prompt says.
+- **`off` now points at `restore`.** `off` removes only the gateway entry, so a user
+  who had taken over and then ran `off` was left with their servers still gone and no
+  hint that `restore` was the way back. `off` now names `mcptoon restore` when a
+  differing `.bak` exists, and the README, `--help` and `status` say the same.
+- **Read-back verification checks both config shapes.** A clobbered VS Code
+  `mcp.servers` write was reported as success because the check only looked at the
+  Claude Code shape.
+- **A copied skill is counted once, not once per agent folder.** Agent skill
+  folders are not only *junctioned* onto one catalog; the first run **copies**
+  mcptoon's own skill into every agent view. The catalog de-duplicated by real
+  path, which catches junctions but not copies, so on a fresh `pip install` the
+  index reported **4–6 identical `mcptoon` rows**, emitted a bogus
+  `SKILL_DUPLICATE` warning, and quoted **12,163 tokens for one 3,130-token
+  file** — the tool's own savings numbers, inflated ~4x on exactly the machine
+  that had just installed it. Byte-identical copies (same slug, same bytes) now
+  collapse to one row; a same-slug file with *different* bytes still warns, since
+  that is a real conflict. `bench`'s figures and the `skills index` now agree by
+  construction (one shared helper).
+- **The skill index scans every folder the installer writes into.** `install_self`
+  wrote the packaged skill into six agent views while the index scanned four, so
+  two of them were written to and never read back. The two lists are now the same
+  set, filtered only by existence.
+
+
+- **The skills percentage rounded to a bare `100%`.** 39/1,030,628 is 99.9962%, and
+  ordinary rounding printed "100%", which reads as a typo (nothing is ever fully
+  free) and overstates the claim. It is floored at two decimals now: `99.99%`.
+- **The footer's change gate compared only the first line.** With a second line
+  added, a skills-only change would have been suppressed as a repeat. It now compares
+  every figure line and still ignores the `note:` age that ticks each minute.
+
 ## [0.8.1] - 2026-09-25
 
 A patch for two bugs found by people running mcptoon against real clients. Both
@@ -1119,7 +1352,6 @@ update is a red CI.
   `set_cached_tools` reports whether the callable surface actually changed, and
   `serve`'s parallel manifest refresh logs tool-set drift from that signal — no
   payload diffing. (`cache.py`, `serve.py`, `tests/test_cache.py`)
-
 
 ## [0.7.9] — 2026-09-11
 

@@ -49,8 +49,13 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the live docs/README-details.html said 206KB — so they join COVERED and their old
 # values are retired here. The other historical spellings below are on the list so a
 # stale figure cannot be reintroduced from an old draft.
+# 2026-09-27: "227KB" joins the list. It was the truth for 0.8.1 (measured
+# 2026-09-24), and it stopped being true at 0.8.2: the footer broadcast, the smart
+# compressor, the report command and the restore/undo hardening added real code —
+# footer.py +24KB, sync.py +18KB, cli.py +17KB, plus four new modules — and the wheel
+# the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
-              "146KB", "180KB", "156KB", "179KB", "190KB")
+              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -63,17 +68,31 @@ TEST_CLAIM_SURFACES = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "ROADMAP
 # The separator may be glued to "passed" ("956 passed, 1 skipped"), which the
 # first cut required a space before — so a stale total hid in plain sight until
 # 2026-09-18. Whitespace is optional on both sides of the separator now.
-TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*1 skipped")
+# 2026-09-26: the skipped count is no longer required to be `1`. This box skips two
+# (case-insensitive NTFS; WSL-stub bash), and a hardcoded `1` made the guard reject
+# the honest total rather than the stale one. The count is still *required* — a
+# claim without it stays exempt as historical — but it is now any number.
+TEST_CLAIM = re.compile(r"(\d+) passed\s*(?:·|\+|,)\s*\d+ skipped")
+# How many tests the tree skips. The docs state the *passed* count, which is
+# `collected - skipped`, so the guard's gap must cover every skip or it rejects the
+# truth. Pinned rather than measured because `--collect-only` does not report skips
+# (they are a runtime decision) and running the suite inside the guard would cost
+# minutes. It is deliberately small: if a third environmental skip appears the guard
+# fails loudly and a human decides, instead of the gap quietly widening.
+SKIP_SLACK = 2
 # The badge and the one-line claim are the machine-readable spellings; prose hides
 # the total in plain English ("1035 tests", "1035 个测试"). Two stragglers survived
 # every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
-# What `pip install mcptoon` downloads. 227KB, measured 2026-09-24 against the tree
-# as CI builds it: a working copy with LF endings, `python -m build --wheel` (and
-# `uv build --wheel`, which agreed to 2 bytes), 232,828 bytes = 227.37 KB -> 227KB.
+# What `pip install mcptoon` downloads. 297KB, measured 2026-09-27 in the CI image
+# (python:3.12-slim, sources with LF endings, `python -m build`) for the 0.8.2 tree:
+# 304,480 bytes = 297.34 KB -> 297KB. `pip install mcptoon` pulls only the wheel.
 #
-# The earlier "233KB" was never a shipped number. It came from
+# It was 227KB at 0.8.1 (2026-09-24). The jump is real product, not line endings:
+# footer.py grew ~24KB (the broadcast/footer-facts work), sync.py ~18KB (the surgical
+# restore), cli.py ~17KB, and ccr/compressor/headers/report are new modules. The
+# earlier "233KB" was never a shipped number — it came from
 # `python -m build --wheel --no-isolation` on a Windows checkout whose sources were
 # CRLF (the local autocrlf default) and whose README was the pre-rewrite 581-line
 # version. Line endings are pure overhead inside the wheel: the same 0.7.21 tree
@@ -81,7 +100,7 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # artifact is 231,659 — so the CRLF checkout inflated every claim by ~1.4KB. This is
 # the measurement method now: convert to LF first, then build. The guard pins a value
 # measured from a real artifact, not from one developer's line endings.
-WHEEL_KB = "227KB"
+WHEEL_KB = "297KB"
 
 
 def modules() -> list[Path]:
@@ -145,14 +164,14 @@ class TestFootprintClaims(unittest.TestCase):
         """`Tests-<n> passed` drifted 694 -> 703 -> 713 unnoticed, and this guard's own
         author then wrote 736 when the truth was 737. A stale badge is a stale claim, so
         the number is compared against collection rather than against someone's memory.
-        The gap allows only what skipped tests can explain (at most one)."""
+        The gap allows only what skipped tests can explain (`SKIP_SLACK`)."""
         proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
                               capture_output=True, text=True, cwd=ROOT)
         collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
         self.assertGreater(collected, 500, "collection failed - the badge cannot be judged")
         for rel in ("README.md", "README.zh-CN.md"):
             for n in re.findall(r"Tests-(\d+)%20passed", self.texts[rel]):
-                self.assertTrue(collected - 1 <= int(n) <= collected,
+                self.assertTrue(collected - SKIP_SLACK <= int(n) <= collected,
                                 f"{rel} badge says {n} but {collected} tests are collected")
 
     def test_no_page_links_a_file_that_does_not_exist(self):
@@ -182,8 +201,8 @@ class TestFootprintClaims(unittest.TestCase):
 
         2026-09-17: the first cut allowed a gap of 5, and the guard's own two new
         tests pushed the suite past the badge while every surface still said 925.
-        The gap is now the number of tests the tree actually skips (at most one:
-        the bash test on a Windows box without WSL), so a stale total cannot hide."""
+        The gap is now the number of tests the tree actually skips (`SKIP_SLACK`), so
+        a stale total cannot hide."""
         proc = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
                               capture_output=True, text=True, cwd=ROOT)
         collected = sum(1 for line in proc.stdout.splitlines() if "::" in line)
@@ -193,7 +212,7 @@ class TestFootprintClaims(unittest.TestCase):
             text = (ROOT / rel).read_text(encoding="utf-8")
             for n in TEST_CLAIM.findall(text):
                 seen += 1
-                self.assertTrue(collected - 1 <= int(n) <= collected,
+                self.assertTrue(collected - SKIP_SLACK <= int(n) <= collected,
                                 f"{rel} advertises {n} passed but {collected} tests are collected")
         self.assertGreater(seen, 0, "no live suite-total claim found - did the wording change?")
 
@@ -218,7 +237,7 @@ class TestFootprintClaims(unittest.TestCase):
             for raw in SUITE_PROSE.findall(text):
                 n = int(raw.replace(",", ""))
                 seen += 1
-                self.assertTrue(collected - 1 <= n <= collected,
+                self.assertTrue(collected - SKIP_SLACK <= n <= collected,
                                 f"{rel} says {raw} tests but {collected} are collected")
         self.assertGreater(seen, 0, "no prose suite-total claim found - did the wording change?")
         # Pin the exclusion rule so a later wording change cannot silently widen the net.

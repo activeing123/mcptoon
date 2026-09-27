@@ -8,16 +8,16 @@
 
 **Install 1,000 skills and 1,000 MCP tools locally — and don't worry about the token context. mcptoon manages it all.**
 
-**Its own compact format saves 99.2% of tokens; no line of config to write for any desktop or command-line agent.**
+**Its own compact format cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number); no line of config to write for any desktop or command-line agent.**
 
 **Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
 
-**It's just a 227KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
+**It's just a 297KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1471%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1626%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -50,7 +50,7 @@ mcptoon keeps those descriptions **on disk, not in context**, and hands the agen
 
 Nothing is lost: the full schema and the full skill text stay one command away. Only the context window is spared.
 
-mcptoon is a **227KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
+mcptoon is a **297KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
 
 ## This isn't just us talking
 
@@ -91,7 +91,9 @@ Script it. `mcptoon` is a plain CLI with stable JSON output and an `mcptoon serv
 </tr>
 </table>
 
-Reproduce the numbers yourself: `pip install mcptoon && mcptoon bench`
+Measure *your* numbers: `pip install mcptoon && mcptoon bench` — it reports your own
+catalog, not the fixed 255-tool sample below (that sample's method is in
+[docs/tiktoken-benchmarks.md](https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md)).
 
 | | Without mcptoon | With mcptoon |
 |---|---|---|
@@ -175,7 +177,7 @@ Full reference: [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/mai
 ## 30 seconds up and running
 
 ```bash
-pip install mcptoon                          # pure stdlib, 227KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 297KB, zero dependencies
 
 # One command: find your MCP servers, write your config, register the gateway
 # in every agent you have, and show you what it found:
@@ -193,11 +195,15 @@ agent's config as the reserved server `mcptoon`, so your agent can see mcptoon i
 Already synced? Re-register with `mcptoon sync --self` (plain `mcptoon sync` only writes
 your servers); check the state any time with `mcptoon status`.
 
-**And it is fully reversible.** `mcptoon sync --self` adds a single entry to an agent's
-config — nothing else is touched. Take it back any time with `mcptoon off` (your own
-servers stay as they are, and every changed file keeps a `.bak`); preview the complete
-removal plan with `mcptoon uninstall --dry`. Your server definitions stay put, and
-`uninstall` prints exactly what it will remove before it removes it.
+**And it is fully reversible.** The install registers the gateway, and by default
+quickstart also *takes over* — it routes your existing servers through the gateway
+and removes their direct entries (that is the mode that actually saves tokens). It
+is a listed, confirmed step, and it is undoable: **`mcptoon restore` drops the
+gateway entry and puts your servers back exactly where they were.** Anything you
+added to a config afterwards is left untouched. `mcptoon off` is the lighter
+switch — it removes only the gateway entry and leaves your servers where they are.
+Preview either with `--dry`, and preview the complete removal plan with
+`mcptoon uninstall --dry` (it prints exactly what it will remove first).
 
 Don't want to install yet? Watch it work instead (needs Node):
 
@@ -294,6 +300,14 @@ mcptoon manifest      # see every tool (name index, the cheapest view)
 mcptoon saves tokens in three separate places. Comparing the numbers across them is
 meaningless.
 
+There are two ways to read "how much does this save?", and they answer different
+questions. **The gateway figure** — full schemas versus what the agent actually loads
+under the default `compact` exposure — is what installing mcptoon buys, and it is the
+honest headline (89% on the machine this was written on). **The slim-schema figure**
+(same tools, terser descriptions) is the smaller, secondary claim (24%), and it is what
+`manifest --slim` buys. `mcptoon status` prints both, side by side, from one
+measurement, so the two can never drift apart.
+
 ### Bill 1 · Tool discovery (`manifest`): 99.2% smaller by default
 
 `mcptoon manifest` with no flags is this tier. Want more? `--slim` (names plus param
@@ -322,7 +336,9 @@ mcptoon skills resolve "make a PDF" --k 5    # 501 tokens, the 5 most relevant
 | | `skills manifest` (pointer) | 39 | 100.0% |
 | | `skills resolve --k 5` | 501 | 99.9% |
 
-The fixed headline benchmark — 255 tools across 50 servers, `tiktoken cl100k_base`:
+The fixed headline benchmark — a **synthetic sample** of 255 tools across 50 servers,
+`tiktoken cl100k_base`. It is not your catalog; run `mcptoon status` to see your own
+numbers:
 
 | Format | Tokens | Savings |
 |---|---:|---:|
@@ -331,7 +347,8 @@ The fixed headline benchmark — 255 tools across 50 servers, `tiktoken cl100k_b
 | SLIM | 8,282 | 88.5% |
 | Compact | 581 | 99.2% |
 
-Reproduce it yourself: `mcptoon bench` (ships in the wheel). Method and caliber:
+Measure your own catalog with `mcptoon bench` (it reports *your* tools, not this fixed
+sample). Method and caliber:
 [docs/tiktoken-benchmarks.md](https://github.com/activeing123/mcptoon/blob/main/docs/tiktoken-benchmarks.md).
 
 ---
@@ -435,6 +452,7 @@ mcptoon demo-server             # the same proof with zero downloads (11 stdlib 
 mcptoon doctor                  # self-check: Python, config, connectivity
 mcptoon status                  # one screen: what's configured, gateway wired, tokens saved
 mcptoon stats                   # token-savings dashboard (vs raw JSON)
+mcptoon report                  # the whole savings account: tools + skills + cumulative
 mcptoon usage                   # local call statistics
 mcptoon footer-facts            # one line of savings for a chat footer (never blocks)
 mcptoon config                  # show gateway settings (footer, welcome, lang)
@@ -442,6 +460,7 @@ mcptoon toggle <server> <tool>  # enable/disable a single tool (--list to show a
 mcptoon policy                  # per-tool compression policy (raw / toon / slim)
 mcptoon completion ps           # shell completion (bash/zsh/fish/powershell)
 mcptoon off                     # remove the gateway entry from your agents (reversible)
+mcptoon restore                 # drop the gateway and put your servers back
 mcptoon uninstall               # full cleanup — prints the plan first (--dry to preview)
 ```
 
@@ -471,7 +490,7 @@ to injecting every schema, at a fraction of the cost.
 
 ## Trust and safety
 
-**It's just a 227KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
+**It's just a 297KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
 
 Three guards run on every tool result before your agent sees it:
 
@@ -481,7 +500,8 @@ Three guards run on every tool result before your agent sees it:
 | **Prompt-injection guard** | results are scanned for injection patterns like "ignore previous instructions" and blocked |
 | **Credential-leak detection** | a result carrying an API key or token is blocked before it enters context |
 
-- **Reversible.** `mcptoon off` removes the one entry it added; `mcptoon uninstall
+- **Reversible.** `mcptoon restore` undoes a takeover (drops the gateway and returns
+  your servers); `mcptoon off` removes only the gateway entry; `mcptoon uninstall
   --dry` prints the full removal plan first. Your servers are never deleted unless you ask.
 - **No telemetry.** No analytics, no crash reports, nothing phoned home.
 - **Local-first.** Your tools, skills and files stay on your machine. The only thing that leaves is `install --search`, which asks the registries for a catalog listing — it never sends your data.
@@ -516,7 +536,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1471 passed, 1 skipped
+python -m pytest tests/ -v   # 1626 passed, 2 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows
@@ -524,7 +544,7 @@ is a first-class target. New here? Start with
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: **20,170 lines of Python across 28 modules**, zero third-party dependencies.
+The codebase: **22,789 lines of Python across 32 modules**, zero third-party dependencies.
 
 ---
 
