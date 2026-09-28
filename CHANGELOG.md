@@ -5,6 +5,31 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-09-27
+
+### Fixed
+
+- **The packaged skill was not valid YAML, so every host silently dropped it.**
+  `SKILL.md`'s frontmatter `description` was written as an unquoted plain scalar
+  containing `": "` (a colon followed by a space), which YAML forbids in a plain
+  scalar. A real YAML parser raises on it; the host then logs one warning and
+  **skips the skill entirely** — so `pip install mcptoon` shipped a skill that
+  Claude Code, DSH, Codex and Cursor never loaded. Nothing in this repo noticed,
+  because mcptoon's own reader (`plugin.parse_skill_frontmatter`) splits on the
+  *first* colon with `str.partition` and happily accepted the broken scalar. The
+  fix is one pair of quotes around the description in all three distribution
+  copies — `src/mcptoon/skill/SKILL.md` (the packaged one `install_self` copies
+  out), `skills/mcptoon/SKILL.md`, and `claude-code-plugin/skills/mcptoon/SKILL.md`
+  — which stay byte-identical.
+- **A regression guard so this shape cannot ship again.**
+  `tests/test_skill_package.py` gains `yaml_frontmatter_error()`, a zero-dependency
+  rule that flags a plain scalar containing `": "` or ending in `:`, plus a
+  `TestFrontmatterIsRealYaml` class that (a) parses every distribution copy's
+  frontmatter, (b) proves the guard actually fires on the shape that shipped
+  broken, and (c) proves it accepts the corrected, quoted description. The guard is
+  hand-written rather than `import yaml` because the zero-dependency rule applies to
+  the tests too.
+
 ## [0.8.2] - 2026-09-27
 
 ### Added

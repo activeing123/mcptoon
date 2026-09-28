@@ -8,7 +8,7 @@
 > where each one may appear.
 
 Every number below is a real `tiktoken cl100k_base` measurement on the author's
-box (mcptoon 0.8.2), not a memory. The catalog there: **12 servers, 96 tools, 408
+box (mcptoon 0.8.3), not a memory. The catalog there: **12 servers, 96 tools, 408
 skills.**
 
 ---
