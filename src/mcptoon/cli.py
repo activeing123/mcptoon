@@ -44,7 +44,7 @@ from .errors import is_error
 # flag gets warned as unknown; add a phantom and the dead-entry test fails.
 KNOWN_FLAGS = frozenset(
     {
-        "--agent", "--archive", "--auth", "--auto", "--all", "--compact", "--copy",
+        "--agent", "--archive", "--auth", "--auto", "--all", "--check", "--compact", "--copy",
         "--derived", "--destructive", "--dry",
         "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
         "--full", "--head", "--desc",
@@ -415,6 +415,9 @@ def _run(state: dict) -> None:
         _cmd_doctor(rest)
     elif command == "install":
         _cmd_install(rest, fmt)
+    elif command == "update":
+        from . import update as update_mod
+        update_mod.run(rest, fmt)
     elif command == "completion":
         _cmd_completion(rest)
     elif command == "serve":
@@ -3145,6 +3148,8 @@ Usage:
     mcptoon install <name> --url <url>    Install HTTP/SSE MCP server
     mcptoon install --list                List installed servers
     mcptoon install --remove <name>       Remove an installed server
+    mcptoon update                        Refresh cached tool surface; report server drift
+    mcptoon update --check                Report drift only, write nothing (exit 1 if moved)
 
     mcptoon plugin scan <dir>             Validate an Agent Plugins 1.0.0 package
     mcptoon plugin install <dir>          Install a plugin into every agent

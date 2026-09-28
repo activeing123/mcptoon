@@ -55,7 +55,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # footer.py +24KB, sync.py +18KB, cli.py +17KB, plus four new modules — and the wheel
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
-              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB")
+              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -85,22 +85,25 @@ SKIP_SLACK = 2
 # every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
-# What `pip install mcptoon` downloads. 297KB, measured 2026-09-27 in the CI image
-# (python:3.12-slim, sources with LF endings, `python -m build`) for the 0.8.2 tree:
-# 304,480 bytes = 297.34 KB -> 297KB. `pip install mcptoon` pulls only the wheel.
+# What `pip install mcptoon` downloads. 301KB, measured 2026-09-28 with the same
+# method as the previous pin (convert the tree to LF, then `python -m build`): the
+# 0.8.3 tree plus `update.py` builds to 308,261 bytes = 301.04 KB. `pip install
+# mcptoon` pulls only the wheel.
 #
-# It was 227KB at 0.8.1 (2026-09-24). The jump is real product, not line endings:
-# footer.py grew ~24KB (the broadcast/footer-facts work), sync.py ~18KB (the surgical
-# restore), cli.py ~17KB, and ccr/compressor/headers/report are new modules. The
-# earlier "233KB" was never a shipped number — it came from
-# `python -m build --wheel --no-isolation` on a Windows checkout whose sources were
-# CRLF (the local autocrlf default) and whose README was the pre-rewrite 581-line
-# version. Line endings are pure overhead inside the wheel: the same 0.7.21 tree
-# builds to 233,034 bytes with CRLF and 231,687 with LF, and PyPI's real 0.7.21
-# artifact is 231,659 — so the CRLF checkout inflated every claim by ~1.4KB. This is
-# the measurement method now: convert to LF first, then build. The guard pins a value
-# measured from a real artifact, not from one developer's line endings.
-WHEEL_KB = "297KB"
+# It was 297KB at 0.8.2 (2026-09-27, 304,480 bytes). The delta is `update.py`
+# itself — a new module, so the wheel grows whether or not the feature is
+# announced. 297KB joins RETIRED_KB for the same reason every earlier value did:
+# it was true, and the tree moved past it.
+#
+# The measurement method is load-bearing and predates this pin: line endings are
+# pure overhead inside the wheel. The earlier "233KB" was never a shipped number —
+# it came from `python -m build --wheel --no-isolation` on a Windows checkout whose
+# sources were CRLF (the local autocrlf default). The same 0.7.21 tree builds to
+# 233,034 bytes with CRLF and 231,687 with LF, and PyPI's real 0.7.21 artifact is
+# 231,659 — so a CRLF checkout inflates every claim by ~1.4KB. Convert to LF first,
+# then build. The guard pins a value measured from a real artifact, not from one
+# developer's line endings.
+WHEEL_KB = "301KB"
 
 
 def modules() -> list[Path]:

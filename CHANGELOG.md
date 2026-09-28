@@ -5,6 +5,27 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`mcptoon update` — refresh the tool surface mcptoon captured from each server.**
+  MCP servers move underneath you: a tool gains a required argument, a server adds
+  or retires a tool. mcptoon keeps a snapshot of each server's surface in two
+  places — the schema cache (`manifest`/`call` serve it) and, for installed
+  servers, the generated handler plus `pro_installed.json`. When the server moves,
+  those snapshots go stale and an agent then calls a tool with the wrong
+  arguments, or cannot see a tool that now exists. `mcptoon update` re-reads every
+  configured server's live tool list, diffs it against what mcptoon is trusting,
+  writes the fresh surface back, and reports exactly what moved (`+added` /
+  `-removed` / `~changed`). `--check` reports drift only, writes nothing, and
+  exits 1 when anything moved, so it drops into a script or a pre-flight step.
+  `--json` gives the same result machine-readably. A server that is unreachable is
+  reported as such and does not abort the sweep of the others.
+  Deliberately not a pip upgrade: mcptoon's runners are unpinned (`npx -y <pkg>`,
+  `uvx <pkg>`), so they already fetch the current release — the version is not
+  what rots; the snapshot is.
+
 ## [0.8.3] - 2026-09-27
 
 ### Fixed
