@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1654%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1657%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -315,12 +315,29 @@ mcptoon skills resolve "做个 PDF" --k 5      # 501 token，返回最相关的 
 pip install mcptoon
 ```
 
+> **Linux（Debian/Ubuntu 23.04+ 及所有遵循 PEP 668 的发行版）、以及 macOS 的
+> Homebrew Python**：直接 `pip install` 到*系统* Python 会被拒绝，报
+> `error: externally-managed-environment`。这是发行版在自我保护，不是 mcptoon 的问题。
+> 改用干净装法：
+>
+> ```bash
+> pipx install mcptoon     # 隔离安装 CLI，推荐
+> # 或者装进你自己控制的虚拟环境：
+> python3 -m venv ~/.mcptoon-venv && ~/.mcptoon-venv/bin/pip install mcptoon
+> ```
+>
+> `pip install --break-system-packages mcptoon` 也能装上，但它会写进系统 Python——
+> 优先用 `pipx` 或 venv。Windows 上 `pip install mcptoon` 直接可用。
+
 <details>
 <summary>其它安装方式</summary>
 
 ```bash
 # 不想装进环境，直接跑（需要 Node）
 uvx mcptoon demo --quick
+
+# 隔离安装 CLI（绕开 Linux / Homebrew Python 的 PEP 668 报错）
+pipx install mcptoon
 
 # 克隆源码（开发用）
 git clone https://github.com/activeing123/mcptoon.git
@@ -474,7 +491,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1654 passed, 2 skipped
+python -m pytest tests/ -v   # 1657 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。

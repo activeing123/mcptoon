@@ -20,6 +20,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ever green, which is why the suite missed it. The parameter is now `root` and a
   regression test exercises the default path.
 
+### Tests
+
+- **The smoke tests no longer write to the developer's real agent configs.**
+  The first cut redirected `HOME`/`USERPROFILE` to a temp dir, but the CLI's
+  agent-config discovery reads `%APPDATA%` on Windows (`discover._appdata()`),
+  which a HOME redirect does not move. Running the new agent-load test once wrote
+  mcptoon's own gateway entry into the real Claude Desktop, Cline and VS Code
+  configs. The env now redirects `APPDATA`/`LOCALAPPDATA` too, and two guard
+  tests assert that every path the CLI resolves stays inside the temp home — one
+  of them fails on the exact regression if the `APPDATA` line is dropped.
+- **New agent-load test: the gateway entry is spawned and completes an MCP
+  handshake.** Every other test stops at "the config file has the right JSON".
+  This one registers a server, runs `sync --self`, parses the written entry out
+  of the config, spawns that exact command, and speaks `initialize` + `tools/list`
+  over stdio — so a wrong interpreter, a `serve` that will not start, or an empty
+  tool list fails the suite instead of shipping.
+- **Smoke tests run offline and in seconds.** `quickstart` spawns every
+  zero-config server it discovers to list their tools; the first run downloads
+  those npm/PyPI packages, which took **140 s** (vs 0.4 s for `discover`). The
+  smoke env now strips `npx`/`uvx` from `PATH`, so the README-path check runs in
+  ~3 s with no network and cannot flake on a slow registry.
+
 ### Added
 
 - **`mcptoon update` — refresh the tool surface mcptoon captured from each server.**
