@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`mcptoon import` — bring your servers over from another client.** The
+  discovery layer already read Claude Desktop, Cursor, Cline and Windsurf
+  configs, but only as a side effect of `discover`/`init --auto`, with no verb a
+  migrating user would guess. `mcptoon import` names it: a dry-run report of what
+  it found (`--from <client>` to narrow to one), `--write` to merge the results
+  into your config (`--force` to overwrite), and `--file <path>` to import any
+  exported `{"mcpServers"|"servers": {...}}` document — which covers
+  `mcpm export` and hand-written files, not just the four known clients. Wheel
+  304KB → 306KB (two modules grew); 34 modules, 23,368 lines.
+
 ### Fixed
 
 - **The release smoke test waited on the wrong index.** `release-smoke.yml`

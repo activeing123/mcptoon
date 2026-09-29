@@ -46,7 +46,8 @@ KNOWN_FLAGS = frozenset(
     {
         "--agent", "--archive", "--auth", "--auto", "--all", "--check", "--compact", "--copy",
         "--derived", "--destructive", "--dry",
-        "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--force", "--format",
+        "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--file", "--force", "--format",
+        "--from",
         "--full", "--head", "--desc",
         "--header", "--health", "--help", "--http", "--input-responses", "--interval",
         "--json", "--keep", "--k", "--limit", "--list", "--listen", "--max-chars", "--mcptoon",
@@ -411,6 +412,8 @@ def _run(state: dict) -> None:
             _cmd_health_check(health_args, fmt)
         else:
             _cmd_auto_discover(rest, fmt)
+    elif command == "import":
+        _cmd_import(rest, fmt)
     elif command == "doctor":
         _cmd_doctor(rest)
     elif command == "install":
@@ -2385,6 +2388,110 @@ def _cmd_auto_discover(rest, fmt):
         print("Run: mcptoon manifest --slim")
 
 
+def _cmd_import(rest, fmt="auto"):
+    """Import MCP servers from another client's config.
+
+    Usage:
+        mcptoon import                      # scan every known client (dry run)
+        mcptoon import --from cursor        # one client only
+        mcptoon import --file servers.json  # any {"mcpServers"|"servers": {...}} export
+        mcptoon import --write              # merge the found servers into your config
+        mcptoon import --write --force      # overwrite entries that already exist
+    """
+    from . import discover as disc
+
+    file_path = ""
+    from_client = ""
+    do_write = "--write" in rest
+    do_force = "--force" in rest
+    for i, a in enumerate(rest):
+        if a == "--file" and i + 1 < len(rest):
+            file_path = rest[i + 1]
+        elif a.startswith("--file="):
+            file_path = a.split("=", 1)[1]
+        elif a == "--from" and i + 1 < len(rest):
+            from_client = rest[i + 1]
+        elif a.startswith("--from="):
+            from_client = a.split("=", 1)[1]
+
+    # ─── Gather findings ───
+    if file_path:
+        p = Path(file_path)
+        if not p.exists():
+            print(f"Config file not found: {p}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            findings = disc.scan_import_file(p)
+        except json.JSONDecodeError as e:
+            print(f"Not valid JSON: {p} ({e})", file=sys.stderr)
+            sys.exit(1)
+        source_label = str(p)
+    elif from_client:
+        canonical = disc.IMPORT_CLIENT_ALIASES.get(from_client, from_client)
+        if canonical not in disc._CLIENT_SCANNERS:
+            known = ", ".join(sorted(set(disc.IMPORT_CLIENT_ALIASES.values())))
+            print(f"Unknown client: {from_client}", file=sys.stderr)
+            print(f"Known clients: {known}", file=sys.stderr)
+            print("Or point at any file with: mcptoon import --file <path>", file=sys.stderr)
+            sys.exit(1)
+        findings = disc.scan_import_client(from_client)
+        source_label = canonical
+    else:
+        findings = []
+        for cid in ("claude-desktop", "cursor", "cline", "windsurf"):
+            findings.extend(disc.scan_import_client(cid))
+        source_label = "all known clients"
+
+    # ─── Dedupe by name (first source wins, matching discover's priority) ───
+    servers: dict = {}
+    sources: dict = {}
+    for item in findings:
+        name = item["name"]
+        if name in servers:
+            continue
+        servers[name] = item["config"]
+        sources[name] = item["source"]
+
+    # ─── Report ───
+    if fmt == "json":
+        print(output.render(servers, fmt="json"))
+        if do_write and servers:
+            cfg.merge_servers(servers, overwrite=do_force)
+        return
+
+    if not servers:
+        print(f"No MCP servers found in {source_label}.")
+        if not file_path:
+            print("")
+            print("If your servers live somewhere else, export them and point at the file:")
+            print("  mcptoon import --file <path-to-export.json>")
+        return
+
+    print(f"Found {len(servers)} server(s) in {source_label}:")
+    print("")
+    by_source: dict = {}
+    for name, src in sources.items():
+        by_source.setdefault(src, []).append(name)
+    for src, names in by_source.items():
+        print(f"  [{src}] {', '.join(names)}")
+    print("")
+
+    if not do_write:
+        print("(--dry run: nothing written. Add --write to merge these into your config.)")
+        print(f"  Would write to: {cfg.CONFIG_FILE}")
+        return
+
+    added, skipped, overwritten = cfg.merge_servers(servers, overwrite=do_force)
+    print(f"Config updated: {cfg.CONFIG_FILE}")
+    print(f"  +{added} new server(s) added")
+    if overwritten:
+        print(f"  ~{overwritten} overwritten")
+    if skipped:
+        print(f"  ={skipped} existing server(s) skipped (use --force to overwrite)")
+    print("")
+    print("Next: mcptoon manifest --slim    # see all available tools")
+
+
 def _cmd_doctor(_rest):
     """Self-diagnose configuration and connectivity."""
     print("mcptoon doctor — running diagnostics...")
@@ -2816,7 +2923,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search"
+    commands="init quickstart list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -2844,7 +2951,7 @@ _ZSH_COMPLETION = r'''
 #compdef mcptoon
 
 _mcptoon() {
-    local commands=(init list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search)
+    local commands=(init list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search)
     local formats=(openai openapi mcp json human)
 
     if (( CURRENT == 1 )); then
@@ -2868,7 +2975,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover doctor policy completion help sync health serve demo demo-server install search'
+complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -2876,7 +2983,7 @@ complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi
 _PS_COMPLETION = '''
 $scriptBlock = {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','doctor','completion','help','sync','health','serve','demo','demo-server','install','search'
+    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','import','doctor','completion','help','sync','health','serve','demo','demo-server','install','search'
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
@@ -3128,6 +3235,10 @@ Usage:
     mcptoon discover --write              Discover + write to config
     mcptoon discover --http <url>         Probe a specific HTTP MCP endpoint
     mcptoon discover --health             Health check (legacy discover behavior)
+    mcptoon import                        Import servers from Claude/Cursor/Cline/Windsurf
+    mcptoon import --from cursor          Import from one client only
+    mcptoon import --file servers.json    Import from any exported config file
+    mcptoon import --write                Merge imported servers into your config
     mcptoon inspect <server> <tool>       Show tool schema
     mcptoon search <query>                Search tools across all servers
     mcptoon call <server> <tool> [ARGS]   Call a tool

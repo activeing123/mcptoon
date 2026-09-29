@@ -55,7 +55,8 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # footer.py +24KB, sync.py +18KB, cli.py +17KB, plus four new modules — and the wheel
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
-              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB")
+              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
+              "304KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -104,7 +105,15 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # 231,659 — so a CRLF checkout inflates every claim by ~1.4KB. Convert to LF first,
 # then build. The guard pins a value measured from a real artifact, not from one
 # developer's line endings.
-WHEEL_KB = "304KB"
+#
+# 2026-09-29 (P3): 304KB → 306KB. `mcptoon import` (the `import` verb + `--file`)
+# grew cli.py and discover.py, so the same LF method now builds to 313,371 bytes =
+# 306.03 KB. The margin over the 305/306 line is ~27 bytes, which is inside this
+# method's run-to-run noise (~±100 bytes of zip metadata; the method reproduces the
+# published 0.8.4 wheel to within 16 bytes and the prior 304KB pin to within 92),
+# so 306KB is the honest floor for the tree and 304KB is retired like every value
+# before it.
+WHEEL_KB = "306KB"
 
 
 def modules() -> list[Path]:

@@ -298,6 +298,76 @@ def _normalize_imported_config(cfg: dict) -> dict | None:
 
 
 # ═══════════════════════════════════════════════════════════════
+# Layer 1b: Import from an explicit config file (mcptoon import)
+# ═══════════════════════════════════════════════════════════════
+
+# Friendly aliases → the built-in scanner for that client. Kept here (not in
+# the CLI) so `mcptoon import --from <alias>` and any future caller agree.
+IMPORT_CLIENT_ALIASES = {
+    "claude": "claude-desktop",
+    "claude-desktop": "claude-desktop",
+    "cursor": "cursor",
+    "cline": "cline",
+    "windsurf": "windsurf",
+}
+
+_CLIENT_SCANNERS = {
+    "claude-desktop": "_scan_claude_desktop",
+    "cursor": "_scan_cursor",
+    "cline": "_scan_cline",
+    "windsurf": "_scan_windsurf",
+}
+
+
+def _extract_servers_map(data: object) -> dict:
+    """Pull the {name: config} map out of a client config document.
+
+    Accepts the two shapes seen in the wild:
+      - Claude Desktop / Cursor / Cline / Windsurf: {"mcpServers": {...}}
+      - mcptoon's own config:                        {"servers": {...}}
+    Returns {} for anything else (caller reports "no servers found").
+    """
+    if not isinstance(data, dict):
+        return {}
+    for key in ("mcpServers", "servers"):
+        block = data.get(key)
+        if isinstance(block, dict):
+            return block
+    return {}
+
+
+def scan_import_file(path) -> list[dict]:
+    """Read an explicit config file and return normalized server entries.
+
+    Unlike the built-in scanners this takes any path, so it also covers
+    configs exported by other managers (e.g. `mcpm export > servers.json`).
+    """
+    p = Path(path)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    servers = _extract_servers_map(data)
+    found = []
+    for name, cfg in servers.items():
+        server_cfg = _normalize_imported_config(cfg)
+        if server_cfg:
+            found.append({
+                "name": name,
+                "config": server_cfg,
+                "source": "file",
+                "reason": f"Imported from {p.name}",
+            })
+    return found
+
+
+def scan_import_client(client: str) -> list[dict]:
+    """Scan one named client's config. `client` is an alias or canonical id."""
+    canonical = IMPORT_CLIENT_ALIASES.get(client, client)
+    fn_name = _CLIENT_SCANNERS.get(canonical)
+    if fn_name is None:
+        return []
+    return globals()[fn_name]()
+
+
+# ═══════════════════════════════════════════════════════════════
 # Layer 2: Environment variable detection
 # ═══════════════════════════════════════════════════════════════
 
