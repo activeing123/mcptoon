@@ -1576,7 +1576,11 @@ def _cmd_remove(rest):
     if cfg.remove_server(name):
         print(f"Removed server: {name}")
     else:
+        # A miss is an error, not a no-op: `mcptoon remove foo && echo done` must
+        # not report success when nothing was removed. Matches `update` (which
+        # already exits 1 on the same message) and the other not-found paths.
         print(f"Server not found: {name}")
+        sys.exit(1)
 
 
 def _cmd_usage(_rest, fmt):
@@ -2234,11 +2238,14 @@ def _cmd_config(rest, fmt):
     if action == "get":
         if len(rest) < 2:
             print("Usage: mcptoon config get <key>")
-            return
+            sys.exit(1)
         key = rest[1].lower()
         if key not in SETTING_DEFAULTS:
+            # An unknown key is an error: a scripted `mcptoon config get <key>`
+            # must not read as success (and print nothing useful) when the key
+            # does not exist. `config set` already exits 1 on the same mistake.
             print(f"Unknown setting: {key}. Known: {', '.join(sorted(SETTING_DEFAULTS))}")
-            return
+            sys.exit(1)
         print(load_settings()[key])
         return
 

@@ -17,9 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into your config (`--force` to overwrite), and `--file <path>` to import any
   exported `{"mcpServers"|"servers": {...}}` document — which covers
   `mcpm export` and hand-written files, not just the four known clients. Wheel
-  304KB → 306KB (two modules grew); 34 modules, 23,368 lines.
+  304KB → 306KB; 34 modules, 23,379 lines.
 
 ### Fixed
+
+- **`mcptoon remove` and `mcptoon config get` exited 0 when the target did not
+  exist.** A miss is an error: `mcptoon remove foo && echo removed` printed
+  "removed" when nothing was removed, and a scripted `config get <typo>` read as
+  success while printing nothing useful. Both now exit 1, matching the sibling
+  paths that already did (`update`, `toggle`, `config set`, `skills remove`).
+  `policy set <unknown-server>` is intentionally left permissive — policies may
+  be set before a server is configured (and a test pins that).
 
 - **`python -m mcptoon.bench_tokens` named the wrong blocker on a fresh install.**
   It imported tiktoken before checking the schema cache, so a machine that had not

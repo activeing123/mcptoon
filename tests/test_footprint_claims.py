@@ -112,7 +112,8 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # method's run-to-run noise (~±100 bytes of zip metadata; the method reproduces the
 # published 0.8.4 wheel to within 16 bytes and the prior 304KB pin to within 92),
 # so 306KB is the honest floor for the tree and 304KB is retired like every value
-# before it.
+# before it. (The later exit-code fix grew cli.py a few more lines: 313,724 bytes =
+# 306.37 KB, still 306KB — the floor did not move.)
 WHEEL_KB = "306KB"
 
 
