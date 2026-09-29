@@ -17,9 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into your config (`--force` to overwrite), and `--file <path>` to import any
   exported `{"mcpServers"|"servers": {...}}` document — which covers
   `mcpm export` and hand-written files, not just the four known clients. Wheel
-  304KB → 306KB; 34 modules, 23,379 lines.
+  304KB → 306KB; 34 modules, 23,389 lines.
 
 ### Fixed
+
+- **`mcptoon config set welcome <typo>` stored the typo and exited 0.** `footer`
+  and `lang` were checked by hand in the CLI, but `welcome` was validated nowhere,
+  so `config set welcome maybe` wrote `"maybe"` to the settings file and reported
+  success — and `welcome_enabled()` treats anything not in `("off","0","false","no")`
+  as *on*, so the user's "off" typo left the first-run banner showing while they
+  believed they had disabled it. `welcome` and `footer` now validate against an
+  explicit on/off set in `set_setting`, so a bad value raises (exit 1) and nothing
+  is written. `lang` stays deliberately lenient — a bad language only picks the
+  wrong language for one printed line and already falls through to detection.
 
 - **The landing pages advertised version 0.7.20 in their structured data.** The
   JSON-LD `softwareVersion` on `docs/index.html` and `docs/index-zh.html` — public

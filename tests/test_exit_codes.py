@@ -65,3 +65,42 @@ def test_config_get_without_a_key_exits_nonzero():
 def test_config_get_known_key_prints_and_does_not_exit(capsys):
     cli._cmd_config(["get", "footer"], "auto")  # must not raise
     assert capsys.readouterr().out.strip(), "a known key must print its value"
+
+
+# ─── config set: a bad value must not be stored ───
+#
+# `welcome` was validated nowhere (the CLI hand-checked footer and lang only), so
+# `config set welcome maybe` stored "maybe" and exited 0 — and `welcome_enabled`
+# treats anything not in ("off","0","false","no") as *on*, so the user's "off"
+# typo left the banner showing. Pin the refusal and the exit code for both
+# boolean switches.
+
+@pytest.mark.parametrize("key", ["welcome", "footer"])
+@pytest.mark.parametrize("bad", ["maybe", "true", "1", "bogus"])
+def test_config_set_rejects_a_non_boolean_value(key, bad, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli._cmd_config(["set", key, bad], "auto")
+    assert exc.value.code == 1
+    assert key in capsys.readouterr().out
+    assert cfg.get_setting(key) == cfg.SETTING_DEFAULTS[key], \
+        f"a rejected value must not be persisted for {key}"
+
+
+@pytest.mark.parametrize("key", ["welcome", "footer"])
+@pytest.mark.parametrize("good", ["on", "off"])
+def test_config_set_accepts_both_boolean_values(key, good):
+    cli._cmd_config(["set", key, good], "auto")  # must not raise
+    assert cfg.get_setting(key) == good
+
+
+def test_config_set_unknown_value_message_names_the_choices(capsys):
+    with pytest.raises(SystemExit):
+        cli._cmd_config(["set", "welcome", "maybe"], "auto")
+    assert "not one of" in capsys.readouterr().out
+
+
+def test_welcome_off_via_cli_actually_disables(capsys):
+    """The end-to-end point of the fix: `set welcome off` must make
+    `welcome_enabled()` false, so the banner is really suppressed."""
+    cli._cmd_config(["set", "welcome", "off"], "auto")
+    assert cfg.welcome_enabled() is False

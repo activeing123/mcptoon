@@ -175,6 +175,9 @@ EXPOSURE_MODES = ("compact", "full")
 #   toon  — the older, lossless re-encoding (JSON→TOON, ~8-34% fewer tokens).
 COMPRESS_MODES = ("smart", "off", "toon")
 
+# Settings that are a plain on/off switch.
+BOOL_MODES = ("on", "off")
+
 # Settings whose value must be one of a fixed set. Validated in `set_setting`,
 # so a typo fails loudly instead of silently persisting a value nothing honours.
 #
@@ -188,7 +191,14 @@ COMPRESS_MODES = ("smart", "off", "toon")
 #     `full` and gets `compact` is told their tools are visible when they are not
 #     — a silent downgrade of exactly the kind this repo treats as a bug, so it
 #     has to fail at the keyboard instead.
-SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES}
+# `welcome` joined on 2026-09-29. It was validated nowhere: the CLI checked
+# `footer` and `lang` by hand but not `welcome`, so `config set welcome maybe`
+# stored "maybe" and exited 0 — the same silent-acceptance bug the exposure note
+# describes, on the one switch whose reader (`welcome_enabled`) treats anything
+# not in ("off", "0", "false", "no") as *on*. A typo therefore left the welcome
+# banner showing while the user believed they had turned it off.
+SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES,
+                   "footer": BOOL_MODES, "welcome": BOOL_MODES}
 
 # Windows LANGID primary-language ids worth naming. Anything unnamed falls back
 # to the locale string and then to English, so an unlisted language degrades to
