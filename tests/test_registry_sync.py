@@ -116,6 +116,32 @@ class TestOwnershipMarker(unittest.TestCase):
         )
 
 
+class TestLandingPagesVersion(unittest.TestCase):
+    """The JSON-LD `softwareVersion` on the Pages landing pages is public metadata:
+    search engines and crawlers read it, and the pages deploy on every push. Nothing
+    pinned it, so it sat at 0.7.20 through 0.8.0-0.8.4 — three releases — because it
+    lives in HTML, not in any file the release ritual touches. Bind it to pyproject
+    the same way server.json is bound, so the next bump either updates the pages or
+    fails CI."""
+
+    PAGES = ("docs/index.html", "docs/index-zh.html")
+
+    def test_software_version_matches_the_release(self):
+        version = project_field("version")
+        for rel in self.PAGES:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            found = re.findall(r'"softwareVersion"\s*:\s*"([^"]+)"', text)
+            self.assertEqual(
+                len(found), 1,
+                f"{rel}: expected exactly one softwareVersion, found {found}",
+            )
+            self.assertEqual(
+                found[0], version,
+                f"{rel} advertises softwareVersion {found[0]}; pyproject says {version} "
+                "- the landing page's structured data is stale",
+            )
+
+
 class TestPublishMechanism(unittest.TestCase):
     def test_workflow_exists_and_uses_oidc(self):
         self.assertTrue(WORKFLOW.is_file(),
