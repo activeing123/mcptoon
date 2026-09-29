@@ -37,6 +37,26 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Wait for the version to appear on PyPI
+      if: github.event_name == 'release'
+      shell: bash
+      run: |
+        # `release: published` fires the moment the GitHub Release is created,
+        # which is before publish.yml has finished uploading the wheel. Without
+        # this wait the smoke test would install the *previous* version and
+        # report a false failure on every release. (publish-mcp.yml learned the
+        # same lesson in v0.7.6/0.7.7.)
+        want="${{ github.event.release.tag_name }}"
+        want="${want#v}"
+        echo "waiting for mcptoon ${want} on PyPI..."
+        for i in $(seq 1 30); do
+          have=$(python -c "import json,urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/mcptoon/json'))['info']['version'])" 2>/dev/null || echo "")
+          if [ "$have" = "$want" ]; then echo "found $want"; exit 0; fi
+          echo "  attempt $i: PyPI has '${have:-?}', want '$want'"
+          sleep 10
+        done
+        echo "timed out waiting for $want on PyPI"; exit 1
+
     - name: Install mcptoon from PyPI (not from the checkout)
       shell: bash
       run: |
