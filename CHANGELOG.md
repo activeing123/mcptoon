@@ -133,6 +133,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`mcptoon quickstart --takeover`.** The scripted form of the install-time offer:
   skips the prompt and applies takeover directly, for CI/automation that cannot
   answer.
+- **Environment-sourced HTTP header values ([#24](https://github.com/activeing123/mcptoon/issues/24)).**
+  A remote MCP server that needs `Authorization: Bearer <token>` could only be
+  configured with the token written into the config file, the generated handler, or
+  the command line — each of which leaves a credential on disk. A header *value* may
+  now name an environment variable, resolved at request time:
+
+  ```toml
+  [servers.baizhi.headers]
+  Authorization = "Bearer ${BAIZHI_TOKEN}"
+  ```
+
+  Four rules, each closing an unsafe alternative: a value with no `${` is untouched
+  (existing literal configs render byte-for-byte); only whole-token `${NAME}` expands,
+  with no shell involved, so the parse is identical on Windows and POSIX and a literal
+  `${NAME}` is written `$${NAME}`; resolution happens at request time in
+  `client.MCPClient`, never at load or save, so the secret reaches neither the config,
+  the generated handler nor any output, and rotating the variable takes effect on the
+  next call with no reinstall; and a missing or empty variable is a hard error naming
+  the variable (`HEADER_ENV_MISSING`), never a silently empty header. `install --url`
+  verification and later calls share the one resolution path, so a server cannot
+  install with a working header and then fail every call. All in `src/mcptoon/headers.py`
+  (standard library only); the 13 cases the reporter asked for — success, 401, missing
+  vs empty, multiple/fixed headers, literal-config compatibility, the Windows path —
+  are pinned in `tests/test_v081_env_headers.py`.
 
 
 - **`--format smart` — structure-aware result compression, and a way back.** The

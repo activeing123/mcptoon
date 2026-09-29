@@ -250,6 +250,18 @@ mcptoon install --remove brave-search        # uninstall one
 One command per server, from npm / pip / HTTP. Or let mcptoon scan what you already have:
 `mcptoon discover`.
 
+A remote server that needs a token reads it from the environment, so no credential is
+ever written to disk:
+
+```bash
+mcptoon install remote-api --url https://example.com/mcp \
+  --header 'Authorization: Bearer ${BAIZHI_TOKEN}'   # BAIZHI_TOKEN set in your environment
+```
+
+`${NAME}` is resolved at request time, so the config, the generated handler and every log
+keep the template — rotate the variable and the next call uses the new value, with no
+reinstall. A missing or empty variable fails loudly, naming it, never as an empty header.
+
 ---
 
 ## Where the tools come from — search 17,000+, install with one command

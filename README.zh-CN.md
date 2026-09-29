@@ -226,6 +226,15 @@ mcptoon install --remove brave-search        # 卸载其中一个
 
 从 npm / pip / HTTP，一条命令加一个服务器。或者让 mcptoon 扫描你机器上已有的：`mcptoon discover`。
 
+需要 token 的远端服务器从环境变量里取，凭据不落盘：
+
+```bash
+mcptoon install remote-api --url https://example.com/mcp \
+  --header 'Authorization: Bearer ${BAIZHI_TOKEN}'   # BAIZHI_TOKEN 设在你的环境变量里
+```
+
+`${NAME}` 在**请求时**才解析，所以配置、生成的 handler、日志里留的都是模板——轮换变量后下一次调用即用新值，无需重装。变量缺失或为空会**报错并点名变量**，绝不会变成空 header。
+
 ---
 
 ## 工具从哪来——搜 17,000+，一条命令装上
