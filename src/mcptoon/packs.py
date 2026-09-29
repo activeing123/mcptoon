@@ -135,7 +135,7 @@ def _tool_kind(tool: dict) -> tuple[str, str | None]:
     return "", None
 
 
-def install_pack(pack: dict, *, packs_root: Path | None = None,
+def install_pack(pack: dict, *, root: Path | None = None,
                  dry_run: bool = False) -> dict:
     """Install every tool in ``pack`` and write its prompt.
 
@@ -190,7 +190,7 @@ def install_pack(pack: dict, *, packs_root: Path | None = None,
 
     prompt = pack.get("prompt")
     if prompt and not dry_run:
-        dest = (packs_root or packs_root()) / name
+        dest = (root or packs_root()) / name
         dest.mkdir(parents=True, exist_ok=True)
         pfile = dest / "PROMPT.md"
         pfile.write_text(prompt, encoding="utf-8")

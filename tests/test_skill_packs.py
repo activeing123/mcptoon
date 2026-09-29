@@ -115,7 +115,7 @@ class TestPackInstall(unittest.TestCase):
                  patch("mcptoon.packs.install_pip", fake_pip), \
                  patch("mcptoon.packs.install_http", fake_http), \
                  patch("mcptoon.packs.install_by_name", fake_by_name):
-                report = packs.install_pack(pack, packs_root=packs_root, **kw)
+                report = packs.install_pack(pack, root=packs_root, **kw)
             prompt = packs_root / pack["name"] / "PROMPT.md"
             # Read the prompt before the temp dir is torn down.
             pinfo = {"exists": prompt.is_file(),
@@ -152,6 +152,30 @@ class TestPackInstall(unittest.TestCase):
         self.assertTrue(report["dry_run"])
         self.assertEqual(len(report["tools"]), 1)
 
+    def test_default_root_does_not_crash_and_uses_the_module_default(self):
+        """Regression: ``install_pack`` with no ``root`` must fall back to
+        ``packs_root()``.
+
+        The parameter used to be named ``packs_root``, shadowing the module-level
+        ``packs_root()`` function, so ``(packs_root or packs_root())`` became
+        ``None or None()`` -> ``TypeError: 'NoneType' object is not callable``.
+        Every existing test passed an explicit root, so the default path — the
+        one the CLI actually uses (`cli.py: _cmd_install_pack` calls
+        ``install_pack(pack)`` with no root) — crashed on a clean machine for
+        `mcptoon install --pack essentials`. This test exercises that default.
+        """
+        pack = {"name": "demo", "title": "Demo", "description": "d",
+                "tools": [{"name": "a", "npm": "@x/a"}], "prompt": "Do the thing."}
+        with tempfile.TemporaryDirectory() as td:
+            default_root = Path(td) / "default-packs"
+            with patch("mcptoon.packs.install_npm", lambda pkg, name=None: {"ok": name}), \
+                 patch("mcptoon.packs.packs_root", lambda: default_root):
+                report = packs.install_pack(pack)  # no root= -> must not crash
+            prompt = default_root / "demo" / "PROMPT.md"
+            self.assertTrue(prompt.is_file(), "prompt must land under the default root")
+            self.assertEqual(prompt.read_text(encoding="utf-8").strip(), "Do the thing.")
+        self.assertTrue(report["tools"][0]["ok"])
+
     def test_one_bad_tool_does_not_abort_the_rest(self):
         pack = {"name": "demo", "title": "Demo", "description": "d",
                 "tools": [{"name": "bad", "npm": "@x/bad"},
@@ -164,7 +188,7 @@ class TestPackInstall(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             with patch("mcptoon.packs.install_npm", flaky_npm):
-                report = packs.install_pack(pack, packs_root=Path(td) / "packs")
+                report = packs.install_pack(pack, root=Path(td) / "packs")
         oks = {t["name"]: t["ok"] for t in report["tools"]}
         self.assertFalse(oks["bad"])
         self.assertTrue(oks["good"], "a failing tool must not stop the others")
@@ -190,7 +214,7 @@ class TestPackInstall(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             with patch("mcptoon.packs.install_npm", lambda pkg, name=None: {"ok": name}), \
                  patch("mcptoon.sync.sync_to_all", fake_sync_to_all):
-                report = packs.install_pack(pack, packs_root=Path(td) / "packs")
+                report = packs.install_pack(pack, root=Path(td) / "packs")
         self.assertTrue(seen.get("include_self"), "sync must run with include_self=True")
         self_entry = next(t for t in report["tools"] if t["name"] == "mcptoon")
         self.assertTrue(self_entry["ok"])
@@ -205,7 +229,7 @@ class TestPackInstall(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             with patch("mcptoon.sync.sync_to_all", boom):
-                report = packs.install_pack(pack, packs_root=Path(td) / "packs", dry_run=True)
+                report = packs.install_pack(pack, root=Path(td) / "packs", dry_run=True)
         self.assertTrue(report["tools"][0]["ok"])
         self.assertIn("planned", report["tools"][0]["detail"])
 

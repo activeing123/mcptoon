@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`mcptoon install --pack <name>` crashed with a `TypeError` on every machine.**
+  `packs.install_pack()` named its optional destination parameter `packs_root`,
+  shadowing the module-level `packs_root()` function, so the default path
+  `(packs_root or packs_root())` evaluated `None or None()` →
+  `TypeError: 'NoneType' object is not callable`. The CLI calls
+  `install_pack(pack)` with no destination, so the README's headline
+  "one command to a working toolset" (`mcptoon install --pack essentials`)
+  died with a raw traceback; only tests that passed an explicit destination were
+  ever green, which is why the suite missed it. The parameter is now `root` and a
+  regression test exercises the default path.
+
 ### Added
 
 - **`mcptoon update` — refresh the tool surface mcptoon captured from each server.**
