@@ -5,6 +5,18 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The release smoke test waited on the wrong index.** `release-smoke.yml`
+  polled PyPI's JSON API (`info.version`) before installing, but pip resolves
+  from the *simple* index, which lags the API. On the 0.8.4 release the wait
+  passed, `pip install mcptoon` pulled 0.8.3, and the job failed on the very bug
+  0.8.4 fixed — a false red. It now polls the simple index and asserts the
+  installed version equals the released tag, so a stale index fails loudly
+  instead of silently testing the previous release.
+
 ## [0.8.4] - 2026-09-29
 
 ### Fixed
