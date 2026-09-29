@@ -60,17 +60,38 @@ def cache_dir(tmp_path):
 
 
 def test_empty_cache_returns_2_with_manifest_hint(tmp_path, capsys):
-    """An empty cache is a hint, not a traceback — the fix is one command."""
-    with patch.object(bench_tokens, "_cache_dir", lambda: tmp_path):
-        code = bench_tokens.main([])
+    """An empty cache is a hint, not a traceback — the fix is one command.
+
+    Deliberately simulates tiktoken being *absent*: with nothing cached the tool
+    must name `mcptoon manifest`, not `pip install tiktoken`. The check order is
+    load-bearing — CI installs the tree without tiktoken, so a machine that has
+    not run `mcptoon manifest` yet would otherwise be told to install the wrong
+    dependency (and the real first step would be unreachable).
+    """
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **kw):
+        if name == "tiktoken":
+            raise ImportError("simulated: tiktoken not installed")
+        return real_import(name, *a, **kw)
+
+    with patch.object(builtins, "__import__", fake_import):
+        with patch.object(bench_tokens, "_cache_dir", lambda: tmp_path):
+            code = bench_tokens.main([])
     assert code == 2
     err = capsys.readouterr().err
     assert "mcptoon manifest" in err
     assert "schema_cache.json" in err
 
 
-def test_missing_tiktoken_returns_2_and_names_the_fix(capsys):
-    """tiktoken stays optional; absent, it must say how to install it, not crash."""
+def test_missing_tiktoken_returns_2_and_names_the_fix(cache_dir, capsys):
+    """tiktoken stays optional; absent, it must say how to install it, not crash.
+
+    Uses a populated cache so the run clears the (now earlier) cache check and
+    actually reaches the tiktoken import — otherwise an empty default cache would
+    answer with the `mcptoon manifest` hint instead and this assertion would
+    silently depend on whatever the developer's cache happens to hold.
+    """
     real_import = builtins.__import__
 
     def fake_import(name, *a, **kw):

@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`python -m mcptoon.bench_tokens` named the wrong blocker on a fresh install.**
+  It imported tiktoken before checking the schema cache, so a machine that had not
+  run `mcptoon manifest` yet was told `pip install tiktoken` — even though the real
+  first step is `mcptoon manifest`. The order is now cache first, tiktoken second,
+  so the empty-cache hint is reachable exactly when it applies. (CI installs the
+  tree without tiktoken, which is how the ordering bug surfaced: the whole 3×4 test
+  matrix went red on a "tiktoken is required" line the developer machine never hit.)
+  The two tests that depended on tiktoken being present are now hermetic — they
+  simulate its absence explicitly instead of relying on the developer's environment.
+
 - **The release smoke test waited on the wrong index.** `release-smoke.yml`
   polled PyPI's JSON API (`info.version`) before installing, but pip resolves
   from the *simple* index, which lags the API. On the 0.8.4 release the wait

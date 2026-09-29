@@ -92,12 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = ap.parse_args(argv)
 
-    try:
-        import tiktoken
-    except ImportError:
-        print("tiktoken is required:  pip install tiktoken", file=sys.stderr)
-        return 2
-
+    # Check the cache *before* tiktoken: with nothing cached there is nothing to
+    # measure, and "pip install tiktoken" would name the wrong blocker. It also
+    # made the hint unreachable on a clean machine — CI installs the tree without
+    # tiktoken, so the tiktoken error masked the real "run mcptoon manifest" fix.
     tools = load_tools()
     n_tools = sum(len(v) for v in tools.values())
     cache_file = _cache_dir() / "schema_cache.json"
@@ -107,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
             "`mcptoon manifest` once so mcptoon fetches the schemas it would replace",
             file=sys.stderr,
         )
+        return 2
+
+    try:
+        import tiktoken
+    except ImportError:
+        print("tiktoken is required:  pip install tiktoken", file=sys.stderr)
         return 2
 
     samples = {
