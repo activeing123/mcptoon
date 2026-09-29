@@ -978,6 +978,12 @@ def _cmd_search(rest, fmt, head_n, max_chars, full):
         print("Tips:")
         print("  - Check if your servers are configured: mcptoon list")
         print("  - See all available tools: mcptoon manifest")
+        # `search` only looks at servers you already have; a miss is the moment a
+        # new user would give up. Point them at the live registries instead of
+        # leaving them with a dead end (issue: the 17,000+ path was discoverable
+        # only if you already knew `install --search`).
+        print(f"  - Not installed yet? Search the live registries "
+              f"(17,000+ MCP servers): mcptoon install --search '{query}'")
         sys.exit(0)
 
     if fmt == "slim":

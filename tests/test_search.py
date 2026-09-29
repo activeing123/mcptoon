@@ -1,4 +1,6 @@
 """Tests for cross-server tool search and auto-routing."""
+import contextlib
+import io
 from unittest.mock import patch
 
 import pytest
@@ -250,3 +252,43 @@ class TestCallToolAuto:
             call_tool_auto("fetch", {"url": "http://example.com"}, is_destructive=True)
             # is_destructive is passed as 4th positional arg (index 3)
             assert mock_call.call_args[0][3] is True
+
+
+# ═══════════════════════════════════════════════════
+# CLI `search` dead-end guidance
+# ═══════════════════════════════════════════════════
+
+class TestSearchDeadEndGuidance:
+    """`mcptoon search` only looks at configured servers. On a miss it must point
+    the user at the live registries (`install --search`), or the most obvious
+    discovery verb becomes a dead end."""
+
+    def _run(self, query, tools):
+        from mcptoon import cli
+        buf = io.StringIO()
+        with patch("mcptoon.manifest.search_tools", return_value=tools), \
+                contextlib.redirect_stdout(buf):
+            with pytest.raises(SystemExit) as exc:
+                cli._cmd_search([query], "auto", None, None, False)
+        return exc.value.code, buf.getvalue()
+
+    def test_miss_points_at_live_registries(self, mock_manifest):
+        code, out = self._run("brave", [])
+        assert code == 0
+        assert "No tools found matching 'brave'." in out
+        assert "install --search" in out
+        assert "17,000+" in out
+
+    def test_miss_echoes_the_query(self, mock_manifest):
+        _, out = self._run("postgres", [])
+        assert "mcptoon install --search 'postgres'" in out
+
+    def test_hit_does_not_print_registry_tip(self, mock_manifest):
+        from mcptoon import cli
+        buf = io.StringIO()
+        hit = [{"server": "exa", "name": "search", "description": "d",
+                "params": "query:string*", "score": 1.0}]
+        with patch("mcptoon.manifest.search_tools", return_value=hit), \
+                contextlib.redirect_stdout(buf):
+            cli._cmd_search(["search"], "auto", None, None, False)
+        assert "install --search" not in buf.getvalue()

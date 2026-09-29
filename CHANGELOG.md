@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed version equals the released tag, so a stale index fails loudly
   instead of silently testing the previous release.
 
+### Changed
+
+- **`mcptoon search` no longer dead-ends on a miss.** It searches only the
+  servers you have configured, so a query for something you have not installed
+  returned "No tools found" with tips that pointed back at local commands — the
+  one moment a new user is most likely to give up. A miss now also points at the
+  live registries: `mcptoon install --search '<query>'` (17,000+ MCP servers).
+  Nothing is installed by the tip; it only makes the registry path discoverable
+  from the obvious verb.
+
 ## [0.8.4] - 2026-09-29
 
 ### Fixed
