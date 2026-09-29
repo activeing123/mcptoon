@@ -86,3 +86,46 @@ jobs:
         mcptoon help
         mcptoon init
         mcptoon list
+
+  # ── Layer 4: what unit tests cannot see ─────────────────────────────────
+  # Every other job installs the *source tree* (`pip install .`). This one
+  # builds the real wheel, installs the wheel, and runs the CLI the way a
+  # first-time user does — because the artifact users get is the wheel, not the
+  # tree. The 2026-09-29 `install --pack` crash lived only in the default code
+  # path the CLI takes on a clean machine, with the whole suite green; this is
+  # the job that would have gone red. It runs on three fresh VMs, so it is also
+  # the "clean machine" check that no developer machine can be.
+  install-smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12"]
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Build the wheel
+      run: |
+        python -m pip install --upgrade build
+        python -m build --wheel --outdir dist
+
+    - name: Install the built wheel (not the source tree)
+      shell: bash
+      run: |
+        python -m pip install --force-reinstall --no-deps dist/*.whl
+        python -c "import mcptoon; print('installed mcptoon', mcptoon.__version__)"
+
+    - name: Install pytest
+      run: python -m pip install pytest
+
+    - name: Run the README user-path smoke tests against the installed wheel
+      env:
+        PYTHONUTF8: "1"
+      run: python -m pytest tests/test_cli_smoke.py -v
