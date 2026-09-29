@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing is installed by the tip; it only makes the registry path discoverable
   from the obvious verb.
 
+- **The token benchmark now ships in the package (`python -m mcptoon.bench_tokens`).**
+  The reproduction path behind the README's fixed table used to live only in
+  `scripts/`, which a `pip install mcptoon` user cannot run — so the number every
+  doc and SVG points at was reproducible only by someone who already had a clone.
+  The measurement moved into `src/mcptoon/bench_tokens.py` (cache path resolved
+  through `MCPTOON_CACHE_DIR` like every other command); `scripts/bench_tokens.py`
+  is now a thin shim so the two cannot drift. tiktoken stays optional and is
+  named in the error when it is missing. Wheel 301KB → 304KB (one new module).
+
 ## [0.8.4] - 2026-09-29
 
 ### Fixed

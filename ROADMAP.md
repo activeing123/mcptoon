@@ -2,7 +2,7 @@
 
 > **唯一权威路线图。所有版本计划以此文件为准。**
 > **最后更新**: 2026-09-27
-> **当前版本**: v0.8.4 | 1660 passed + 2 skipped | 0 依赖 | Agent Plugins Spec 1.0.0
+> **当前版本**: v0.8.4 | 1668 passed + 2 skipped | 0 依赖 | Agent Plugins Spec 1.0.0
 > **目标**: 让"零配置 + Token 效率"成为轻量 CLI 区间的事实标准
 > **版本策略**: 产品上小步维护，**战略重心 = 推广与转化**（2026-08-27 用户定调）
 
@@ -66,7 +66,7 @@ X/Reddit 一图+一句话     知乎/掘金/公号投放         一键安装脚
 | A3 | 一键安装脚本（install.ps1 / install.sh：检测 Python → 安装 → quickstart） | ✅ v0.7.2 | README 双语已挂一行命令 |
 | A4 | 「小白使用手册」独立页（图 + 三步 + FAQ + 反馈入口） | ⬜ | 篇三长文配套 |
 | A5 | 上下文税计算器（浏览器本地跑的估算页） | ✅ 2026-09-05 | `docs/tools/token-tax/index.html` → activeing123.github.io/mcptoon/tools/token-tax/ ；`tests/test_calculator.py` 钉住"零网络 + 率值来自 benchmark 工件 + 免责声明不许删" |
-| A6 | `python -m mcptoon.bench_tokens`（把复现脚本装进包里） | ⬜ | 0.7.5 的 wheel 实测只有 28 个文件、不含 `scripts/`，所以 README 首屏目前只能写"克隆仓库后运行"。进包之后那行才对 pip 用户为真；tiktoken 保持可选，缺了就打印安装提示 |
+| A6 | `python -m mcptoon.bench_tokens`（把复现脚本装进包里） | ✅ 2026-09-29 | 装进包（`src/mcptoon/bench_tokens.py`，`scripts/` 退化为转发壳）；pip 用户无需克隆即可复现 README 那张三格式表；tiktoken 仍可选、缺了打印 `pip install tiktoken`；`tests/test_bench_tokens.py` 8 项钉住 |
 
 ### A+. Agent Plugins 生态（v0.7.1 新增，随 v0.7.1 已落地）
 | # | 项 | 状态 | 备注 |

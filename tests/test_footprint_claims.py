@@ -55,7 +55,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # footer.py +24KB, sync.py +18KB, cli.py +17KB, plus four new modules — and the wheel
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
-              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB")
+              "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -85,15 +85,16 @@ SKIP_SLACK = 2
 # every earlier guard - README's contributor note said 931 and DEVELOPERS.md said 730
 # - because nothing looked at that shape. This regex does, so it is judged the same way.
 SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
-# What `pip install mcptoon` downloads. 301KB, measured 2026-09-28 with the same
-# method as the previous pin (convert the tree to LF, then `python -m build`): the
-# 0.8.3 tree plus `update.py` builds to 308,261 bytes = 301.04 KB. `pip install
-# mcptoon` pulls only the wheel.
+# What `pip install mcptoon` downloads. 304KB, measured 2026-09-29 with the same
+# method as the previous pin (convert the tree to LF, then build a wheel): the
+# 0.8.4 tree plus `bench_tokens.py` builds to 311,543 bytes = 304.24 KB (floor).
+# `pip install mcptoon` pulls only the wheel.
 #
-# It was 297KB at 0.8.2 (2026-09-27, 304,480 bytes). The delta is `update.py`
-# itself — a new module, so the wheel grows whether or not the feature is
-# announced. 297KB joins RETIRED_KB for the same reason every earlier value did:
-# it was true, and the tree moved past it.
+# It was 301KB at 0.8.3/0.8.4 (2026-09-28, 308,629 bytes published). The delta is
+# `bench_tokens.py` — the reproduction script moved into the package so a pip user
+# can run the README-caliber table without a clone; a new module grows the wheel
+# whether or not the feature is announced. 301KB joins RETIRED_KB for the same
+# reason every earlier value did: it was true, and the tree moved past it.
 #
 # The measurement method is load-bearing and predates this pin: line endings are
 # pure overhead inside the wheel. The earlier "233KB" was never a shipped number —
@@ -103,7 +104,7 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # 231,659 — so a CRLF checkout inflates every claim by ~1.4KB. Convert to LF first,
 # then build. The guard pins a value measured from a real artifact, not from one
 # developer's line endings.
-WHEEL_KB = "301KB"
+WHEEL_KB = "304KB"
 
 
 def modules() -> list[Path]:

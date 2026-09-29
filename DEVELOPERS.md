@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.8.4 · 1660 passed + 2 skipped · 0 依赖 · 301KB wheel · 33 模块 · Apache 2.0
+- 版本：v0.8.4 · 1668 passed + 2 skipped · 0 依赖 · 304KB wheel · 34 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -55,7 +55,7 @@ mcptoon manifest --compact   # 名字索引（255 工具 = 581 tokens），schem
 | `--slim`（名字+参数类型） | 8,282 | −88.5% |
 | `--compact`（仅名字） | 581 | **−99.2%** |
 
-复现：`python scripts/bench_tokens.py`（读 `~/.cache/mcptoon/schema_cache.json`，需 `pip install tiktoken`）。 这是一个旋钮不是开关：需要零歧义时切回 `--json`。
+复现：`python -m mcptoon.bench_tokens`（读 `~/.cache/mcptoon/schema_cache.json`，需 `pip install tiktoken`）。 这是一个旋钮不是开关：需要零歧义时切回 `--json`。装进包里之后 pip 用户无需克隆即可跑（`scripts/bench_tokens.py` 只是转发到它的仓库壳）。
 
 ### 3 · One door in front of every server — `serve`
 
@@ -190,13 +190,13 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-everything"]) a
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 1660 tests, green expected
+python -m pytest tests/ -v          # 1668 tests, green expected
 
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
 零第三方导入是 review 阶段硬性规则。新功能必须带测试。
-23,032 行 Python（物理行）、33 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+23,187 行 Python（物理行）、34 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
