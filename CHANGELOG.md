@@ -41,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those npm/PyPI packages, which took **140 s** (vs 0.4 s for `discover`). The
   smoke env now strips `npx`/`uvx` from `PATH`, so the README-path check runs in
   ~3 s with no network and cannot flake on a slow registry.
+- **The suite no longer writes the developer's real `~/.cache/mcptoon/usage.json`.**
+  `usage._USAGE_FILE` is bound to `config.CACHE_DIR`, an import-time constant, so
+  `MCPTOON_CACHE_DIR` does not move it — a test that records a usage entry grew
+  the real file (found 2026-09-29: `test_serve_perf`/`test_envelope` added 171
+  bytes). A new `tests/conftest.py` redirects `HOME`/`USERPROFILE`/`APPDATA`/
+  `LOCALAPPDATA` at session scope, before any test imports `mcptoon`, so the
+  import-time roots land in a temp dir too. The full suite now leaves the real
+  `usage.json` byte-identical.
 
 ### Added
 
