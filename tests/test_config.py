@@ -79,3 +79,47 @@ class TestSampleConfig:
     def test_sample_config_uses_stdio(self):
         for server in cfg.SAMPLE_CONFIG["servers"].values():
             assert server["transport"] == "stdio"
+
+
+class TestLoadConfigToleratesHandEdits:
+    """A hand-edited config can be *valid* JSON/TOML that is not the shape we
+    expect. `load_config` caught parse errors but assumed the parsed value was a
+    dict, so `[1,2,3]` or `{"servers": [1,2]}` crashed every reader with
+    `AttributeError: 'list' object has no attribute 'get'` — a traceback on the
+    first command a user runs after fat-fingering their config. These pin the
+    graceful path (ignore the section, keep going), matching the
+    `isinstance(data, dict)` guard `load_settings` already had.
+    """
+
+    def _write_and_load(self, tmp_path, text, monkeypatch):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(text, encoding="utf-8")
+        monkeypatch.setenv("MCPTOON_CONFIG_FILE", str(cfg_file))
+        # Keep the TOML/local/env sources out of the way.
+        monkeypatch.delenv("MCPTOON_SERVERS", raising=False)
+        monkeypatch.chdir(tmp_path)
+        return cfg.load_config()
+
+    def test_top_level_list_is_ignored(self, tmp_path, monkeypatch):
+        assert self._write_and_load(tmp_path, "[1, 2, 3]", monkeypatch) == {}
+
+    def test_top_level_string_is_ignored(self, tmp_path, monkeypatch):
+        assert self._write_and_load(tmp_path, '"just a string"', monkeypatch) == {}
+
+    def test_servers_section_that_is_a_list_is_ignored(self, tmp_path, monkeypatch):
+        assert self._write_and_load(tmp_path, '{"servers": [1, 2]}', monkeypatch) == {}
+
+    def test_servers_section_that_is_null_is_ignored(self, tmp_path, monkeypatch):
+        assert self._write_and_load(tmp_path, '{"servers": null}', monkeypatch) == {}
+
+    def test_a_valid_servers_section_still_loads(self, tmp_path, monkeypatch):
+        text = '{"servers": {"a": {"transport": "http", "url": "https://x/mcp"}}}'
+        assert "a" in self._write_and_load(tmp_path, text, monkeypatch)
+
+    def test_malformed_json_is_still_ignored(self, tmp_path, monkeypatch):
+        assert self._write_and_load(tmp_path, "{ not json", monkeypatch) == {}
+
+    def test_list_servers_survives_a_wrong_shape(self, tmp_path, monkeypatch):
+        """The end-to-end symptom: `mcptoon list` reads via list_servers()."""
+        self._write_and_load(tmp_path, "[1, 2, 3]", monkeypatch)
+        assert cfg.list_servers() == []

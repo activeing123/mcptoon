@@ -266,6 +266,23 @@ def resolve_server_name(name: str) -> str:
 
 # ─── Config loading ───
 
+def _servers_section(data) -> dict:
+    """The `servers` mapping of a parsed config document, or {} if it is not one.
+
+    The config file is hand-editable, so it can be *valid* JSON/TOML that is not
+    the shape we expect: a top-level list, or `servers` set to a list. `load_config`
+    catches parse errors but assumed the parsed value was a dict, so `[1,2,3]` (or
+    `{"servers": [1,2]}`) crashed every command that reads the config with
+    `AttributeError: 'list' object has no attribute 'get'` instead of being ignored
+    the way a syntax error is. This mirrors the `isinstance(data, dict)` guard
+    `load_settings` already applies to the same class of hand-edit.
+    """
+    if not isinstance(data, dict):
+        return {}
+    section = data.get("servers", {})
+    return section if isinstance(section, dict) else {}
+
+
 def load_config() -> dict:
     """Load merged server configuration.
 
@@ -287,13 +304,13 @@ def load_config() -> dict:
     if toml_file.exists():
         try:
             data = _parse_toml(toml_file.read_text(encoding="utf-8"))
-            servers.update(data.get("servers", {}))
+            servers.update(_servers_section(data))
         except (OSError, ValueError):
             pass
     if json_file.exists():
         try:
             data = json.loads(json_file.read_text(encoding="utf-8"))
-            servers.update(data.get("servers", {}))
+            servers.update(_servers_section(data))
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -302,14 +319,14 @@ def load_config() -> dict:
     if local_toml.exists():
         try:
             data = _parse_toml(local_toml.read_text(encoding="utf-8"))
-            servers.update(data.get("servers", {}))
+            servers.update(_servers_section(data))
         except (OSError, ValueError):
             pass
     local = Path(".mcptoon.json")
     if local.exists():
         try:
             data = json.loads(local.read_text(encoding="utf-8"))
-            servers.update(data.get("servers", {}))
+            servers.update(_servers_section(data))
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -318,7 +335,7 @@ def load_config() -> dict:
     if env_servers:
         try:
             data = json.loads(env_servers)
-            servers.update(data.get("servers", {}))
+            servers.update(_servers_section(data))
         except json.JSONDecodeError:
             pass
 

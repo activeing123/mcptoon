@@ -17,9 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into your config (`--force` to overwrite), and `--file <path>` to import any
   exported `{"mcpServers"|"servers": {...}}` document — which covers
   `mcpm export` and hand-written files, not just the four known clients. Wheel
-  304KB → 306KB; 34 modules, 23,389 lines.
+  304KB → 306KB; 34 modules, 23,406 lines.
 
 ### Fixed
+
+- **A hand-edited config that was valid JSON but the wrong shape crashed every
+  command.** `load_config` caught parse errors but assumed the parsed value was a
+  dict, so a config containing `[1, 2, 3]` (or `{"servers": [1, 2]}`) raised
+  `AttributeError: 'list' object has no attribute 'get'` — a traceback on `list`,
+  `status`, `doctor` and anything else that reads the config, right after a user
+  fat-fingers their file. A wrong shape is now ignored the same way a syntax error
+  is, matching the `isinstance(data, dict)` guard `load_settings` already had.
+  A malformed file still degrades silently, as before.
 
 - **`mcptoon config set welcome <typo>` stored the typo and exited 0.** `footer`
   and `lang` were checked by hand in the CLI, but `welcome` was validated nowhere,
