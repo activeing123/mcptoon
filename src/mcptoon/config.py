@@ -283,6 +283,45 @@ def _servers_section(data) -> dict:
     return section if isinstance(section, dict) else {}
 
 
+def _preserve_unreadable(path: Path, raw: str) -> None:
+    """Copy a config file we are about to ignore to `<path>.bak`, once.
+
+    `load_config` used to drop a file it could not honor (bad syntax, or valid
+    JSON/TOML that is not the expected shape) and carry on with defaults. That is
+    the right *read* behavior — one bad file must not break every command — but it
+    is silent data loss: the next `save_config` (any `add`/`remove`/`import
+    --write`) rewrites the file from the merged defaults, so the user's hand-edit
+    vanishes with no trace. Keeping a `.bak` means the original is recoverable.
+
+    Never clobbers an existing `.bak` — the first snapshot is the one closest to
+    the original. Best-effort: a write failure is not worth breaking the read.
+    """
+    bak = path.with_suffix(path.suffix + ".bak")
+    try:
+        if not bak.exists():
+            bak.write_text(raw, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _load_one_config_file(path: Path, parse) -> dict:
+    """The `servers` mapping of one config file, preserving the file if we ignore it."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    try:
+        data = parse(raw)
+    except ValueError:  # json.JSONDecodeError is a ValueError; _parse_toml raises it too
+        _preserve_unreadable(path, raw)
+        return {}
+    if isinstance(data, dict) and isinstance(data.get("servers", {}), dict):
+        return dict(data.get("servers", {}))
+    # Parsed, but not the shape we read (e.g. a top-level list, or `servers` a list).
+    _preserve_unreadable(path, raw)
+    return {}
+
+
 def load_config() -> dict:
     """Load merged server configuration.
 
@@ -302,33 +341,17 @@ def load_config() -> dict:
     toml_file = _config_file_toml()
     json_file = _config_file()
     if toml_file.exists():
-        try:
-            data = _parse_toml(toml_file.read_text(encoding="utf-8"))
-            servers.update(_servers_section(data))
-        except (OSError, ValueError):
-            pass
+        servers.update(_load_one_config_file(toml_file, _parse_toml))
     if json_file.exists():
-        try:
-            data = json.loads(json_file.read_text(encoding="utf-8"))
-            servers.update(_servers_section(data))
-        except (json.JSONDecodeError, OSError):
-            pass
+        servers.update(_load_one_config_file(json_file, json.loads))
 
     # 2. Project local config (overrides user) — try TOML first, then JSON
     local_toml = Path(".mcptoon.toml")
     if local_toml.exists():
-        try:
-            data = _parse_toml(local_toml.read_text(encoding="utf-8"))
-            servers.update(_servers_section(data))
-        except (OSError, ValueError):
-            pass
+        servers.update(_load_one_config_file(local_toml, _parse_toml))
     local = Path(".mcptoon.json")
     if local.exists():
-        try:
-            data = json.loads(local.read_text(encoding="utf-8"))
-            servers.update(_servers_section(data))
-        except (json.JSONDecodeError, OSError):
-            pass
+        servers.update(_load_one_config_file(local, json.loads))
 
     # 3. Environment variable (highest priority)
     env_servers = os.environ.get("MCPTOON_SERVERS", "")

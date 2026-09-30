@@ -17,9 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into your config (`--force` to overwrite), and `--file <path>` to import any
   exported `{"mcpServers"|"servers": {...}}` document — which covers
   `mcpm export` and hand-written files, not just the four known clients. Wheel
-  304KB → 307KB; 34 modules, 23,432 lines.
+  304KB → 308KB; 34 modules, 23,485 lines.
 
 ### Fixed
+
+- **`mcptoon add --http` accepted a value that cannot be an endpoint.** It wrote
+  any string to config — `javascript:alert(1)`, `ftp://x`, `not a url`, or a
+  host-less `http://` — so the mistake surfaced later as a confusing connection
+  error instead of at the keyboard. It now rejects a non-http(s) scheme or a
+  missing host, and nothing is written. The check is deliberately narrow: a typo
+  in the path, or an unusual-but-real host, still passes.
+
+- **A config file mcptoon could not read was silently discarded on the next
+  write.** Ignoring a bad file is the right *read* behavior — one bad file must
+  not break every command — but it was also silent data loss: the next `add`,
+  `remove` or `import --write` rewrote the file from the merged defaults and the
+  hand-edit vanished with no trace. The ignored original is now copied to
+  `<config>.bak` (once, never clobbering an existing backup), so it is
+  recoverable.
 
 - **Shell completion could not suggest a third of the CLI.** The bash, zsh, fish
   and PowerShell scripts each hardcoded their own copy of the verb list, and all

@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB")
+              "304KB", "306KB", "307KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -119,7 +119,11 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # guard) added a little code, so the LF method now builds to 314,703 bytes =
 # 307.33 KB. That is past the 307 line by ~340 bytes — well outside the ±100-byte
 # noise, so the floor genuinely moved and 306KB is retired like every value before.
-WHEEL_KB = "307KB"
+# 2026-09-29 (harden + freeze): 307KB → 308KB. Two small hardenings — `add --http`
+# validates the URL, and a config file we cannot honor is preserved as `.bak`
+# instead of dropped — pushed the LF build to 315,707 bytes = 308.31 KB, past the
+# 308 line by ~318 bytes (again beyond the ±100-byte noise). 307KB is retired.
+WHEEL_KB = "308KB"
 
 
 def modules() -> list[Path]:

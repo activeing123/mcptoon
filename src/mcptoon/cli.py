@@ -1538,6 +1538,27 @@ def _cmd_init(rest, fmt="auto"):
     print("  mcptoon doctor             # verify connectivity")
 
 
+def _http_url_problem(url: str) -> str:
+    """Why `url` is not a usable MCP HTTP endpoint, or "" if it looks usable.
+
+    Deliberately narrow: it rejects only what cannot work (wrong scheme, no host)
+    so a typo in the path or an unusual-but-real host still passes. Returns a
+    human-readable reason, phrased to follow "Error: --http ".
+    """
+    from urllib.parse import urlsplit
+
+    text = (url or "").strip()
+    if not text:
+        return "needs a URL"
+    parsed = urlsplit(text)
+    if parsed.scheme not in ("http", "https"):
+        got = parsed.scheme or text
+        return f"must be an http(s) URL, not {got!r}"
+    if not parsed.netloc:
+        return f"is missing a host: {text!r}"
+    return ""
+
+
 def _cmd_add(rest):
     """Add a server to config."""
     if not rest:
@@ -1569,6 +1590,15 @@ def _cmd_add(rest):
             print("Error: --http requires a URL")
             sys.exit(1)
         url = flags[idx + 1]
+        # Refuse a value that cannot be an MCP endpoint. `add` used to accept any
+        # string — `javascript:alert(1)`, `ftp://x`, `not a url`, or a bare
+        # `http://` — and wrote it to config, so the breakage surfaced later as a
+        # confusing connection error instead of at the keyboard. (A wrong host is
+        # still the user's to make; this only rejects non-http(s) and host-less.)
+        problem = _http_url_problem(url)
+        if problem:
+            print(f"Error: --http {problem}")
+            sys.exit(1)
         server_cfg = {"transport": "http", "url": url}
 
         # Parse headers

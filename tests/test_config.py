@@ -123,3 +123,38 @@ class TestLoadConfigToleratesHandEdits:
         """The end-to-end symptom: `mcptoon list` reads via list_servers()."""
         self._write_and_load(tmp_path, "[1, 2, 3]", monkeypatch)
         assert cfg.list_servers() == []
+
+    def test_a_file_we_ignore_is_preserved_as_bak(self, tmp_path, monkeypatch):
+        """Ignoring a bad file is right for reading, but silent data loss: the next
+        save rewrites the file from defaults and the hand-edit is gone. Keep a .bak."""
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("[1, 2, 3]", encoding="utf-8")
+        monkeypatch.setenv("MCPTOON_CONFIG_FILE", str(cfg_file))
+        monkeypatch.delenv("MCPTOON_SERVERS", raising=False)
+        monkeypatch.chdir(tmp_path)
+        cfg.load_config()
+        bak = tmp_path / "config.json.bak"
+        assert bak.exists(), "an ignored config must be preserved"
+        assert bak.read_text(encoding="utf-8") == "[1, 2, 3]"
+
+    def test_a_valid_file_is_not_backed_up(self, tmp_path, monkeypatch):
+        text = '{"servers": {"a": {"transport": "http", "url": "https://x/mcp"}}}'
+        self._write_and_load(tmp_path, text, monkeypatch)
+        assert not (tmp_path / "config.json.bak").exists()
+
+    def test_a_malformed_file_is_also_preserved(self, tmp_path, monkeypatch):
+        """The parse-error path preserves too, not just the wrong-shape path."""
+        self._write_and_load(tmp_path, "{ not json", monkeypatch)
+        assert (tmp_path / "config.json.bak").read_text(encoding="utf-8") == "{ not json"
+
+    def test_the_bak_is_not_clobbered_by_a_second_read(self, tmp_path, monkeypatch):
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setenv("MCPTOON_CONFIG_FILE", str(cfg_file))
+        monkeypatch.delenv("MCPTOON_SERVERS", raising=False)
+        monkeypatch.chdir(tmp_path)
+        cfg_file.write_text("[1, 2, 3]", encoding="utf-8")
+        cfg.load_config()
+        # A later, different bad edit must not overwrite the first snapshot.
+        cfg_file.write_text("{ broken", encoding="utf-8")
+        cfg.load_config()
+        assert (tmp_path / "config.json.bak").read_text(encoding="utf-8") == "[1, 2, 3]"
