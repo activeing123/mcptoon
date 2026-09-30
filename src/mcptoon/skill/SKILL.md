@@ -1,6 +1,6 @@
 ---
 name: mcptoon
-version: 1.2.0
+version: 1.2.1
 description: "Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. Also route here when a tool *result* looks truncated, compressed, or \"lost data\": result compression is on by default, originals come back via `mcptoon_retrieve handle=<id>`, and it turns off with `mcptoon config set compress off`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge."
 ---
 
@@ -224,10 +224,15 @@ and only when `mcptoon serve` is actually registered with that agent.
   `github.com/activeing123/mcptoon`. If an install prompt shows any other
   publisher or index, stop and check before continuing.
 - Diagnose: `mcptoon doctor`.
-- Undo: `pip uninstall mcptoon` removes the CLI. Its config lives in
-  `~/.mcptoon/config.json` (plus an optional per-project `./.mcptoon.json`); remove
-  those files, or drop a single server with `mcptoon remove <name>`. Nothing outside
-  them is touched.
+- Undo — two different things, do not conflate them:
+  - `pip uninstall mcptoon` removes the **CLI** only. It never edits an agent's MCP
+    config, so a routing change made by `sync --takeover` survives it — undo that
+    with `mcptoon restore` (or `mcptoon off` for the gateway entry alone).
+  - `mcptoon restore` is the true undo of mcptoon's **agent-config edits**: it drops
+    the gateway entry and returns the servers `sync --takeover` removed.
+- Config location: mcptoon's own config is `~/.mcptoon/config.json` (plus an
+  optional per-project `./.mcptoon.json`); remove those files, or drop a single
+  server with `mcptoon remove <name>`.
 - Claude Code users get one-command setup instead:
   `/plugin marketplace add activeing123/mcptoon` (installs the CLI, wires the
   bridge, and bundles this skill).
