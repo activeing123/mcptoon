@@ -17,9 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into your config (`--force` to overwrite), and `--file <path>` to import any
   exported `{"mcpServers"|"servers": {...}}` document — which covers
   `mcpm export` and hand-written files, not just the four known clients. Wheel
-  304KB → 306KB; 34 modules, 23,406 lines.
+  304KB → 307KB; 34 modules, 23,432 lines.
 
 ### Fixed
+
+- **Shell completion could not suggest a third of the CLI.** The bash, zsh, fish
+  and PowerShell scripts each hardcoded their own copy of the verb list, and all
+  four had gone stale: `bench`, `config`, `footer-facts`, `off`, `plugin`,
+  `report`, `restore`, `skills`, `stats`, `status`, `toggle`, `uninstall` and
+  `update` were missing, so tab-completion silently offered 22 of the 35 verbs.
+  A test that spot-checked five names let it pass. All four now embed one
+  canonical list, and `tests/test_completion.py` reads the dispatch chain out of
+  `cli.py` and fails if the two ever disagree — in either direction.
 
 - **A hand-edited config that was valid JSON but the wrong shape crashed every
   command.** `load_config` caught parse errors but assumed the parsed value was a

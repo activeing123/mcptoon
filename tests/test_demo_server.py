@@ -604,9 +604,15 @@ class TestRealProcess(unittest.TestCase):
 
     def test_shell_completions_offer_the_command(self):
         from mcptoon import cli
-        for block in (cli._BASH_COMPLETION, cli._ZSH_COMPLETION,
-                      cli._FISH_COMPLETION, cli._PS_COMPLETION):
-            self.assertIn("demo-server", block)
+        # Assert on the *rendered* script, not the raw template: the templates now
+        # hold a `__MC_TOON_COMMANDS__` marker that _cmd_completion fills in, so the
+        # verb appears only after substitution. tests/test_completion.py owns the
+        # full coverage check; this one only guards that demo-server is offered.
+        for shell in ("bash", "zsh", "fish", "powershell"):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                cli._cmd_completion([shell])
+            self.assertIn("demo-server", buf.getvalue(), f"{shell} omits demo-server")
 
 
 if __name__ == "__main__":

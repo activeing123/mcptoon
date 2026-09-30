@@ -72,6 +72,29 @@ KNOWN_FLAGS = frozenset(
 # tests/test_help_shortcircuit.py, which pins this set's purpose.
 _COMMANDS_WITH_OWN_HELP = frozenset({"demo", "demo-server", "serve"})
 
+# The verbs shell completion offers. This is the dispatch chain's canonical verbs
+# plus the aliases it accepts (list|servers, manifest|tools, quickstart|qs,
+# status|brief), so completion can suggest anything the CLI would actually run.
+#
+# It drifted: the four completion scripts each hardcoded their own copy and had
+# gone stale — bench, config, footer-facts, off, plugin, report, restore, skills,
+# stats, status, toggle, uninstall and update were all missing, so tab-completion
+# could not suggest a third of the CLI. A test that only spot-checked five names
+# let it pass. Keeping the list here, next to the dispatch table's other frozenset,
+# makes the next verb a one-line addition; tests/test_completion.py derives the
+# dispatch set from this file and fails if the two ever disagree.
+_COMPLETION_COMMANDS = (
+    "add", "bench", "call", "completion", "config", "demo", "demo-server",
+    "discover", "doctor", "footer-facts", "health", "help", "import", "init",
+    "inspect", "install", "list", "manifest", "off", "plugin", "policy",
+    "quickstart", "remove", "report", "restore", "search", "serve", "skills",
+    "stats", "status", "sync", "toggle", "uninstall", "update", "usage",
+    # aliases the dispatch chain also accepts
+    "servers", "tools", "qs", "brief",
+)
+_CMD_WORDS = " ".join(_COMPLETION_COMMANDS)
+_CMD_PS_WORDS = ",".join("'" + c + "'" for c in _COMPLETION_COMMANDS)
+
 
 def unknown_flag_warnings(args):
     """Return the long options in args that mcptoon does not implement.
@@ -2930,7 +2953,7 @@ _mcptoon_complete() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="init quickstart list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search"
+    commands="__MC_TOON_COMMANDS__"
 
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$commands" -- $cur) )
@@ -2958,7 +2981,7 @@ _ZSH_COMPLETION = r'''
 #compdef mcptoon
 
 _mcptoon() {
-    local commands=(init list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search)
+    local commands=(__MC_TOON_COMMANDS__)
     local formats=(openai openapi mcp json human)
 
     if (( CURRENT == 1 )); then
@@ -2982,7 +3005,7 @@ compdef _mcptoon mcptoon
 '''
 
 _FISH_COMPLETION = r'''
-complete -c mcptoon -n '__fish_use_subcommand' -a 'init quickstart list manifest inspect call add remove usage discover import doctor policy completion help sync health serve demo demo-server install search'
+complete -c mcptoon -n '__fish_use_subcommand' -a '__MC_TOON_COMMANDS__'
 complete -c mcptoon -n '__fish_seen_subcommand_from call inspect' -a '(mcptoon list 2>/dev/null | sed "s/  //;s/ \[.*//")'
 complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi mcp json human'
 '''
@@ -2990,7 +3013,7 @@ complete -c mcptoon -n '__fish_seen_subcommand_from --format' -a 'openai openapi
 _PS_COMPLETION = '''
 $scriptBlock = {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = 'init','quickstart','list','manifest','inspect','call','add','remove','usage','discover','import','doctor','completion','help','sync','health','serve','demo','demo-server','install','search'
+    $commands = __MC_TOON_COMMANDS_PS__
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
@@ -3017,6 +3040,9 @@ def _cmd_completion(rest):
         sys.exit(1)
 
     name, script = scripts[shell]
+    # One source of truth for the verb list; each shell script embeds a marker.
+    script = script.replace("__MC_TOON_COMMANDS__", _CMD_WORDS)
+    script = script.replace("__MC_TOON_COMMANDS_PS__", _CMD_PS_WORDS)
     print(f"# mcptoon completion for {name}")
     print("# Install: eval this script or add to your shell config")
     print(script)

@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB")
+              "304KB", "306KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -112,9 +112,14 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # method's run-to-run noise (~±100 bytes of zip metadata; the method reproduces the
 # published 0.8.4 wheel to within 16 bytes and the prior 304KB pin to within 92),
 # so 306KB is the honest floor for the tree and 304KB is retired like every value
-# before it. (The later exit-code fix grew cli.py a few more lines: 313,724 bytes =
-# 306.37 KB, still 306KB — the floor did not move.)
-WHEEL_KB = "306KB"
+# before it.
+# 2026-09-29 (completion fix): 306KB → 307KB. The four shell-completion scripts
+# were rewritten to embed one canonical verb list instead of four stale copies, and
+# the two edits before it (the `welcome` validation and the wrong-shape config
+# guard) added a little code, so the LF method now builds to 314,703 bytes =
+# 307.33 KB. That is past the 307 line by ~340 bytes — well outside the ±100-byte
+# noise, so the floor genuinely moved and 306KB is retired like every value before.
+WHEEL_KB = "307KB"
 
 
 def modules() -> list[Path]:
