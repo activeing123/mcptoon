@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-09-30
+
 ### Added
 
 - **`mcptoon import` — bring your servers over from another client.** The
@@ -68,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON-LD `softwareVersion` on `docs/index.html` and `docs/index-zh.html` — public
   metadata that crawlers read, deployed on every push — sat three releases behind
   (0.7.20 through 0.8.4) because it lives in HTML, outside every file the release
-  ritual touches and outside every version guard. It now reads 0.8.4, and
+  ritual touches and outside every version guard. It now reads 0.8.5, and
   `tests/test_registry_sync.py` binds both pages to `pyproject.toml` so the next
   bump either updates them or fails CI.
 
