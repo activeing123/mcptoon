@@ -31,6 +31,40 @@ The numtide bot turns PyPI releases into Nix bump PRs automatically. A version t
 exists on main but not on PyPI (or the reverse) leaves a broken bump in that channel.
 Breaking changes must land as deprecation warnings one minor version before removal.
 
+### Step 6 (added 2026-10-01) — run the drift gate, don't eyeball the channels
+
+```powershell
+python scripts/release_sync.py --apply     # from the ops zone, not this repo
+```
+
+One command checks **every** distribution channel against PyPI as the baseline,
+auto-repairs the Homebrew tap if it drifted, rewrites the channel ledger, and records
+an op entry. **Exit code 2 means a channel that is supposed to be automatic has
+drifted — fix it before calling the release done.** Exit 0 may still print 🟡 advisory
+items (Chocolatey / winget / ClawHub): those need a human to build an artifact, so they
+never block and never go quiet.
+
+`scripts/release_sync.py` lives in the maintainer's ops zone (`mcptoon/scripts/`), not in
+this repo — the public tree deliberately stays free of machine-local paths.
+
+This step exists because of a measured failure, not theory: on 2026-10-01 the Homebrew
+tap was found **four releases behind** (0.8.1 while PyPI was at 0.8.5, from 09-25) with
+**zero errors anywhere**. The tap is a hand-written formula pinned to a `sha256`; it is
+in no workflow and no bot watches it, so the release ritual had nothing to catch it.
+It is now self-healing — `activeing123/homebrew-mcptoon` runs `.github/workflows/auto-bump.yml`
+daily — but step 6 is what tells *you*, immediately, if that automation ever breaks.
+
+Deliberate design limits, so the gate does not turn into noise:
+- **Blocking** = only channels that are supposed to move automatically
+  (MCP Registry / numtide / Homebrew / gemini manifest / GitHub Release), each with a
+  grace window sized to its bot (2h tap, 24h registry, 72h numtide).
+- **Advisory** = channels needing a human-built artifact. A gate that cries wolf daily
+  gets ignored, and then the real signal dies with it.
+- **ClawHub's version is a different numbering system** (skill `1.0.8` vs CLI `0.8.5`).
+  It is displayed, never compared.
+- Proving a gate still fires is part of using it:
+  `release_sync.py --check --simulate-drift "Homebrew=0.8.1"` must exit 2.
+
 Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritual:
 
 - **The version lives in five places.** `pyproject.toml`, `server.json`
@@ -74,6 +108,10 @@ What mcptoon has earned externally, and the standing obligation each one creates
 | numtide/llm-agents.nix | S-tier: packaged; bot auto-follows since init PR #7839 (zimbatm) | Release discipline above; after each release, confirm the bot PR merged |
 | PyPI | every release | publish workflow green before announcing |
 | MCP Registry (`server.json`) | listed; published automatically by `.github/workflows/publish-mcp.yml` on every release (OIDC) | keep `server.json` in sync — CI enforces the versions, the `mcp-name:` README marker and the workflow itself via `tests/test_registry_sync.py` |
+| **Homebrew tap (`activeing123/homebrew-mcptoon`)** | personal tap, **not** Homebrew core (core rejects pip-installable Python CLIs) | **listed here on purpose** — it is a hand-written formula pinned to a `sha256`, invisible to every workflow and bot. It drifted four releases (0.8.1 vs PyPI 0.8.5) with zero errors until 2026-10-01. Now self-healing via that repo's daily `auto-bump.yml`; step 6 above is what reports it if that automation ever breaks. Never publish a release without checking it. |
+| Chocolatey community package | listed (0.8.3); 0.8.5 submitted, awaiting review | manual: build the nupkg, push, wait for the automated review. Advisory-only in the drift gate |
+| `microsoft/winget-pkgs` | PR #443014 open (0.8.3), awaiting a community moderator | manual: needs a self-contained zip asset per version. Advisory-only in the drift gate. Say "PR submitted", never "on winget" until merged |
+| ClawHub skill listing | listed; its tag number is ClawHub's own counter (**not** the CLI version, **not** the SKILL.md frontmatter version) | manual republish when SKILL.md changes. Never compare its number to any other version line |
 | apify/mcpc client comparison | listed in comparison table | none — leave the table alone |
 | awesome-mcp-clients PR #283 | pending | do not nag maintainers until ≥500 stars |
 | striki18/benchmark | third-party benchmark harness running mcptoon | external repo — read for intel, do not touch |
