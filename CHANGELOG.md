@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-10-02
+
+### Fixed
+
+- **v0.8.6 shipped a broken wheel and this is the repair.** `.gitignore`'s `_*.py` rule
+  (meant to discard ad-hoc probe scripts) also matched
+  `src/mcptoon/_toon/__init__.py`. The file was present in the working tree, so the
+  full suite passed locally, `git status` stayed empty (the file was *ignored*, not
+  missing), and a locally built wheel was fine — all three hid it. Only a clean
+  checkout exposed it. Anyone who installed **0.8.6 from PyPI** got a CLI that dies on
+  startup:
+  ```
+  mcptoon --version
+  ImportError: cannot import name 'ToonDecodeError' from 'mcptoon._toon'
+  ```
+  PyPI does not allow re-uploading a version, hence the hotfix. **Upgrade to 0.8.7 if
+  you are on 0.8.6.**
+
+- **Added the guard that would have caught it** (`tests/test_source_tracked.py`):
+  every `.py` under `src/` must be tracked by git (naming the `.gitignore` rule that
+  ate it when it isn't), every directory containing `.py` must have an `__init__.py`,
+  and `_toon` must be importable from an installed package.
+- The benchmark tests now skip per-test instead of per-module, so the collected test
+  count no longer depends on whether tiktoken is installed. A module-level
+  `importorskip` had made CI collect 1740 and this machine 1752, which turned the
+  suite-total guard red on a green codebase.
+
 ## [0.8.6] - 2026-10-02
 
 ### Fixed
