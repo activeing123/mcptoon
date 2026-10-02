@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1738%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1750%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -46,7 +46,10 @@ mcptoon keeps those descriptions **on disk, not in context**, and hands the agen
 
 - **A name index, not full schemas.** Picking a tool only needs its name — 255 tools become **581 tokens (−99.2%)**. The full schema is fetched on demand with `mcptoon inspect`, only when a tool is actually called.
 - **Skills the same way.** One resident pointer (**39 tokens**) plus one lookup (**501 tokens**) replaces loading every `SKILL.md` in full — **926,232 → 39 + 501 (−99.9%)**.
-- **Results too.** `--toon` encodes a tool's *result* **~34%** smaller than JSON.
+- **Results too.** `--toon` re-encodes a tool's *result* as standard TOON.
+  Measured **5.7%** smaller on a mixed result sample, ranging **1.8%-48.6%** by
+  result shape — a list of records barely shrinks, a single record halves. Not a
+  flat 34%: see `assets/benchmark_results.json`.
 
 Nothing is lost: the full schema and the full skill text stay one command away. Only the context window is spared.
 
@@ -103,7 +106,7 @@ catalog, not the fixed 255-tool sample below (that sample's method is in
 | **Finding tools & skills** | hunt GitHub by hand | `install --search` (**17,000+ MCP servers**) + `skills search` |
 | **Starting from scratch** | wire tools one by one | 4 built-in starter packs — one command to a working set |
 
-Skills work the same way: **926,232 tokens** of `SKILL.md` text → **39** resident + **501** per lookup (−99.9%). Call results shrink another **~34%** with `--toon`.
+Skills work the same way: **926,232 tokens** of `SKILL.md` text → **39** resident + **501** per lookup (−99.9%). Call results shrink a further **~6%** with `--toon` (shape-dependent).
 
 ---
 
@@ -145,7 +148,8 @@ mcptoon call <server> <tool> '{}'   # call any tool, JSON or --toon output
 mcptoon serve                       # expose every configured server behind one MCP endpoint
 ```
 
-- **Stable output** — JSON by default, `--toon` for ~34% smaller results, `--format mcp` to export standard MCP JSON.
+- **Stable output** — JSON by default, `--toon` for smaller results (shape-dependent,
+  5.7% on a mixed sample), `--format mcp` to export standard MCP JSON.
 - **`mcptoon serve`** — stdio or HTTP, connection pooling, per-agent keys, for clients that insist on a proxy.
 - **Zero dependencies** — pure Python standard library, so it drops into any environment (CI, containers, air-gapped).
 
@@ -325,7 +329,7 @@ measurement, so the two can never drift apart.
 `mcptoon manifest` with no flags is this tier. Want more? `--slim` (names plus param
 types, 8,282 tokens, −88.5%) or `--full` (the complete schema).
 
-### Bill 2 · Call results (`call`): optional, `--toon` saves ~34%
+### Bill 2 · Call results (`call`): optional, `--toon` saves ~6%
 
 This bill comes due *after* a tool returns. `mcptoon call` prints JSON by default and
 **saves nothing by default**. Add `--toon` to shrink the result.
@@ -513,7 +517,7 @@ All optional; the default is already the leanest tier.
 | **compact (default)** | names only `search_web` | **99.2% smaller** | common design |
 | **slim** | name + param types `search_web\|query:s*` | 88.5% smaller | **mcptoon original** |
 | **full** | full schema with params | baseline | native MCP |
-| **toon** (results) | reversible structured encoding | ~34% smaller than JSON | open TOON standard |
+| **toon** (results) | reversible structured encoding | 5.7% on a mixed sample (1.8-48.6% by shape) | open TOON standard |
 
 **Why compact by default?** Choosing *which* tool to use only needs names (581 tokens for
 255 tools); parameter detail matters at call time and is fetched on demand. Defaulting to
@@ -574,7 +578,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1738 passed, 2 skipped
+python -m pytest tests/ -v   # 1750 passed, 2 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows

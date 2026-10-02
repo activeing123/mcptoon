@@ -14,7 +14,7 @@
 | Platforms | — | usually macOS/Linux-first | often macOS-only (e.g. commercial managers) | **Windows / macOS / Linux equal** (pure Python stdlib) |
 | Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (322KB wheel)** |
 | Token cost of tool discovery | full JSON schemas | full JSON schemas | full JSON schemas | **−88.5% (slim) or −99.2% (name-only manifest)** |
-| Result payload size | raw JSON | raw JSON | raw JSON | **−34% (TOON encoding)** |
+| Result payload size | raw JSON | raw JSON | raw JSON | **−5.7% (TOON, shape-dependent)** |
 | Security inspection of results | none | none | none | **injection / credential-leak / destructive-op guards on every call** |
 | Health checks across agents | manual | some | some | built-in (`mcptoon health`, CI exit codes) |
 
@@ -38,7 +38,8 @@ session; mcptoon's compact manifest costs a sticky note.
 ## Honest limitations
 
 - Discovery savings apply to *tool listing*. Per-call arguments and outputs are
-  unchanged — except results encoded as TOON, which measure ~34% smaller.
+  unchanged — except results encoded as TOON, which measure 5.7% smaller on a
+mixed sample (1.8%-48.6% depending on the shape of the result).
 - Exact numbers vary with your toolset's names/descriptions. Measure your own:
   `mcptoon demo` prints before/after for a live sample server on your machine.
 - Config-sync CLIs and mcptoon overlap only partially: they move bytes between

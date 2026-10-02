@@ -12,7 +12,14 @@ v4.1, implemented by vendored **python-toon v0.2.0** (`src/mcptoon/_toon/`).
 
 **Full name:** Token-Oriented Object Notation
 
-**Purpose:** A token-efficient serialization format for LLM contexts. ~34% fewer tokens than JSON (measured with tiktoken, cl100k_base; see `assets/benchmark_tiktoken.json`).
+**Purpose:** A token-efficient serialization format for LLM contexts. On call
+results it measures **5.7%** fewer tokens than JSON on a mixed sample, and
+**1.8%-48.6%** depending on the result's shape (measured with tiktoken,
+cl100k_base; see `assets/benchmark_results.json`, regenerate with
+`python scripts/make_benchmark.py`). On tool *schemas* — a different payload —
+the same encoder measures 11.8% on `assets/benchmark_tiktoken.json`. The old
+"~34%" figure was the schema number quoted as if it were the result number,
+measured on a corpus that was never committed, so nothing could reproduce it.
 
 ---
 

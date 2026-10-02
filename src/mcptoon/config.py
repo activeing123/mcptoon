@@ -172,7 +172,8 @@ EXPOSURE_MODES = ("compact", "full")
 #           whole point of the gateway is to cost less without being asked.
 #   off   — results pass through verbatim. The pre-feature behavior, and the
 #           escape hatch for anyone who wants byte-identical output.
-#   toon  — the older, lossless re-encoding (JSON→TOON, ~8-34% fewer tokens).
+#   toon  — the older, lossless re-encoding (JSON→TOON; the saving is shape-dependent,
+#           1.8%-48.6% on call results, 11.8% on schemas — never quote a flat number).
 COMPRESS_MODES = ("smart", "off", "toon")
 
 # Settings that are a plain on/off switch.

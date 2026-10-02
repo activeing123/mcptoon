@@ -1,0 +1,13 @@
+{
+  "results": 200,
+  "json": 25545,
+  "toon": 24081,
+  "toon_save": 5.7,
+  "by_shape": {
+    "record": 48.6,
+    "list": 30.3,
+    "records_table": 1.8,
+    "blob": 8.2
+  },
+  "note": "mixed corpus; the saving is shape-dependent, see by_shape"
+}

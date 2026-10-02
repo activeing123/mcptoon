@@ -1,0 +1,32 @@
+[
+  {
+    "tools": 5,
+    "json": 1084,
+    "toon": 955,
+    "slim": 115,
+    "compact": 18,
+    "toon_save": 11.9,
+    "slim_save": 89.4,
+    "compact_save": 98.3
+  },
+  {
+    "tools": 50,
+    "json": 11792,
+    "toon": 10249,
+    "slim": 1397,
+    "compact": 187,
+    "toon_save": 13.1,
+    "slim_save": 88.2,
+    "compact_save": 98.4
+  },
+  {
+    "tools": 255,
+    "json": 59432,
+    "toon": 52415,
+    "slim": 6926,
+    "compact": 976,
+    "toon_save": 11.8,
+    "slim_save": 88.3,
+    "compact_save": 98.4
+  }
+]

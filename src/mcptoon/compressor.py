@@ -17,8 +17,10 @@
 Why this exists
 ---------------
 mcptoon's existing output formats (``--toon``/``--slim``/``--compact``) only
-*re-encode* a payload: JSON becomes TOON, and the same content costs ~8-34%
-fewer tokens. They never touch the content itself. Measured on this machine, a
+*re-encode* a payload: JSON becomes TOON, and the same content costs fewer tokens —
+1.8%-48.6% on call results depending on the result's shape, 11.8% on tool schemas
+(measured 2026-10-02, assets/benchmark_results.json + benchmark_schemas_repro.json;
+there is no single flat figure, which is why the README stopped quoting one). They never touch the content itself. Measured on this machine, a
 25-row search result costs 6,327 tokens as JSON and 5,827 as TOON — an 8% win.
 
 The compression layer this module adds is different: it is **content-aware**.

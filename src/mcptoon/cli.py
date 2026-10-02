@@ -3361,7 +3361,9 @@ Usage:
     mcptoon bench --json                  Machine-readable; --roots/--query/-k tune the skills half
 
 Output flags:
-    --toon         Standard TOON (toon-format/toon spec, saves ~34% vs JSON)
+    --toon         Standard TOON (toon-format/toon spec). Saves 5.7% vs JSON on a
+                          mixed call-result sample; 1.8%-48.6% depending on result
+                          shape (reproduce: scripts/make_benchmark.py)
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
     --slim         Ultra-compact tool manifests (saves 88.5% tokens, measured)
     --smart        Structure-aware result compression (keeps keys, cuts payload)

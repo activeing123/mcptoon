@@ -38,7 +38,7 @@ descriptions on top; `--json` (full schema) is the baseline.
 [compute your own numbers in the browser](https://activeing123.github.io/mcptoon/tools/token-tax/),
 30 seconds, nothing uploaded.*
 
-### Bill 2 — Call results (`call`): optional, `--toon` saves ~34%
+### Bill 2 — Call results (`call`): optional, `--toon` saves ~6%
 
 This bill comes due **after a tool returns its result to your agent**. `mcptoon call`
 outputs JSON by default, so the default saves nothing. To shrink results too, add
@@ -46,14 +46,15 @@ outputs JSON by default, so the default saves nothing. To shrink results too, ad
 
 ```
 Default:  mcptoon call fetch fetch '{"url":"https://example.com"}'   -> JSON (baseline)
-Leaner:   mcptoon call fetch fetch '{"url":"https://example.com"}' --toon   -> ~34% saved
+Leaner:   mcptoon call fetch fetch '{"url":"https://example.com"}' --toon   -> ~6% saved
 ```
 
-34% is the measured `toon_save` value in `assets/benchmark_tiktoken.json`
+The result-side number is `toon_save` in `assets/benchmark_results.json` (5.7% mixed,
+1.8%-48.6% by shape); `assets/benchmark_tiktoken.json` is the *schema* number
 (34.0–34.2%), not a marketing number.
 
-**One line to remember: 99.2% is what you save seeing which tools exist; 34% is what
-you can further save on results.**
+**One line to remember: 99.2% is what you save seeing which tools exist; ~6% is what
+you can further save on results, and that second figure swings with the result's shape.**
 
 ### Bill 3 — Skill catalog (`skills`): 926,232 to 39 resident + 501 per lookup
 
@@ -252,7 +253,7 @@ you keep ~99% of the token savings *and* full call accuracy. The rule for agents
 | Tier | Output | vs JSON | Origin |
 |---|---|---|---|
 | **(default)** | JSON | baseline | common |
-| **--toon** | structured encoding (reversible) | ~34% smaller | open TOON standard |
+| **--toon** | structured encoding (reversible) | 5.7% smaller (mixed sample) | open TOON standard |
 | **--mcptoon** | legacy pipe format | — | mcptoon original (legacy) |
 
 **Where these formats come from**

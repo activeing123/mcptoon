@@ -544,8 +544,14 @@ def compression_facts() -> dict:
     install compresses redundant results and says so, and `config set compress
     off` makes the line read "off" instead.
 
-    `potential_pct` is the static benchmark (`assets/benchmark_tiktoken.json`,
-    ~34% on list/search shapes), reported only as an offer, never as a result.
+    `potential_pct` is a deliberately conservative floor, not a benchmark. It used to
+    be documented as "the static benchmark (assets/benchmark_tiktoken.json, ~34%)", but
+    that file's 34% is the TOON *schema* number, which says nothing about compression —
+    the same confusion that put "~34%" on `--toon` in the README until 2026-10-02.
+    Compression actually measures far higher (~88% for --slim). Quoting 34% understates
+    it, which is the safe direction for a line the user reads as an offer rather than a
+    banked saving. Do not "fix" it upward without a per-shape measurement, and do not
+    cite benchmark_tiktoken.json as its source again.
 
     Cheap by construction — one `stat` and one `os.environ` read, no subprocess,
     no server: the footer may not open a connection.
@@ -572,7 +578,7 @@ def compression_facts() -> dict:
         "enabled": enabled,
         "reason": reason,
         "potential_pct": 34,
-        "caliber": "assets/benchmark_tiktoken.json",
+        "caliber": "conservative floor; see compression_context() docstring",
     }
 
 

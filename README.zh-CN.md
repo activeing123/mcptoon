@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1738%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1750%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -46,7 +46,9 @@ mcptoon 把这些描述**留在磁盘上、不放进上下文**，只交给 Agen
 
 - **给名字索引，不给完整 schema。** 挑工具只需要名字——255 个工具压成 **581 tokens（−99.2%）**。完整 schema 用 `mcptoon inspect` 按需取，只在真正调用某个工具时才取。
 - **技能同理。** 常驻一条指针（**39 tokens**）+ 一次查询（**501 tokens**），取代加载每一份 `SKILL.md` 全文——**926,232 → 39 + 501（−99.9%）**。
-- **结果也一样。** `--toon` 把工具的*结果*编码得比 JSON 小 **~34%**。
+- **结果也一样。** `--toon` 把工具*结果*重新编码成标准 TOON。混合样本实测比 JSON 小
+  **5.7%**，按结果形状在 **1.8%–48.6%** 之间——记录列表几乎不变，单条记录能减半。
+  不是稳定的 34%，见 `assets/benchmark_results.json`。
 
 什么都不丢：完整 schema 和完整技能全文，永远只差一条命令。省下的只有上下文窗口。
 
@@ -100,7 +102,7 @@ mcptoon 是今天就能用、一次覆盖所有 Agent 的那个。
 | **去哪找工具和技能** | 手动翻 GitHub | `install --search`（**17,000+ 个 MCP 服务器**）+ `skills search` |
 | **从零开始** | 一个工具一个工具地接 | 4 个内置起步包——一条命令搭出可用组合 |
 
-技能同理：**926,232 tokens** 的 `SKILL.md` 全文 → 常驻 **39** + 每次查询 **501**（−99.9%）。调用结果加 `--toon` 再省 **~34%**。
+技能同理：**926,232 tokens** 的 `SKILL.md` 全文 → 常驻 **39** + 每次查询 **501**（−99.9%）。调用结果加 `--toon` 再省 **~6%**（随形状 1.8%–48.6%）。
 
 ---
 
@@ -141,7 +143,7 @@ mcptoon call <server> <tool> '{}'   # 调任意工具，JSON 或 --toon 输出
 mcptoon serve                       # 把所有已配置的服务器收在同一个 MCP 端点后
 ```
 
-- **输出稳定**——默认 JSON，`--toon` 结果再小 ~34%，`--format mcp` 导出标准 MCP JSON。
+- **输出稳定**——默认 JSON，`--toon` 结果再小一点（随形状 1.8%–48.6%，混合样本 5.7%），`--format mcp` 导出标准 MCP JSON。
 - **`mcptoon serve`**——stdio 或 HTTP、连接池、按 Agent 分发的 key，给那些坚持要走代理的客户端。
 - **零依赖**——纯 Python 标准库，任何环境都能塞进去（CI、容器、内网）。
 
@@ -283,7 +285,7 @@ mcptoon 省下的 token 分三处，混在一起比数字没有意义。
 
 `mcptoon manifest` 不带参数就是这一档。想要更多：`--slim`（名字加参数类型，8,282 token，−88.5%）或 `--full`（完整 schema）。
 
-### 第二笔 · 调用结果（`call`）：可选，`--toon` 省约 34%
+### 第二笔 · 调用结果（`call`）：可选，`--toon` 省约 6%
 
 这笔账在工具返回结果**之后**到期。`mcptoon call` 默认输出 JSON，**默认不省**。想省就加 `--toon`。
 
@@ -460,7 +462,7 @@ mcptoon uninstall               # 完整清理——先打印计划（--dry 预�
 | **compact（默认）** | 只有名字 `search_web` | **小 99.2%** | 通用设计 |
 | **slim** | 名字 + 参数类型 `search_web\|query:s*` | 小 88.5% | **mcptoon 原创** |
 | **full** | 带参数的完整 schema | 基线 | 原生 MCP |
-| **toon**（结果） | 可逆的结构化编码 | 比 JSON 小 ~34% | 开放 TOON 标准 |
+| **toon**（结果） | 可逆的结构化编码 | 混合样本小 5.7%（按形状 1.8-48.6%） | 开放 TOON 标准 |
 
 **为什么默认 compact？** 决定「用哪个工具」只需要名字（255 个工具 581 token）；参数细节在调用时才有用，按需再取。默认给完整 schema，就等于把省下的 99.2% 又还回去了。
 
@@ -508,7 +510,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1738 passed, 2 skipped
+python -m pytest tests/ -v   # 1750 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
