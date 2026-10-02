@@ -5,7 +5,7 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.8] - 2026-10-02
 
 ### Fixed
 
@@ -43,6 +43,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/nix/store` and the source tree in the build directory. It was the reason
   numtide/llm-agents.nix's `nix-build` failed on all three platforms for every bump
   from 0.8.4 on (`1 failed, 1739 passed, 12 skipped`).
+
+- **A server that never started was counted, celebrated, and called healthy.**
+  Reproduced 2026-10-02 on a simulated clean box with one working server and one whose
+  binary does not exist:
+
+  - `quickstart` ended with **`🎉 11 tools ready across 2 servers!`** — one of those two
+    servers was dead. The tool count was already honest (error entries are skipped);
+    the server count was not. The line now names the gap:
+    `11 tools ready across 1 server (1 could not start)!`.
+  - `mcptoon doctor` printed `! dead  [stdio] 0 tools (server may be empty)`, counted
+    **0 issues**, and finished with **"All good! ✓"**. It now reports
+    `✗ dead  [stdio] cannot start: …` and counts it as an issue.
+  - Root cause: `manifest.get_server_tools` swallowed a failed start into `[]` — the
+    same value a server that answered with no tools returns — so callers could not
+    tell "could not start" from "started, exposes nothing". It now returns an
+    `{"error": …}` entry (the shape `get_manifest` already used), and `discover
+    --health` reports that as `error` instead of `no-tools`.
+
+- **Re-running `quickstart` denied the servers it manages.** Discovery reads *other*
+  agents' configs (Claude Desktop, Cursor, env vars, …), never mcptoon's own, so a
+  second `quickstart` on a machine that already had servers printed **"No MCP servers
+  found on this machine."** while `mcptoon list` printed them. It now says
+  "Nothing new to discover — you already have N server(s) configured" and points at
+  `mcptoon list` / `status` / `sync --self`.
+
+- **A server list that lives in `config.toml` was silently deleted.** `load_config()`
+  reads both `config.toml` and `config.json`, but three callers gated on
+  `CONFIG_FILE.exists()` — the JSON path alone. On a machine whose servers live in
+  TOML that made `quickstart` and `init --auto` take the "no config yet" branch and
+  call `save_config()`, which sees the TOML file and rewrites it with *only* the
+  newly discovered servers: the user's whole list was gone, with no `.bak`
+  (reproduced 2026-10-02). All three now use a new `config.has_config_file()`, which
+  checks either format. `doctor` was wrong the other way and now names whichever file
+  it actually found instead of reporting "No config found. Run: mcptoon quickstart" —
+  advice that, before this fix, would have deleted the config it was diagnosing.
+
+- **A failed write was reported as a successful removal.** `mcptoon off` filtered its
+  results on `removed`, which means "the gateway entry was found", not "it is gone" —
+  a write that failed still reports `removed=True, written=False`. So `off` printed
+  **"Done: 1 agent(s) no longer see mcptoon"** while the file still held the entry
+  (reproduced 2026-10-02). It now requires both, names the agent whose write failed
+  ("the gateway entry is STILL there"), and `--json` gains a `failed` list. The same
+  filter bug in `mcptoon restore` made `--json` and the text form print **two
+  different counts for one run**; both now count `restored and written`.
+
+- **`mcptoon health` said "All N servers healthy" while listing a `no-config` row.**
+  A row whose server is not in the config is neither alive nor dead; it fell into
+  neither counter, and the footer keyed off `error_count == 0`. A report reading
+  `0/1 alive, 0 dead` therefore ended **"All 1 servers healthy."** (reproduced
+  2026-10-02). Unknown is now its own state — `1 unknown`, and a footer that says
+  `0/1 servers healthy; 1 not in the config`.
+
+- **`serve` /health called an alive-but-empty server `status: "error"`.** `failed`
+  was inferred from "absent from `_tool_index`", which is also true of a server that
+  connects and legitimately exposes zero tools — so a single such server made the
+  endpoint report `error` with `failed_servers == 1` (reproduced 2026-10-02). Failure
+  is now tracked where the fetch actually raises, the payload carries the per-server
+  errors, and an empty-but-alive server is `ok`.
+
+- **An unreachable HTTP endpoint was counted as a discovered server.** Two halves:
+  `probe_http_endpoint` returned `{"alive": True, "tools_count": 0}` for *any*
+  exception, so an endpoint that answered `initialize` but could not list tools was
+  indistinguishable from one that answered with zero tools (now `tools_count: None`,
+  `tools_known: False`); and `discover --http <dead-url>` wrote the entry into
+  `result.count` and `--write` merges anyway, leaving only the prose "(not
+  responding)" as a signal. A dead URL is now reported and not counted.
+
+- **`mcptoon uninstall` counted things it had not removed.** It summed `removed`
+  (found, not written) for agent configs, and its unlink loop swallowed `OSError`, so
+  a file that could not be deleted was still counted in "Deleted … N file(s)". Both
+  now count only what actually happened, and failures are printed. The installer's
+  own registry (`~/.mcp-cli/pro_installed.json`) was missing from `state_paths()`, so
+  a full uninstall left it behind; it is now bookkeeping, and its path is
+  env-overridable like every other state file.
+
+- **The `install.sh` syntax test failed on a Windows box that merely lacks WSL.** It
+  ran `bash -n install.sh` and skipped only on exit code 127. On Windows `bash` on
+  PATH is usually `%SystemRoot%\System32\bash.exe`, the WSL launcher stub — with no
+  distro installed it does not exit 127, it *blocks*, so the run died with
+  `subprocess.TimeoutExpired` instead of skipping and the suite went red. The test
+  now recognizes the stub and treats a 30-second hang as "bash unusable", not "the
+  script is broken".
 
 ## [0.8.7] - 2026-10-02
 
