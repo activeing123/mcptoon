@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-10-02
+
+### Fixed
+
+- **The TOON encoder was three releases out of date, and the spec document said it
+  wasn't.** mcptoon vendored python-toon **v0.1.1** (2025-10-30) while upstream shipped
+  **v0.2.0** (2026-09-29) whose release note reads *"conform to TOON spec 4.1"* — and
+  `docs/TOON_SPEC.md` already claimed spec v4.1 alignment. The document described a
+  conformance the shipped encoder did not have. This is what the toon maintainer meant
+  when they closed our PR with "the TOON encoder it bundles is long out of date".
+  0.1.1 emitted the spec's **retired comma length marker** (`rows[3,]{id,n}:`) and, in
+  mixed arrays, **dropped the list-item prefix on nested arrays** — so `{"mixed":[1,{"a":1},[2],"str"]}`
+  did not survive its own round-trip. Measured over 320 payloads: **0.2.0 round-trips
+  320/320, 0.1.1 only 319/320**, and 77.2% of outputs are byte-identical — every one of
+  the 73 differences is 0.1.1 producing non-conformant text. Output is never materially
+  larger (1/320 grew by one token; net −2.76%).
+- **`--toon` help text and the README quoted the wrong number.** "~34%" was measured on
+  tool *schemas*; `--toon` encodes *call results*. Measured on both payloads:
+  schemas 11.8%, call results 5.7% mixed and **1.8%–48.6% by result shape** (a list of
+  records barely shrinks; a single record halves). 18 doc sites corrected.
+- **The 34% was not reproducible by anyone, including us.** The script that produced it
+  is gone (`bench_tokens.py` emits json/slim/compact but never had a TOON row) and the
+  corpus was never committed, so the encoder moving 0.1.1 → 0.2.0 went unnoticed.
+  `scripts/make_benchmark.py` now carries its corpus, seed and generator, and
+  `tests/test_benchmark_repro.py` (12 tests) pins the assets to a fresh run, refuses to
+  let the historical table be overwritten, and fails if any shipped doc attaches a flat
+  percentage to `--toon`. It caught three missed sites the day it was written.
+- **The footprint guard could not see subpackages.** `SRC.glob("*.py")` is not
+  recursive, so `_toon/` — the repo's first `.py` subpackage — was invisible to it. Now
+  recursive: 24,148 lines across 43 modules.
+- **`--toon` no longer errors on input the old encoder accepted.** Decode is
+  non-strict by default (upstream ships `strict=True`); empty input returns `{}`.
+
+### Changed
+
+- Wheel **308KB → 322KB** (329,878 bytes measured). The growth is packaging, not bloat:
+  upstream's package layout plus a decoder that is 23.7KB of source. 308KB is retired
+  from every live surface; `CHANGELOG.md` keeps saying 308KB because that is what 0.8.5
+  actually shipped. 23,485 lines / 34 modules → **24,148 / 43**.
+- `ruff` excludes `src/mcptoon/_toon/`. Vendored code is not ours to reformat; the
+  upgrade path stays a straight replacement. Our wrapper is linted normally.
+
+### Notes for downstreams
+
+- TOON text produced by 0.8.5 and earlier in the retired `[N,]` form **cannot be decoded
+  by 0.8.6**. That form was never spec-valid, so this only affects output that was
+  already unreadable. Text produced by any spec-conformant encoder is unaffected.
+- `VENDORED_VERSION` and `TOON_SPEC_VERSION` are now exported from
+  `mcptoon.toon_vendored`, so the shipped version can be read instead of guessed from a
+  doc string.
+
 ## [0.8.5] - 2026-09-30
 
 ### Added
