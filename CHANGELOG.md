@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`quickstart` recommended a `git` server twice, and on a machine with no `git`.**
+  Measured on a clean Windows box (fresh `USERPROFILE`, `uvx` present, no `git`, cwd a
+  git repo): the discovery table said "Discovered 3" but listed four rows, and the
+  `git` entry was offered even though the binary is absent — so the spawned server
+  died with `[PROCESS_DIED] … All git commands will error until this is rectified`
+  while the summary still counted it (`🎉 3 tools ready across 3 servers!`). Two
+  causes: `git` had been moved into the zero-config `uvx` table without deleting the
+  older "we are in a git repository" special case, and the gate checked only for
+  `uvx`. The row now carries the binary it needs (`requires`), is offered once, and
+  is skipped when that binary is missing. The old test hid the duplicate because it
+  matched on a phrase the duplicate's reason did not contain.
+
+- **The skill and the agent configs were written for agents that are not installed.**
+  `quickstart` created six agent skill folders (`.claude`, `.agents`, `.codex`,
+  `.cursor`, `.catpaw`, `.codeium/windsurf`) on a box with none of the six agents and
+  reported "installed for 6 agent(s)"; `sync` likewise wrote a config file for every
+  host it knew about — including `%APPDATA%\Code\User\settings.json` on a machine with
+  no VS Code. Both now write only where the agent is actually present (the `exists`
+  that detection already computed is now acted on, not merely stored), the wording is
+  "agent folder(s)", and a machine with no known folder says so and points at
+  `mcptoon skills install-self --view <folder>` for an agent mcptoon does not know
+  about. Cline's detection was the VS Code *User* directory — true on any box with
+  VS Code — and is now Cline's own `saoudrizwan.claude-dev` folder.
+
+  Closing the hole this would otherwise leave: the first-run self-heal marker is
+  written once per release, so an agent installed *after* mcptoon would never receive
+  the skill. The heal now re-checks, on every command, for an existing agent view that
+  lacks our file, so the copy lands as soon as the agent's folder appears.
+
+- **A test asserted the installed skill path equals the source-tree one.** True only
+  under `PYTHONPATH=src`; false under Nix, where the packaged copy lives in
+  `/nix/store` and the source tree in the build directory. It was the reason
+  numtide/llm-agents.nix's `nix-build` failed on all three platforms for every bump
+  from 0.8.4 on (`1 failed, 1739 passed, 12 skipped`).
+
 ## [0.8.7] - 2026-10-02
 
 ### Fixed
