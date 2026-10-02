@@ -44,10 +44,19 @@ Invariants (pinned by ``tests/test_compressor.py``)
 ---------------------------------------------------
 1. Every dict key in the input is present in the output.
 2. Scalar types (bool / None / int / float) pass through unchanged.
-3. The output is always JSON-serialisable.
+3. The output is always serialisable by ``json.dumps``. That is *not* the same as
+   strict JSON: a payload carrying ``NaN`` or ``Infinity`` renders those two
+   tokens, which ``json.dumps`` emits by default and which JavaScript's
+   ``JSON.parse`` rejects. They are left alone deliberately — rewriting them as
+   ``null`` would destroy a value, and the lossless rule outranks the
+   pretty-printed-JSON rule. Anything parsing this text should also expect the
+   trailing notice line that ``compress_with_ccr`` appends.
 4. ``compress()`` is idempotent: compressing an already-compressed payload does
    not shrink it further.
-5. Binary / base64-looking payloads are never compressed.
+5. Binary / base64-looking payloads are never compressed — checked per string, at
+   any depth, not just on the top-level value.
+6. ``applied`` False means the returned object *is* the input, untouched. There is
+   no state where the object changed but the flag says otherwise.
 """
 
 from __future__ import annotations
@@ -73,7 +82,7 @@ _LOG_LINE_RE = re.compile(
     r"^\s*(?:\[?\d{4}-\d{2}-\d{2}|\[?\d{2}:\d{2}:\d{2}|\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})"
     r"|\b(?:INFO|WARN|WARNING|ERROR|DEBUG|TRACE|CRITICAL|FATAL)\b"
 )
-_BASE64_RE = re.compile(r"^[A-Za-z0-9+/=\r\n\s]+$")
+_BASE64_RE = re.compile(r"^[A-Za-z0-9+/\r\n]+={0,2}$")
 
 
 def _looks_binary(text: str) -> bool:
@@ -82,19 +91,36 @@ def _looks_binary(text: str) -> bool:
     A truncated base64 blob is not "smaller context", it is a corrupted image the
     model can no longer reason about. Callers that hit this return the input
     untouched, which is also why the check is deliberately generous.
+
+    The alphabet above deliberately excludes spaces and tabs while still allowing
+    ``\\r\\n``: MIME-wrapped base64 breaks lines but does not insert spaces, so a
+    newline is evidence *for* a blob and a space is evidence against one. The
+    earlier pattern allowed all whitespace and its comment claimed "prose/JSON does
+    not match the alphabet above in the first place" — which is false, because the
+    alphabet contains every letter, every digit and (then) every space. A 400-char
+    run of punctuation-free prose was therefore classified as binary and silently
+    exempted from compression (measured 2026-10-02).
+
+    What remains is honest rather than perfect: a string of 64+ characters drawn
+    only from ``[A-Za-z0-9+/]`` with no punctuation and no spaces is treated as
+    opaque, because it is genuinely indistinguishable from base64 by inspection.
+    The floor is 64 rather than the original 256 because the guard now runs per
+    string, where the strings that matter live: at a 120-character budget a
+    121..255-character blob was still sliced, so the old floor described a payload
+    size rather than the shape being guarded. The cost of this choice is a missed
+    saving on an unusual string; the cost of the opposite choice is a corrupted
+    blob handed to a model that cannot tell. Known gap, stated rather than hidden:
+    base64url tokens containing ``-`` or ``_``, and JWTs (which contain ``.``), do
+    not match the alphabet and can still be cut.
     """
     if not isinstance(text, str):
         return False
     if text.startswith("data:") and ";base64," in text[:128]:
         return True
     stripped = text.strip()
-    if len(stripped) < 256:
+    if len(stripped) < 64:
         return False
-    if not _BASE64_RE.match(stripped):
-        return False
-    # Base64 has no long runs of a single character; prose/JSON does not match
-    # the alphabet above in the first place. Length alone is the discriminator.
-    return True
+    return bool(_BASE64_RE.match(stripped))
 
 
 def detect_kind(obj: Any) -> str:
@@ -252,6 +278,16 @@ def smart_crush(obj: Any, *, str_budget: int = DEFAULT_STR_BUDGET,
                 items = items[:limit]
             return items
         if isinstance(node, str):
+            # The binary guard has to live *here*, per string. ``is_compressible``
+            # only inspects the top-level type, so a base64 blob sitting inside a
+            # list of records sailed straight past it and got sliced at the string
+            # budget — measured 2026-10-02: a 400-character blob came back as 121
+            # characters ending in an ellipsis, and decoding it yields garbage.
+            # That is exactly what this module's own comment above warns about: a
+            # truncated base64 blob is not "smaller context", it is a corrupted
+            # image the model can no longer reason about.
+            if _looks_binary(node):
+                return node
             if depth < 4:
                 embedded = _maybe_json_string(node)
                 if embedded is not None:
@@ -327,12 +363,34 @@ def compress(obj: Any, *, str_budget: int = DEFAULT_STR_BUDGET,
         out, stats = smart_crush(obj, str_budget=str_budget, keep_head=keep_head)
 
     after = _count_tokens(out)
-    saved = max(0, before - after)
+    if after >= before:
+        # Nothing was gained, so hand back the payload that came in — and *only*
+        # the payload that came in. Two reasons this is an early return rather
+        # than just a flag:
+        #
+        # (a) ``applied=False`` should mean "the object you got is your input".
+        #     Otherwise every caller has to remember to consult the flag before
+        #     trusting the value, and one already did not: ``output.render``
+        #     discarded the stats and rendered the crushed payload anyway.
+        # (b) A payload can be *changed* without getting smaller. A 121-character
+        #     string becomes 120 characters plus the ellipsis: same length, same
+        #     token count, different bytes. Returning that under "not applied" is
+        #     the silent edit this whole layer exists to avoid.
+        #
+        # The counters are zeroed for the same reason: reporting "3 strings cut"
+        # about a payload that was handed back untouched would be a false
+        # statement in the stats a caller uses to describe what happened.
+        return obj, {
+            "kind": kind, "applied": False, "before_tokens": before,
+            "after_tokens": before, "saved_tokens": 0, "pct": 0,
+            "truncated_strings": 0, "dropped_items": 0, "deduped_items": 0,
+        }
+
+    saved = before - after
     pct = round(100 * saved / before) if before else 0
-    applied = after < before
 
     stats.update({
-        "kind": kind, "applied": applied, "before_tokens": before,
+        "kind": kind, "applied": True, "before_tokens": before,
         "after_tokens": after, "saved_tokens": saved, "pct": pct,
     })
     return out, stats

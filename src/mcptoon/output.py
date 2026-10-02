@@ -889,11 +889,25 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
     if fmt == "smart":
         # Structure-aware compression (compressor.py): keep navigation, compress
         # payload. Never char-truncated — that would cut valid JSON mid-object.
-        # The CCR handle + notice are attached by the caller (serve knows the
-        # server:tool; this pure formatter does not).
+        #
+        # This pure formatter cannot reach the CCR store (it has no server:tool to
+        # key a handle on), so it cannot offer a way back. That makes the notice
+        # mandatory rather than optional: without it a caller receives a silently
+        # trimmed payload — the one outcome the lossless contract forbids. The
+        # line is the same one `compressor.compress_with_ccr` appends when its
+        # store refuses, so the two paths read alike.
+        #
+        # The stats used to be discarded (`crushed, _stats = ...`), which meant a
+        # payload that was not actually shrunk was still rendered in its crushed
+        # form. `compress()` now returns the input untouched in that case, and the
+        # flag is consulted here so the original is what gets rendered.
         from . import compressor as _compressor
-        crushed, _stats = _compressor.compress(obj)
-        return json.dumps(crushed, ensure_ascii=False, separators=(",", ":"))
+        crushed, stats = _compressor.compress(obj)
+        if not stats.get("applied"):
+            return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+        text = json.dumps(crushed, ensure_ascii=False, separators=(",", ":"))
+        line = _compressor.notice(stats, None)
+        return f"{text}\n{line}" if line else text
 
     # Truncation threshold
     if full:

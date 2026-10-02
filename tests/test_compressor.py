@@ -131,8 +131,13 @@ class TestEmbeddedJson(unittest.TestCase):
         self.assertTrue(st["applied"])
 
     def test_plain_string_in_a_record_is_truncated(self):
-        obj = {"note": "x" * 500, "a": 1, "b": 2, "c": 3, "d": 4, "e": 5,
-               "f": 6, "g": 7}
+        # Prose, not `"x" * 500`: a punctuation-free alphanumeric run of 64+ chars
+        # is treated as an opaque blob (see _looks_binary) because at that shape it
+        # is indistinguishable from base64, and slicing it would corrupt it. The
+        # intent here is the other case — an ordinary text value that is not
+        # embedded JSON, which must still be cut rather than recursed into.
+        obj = {"note": "a plain note with words " * 40, "a": 1, "b": 2, "c": 3,
+               "d": 4, "e": 5, "f": 6, "g": 7}
         out, _ = C.compress(obj)
         self.assertIsInstance(out["note"], str)
         self.assertTrue(out["note"].endswith(C.ELLIPSIS))
@@ -173,6 +178,157 @@ class TestNotice(unittest.TestCase):
     def test_no_notice_when_not_applied(self):
         _, st = C.compress({"ok": True})
         self.assertEqual(C.notice(st, "x"), "")
+
+
+class TestOpaqueBlobsSurvive(unittest.TestCase):
+    """Invariant 5, at every depth — found false by probing, not by reading.
+
+    2026-10-02: the guard lived only in ``is_compressible``, which inspects the
+    top-level type. A base64 blob sitting inside a list of records therefore sailed
+    past it and was sliced at the string budget: a 400-character blob came back as
+    121 characters ending in an ellipsis, and decoding that yields garbage. The
+    module's own comment already said why that is the one thing not to do
+    ("a truncated base64 blob is not smaller context, it is a corrupted image").
+    """
+
+    @staticmethod
+    def blob(nbytes: int) -> str:
+        import base64
+        return base64.b64encode(bytes(i % 256 for i in range(nbytes))).decode()
+
+    def shapes(self):
+        blob = self.blob(300)
+        return {
+            "list of records": [{"id": i, "image": blob} for i in range(3)],
+            "nested array": {"rows": [{"blob": blob} for _ in range(3)]},
+            "data URI in a record": [
+                {"id": i, "src": "data:image/png;base64," + self.blob(400)}
+                for i in range(3)],
+            "dict with eight keys": {**{f"k{i}": "v" for i in range(7)},
+                                     "payload": blob},
+        }
+
+    def test_a_blob_inside_a_container_is_never_cut(self):
+        blob = self.blob(300)
+        for label, payload in self.shapes().items():
+            with self.subTest(shape=label):
+                out, _ = C.compress(payload)
+                text = json.dumps(out, ensure_ascii=False)
+                self.assertIn(blob, text,
+                              f"{label}: the blob was truncated — it is now a "
+                              f"corrupted binary the model cannot decode")
+
+    def test_a_data_uri_inside_a_container_is_never_cut(self):
+        payload = [{"id": i, "src": "data:image/png;base64," + self.blob(400)}
+                   for i in range(3)]
+        out, _ = C.compress(payload)
+        self.assertIn("data:image/png;base64," + self.blob(400),
+                      json.dumps(out, ensure_ascii=False))
+
+    def test_a_short_blob_is_protected_too(self):
+        """121..255 characters used to be sliced: the old floor described a payload
+        size, not the shape being guarded."""
+        blob = self.blob(120)          # 160 characters
+        self.assertGreater(len(blob), C.DEFAULT_STR_BUDGET)
+        self.assertLess(len(blob), 256)
+        out, _ = C.compress([{"id": i, "image": blob} for i in range(3)])
+        self.assertIn(blob, json.dumps(out, ensure_ascii=False))
+
+    def test_prose_without_punctuation_is_still_compressed(self):
+        """The guard must not become a tax on ordinary text.
+
+        The alphabet it matches contains every letter, every digit and — until this
+        was fixed — every space, so a 400-character run of punctuation-free prose
+        was classified as binary and exempted from compression. Spaces are now
+        evidence *against* a blob, which is what keeps this case working.
+        """
+        prose = "the quick brown fox jumps over the lazy dog " * 10
+        self.assertFalse(C._looks_binary(prose))
+        out, st = C.compress({"note": prose, "a": 1, "b": 2, "c": 3, "d": 4,
+                              "e": 5, "f": 6, "g": 7})
+        self.assertTrue(st["applied"])
+        self.assertTrue(out["note"].endswith(C.ELLIPSIS))
+
+    def test_wrapped_base64_still_counts_as_binary(self):
+        """MIME wraps base64 at 76 characters with newlines, not spaces."""
+        wrapped = "\n".join(self.blob(300)[i:i + 76] for i in range(0, 300, 76))
+        self.assertTrue(C._looks_binary(wrapped))
+
+
+class TestNotAppliedMeansUntouched(unittest.TestCase):
+    """`applied` False must mean "the object you got is your input".
+
+    Without this, every caller has to remember to consult the flag before trusting
+    the value, and one already did not: `output.render` discarded the stats and
+    rendered the crushed payload anyway. A payload can also be *changed* without
+    getting smaller — a 121-character string becomes 120 characters plus the
+    ellipsis: same length, same token count, different bytes.
+    """
+
+    def test_a_changed_but_not_smaller_payload_comes_back_unchanged(self):
+        payload = [{"i": 0, "t": "x" * 121}, {"i": 1, "t": "y" * 121}]
+        out, st = C.compress(payload)
+        if st["applied"]:
+            self.assertNotEqual(out, payload)          # a real shrink happened
+        else:
+            self.assertEqual(out, payload,
+                             "compress() edited the payload while reporting "
+                             "applied=False")
+
+    def test_not_applied_always_returns_the_identical_object(self):
+        cases = [
+            {"ok": True},
+            [{"a": 1}, {"a": 2}],
+            "a long prose answer " * 200,
+            [{"i": 0, "t": "x" * 121}, {"i": 1, "t": "y" * 121}],
+            [{"id": 1, "image": TestOpaqueBlobsSurvive.blob(300)} for _ in range(3)],
+            [],
+        ]
+        for payload in cases:
+            with self.subTest(payload=repr(payload)[:60]):
+                out, st = C.compress(payload)
+                if not st["applied"]:
+                    self.assertEqual(
+                        json.dumps(out, ensure_ascii=False, sort_keys=True),
+                        json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                        "applied=False but the value differs")
+                    self.assertEqual(st["saved_tokens"], 0)
+                    self.assertEqual(st["truncated_strings"], 0)
+                    self.assertEqual(st["dropped_items"], 0)
+
+    def test_counters_are_zeroed_when_nothing_was_applied(self):
+        """Reporting cuts that were not made would be a false statement in the
+        numbers a caller uses to describe what happened."""
+        obj = {"ok": True, "n": 1}
+        _, st = C.compress(obj)
+        self.assertFalse(st["applied"])
+        self.assertEqual((st["truncated_strings"], st["dropped_items"],
+                          st["deduped_items"], st["saved_tokens"], st["pct"]),
+                         (0, 0, 0, 0, 0))
+
+
+class TestNonFiniteNumbers(unittest.TestCase):
+    """Invariant 3's real caliber: `json.dumps` succeeds, strict JSON does not.
+
+    NaN and Infinity are emitted as bare tokens by json.dumps and rejected by
+    JavaScript's JSON.parse. They are left alone deliberately — rewriting them as
+    null would destroy a value, and losslessness outranks JSON purity. This test
+    exists so the limit is recorded rather than discovered.
+    """
+
+    def test_nan_and_infinity_survive_as_themselves(self):
+        payload = [{"i": 0, "f": float("nan")}, {"i": 1, "f": float("inf")}]
+        out, _ = C.compress(payload)
+        text = json.dumps(out, ensure_ascii=False)
+        self.assertIn("NaN", text)
+        self.assertIn("Infinity", text)
+        with self.assertRaises(ValueError):
+            json.loads(text, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+        # Python's own parser accepts them by default, which is why this is a
+        # documented limit and not a scramble to "fix" the data.
+        import math
+        self.assertTrue(math.isnan(json.loads(text)[0]["f"]))
+        self.assertEqual(json.loads(text)[1]["f"], float("inf"))
 
 
 if __name__ == "__main__":

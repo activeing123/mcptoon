@@ -119,9 +119,20 @@ def _truncate_desc(desc: str | None, budget: int = _MAX_DESC_LEN,
 
     Sentences are taken in the order the server wrote them. The first one that does not
     fit stops the run; nothing is skipped over to grab a shorter later sentence, so the
-    result is always a prefix of the original. A first sentence too long for the budget
-    on its own is cut at a word boundary, never mid-word. Text that stays within both
-    limits passes through byte-identical, which makes this safe to apply twice.
+    kept text never contains a sentence the server wrote *after* one it dropped.
+
+    "Nothing skipped" is not the same as "a literal prefix of the input", and the older
+    wording here claimed the stronger thing. Two normalisations break byte-prefix
+    equality: sentences are re-joined with single spaces, so a multi-line description
+    comes back with its line breaks folded, and a leading markdown marker on a line
+    (``-``, ``*``, ``#``, ``>``) is stripped. The words and their order are preserved;
+    the whitespace between them is not. Measured 2026-10-02 over a 22-shape corpus: the
+    character budget held in every case, and the only inputs whose output is not a
+    substring of the input are the multi-line ones, for exactly this reason.
+
+    A first sentence too long for the budget on its own is cut at a word boundary, never
+    mid-word. Text that stays within both limits passes through byte-identical, which
+    makes this safe to apply twice.
     """
     if not desc:
         return None
@@ -197,6 +208,50 @@ def _simplify_property(prop: dict) -> dict:
     # Keep required for nested objects
     if "required" in prop and isinstance(prop["required"], list):
         result["required"] = prop["required"]
+
+    # anyOf / oneOf / allOf used to fall through with nothing kept, so a property
+    # defined purely by alternatives simplified to `{}` — which JSON Schema reads
+    # as "any value", the least informative thing this function can emit, for a
+    # property that is frequently *required*. The remove list at the top of this
+    # module never said combinators vanish; the code simply had no branch for
+    # them (found 2026-10-02 by probing property shapes, not by reading the list).
+    #
+    # Keeping the branch types costs a handful of characters and restores the one
+    # thing an agent needs to make a call at all: what kind of value goes here. A
+    # union of types is written as the JSON Schema array form, which is valid and
+    # which this module's own validator skips rather than misjudging.
+    if "type" not in result:
+        for combinator in ("anyOf", "oneOf", "allOf"):
+            branches = prop.get(combinator)
+            if not isinstance(branches, list) or not branches:
+                continue
+            types: list[str] = []
+            for branch in branches:
+                if isinstance(branch, dict) and isinstance(branch.get("type"), str):
+                    if branch["type"] not in types:
+                        types.append(branch["type"])
+            if len(types) == 1:
+                result["type"] = types[0]
+            elif types:
+                result["type"] = types
+            # Structure from the first branch that has any, so a nested object
+            # inside an alternative keeps its shape instead of disappearing.
+            for branch in branches:
+                if not isinstance(branch, dict):
+                    continue
+                if not ({"properties", "items", "enum"} & set(branch)):
+                    continue
+                simplified = _simplify_property(branch)
+                for key in ("properties", "items", "enum"):
+                    if key in simplified and key not in result:
+                        result[key] = simplified[key]
+                # `required` is a conjunction only inside `allOf`. In anyOf/oneOf
+                # it belongs to one alternative; copying it would tell the agent a
+                # parameter is mandatory when the schema does not say that.
+                if combinator == "allOf" and "required" in simplified:
+                    result["required"] = simplified["required"]
+                break
+            break
 
     return result
 

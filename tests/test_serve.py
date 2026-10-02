@@ -39,8 +39,10 @@ from mcptoon.schema_simplifier import (
     split_namespaced,
     compute_token_stats,
     _MAX_DESC_LEN,
+    _MAX_DESC_SENTENCES,
     _MAX_PARAM_DESC_LEN,
     _MAX_PARAM_DESC_SENTENCES,
+    _TRUNCATION_MARK,
     _split_sentences,
     _truncate_desc,
 )
@@ -264,6 +266,174 @@ class TestDescriptionBudget:
         kept = slim["properties"]["q"]["description"]
         assert len(kept) <= _MAX_PARAM_DESC_LEN
         assert kept.endswith("...")
+
+
+class TestDescriptionBudgetIsAPromise:
+    """The stated limit has to hold for *shapes*, not for the examples you thought of.
+
+    2026-10-02 ran this 22-shape corpus through both tiers (tool 360/3, parameter
+    200/2): CJK with no spaces at all, one 1001-character "word", emoji, the exact
+    360/361 and 200/201 boundaries, 80 short lines, markdown bullets, abbreviations,
+    tabs, a sentence split across a newline. Every output held both limits.
+
+    The first version of that probe reported three "sentence cap breaches" that were
+    its own bug — it counted the `...` marker as a sentence. That is recorded here on
+    purpose: a false positive is more dangerous than a miss, because it makes a wrong
+    conclusion look evidenced.
+    """
+
+    CORPUS = [
+        "x" * 1000,
+        ("word " * 300).strip(),
+        ". ".join("w" * 200 for _ in range(6)) + ".",
+        ". ".join("a" for _ in range(400)) + ".",
+        "中" * 900,
+        "。".join("中" * 100 for _ in range(10)),
+        "🎉" * 500,
+        "y" * 360,
+        "y" * 361,
+        "z" * 200,
+        "z" * 201,
+        "\n".join(f"line {i} of text" for i in range(80)),
+        "\n".join(f"- item {i} with some text" for i in range(60)),
+        "Use this, e.g. for files. " * 40,
+        "Version 3.5 is fine. " * 40,
+        "See mcptoon.io for details. " * 40,
+        "abc\ndef " * 100,
+        "col1\tcol2\tcol3 " * 60,
+        "   " + ("w " * 300) + "   ",
+        "\n".join("q" * 30 for _ in range(50)),
+        "a" * 500 + " " + "b" * 500,
+        "`code_block_here` " * 60,
+    ]
+
+    @staticmethod
+    def _body(out):
+        """Output minus the truncation marker — the marker is not a sentence."""
+        if not out:
+            return ""
+        for mark in (f" {_TRUNCATION_MARK}", _TRUNCATION_MARK):
+            if out.endswith(mark):
+                return out[: -len(mark)]
+        return out
+
+    @staticmethod
+    def _canon(text):
+        """Normalise the way the function normalises its own output.
+
+        Per line: strip leading markdown markers and surrounding whitespace, then
+        fold every whitespace run to one space. Comparing re-split sentence *lists*
+        instead measures the splitter twice and reports differences that are not
+        skips — a joined output has no line breaks left, so it re-splits differently
+        by construction.
+        """
+        lines = [ln.strip().lstrip("#*>- \t").strip() for ln in text.splitlines()]
+        return " ".join(" ".join(ln.split()) for ln in lines if ln)
+
+    def test_character_budget_holds_for_every_shape(self):
+        for text in self.CORPUS:
+            out = _truncate_desc(text)
+            param = _truncate_desc(text, _MAX_PARAM_DESC_LEN, _MAX_PARAM_DESC_SENTENCES)
+            assert len(out) <= _MAX_DESC_LEN, (len(out), repr(text[:40]))
+            assert len(param) <= _MAX_PARAM_DESC_LEN, (len(param), repr(text[:40]))
+
+    def test_sentence_cap_holds_for_every_shape(self):
+        for text in self.CORPUS:
+            kept = _split_sentences(self._body(_truncate_desc(text)))
+            assert len(kept) <= _MAX_DESC_SENTENCES, (kept, repr(text[:40]))
+
+    def test_no_later_sentence_is_taken_while_an_earlier_one_is_dropped(self):
+        """The property that would actually mislead a reader.
+
+        Not "byte prefix of the input": line breaks are folded to spaces and a
+        leading markdown marker is stripped, both documented. What must never happen
+        is skipping a sentence that did not fit in order to grab a shorter one from
+        further down the description.
+        """
+        for text in self.CORPUS:
+            kept = self._canon(self._body(_truncate_desc(text)))
+            if kept:
+                assert self._canon(text).startswith(kept), repr(text[:40])
+
+    def test_budget_holds_for_cjk_without_any_spaces_to_cut_on(self):
+        """No space to break on: the word-boundary rule must not become a budget
+        overrun, and must not cut a character in half."""
+        out = _truncate_desc("中" * 900)
+        assert len(out) <= _MAX_DESC_LEN
+        assert out.endswith("...")
+        assert "中" in out
+
+
+class TestCombinatorPropertiesSurvive:
+    """A property defined by anyOf / oneOf used to simplify to `{}`.
+
+    `{}` is JSON Schema for "any value" — the least informative thing this module can
+    emit, for a property that is frequently *required*. The remove list at the top of
+    the module never said combinators vanish; the code simply had no branch for them.
+    This matters most for Pydantic-generated servers, where a nested model parameter
+    arrives as `{"$ref": "#/$defs/Model"}`.
+    """
+
+    def test_anyof_keeps_every_branch_type(self):
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"anyOf": [{"type": "string"}, {"type": "number"}]}},
+            "required": ["p"]})
+        assert slim["properties"]["p"].get("type") == ["string", "number"]
+
+    def test_a_lone_branch_is_not_wrapped_in_a_list(self):
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"allOf": [{"type": "string"}]}}})
+        assert slim["properties"]["p"]["type"] == "string"
+
+    def test_object_structure_inside_an_alternative_survives(self):
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"anyOf": [{"type": "object", "properties": {
+                "k": {"type": "integer"}}, "required": ["k"]}]}}})
+        assert slim["properties"]["p"]["properties"]["k"]["type"] == "integer"
+
+    def test_an_explicit_type_wins_over_the_combinator(self):
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"type": "string",
+                  "anyOf": [{"type": "number"}, {"type": "boolean"}]}}})
+        assert slim["properties"]["p"]["type"] == "string"
+
+    def test_required_is_not_copied_out_of_an_alternative(self):
+        """In anyOf/oneOf a branch's `required` belongs to that branch. Copying it
+        would tell an agent a parameter is mandatory when the schema does not say
+        that — which is worse than saying nothing."""
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"oneOf": [
+                {"type": "object", "properties": {"a": {"type": "string"}},
+                 "required": ["a"]},
+                {"type": "string"}]}}})
+        assert "required" not in slim["properties"]["p"]
+
+    def test_required_is_copied_out_of_allof(self):
+        """allOf is a conjunction, so a branch's `required` really is mandatory."""
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"allOf": [{"type": "object", "properties": {"a": {"type": "string"}},
+                             "required": ["a"]}]}}})
+        assert slim["properties"]["p"]["required"] == ["a"]
+
+    def test_a_bare_ref_is_a_known_limitation(self):
+        """Declared, not discovered: `$ref` is on the remove list, so a property that
+        is nothing but a reference still simplifies to `{}`. The referenced type is
+        recoverable only from the full schema, which this function never sees."""
+        slim = simplify_schema({"type": "object", "properties": {
+            "p": {"$ref": "#/$defs/Model"}}, "required": ["p"]})
+        assert slim["properties"]["p"] == {}
+
+    def test_a_stripped_enum_still_tells_the_caller_where_to_go(self):
+        """A big enum is removed to save tokens; the cost is one round trip, not a
+        dead end, because the validator that rejects the call names every allowed
+        value. That is what makes the removal acceptable rather than lossy."""
+        schema = {"type": "object", "properties": {
+            "mode": {"type": "string", "enum": [f"mode{i}" for i in range(10)]}},
+            "required": ["mode"]}
+        slim = simplify_schema(schema)
+        assert "enum" not in slim["properties"]["mode"]
+        errors = validate_args({"mode": "wrong"}, schema)
+        assert errors and "mode0" in errors[0]
 
 
 class TestSimplifyToolDef:
