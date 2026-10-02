@@ -7,7 +7,7 @@ description: "Compress MCP tool discovery with the mcptoon CLI. Trigger when a s
 # mcptoon — MCP tool-catalog compression
 
 mcptoon is a zero-dependency CLI. If it is not installed yet, one command sets
-it up: `pip install mcptoon` (327KB, installs in seconds, nothing else pulled
+it up: `pip install mcptoon` (334KB, installs in seconds, nothing else pulled
 in). It gives you a compressed view of the user's MCP tools and calls them
 back.
 
@@ -156,8 +156,22 @@ objects. It **leaves alone** a single source file, one long prose answer, an
 image/base64 blob, and any lone short value — those pass through byte-for-byte.
 A compressed result is *reversible*: the full original is cached and the result
 carries `full text: mcptoon_retrieve handle=<id>`; call the `mcptoon_retrieve`
-tool with that handle to get it back exactly. Cache TTL is 300 s
-(`MCPTOON_CCR_TTL` / `MCPTOON_CCR_DIR`).
+tool with that handle to get it back exactly. Cached originals **no longer expire
+on a timer** — the store is bounded by size instead (`MCPTOON_CCR_MAX_BYTES`,
+default 200 MB, evicted oldest-first), so an original stays retrievable for the
+whole session. `MCPTOON_CCR_TTL` restores timer-based expiry for anyone who wants
+it (`0`, the default, means never expire); `MCPTOON_CCR_DIR` moves the store.
+
+**A result you were already given is not sent twice.** Inside one session, if a
+tool returns byte-identical content to an earlier call, the body is replaced by a
+reference line — `identical to an earlier result in this session — body not
+resent` — which still carries the handle, so `mcptoon_retrieve` returns the
+original as usual. Measured on a 60-row search result (`cl100k_base`): the first
+send is 286 tokens, the repeat is 50. That is a saving on repeats only — a result
+that never repeats pays nothing and saves nothing. If a summary was cut and there
+is **no** handle, the line says so instead (`original not stored — this view is
+all there is`), which means there is genuinely nothing to retrieve: run the tool
+again rather than re-sending the handle.
 
 **When a user says a result looks wrong, cut short, or "it lost my data":**
 
@@ -217,7 +231,7 @@ and only when `mcptoon serve` is actually registered with that agent.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  327KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  334KB, installs in seconds). Confirm the upgrade before running it — pinning a
   version here would only go stale, but a bare `--upgrade` should be your call,
   not an automatic one.
 - Source: this package is published to PyPI by GitHub Actions from

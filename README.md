@@ -12,12 +12,12 @@
 
 **Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
 
-**It's just a 327KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
+**It's just a 334KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1785%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1825%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -53,7 +53,7 @@ mcptoon keeps those descriptions **on disk, not in context**, and hands the agen
 
 Nothing is lost: the full schema and the full skill text stay one command away. Only the context window is spared.
 
-mcptoon is a **327KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
+mcptoon is a **334KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
 
 ## This isn't just us talking
 
@@ -181,7 +181,7 @@ Full reference: [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/mai
 ## 30 seconds up and running
 
 ```bash
-pip install mcptoon                          # pure stdlib, 327KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 334KB, zero dependencies
 
 # One command: find your MCP servers, write your config, register the gateway
 # in every agent you have, and show you what it found:
@@ -532,7 +532,7 @@ to injecting every schema, at a fraction of the cost.
 
 ## Trust and safety
 
-**It's just a 327KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
+**It's just a 334KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
 
 Three guards run on every tool result before your agent sees it:
 
@@ -578,7 +578,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1785 passed, 2 skipped
+python -m pytest tests/ -v   # 1825 passed, 2 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows
@@ -586,7 +586,7 @@ is a first-class target. New here? Start with
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: **24,473 lines of Python across 43 modules**, zero third-party dependencies.
+The codebase: **24,857 lines of Python across 43 modules**, zero third-party dependencies.
 
 ---
 

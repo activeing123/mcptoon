@@ -209,6 +209,15 @@ class MCPServerBridge:
         self._initialized = False
         self._lock = threading.Lock()
         self._shutdown = False
+        # One bridge is one conversation. The CCR store keys its "already sent
+        # this exact payload" bookkeeping by session, so the reference-instead-of-
+        # body shortcut can only fire against results this conversation actually
+        # saw — never against a previous run's (ccr.begin_session).
+        try:
+            from . import ccr as _ccr
+            _ccr.begin_session()
+        except Exception:
+            pass
         # Last JSON-RPC response built by handle_request (in-process read-back
         # hook; the response is still delivered via _send_response as before).
         self._last_response: dict | None = None
@@ -1009,9 +1018,10 @@ class MCPServerBridge:
         The compressed payload is the summary; the *original* goes to the CCR
         store and its handle rides along in a one-line notice, so a model that
         needs a dropped detail can call ``mcptoon_retrieve`` instead of being
-        stuck. Anything that cannot be stored or was not shrunk is returned
-        untouched — compression must never cost a caller information it cannot
-        get back.
+        stuck. A result that was not shrunk is returned untouched. A result that
+        *was* shrunk but could not be stored still comes back compressed — with a
+        notice that says so — because the one thing this path must never produce
+        is a trimmed view with no way back and no explanation.
         """
         try:
             from . import compressor as _compressor
@@ -1440,6 +1450,19 @@ class MCPHTTPHandler(BaseHTTPRequestHandler):
         # Use thread-local capture buffer (concurrency-safe)
         buf = io.StringIO()
         _response_capture.buf = buf
+        # Scope CCR de-duplication to this agent. One HTTP process serves several
+        # agents concurrently, so a shared "already sent" set would tell one agent
+        # it had already seen another's payload — a wrong answer that looks like a
+        # saving. The MCP Streamable HTTP session header names the conversation;
+        # without it, de-duplication is switched off for this call rather than
+        # guessed at. (begin_session is thread-local, so parallel requests cannot
+        # stomp each other; see ccr.begin_session.)
+        try:
+            from . import ccr as _ccr
+            sid = (self.headers.get("Mcp-Session-Id") or "").strip()
+            _ccr.begin_session(sid or None, dedup=bool(sid))
+        except Exception:
+            pass
         try:
             bridge._handle_request(request)
         except Exception as e:

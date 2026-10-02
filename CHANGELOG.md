@@ -5,6 +5,60 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.9] - 2026-10-02
+
+### Added
+
+- **A result this session already sent is not sent a second time.** The CCR handle is
+  a hash of the payload, so "have I already given the model this exact thing?" is a set
+  lookup — and the answer was always *no*, because nobody asked. Now the second send is
+  a one-line reference that still carries the handle, so a model that needs the original
+  can still fetch it, and one that already has it does not pay again. Measured on a
+  60-row search result (14,980-byte payload, `cl100k_base`): first send 286 tokens,
+  second send **50 tokens** — the body was 1,420 characters, the reference 167. The
+  saving is per repeat, not per call: it is zero for a payload that never repeats. Scoped
+  to one conversation on purpose — a fresh session saying "same as before" would point at
+  something the model never saw. `serve` scopes it per bridge (stdio = one process, one
+  conversation) and `serve --listen` scopes it per request from the `Mcp-Session-Id`
+  header, keeping the active session thread-local so two concurrent agents cannot
+  overwrite each other. **A request with no session header gets de-duplication switched
+  off**, because that process may be serving several agents at once and telling one of
+  them it already saw another's payload would be a wrong answer dressed up as a saving.
+  A one-shot CLI run never de-duplicates at all: it has no earlier turn to compare with.
+
+### Changed
+
+- **Stored originals no longer expire on a timer — eviction is the only way they go.**
+  The default TTL was 300 seconds and `retrieve` *unlinked the file* on read, so five
+  minutes after a tool call the dropped detail was gone permanently: the compressed view
+  said "-52 items · 8 strings cut" and the handle behind it was dead. The store is now
+  bounded by bytes instead (`MCPTOON_CCR_MAX_BYTES`, default 200 MB, evicted
+  oldest-first). `MCPTOON_CCR_TTL` still works for operators who would rather trade
+  losslessness for disk; **an explicit `ttl=0` now means "never expires"**, which is the
+  opposite of what it meant before.
+
+### Fixed
+
+- **A payload over 1 MB was compressed with no way back.** `_MAX_ENTRY_BYTES` refused it,
+  and the notice appended a retrieve hint *only when a handle existed* — so a
+  1,416,690-byte result compressed to 218 tokens and the model was told its data had been
+  cut with nowhere to go, and nothing distinguished that from a bug. Anything that fits
+  the store budget is now stored; anything that cannot be is refused **and said out
+  loud** ("original not stored — this view is all there is"), with the reason attached.
+  A compressed view with neither a handle nor that admission is now a test failure.
+- **`mcptoon_retrieve` could not say why it failed.** Four unrelated situations — a
+  mistyped handle, an entry that was never written, one evicted under the budget, one
+  past its TTL — all answered `found: false` with the same sentence, so a model could not
+  tell "retype it" from "that data is gone" and would retry the same typo. Each now
+  reports a `status` from a closed set (`ok` / `bad-handle` / `never-stored` / `expired`
+  / `unreadable`) with a sentence that changes what to do next.
+
+  Both halves are pinned by `tests/test_ccr_lossless.py`, which walks the four boundaries
+  (just stored, past the TTL, over 1 MB, after eviction) and asserts the rule that makes
+  the word "lossless" mean something: for every piece of information withheld from the
+  model, either the handle returns it byte-identical, or the notice says there is nothing
+  to return.
+
 ## [0.8.8] - 2026-10-02
 
 ### Fixed

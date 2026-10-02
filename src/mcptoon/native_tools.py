@@ -796,22 +796,45 @@ def _retrieve(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform s
     The write half lives in ``serve._smart_compress``: it stores the untruncated
     result and puts the handle in a notice line. This handler is the model's way
     back to that original, which is what makes compression reversible rather
-    than a dead end. Unknown or expired handles answer ``found: false`` — not an
-    error, because "that summary is all there is now" is a valid outcome.
+    than a dead end.
+
+    Unknown handles answer ``found: false`` — not an error, because "that summary
+    is all there is now" is a valid outcome. But the *reason* is reported, from a
+    closed set: ``bad-handle`` (you mistyped it) and ``never-stored`` (it was
+    evicted, or never written) call for different next moves, and collapsing all
+    of them into one empty answer is how a model ends up retrying the same typo
+    forever.
     """
     handle = _as_str(arguments.get("handle"))
     if not handle:
-        return {"found": False, "handle": "", "notice": "Pass the handle from a "
-                "result's 'mcptoon_retrieve handle=...' line."}
+        return {"found": False, "status": "bad-handle", "handle": "",
+                "notice": "Pass the handle from a result's "
+                "'mcptoon_retrieve handle=...' line."}
     from . import ccr as _ccr
     try:
-        original = _ccr.retrieve(handle)
+        status, original = _ccr.retrieve_status(handle)
     except Exception:  # pragma: no cover - defensive
-        original = None
-    if original is None:
-        return {"found": False, "handle": handle, "notice": "No stored result for "
-                "that handle (expired, or the result was never compressed)."}
-    return {"found": True, "handle": handle, "original": original}
+        status, original = "unreadable", None
+    if status == "ok":
+        return {"found": True, "status": status, "handle": handle,
+                "original": original}
+    return {"found": False, "status": status, "handle": handle,
+            "notice": _RETRIEVE_NOTICES.get(status, _RETRIEVE_NOTICES["unreadable"])}
+
+
+# One sentence per status, because the status is only useful if it changes what
+# the model does next: retype it, fetch it again, or stop asking.
+_RETRIEVE_NOTICES = {
+    "bad-handle": "That handle is not a handle (they are 12 lowercase hex "
+                  "characters, copied from a 'mcptoon_retrieve handle=...' line).",
+    "never-stored": "No stored result for that handle. Either it was never "
+                    "compressed, or the store evicted it to stay under its size "
+                    "budget — call the tool again to regenerate it.",
+    "expired": "That stored result expired and was deleted. Set "
+               "MCPTOON_CCR_TTL=0 (or unset it) to keep originals indefinitely.",
+    "unreadable": "The stored entry exists but could not be read (damaged or "
+                  "unreadable file). Call the tool again to regenerate it.",
+}
 
 
 _HANDLERS = {

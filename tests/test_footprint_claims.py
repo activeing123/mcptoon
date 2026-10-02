@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB", "307KB", "308KB", "322KB")
+              "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -135,7 +135,15 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # them, and the LF build now measures 335,476 bytes = 327.61 KB — past the 327 line
 # by ~630 bytes, well outside the ±100-byte noise. 322KB is retired; CHANGELOG.md
 # keeps saying 322KB, because that is what 0.8.7 shipped.
-WHEEL_KB = "327KB"
+# 2026-10-02 (0.8.9 lossless sweep): 327KB → 334KB. Two behaviours changed shape and
+# both cost bytes: the CCR store now keeps an entry it used to refuse outright (a
+# payload over 1 MB was dropped *and* left the compressed view with no handle, so
+# "retrieve" was a dead end past that size), and a payload this conversation already
+# received is answered with a one-line reference instead of the body — including the
+# per-request session scoping that keeps concurrent HTTP agents apart. The LF build
+# measures 341,580 bytes = 333.57 KB — past the 334 line. 327KB is retired like every
+# value before it; CHANGELOG.md keeps saying 327KB for 0.8.8, because that shipped.
+WHEEL_KB = "334KB"
 
 
 def modules() -> list[Path]:

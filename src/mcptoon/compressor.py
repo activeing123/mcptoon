@@ -341,22 +341,47 @@ def compress(obj: Any, *, str_budget: int = DEFAULT_STR_BUDGET,
 def notice(stats: dict, handle: str | None = None) -> str:
     """The one-line signal appended to a compressed result.
 
-    It tells the model two things it cannot otherwise know: that the payload was
-    compressed, and how to get the untruncated original back. Without the second
-    half, a model that needs a dropped detail has no way to ask for it.
+    It tells the model three things it cannot otherwise know: that the payload was
+    compressed, how to get the untruncated original back, and — when there is no
+    way back — that the view it is reading is all there is. Without the last two,
+    a model either cannot ask for a dropped detail or does not know it must ask
+    for nothing, and both failures are silent.
     """
     if not stats.get("applied"):
         return ""
-    parts = [f"{stats['before_tokens']}\u2192{stats['after_tokens']} tok "
-             f"(\u2212{stats['pct']}%)"]
+    numbers = (f"{stats['before_tokens']}\u2192{stats['after_tokens']} tok "
+               f"(\u2212{stats['pct']}%)")
+
+    if stats.get("deduped"):
+        # The body was withheld because this session already sent this exact
+        # payload. Say so, and keep the handle: the model may still need the
+        # original, and "identical to before" is not "you have seen everything".
+        parts = [f"identical to an earlier result in this session "
+                 f"\u2014 body not resent \u00b7 as first sent {numbers}"]
+        return "[mcptoon smart: " + " \u00b7 ".join(parts) + _tail(handle) + "]"
+
+    parts = [numbers]
     if stats.get("dropped_items"):
         parts.append(f"-{stats['dropped_items']} items")
     if stats.get("merged_lines"):
         parts.append(f"-{stats['merged_lines']} log lines")
     if stats.get("truncated_strings"):
         parts.append(f"{stats['truncated_strings']} strings cut")
-    tail = f" \u00b7 full text: mcptoon_retrieve handle={handle}" if handle else ""
-    return "[mcptoon smart: " + " \u00b7 ".join(parts) + tail + "]"
+    return "[mcptoon smart: " + " \u00b7 ".join(parts) + _tail(handle) + "]"
+
+
+def _tail(handle: str | None) -> str:
+    """The retrieve half of a notice line, or an honest admission that there is none.
+
+    A compressed result with neither a handle nor an explanation is the one
+    outcome the lossless contract forbids: the model is told its data was cut and
+    given no way to get it back, with nothing to distinguish that from a bug. So
+    a missing handle is always spelled out, with the reason the store gave.
+    """
+    if handle:
+        return f" \u00b7 full text: mcptoon_retrieve handle={handle}"
+    return (" \u00b7 original not stored \u2014 this view is all there is "
+            "(nothing to retrieve)")
 
 
 def compress_with_ccr(obj: Any, *, server: str, tool: str,
@@ -369,17 +394,45 @@ def compress_with_ccr(obj: Any, *, server: str, tool: str,
     get a compressed JSON text carrying a retrieve handle. Returns
     ``(text, stats)``; ``text`` is None when nothing was compressed, which tells
     the caller to pass the result through untouched.
+
+    Two things happen before the body is rendered, and both exist to keep the
+    saving honest:
+
+    * **The original is stored first**, and if it cannot be, the notice says so
+      rather than leaving the model with a trimmed view and no handle (see
+      :func:`mcptoon.ccr.store_ex`).
+    * **A payload this session already sent is not sent again.** The handle is
+      content-addressed, so "have I sent this exact thing?" is a set lookup. When
+      it hits, the body is replaced by a reference line *that still carries the
+      handle* — the model can tell it has seen this, and can still fetch the
+      original. De-duplication is scoped to one session on purpose: a fresh
+      session saying "same as before" would point at something the model never
+      saw.
     """
     crushed, stats = compress(obj, str_budget=str_budget, keep_head=keep_head)
     if not stats.get("applied"):
         return None, stats
     _mark_applied()
+
     handle = None
     try:
         from . import ccr as _ccr
-        handle = _ccr.store(obj, server=server, tool=tool)
+        outcome = _ccr.store_ex(obj, server=server, tool=tool)
+        handle = outcome.handle
+        stats["store_reason"] = outcome.reason
+        stats["original_bytes"] = outcome.bytes
+        if handle and _ccr.was_sent(handle):
+            stats["deduped"] = True
+            _ccr.note_deduped()
+            return notice(stats, handle), stats
+        if handle:
+            _ccr.mark_sent(handle)
     except Exception:
+        # A broken store must not fail the call, but it must also not pretend the
+        # original is retrievable — leaving handle as None does exactly that.
+        stats["store_reason"] = "store-error"
         handle = None
+
     text = json.dumps(crushed, ensure_ascii=False, separators=(",", ":"))
     line = notice(stats, handle)
     if line:
