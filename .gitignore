@@ -106,3 +106,6 @@ local/
 
 # Preview artifacts
 readme_preview.html
+
+# 2026-10-02: 手工改 YAML 时留下的备份，别再被 git add -A 卷进去
+SKILL.md.bak-*
