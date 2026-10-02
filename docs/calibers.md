@@ -124,13 +124,17 @@ smaller one, and a live call counter that moves.** That is the intended state.
 | `stats` | 89.1% gateway, 24.3% slim, per-server "slim only" | #1 + #2 | ✅ fixed 2026-09-26 |
 | skills claims | "926,232 tokens → 39 + 501" | skills-only | ✅ separate feature, separately measured |
 
-**The one open item.** README line 11 still says "saves 99.2% of tokens" in the
-hero sentence with no qualifier. Everything under it now explains that 99.2% is a
-synthetic sample, but a reader who stops at line 11 takes away 99.2% as *their*
-number. Recommendation: either qualify the sentence inline ("up to 99.2% on a
-255-tool sample; `mcptoon status` shows yours") or lead with the live caliber.
-Not changed here because line 11 is a headline decision for the maintainer, not a
-mechanical fix.
+**✅ Closed 2026-10-02.** README line 11 used to say "saves 99.2% of tokens" in the hero
+sentence with no qualifier, so a reader who stopped there took 99.2% away as *their*
+number. Both language versions now read:
+
+> ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number)
+
+That is the "qualify inline" option, and it also fixed a worse defect: the old sentence
+said **99.2%** while the same paragraph's neighbours said **~90%**, so the hero disagreed
+with itself. The live caliber (~90%, the slim gateway) now leads and the synthetic
+sample is the qualifier, which is the same shape the rest of this document uses.
+Changed in the 0.8.7 cycle, so it is in the shipped README on PyPI from 0.8.7 on.
 
 ---
 
