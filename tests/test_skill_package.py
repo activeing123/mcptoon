@@ -80,10 +80,35 @@ class TestThreeCopiesAgree:
             )
 
     def test_packaged_path_resolves_to_the_copy_on_disk(self):
-        """`install_self` copies from this path, so it must be the real one."""
+        """`install_self` copies from this path, so it must be the real one.
+
+        Two environments, one invariant.
+
+        In a **source checkout** the packaged copy *is* the file under `src/`, so the
+        two paths must be identical. In an **installed** package they are two
+        different directories and can never be equal — a wheel puts one in
+        `site-packages`, and Nix puts the package in `/nix/store` while the source
+        sits in `/nix/var/nix/builds`. Asserting directory identity there asserts
+        something false about a perfectly correct install.
+
+        That is not hypothetical: it failed `nix-build` on all three platforms for
+        0.8.7 (1 failed, 1739 passed), which blocked the numtide channel — the bump
+        PR sat with `mergeable_state=blocked` while every other check was green.
+        Locally and in CI it passed because both paths resolve to the same checkout.
+
+        What must hold in *both* environments: the path exists, and it is the same
+        **content** as the canonical copy. Byte identity is what `install_self`
+        actually depends on; directory identity is an accident of how the tests
+        happen to be invoked.
+        """
         resolved = skills.packaged_skill_path()
         assert resolved.is_file(), resolved
-        assert resolved.resolve() == COPIES["packaged"].resolve()
+        if resolved.resolve() == COPIES["packaged"].resolve():
+            return                      # source checkout — identity is expected
+        assert resolved.read_bytes() == COPIES["packaged"].read_bytes(), (
+            f"the installed skill at {resolved} differs from the source-tree copy at "
+            f"{COPIES['packaged']} — `install_self` would hand agents a different file"
+        )
 
     def test_the_skill_ships_in_the_wheel(self):
         """A file on disk is not a file a `pip install` gets.
