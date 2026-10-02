@@ -5,6 +5,79 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.11] - 2026-10-02
+
+### Fixed
+
+- **A base64 blob inside a container was sliced in half.** `compressor.py` states, in its own
+  comment, that a truncated base64 blob is not "smaller context" but a corrupted image the
+  model can no longer reason about — and invariant 5 promises such payloads are never
+  compressed. The guard that enforced that promise lived in `is_compressible`, which inspects
+  only the **top-level** type, so a blob sitting inside a list of records never reached it.
+  Measured: `[{"id": i, "image": <400-char blob>}]` came back with the blob cut to **121
+  characters** ending in an ellipsis, and decoding it yields garbage. Same for a nested array,
+  for a `data:` URI inside a record, and for a blob among eight dictionary keys. The check now
+  runs per string at every depth.
+- **The binary alphabet contained every space, so punctuation-free prose was exempt from
+  compression.** `_BASE64_RE` allowed all whitespace, and its comment claimed "prose/JSON does
+  not match the alphabet above in the first place" — false, because the alphabet holds every
+  letter, every digit and (then) every space. A 400-character run of text with no punctuation
+  was classified as binary and silently skipped. Spaces and tabs are now evidence *against* a
+  blob while `\r\n` still counts for MIME-wrapped base64. The length floor also moves from 256
+  to 64 characters, because the check now runs per string, where the strings that matter live:
+  at a 120-character budget a 121..255-character blob was still being sliced. Known gap,
+  stated rather than hidden: base64url tokens containing `-` or `_`, and JWTs (which contain
+  `.`), do not match the alphabet and can still be cut.
+- **`compress()` could return an edited object while reporting `applied: False`.** A payload
+  can be *changed* without getting smaller: a 121-character string becomes 120 characters plus
+  the ellipsis — same length, same token count, different bytes. Any caller treating the flag
+  as "nothing happened" was handed modified data with no notice, and one caller did exactly
+  that. `applied: False` now means the returned object **is** the input, untouched, with the
+  counters zeroed so the stats cannot describe cuts that were not made.
+- **`output.render(fmt="smart")` dropped data silently.** It rendered the crushed payload while
+  discarding `compress()`'s stats entirely (`crushed, _stats = ...`), so not even the fact that
+  something had been cut left a mark: 50 records became 8, a 300-character description became
+  121 characters, and the output carried neither a retrieve handle nor any statement that the
+  rest was gone. It also rendered the crushed form when compression had not helped at all. This
+  formatter has no `server:tool` to key a handle on, so it cannot offer a way back — which makes
+  the notice mandatory, not optional. It now appends the same "original not stored — this view
+  is all there is" line that `compress_with_ccr` appends when its store refuses, and returns the
+  original untouched when nothing was applied. Reachability, stated plainly: the default format
+  is `json`, and both the CLI and the MCP bridge route `smart` through `compress_with_ccr`, so
+  this was a defective public entry point rather than a live path users were hitting.
+- **A property defined by `anyOf` / `oneOf` collapsed to `{}`.** That is JSON Schema for "any
+  value" — the least informative thing `schema_simplifier.py` can emit, for a property that is
+  frequently *required*. The remove list at the top of the module never said combinators
+  vanish; the code simply had no branch for them. Branch types are now kept (a union is written
+  as the JSON Schema array form) and object structure inside an alternative survives, so
+  `{"anyOf": [{"type": "string"}, {"type": "number"}]}` reads as `string | number` instead of
+  nothing. A branch's `required` is copied for `allOf` (a conjunction, where it really is
+  mandatory) but deliberately **not** for `anyOf` / `oneOf`, where it belongs to one
+  alternative — telling an agent a parameter is mandatory when the schema does not say so is
+  worse than saying nothing.
+
+### Changed
+
+- Two docstrings claimed more than the code does, and both now state their real caliber.
+  `compressor.py`'s "the output is always JSON-serialisable" is true of `json.dumps`, which
+  emits `NaN` and `Infinity` as bare tokens that JavaScript's `JSON.parse` rejects; they are
+  left alone on purpose, because rewriting them as `null` would destroy a value.
+  `schema_simplifier.py`'s "the result is always a prefix of the original" was false for
+  multi-line descriptions: sentences are re-joined with single spaces and a leading markdown
+  marker is stripped, so the words and their order survive but the whitespace between them does
+  not. The property that actually matters — no sentence is skipped over to grab a shorter later
+  one — holds and is now pinned by a test.
+- `output.render(fmt="smart")` output is now the JSON body plus a trailing notice line, matching
+  `compress_with_ccr`. A caller parsing it must read line 0, as the smart-format tests already did.
+
+### Tests
+
+- The suite grows by the property tests that pin the six behaviours above: base64 intact at four
+  container depths, the 121..255 band, prose-without-punctuation still compressed, wrapped base64
+  still detected, `applied: False` returning the identical object with zeroed counters, the
+  non-finite-number limit, a 22-shape description corpus checked against both budgets, the
+  no-skipped-sentence property, six combinator shapes, and the retirement of the 334KB claim.
+
 ## [0.8.10] - 2026-10-02
 
 ### Fixed

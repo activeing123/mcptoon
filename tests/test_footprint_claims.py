@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB")
+              "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -146,7 +146,12 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # 2026-10-02 (0.8.10): 342,209 bytes = 334.19 KB — same claim, 629 bytes further
 # from the boundary. The 0.8.10 fixes add one eviction guard and a size accounting
 # correction, so the wheel grew without crossing a KB line.
-WHEEL_KB = "334KB"
+# 2026-10-02 (0.8.11): 345,068 bytes = 336.98 KB — past the 337 line, so the
+# claim moves and 334KB retires. The adversarial pass over compressor.py and
+# schema_simplifier.py added the per-string binary guard, the "applied False
+# means untouched" contract, the render(fmt='smart') admission, the combinator
+# preservation and the tests pinning each one.
+WHEEL_KB = "337KB"
 
 
 def modules() -> list[Path]:
