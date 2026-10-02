@@ -88,6 +88,7 @@ class _IsolatedHome(unittest.TestCase):
             "MCPTOON_FOOTER_STATE_FILE": str(self.home / "footer-state.json"),
             "MCPTOON_TOGGLE_FILE": str(self.home / "toggles.json"),
             "MCPTOON_COMPRESSION_FILE": str(self.home / "compression.json"),
+            "MCPTOON_INSTALLED_FILE": str(self.home / "pro_installed.json"),
             "MCPTOON_CACHE_DIR": str(self.cache),
         })
         self._env.start()
@@ -395,6 +396,36 @@ class TestUninstallCommand(_IsolatedHome):
         self.assertIn("Refusing to delete", out)
         written = json.loads(target.read_text(encoding="utf-8"))
         self.assertIn(SELF_SERVER_NAME, written["mcpServers"], "nothing removed without --yes")
+
+    def test_the_installed_registry_is_in_state_paths(self):
+        """`~/.mcp-cli/pro_installed.json` is state mcptoon created, so uninstall
+        must know about it. It was absent from `state_paths()`, so a full cleanup
+        left the registry behind (2026-10-02)."""
+        paths = cfg.state_paths()
+        names = [Path(p).name for p in paths["bookkeeping"]]
+        self.assertIn("pro_installed.json", names)
+
+    def test_uninstall_counts_only_files_it_actually_deleted(self):
+        """The unlink loop swallowed OSError, so a file that could not be removed
+        was still counted in "Deleted ... N file(s)"."""
+        target = self._cursor({SELF_SERVER_NAME: {}})
+        # Two bookkeeping files that exist; force the second to refuse deletion.
+        stuck = self.home / "footer-state.json"
+        stuck.write_text("{}", encoding="utf-8")
+        real_unlink = Path.unlink
+
+        def fake_unlink(self, *a, **k):
+            if self.name == "footer-state.json":
+                raise OSError("locked")
+            return real_unlink(self, *a, **k)
+
+        with contextlib.ExitStack() as stack:
+            for p in self._patch_all_agents(target):
+                stack.enter_context(p)
+            stack.enter_context(patch.object(Path, "unlink", fake_unlink))
+            out = _run_main(["uninstall", "--yes"])
+        self.assertIn("Could not delete", out)
+        self.assertTrue(stuck.exists())
 
 
 # ─── status: one caliber ───

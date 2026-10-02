@@ -82,19 +82,35 @@ def state_paths() -> dict:
     Split into three groups because `mcptoon uninstall` treats them differently:
 
       - ``bookkeeping`` — mcptoon's own state (settings, first-run marker,
-        toggles, compression policy). Safe to delete; deleting it is what
-        "uninstall" means.
+        toggles, compression policy, the installed-server registry). Safe to
+        delete; deleting it is what "uninstall" means.
       - ``servers``     — the MCP server definitions the *user* configured.
         Preserved by default: silently deleting someone's server list while
         claiming to clean up would be the worst kind of surprise.
       - ``cache``       — regenerable (manifest + usage). Always safe to delete.
+
+    The installed-server registry (`~/.mcp-cli/pro_installed.json`) is in
+    ``bookkeeping`` as of 2026-10-02: it was absent, so `mcptoon uninstall` left
+    it behind even though it is state mcptoon created.
     """
     return {
         "bookkeeping": [_settings_file(), _welcome_file(), _footer_state_file(),
-                        _selfheal_file(), _toggle_file(), _policy_file()],
+                        _selfheal_file(), _toggle_file(), _policy_file(),
+                        _installed_registry_file()],
         "servers": [_config_file(), _config_file_toml()],
         "cache": [_cache_dir()],
     }
+
+
+def _installed_registry_file() -> Path:
+    """`~/.mcp-cli/pro_installed.json` — mcptoon's registry of installed servers.
+
+    Resolved at call time from the same env var `installer` reads, so a test or a
+    redirected home names one path, not two.
+    """
+    return Path(os.environ.get(
+        "MCPTOON_INSTALLED_FILE",
+        os.path.expanduser("~/.mcp-cli/pro_installed.json")))
 
 # Gateway preferences that are not per-server (footer on/off, ...). Kept apart
 # from config.json so a settings write can never corrupt a server definition.
@@ -882,6 +898,21 @@ def init_sample_config():
         save_config(SAMPLE_CONFIG["servers"])
         return True
     return False
+
+
+def has_config_file() -> bool:
+    """True when a config exists in **either** supported format.
+
+    `load_config()` reads both `config.toml` and `config.json` (and the
+    `config.local.*` overlays), but callers kept gating on `CONFIG_FILE.exists()`
+    — the JSON path alone. On a machine whose servers live in `config.toml` that
+    made `quickstart` / `init --auto` take the "no config yet" branch and call
+    `save_config()`, which sees the TOML file and rewrites it with *only* the new
+    servers: the user's whole list was deleted, with no `.bak` (reproduced
+    2026-10-02). `doctor` was wrong the other way, reporting "No config found" on
+    a machine that had one. Use this instead of `CONFIG_FILE.exists()`.
+    """
+    return _config_file().exists() or _config_file_toml().exists()
 
 
 # ═══════════════════════════════════════════════════════════════

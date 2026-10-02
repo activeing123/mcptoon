@@ -195,6 +195,12 @@ class MCPServerBridge:
         self._output_format = output_format
         self._pool: MCPClientPool | None = None
         self._servers: dict = {}
+        # Servers whose last fetch *failed* (as opposed to answered with no tools).
+        # `_handle_health` needs this distinction: it used to infer "failed" from
+        # "absent from `_tool_index`", which is also true of a healthy server that
+        # exposes zero tools — so one alive-but-empty server made /health report
+        # `status: "error"` (reproduced 2026-10-02).
+        self._server_fetch_errors: dict[str, str] = {}
         # tool_index: namespaced_name → {server, tool, full_schema, full_def}
         self._tool_index: dict[str, dict] = {}
         self._tool_index_lock = threading.RLock()
@@ -295,9 +301,13 @@ class MCPServerBridge:
                              f"({len(tools)} tools) - index updated")
                 except Exception:
                     pass
+                with self._tool_index_lock:
+                    self._server_fetch_errors.pop(srv, None)
                 return srv, tools
             except Exception as e:
                 _log(f"  [{srv}] fetch failed: {e}")
+                with self._tool_index_lock:
+                    self._server_fetch_errors[srv] = str(e)[:200]
                 return srv, []
 
         with concurrent.futures.ThreadPoolExecutor(
@@ -559,24 +569,28 @@ class MCPServerBridge:
             }
         total_tools = len(self._tool_index)
         total_servers = len(self._servers)
-        # Check if any servers failed to load
-        failed = sum(1 for s in self._servers if s not in {
-            v.get("server") for v in self._tool_index.values()
-        })
+        # "Failed" means the fetch raised, tracked in `_server_fetch_errors` — not
+        # merely "absent from `_tool_index`", which is also true of a server that
+        # connects and legitimately exposes no tools. Inferring failure from the
+        # index made one alive-but-empty server report `status: "error"`.
+        failed = len(self._server_fetch_errors)
         if failed > 0 and failed == total_servers:
             status = "error"
         elif failed > 0:
             status = "degraded"
         else:
             status = "ok"
-        return {
+        payload = {
             "status": status,
             "version": __version__,
             "servers": total_servers,
             "tools": total_tools,
-            "failed_servers": failed if failed > 0 else 0,
+            "failed_servers": failed,
             "uptime": time.time() - getattr(self, "_start_time", time.time()),
         }
+        if failed:
+            payload["errors"] = dict(self._server_fetch_errors)
+        return payload
 
     # ═══════════════════════════════════════════════════
     # Plugin skills as MCP prompts (v0.7.2)

@@ -57,7 +57,12 @@ class _Log:
 log = _Log()
 
 # ─── Installed MCP servers config file ───
-_INSTALLED_FILE = os.path.expanduser("~/.mcp-cli/pro_installed.json")
+# Overridable so tests (and `mcptoon uninstall`, which must be able to name this
+# path) can redirect it without touching a real home. `config.state_paths()`
+# resolves the same variable, which is what lets `uninstall` clean it up — the
+# registry used to be invisible to uninstall and survived a full cleanup.
+_INSTALLED_FILE = os.environ.get(
+    "MCPTOON_INSTALLED_FILE", os.path.expanduser("~/.mcp-cli/pro_installed.json"))
 
 
 def _load_installed():
@@ -771,7 +776,13 @@ def list_installed():
 
 
 def remove_installed(server_name):
-    """Remove an installed MCP server."""
+    """Remove an installed MCP server.
+
+    Returns ``status: "removed"`` when the registry entry was dropped, and
+    ``handler_removed`` says whether a generated handler file was actually
+    deleted — the two are independent (most registry entries have no handler
+    file), so the caller can report the truth instead of assuming both.
+    """
     installed = _load_installed()
     if server_name not in installed:
         return make_error("NOT_FOUND", f"Server '{server_name}' not installed", "installer")
@@ -779,14 +790,17 @@ def remove_installed(server_name):
     # Delete handler file
     safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
     handler_file = os.path.join(os.path.dirname(__file__), "handlers", f"{safe_name}.py")
+    handler_removed = False
     if os.path.exists(handler_file):
         os.remove(handler_file)
+        handler_removed = True
 
     # Remove from installed.json
     del installed[server_name]
     _save_installed(installed)
 
-    return {"status": "removed", "server": server_name}
+    return {"status": "removed", "server": server_name,
+            "handler_removed": handler_removed}
 
 
 def _now_iso():

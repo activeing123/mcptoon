@@ -680,8 +680,15 @@ def _cmd_inspect(rest, fmt, max_chars, full):
             print(f"Tool not found: {server}:{tool}")
             # Show all tools for this server
             tools = manifest_mod.get_server_tools(server)
-            if tools:
-                print(f"Available tools: {' '.join(t.get('name','?') for t in tools)}")
+            # `get_server_tools` returns an error entry (not `[]`) when the server
+            # never answered; name that instead of printing a bare "?" for it.
+            errs = [t for t in tools if isinstance(t, dict) and "error" in t]
+            names = [t.get("name", "?") for t in tools
+                     if isinstance(t, dict) and "error" not in t]
+            if names:
+                print(f"Available tools: {' '.join(names)}")
+            elif errs:
+                print(f"Could not reach {server}: {str(errs[0].get('error', ''))[:120]}")
         sys.exit(1)
 
     print(output.render(info, fmt=fmt if fmt != "auto" else "json", max_chars=max_chars, full=full))
@@ -1087,10 +1094,35 @@ def _cmd_quickstart(rest, fmt="auto"):
             http_config = disc.make_http_config(http_url)
             result.servers["http-endpoint"] = http_config
             result.sources["http-endpoint"] = ["manual"]
-            tool_count = probe_info.get("tools_count", 0)
-            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+            # `tools_count` is None when `tools/list` could not be read (see
+            # `probe_http_endpoint`); "0 tools" would be a different, wrong claim.
+            if probe_info.get("tools_known", True):
+                tool_count = probe_info.get("tools_count") or 0
+                result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+            else:
+                result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} (reachable; tool list unreadable)"
+        else:
+            print(f"  ! {http_url} did not answer an MCP initialize — skipping it.")
 
     if result.count == 0:
+        # Discovery reads *other* agents' configs (Claude Desktop, Cursor, env, …),
+        # never mcptoon's own. So a second `quickstart` on a machine that already
+        # manages servers found nothing new and said "No MCP servers found on this
+        # machine" — while `mcptoon list` printed them (reproduced 2026-10-02). Say
+        # what is true: you already have servers, here is where to see them.
+        already = cfg.list_servers()
+        if already:
+            n = len(already)
+            print(f"  Nothing new to discover — you already have {n} "
+                  f"server{'s' if n != 1 else ''} configured.")
+            print("")
+            print("  See them:      mcptoon list")
+            print("  Their cost:    mcptoon status")
+            print("  Push to agents: mcptoon sync --self")
+            print("")
+            print("  Add another:   mcptoon add <name> --stdio npx -y <package>")
+            print("                 mcptoon install --search <query>   # search 17,000+")
+            return
         print("  No MCP servers found on this machine.")
         print("")
         print("  Don't worry — here's how to get started:")
@@ -1118,7 +1150,11 @@ def _cmd_quickstart(rest, fmt="auto"):
 
     # Step 2: Write config (unless dry)
     if not is_dry:
-        if cfg.CONFIG_FILE.exists():
+        # Gate on EITHER config format. `cfg.CONFIG_FILE.exists()` saw only JSON,
+        # so a user whose servers lived in `config.toml` fell into the else branch
+        # below and `save_config` rewrote the TOML file with just the discovered
+        # servers — silently deleting their list (2026-10-02).
+        if cfg.has_config_file():
             added, skipped, _ = cfg.merge_servers(result.servers, overwrite=False)
             if added > 0:
                 print(f"  ✓ {added} new server(s) added to config")
@@ -1213,6 +1249,7 @@ def _cmd_quickstart(rest, fmt="auto"):
 
     # Step 5: The "aha moment" — show slim manifest
     tool_count = None
+    unreachable = 0
     if not is_dry:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("  Your tools (names only \u2014 the default manifest tier):")
@@ -1220,6 +1257,7 @@ def _cmd_quickstart(rest, fmt="auto"):
         try:
             manifest = manifest_mod.get_manifest(use_cache=False)
             tool_count = _manifest_tool_count(manifest)
+            unreachable = _manifest_unreachable_count(manifest)
             slim_output = manifest_mod.format_manifest(manifest, full=False)
             if slim_output.strip():
                 print(slim_output)
@@ -1231,7 +1269,7 @@ def _cmd_quickstart(rest, fmt="auto"):
 
     print("")
     if not is_dry:
-        _quickstart_celebration(tool_count, result.count)
+        _quickstart_celebration(tool_count, result.count, unreachable)
         # The one moment the token tradeoff is legible: the servers were just
         # registered, the user can still say no for free, and the warning is about
         # a number they care about. Off for --dry, machine formats and --no-self.
@@ -1281,19 +1319,45 @@ def _manifest_tool_count(manifest) -> int:
     return 0
 
 
-def _quickstart_celebration(tool_count, server_count):
+def _manifest_unreachable_count(manifest) -> int:
+    """Servers in a `get_manifest()` result that never answered.
+
+    A server that could not be started caches a single ``{"error": ...}`` entry
+    (see `_manifest_tool_count`). Reproduced 2026-10-02 on a simulated clean box
+    with one working server and one whose binary is absent: the celebration said
+    **"11 tools ready across 2 servers"** when one of those two servers was dead.
+    The tool count was already honest (errors are skipped); the *server* count was
+    not. This is what lets the payoff line tell the truth.
+    """
+    if not isinstance(manifest, dict):
+        return 0
+    dead = 0
+    for value in manifest.values():
+        if not isinstance(value, list) or not value:
+            continue
+        if all(isinstance(t, dict) and "error" in t for t in value):
+            dead += 1
+    return dead
+
+
+def _quickstart_celebration(tool_count, server_count, unreachable=0):
     """A1: the payoff block after a successful quickstart.
 
     Zero-config feel: big number, one-line status, one clear next action.
+    ``unreachable`` is how many of ``server_count`` never started; when any did,
+    the line names it instead of implying every server is usable (2026-10-02).
     """
     line = "━" * 54
+    ready = max(0, server_count - unreachable)
+    tail = f" ({unreachable} could not start)" if unreachable else ""
+    noun = "server" if ready == 1 else "servers"
     if tool_count:
         print(line)
-        print(f"  🎉  {tool_count} tools ready across {server_count} servers!")
+        print(f"  🎉  {tool_count} tools ready across {ready} {noun}{tail}!")
         print(line)
     else:
         print(line)
-        print(f"  🎉  {server_count} MCP servers configured — you're set!")
+        print(f"  🎉  {ready} MCP {noun} configured — you're set{tail}!")
         print(line)
     print("")
     print("  Now you can:")
@@ -1430,9 +1494,17 @@ def _cmd_health_check(rest, fmt):
 
         try:
             tools = manifest_mod.get_server_tools(name, use_cache=True)
-            tool_count = len(tools)
-            if tool_count == 0:
-                status = "no-tools"
+            errs = [t for t in tools if isinstance(t, dict) and "error" in t]
+            if errs:
+                # `get_server_tools` returns an error entry, not `[]`, when the
+                # server never answered (2026-10-02) — so a failure is reported as
+                # one here instead of reading as "answered, but exposes nothing".
+                status = "error"
+                error_msg = str(errs[0].get("error", ""))[:80]
+            else:
+                tool_count = len(tools)
+                if tool_count == 0:
+                    status = "no-tools"
         except Exception as e:
             status = "error"
             error_msg = str(e)[:80]
@@ -1510,10 +1582,19 @@ def _cmd_init(rest, fmt="auto"):
             http_config = disc.make_http_config(http_url)
             result.servers["http-endpoint"] = http_config
             result.sources["http-endpoint"] = ["manual"]
-            tool_count = probe_info.get("tools_count", 0)
-            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
-            print(f"  [Manual] http-endpoint: {http_url} ({tool_count} tools)")
+            if probe_info.get("tools_known", True):
+                tool_count = probe_info.get("tools_count") or 0
+                result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+                print(f"  [Manual] http-endpoint: {http_url} ({tool_count} tools)")
+            else:
+                # Reachable, but its tool list could not be read — "0 tools" would
+                # be a different (and wrong) claim (2026-10-02).
+                result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} (reachable; tool list unreadable)"
+                print(f"  [Manual] http-endpoint: {http_url} — reachable, tool list unreadable")
         else:
+            # The user named this URL explicitly, so it is added anyway — but say
+            # plainly that it did not answer, so the count is not mistaken for
+            # "one working endpoint".
             print(f"  [Manual] http-endpoint: {http_url} — NOT responding (added anyway)")
             result.servers["http-endpoint"] = disc.make_http_config(http_url)
             result.sources["http-endpoint"] = ["manual"]
@@ -1531,7 +1612,8 @@ def _cmd_init(rest, fmt="auto"):
         return
 
     # Write config
-    if cfg.CONFIG_FILE.exists() and not is_force:
+    # EITHER format counts as "a config exists" — see `config.has_config_file`.
+    if cfg.has_config_file() and not is_force:
         added, skipped, overwritten = cfg.merge_servers(result.servers, overwrite=False)
         print(f"Config updated: {cfg.CONFIG_FILE}")
         print(f"  +{added} new servers added")
@@ -1974,13 +2056,19 @@ def _cmd_off(rest, fmt):
 
     dry_run = "--dry" in rest or "--dry-run" in rest
     results = remove_gateway_from_all(dry_run=dry_run)
-    present = [r for r in results if r.get("removed")]
+    # `removed` means "the gateway entry was found", not "it is gone": a write that
+    # failed still reports removed=True with written=False (sync.py). Counting only
+    # `removed` made `off` print "Done: N agent(s) no longer see mcptoon" while the
+    # file still held the entry (reproduced 2026-10-02). A real removal needs both.
+    present = [r for r in results if r.get("removed") and (dry_run or r.get("written"))]
+    failed = [r for r in results if r.get("removed") and not dry_run and not r.get("written")]
 
     if fmt == "json":
         print(json.dumps({
             "dry_run": dry_run,
             "removed_from": [r.get("agent") for r in present],
             "count": len(present),
+            "failed": [{"agent": r.get("agent"), "error": r.get("error")} for r in failed],
         }, indent=2, ensure_ascii=False))
         return
 
@@ -1988,15 +2076,23 @@ def _cmd_off(rest, fmt):
     print(line)
     print("  mcptoon off" + ("  (DRY RUN — nothing written)" if dry_run else ""))
     print(line)
-    if not present:
+    if not present and not failed:
         print("  Gateway is not registered in any agent. Nothing to remove.")
     else:
         for r in present:
             verb = "would remove" if dry_run else "removed"
             print(f"  {'→' if dry_run else '✓'} {r.get('agent_name', r.get('agent')):25s} {verb} the gateway entry")
+        for r in failed:
+            print(f"  ✗ {r.get('agent_name', r.get('agent')):25s} could not be written — the gateway entry is STILL there")
+            if r.get("error"):
+                print(f"      {str(r['error'])[:100]}")
         print("")
         if dry_run:
             print(f"  Preview: {len(present)} agent(s) would lose the gateway entry.")
+        elif failed:
+            print(f"  Done: {len(present)} agent(s) no longer see mcptoon; "
+                  f"{len(failed)} could not be updated (see above).")
+            print("  Your servers are untouched.")
         else:
             print(f"  Done: {len(present)} agent(s) no longer see mcptoon. Your servers are untouched.")
             print("  Put the gateway back with: mcptoon sync --self")
@@ -2070,10 +2166,17 @@ def _cmd_restore(rest, fmt):
             return
         results = (restore_agent_from_backup(agent_id, dry_run=False)
                    if agent_id else restore_all_from_backup(dry_run=False))
-        present = [r for r in results if r.get("restored")]
+        # Same filter as the text branch below: `restored` alone means "there was
+        # something to undo", not "a file changed". A host with restored=True,
+        # written=False (e.g. "config unreadable; left unchanged") was counted by
+        # `--json` and omitted from "Done: N" by the plain form — two answers for
+        # one run (2026-10-02). Report the written ones and the failures.
+        present = [r for r in results if r.get("restored") and r.get("written")]
+        failed = [r for r in results if r.get("restored") and r.get("error")]
         print(json.dumps({
             "restored": [r.get("agent") for r in present],
             "count": len(present),
+            "failed": [{"agent": r.get("agent"), "error": r.get("error")} for r in failed],
         }, indent=2, ensure_ascii=False))
         return
 
@@ -2219,23 +2322,41 @@ def _cmd_uninstall(rest, fmt):
             return
 
     removed_agents = remove_gateway_from_all(dry_run=False)
-    n_agents = sum(1 for r in removed_agents if r.get("removed"))
+    # Count only writes that actually landed. `removed` means "the entry was
+    # found", so counting it reported success for a failed write (same bug as
+    # `off`, 2026-10-02).
+    n_agents = sum(1 for r in removed_agents
+                   if r.get("removed") and r.get("written"))
+    failed_agents = [r for r in removed_agents
+                     if r.get("removed") and not r.get("written")]
     refused = []
     for d in dirs_present:
         if not _safe_rmtree(d):
             refused.append(d)
+    # Count only files that are actually gone. The loop swallowed OSError, so a
+    # file that could not be deleted was still counted in "Deleted ... N file(s)".
+    undeleted = []
     for f in files_present:
         try:
             Path(f).unlink(missing_ok=True)
         except OSError:
             pass
+        if Path(f).exists():
+            undeleted.append(f)
+    n_files = len(files_present) - len(undeleted)
     print("")
     print(f"  ✓ Removed the gateway from {n_agents} agent config(s).")
+    for r in failed_agents:
+        print(f"  ✗ {r.get('agent_name', r.get('agent'))} — the gateway entry is STILL there")
+        if r.get("error"):
+            print(f"      {str(r['error'])[:100]}")
     n_dirs = len(dirs_present) - len(refused)
     print(f"  ✓ Deleted {n_dirs} director{'y' if n_dirs == 1 else 'ies'} "
-          f"and {len(files_present)} file(s).")
+          f"and {n_files} file(s).")
     for d in refused:
         print(f"  ! Refused to delete {d} — not a directory mcptoon owns.")
+    for f in undeleted:
+        print(f"  ! Could not delete {f}")
     if config_kept:
         print(f"  ✓ Kept your server definitions: {', '.join(Path(f).name for f in config_kept)}")
     print("  mcptoon the package is still installed — remove it with:")
@@ -2432,12 +2553,22 @@ def _cmd_auto_discover(rest, fmt):
             http_config = disc.make_http_config(http_url)
             result.servers["http-endpoint"] = http_config
             result.sources["http-endpoint"] = ["manual"]
-            tool_count = probe_info.get("tools_count", 0)
-            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} ({tool_count} tools)"
+            # `tools_count` is None when the endpoint answered `initialize` but its
+            # tool list could not be read — say so rather than "0 tools".
+            if probe_info.get("tools_known", True):
+                tool_count = probe_info.get("tools_count") or 0
+                result.reasons["http-endpoint"] = (
+                    f"HTTP MCP endpoint at {http_url} ({tool_count} tools)")
+            else:
+                result.reasons["http-endpoint"] = (
+                    f"HTTP MCP endpoint at {http_url} (reachable; tool list unreadable)")
         else:
-            result.servers["http-endpoint"] = disc.make_http_config(http_url)
-            result.sources["http-endpoint"] = ["manual"]
-            result.reasons["http-endpoint"] = f"HTTP MCP endpoint at {http_url} (not responding)"
+            # The endpoint did not answer an MCP `initialize`. Counting it as a
+            # discovered server put a dead URL in `result.count` and in `--write`
+            # merges, with only the prose "(not responding)" as a signal
+            # (reproduced 2026-10-02). Report it, but do not count it.
+            print(f"  ! {http_url} did not answer an MCP initialize — not added.")
+            print("    (the URL is recorded in the note below, but not as a server)")
 
     if fmt in ("toon", "mcptoon", "compact", "slim"):
         print(output.render(list(result.servers.keys()), fmt=fmt))
@@ -2579,9 +2710,14 @@ def _cmd_doctor(_rest):
 
     # 2. Config file
     checks += 1
-    if cfg.CONFIG_FILE.exists():
+    # `cfg.CONFIG_FILE` is only the JSON path; `load_config` also reads
+    # `config.toml`. Gating on JSON alone told a user with a TOML config
+    # "No config found. Run: mcptoon quickstart" — advice that, before this fix,
+    # would have deleted their servers (2026-10-02).
+    if cfg.has_config_file():
         servers = cfg.load_config()
-        print(f"  ✓ Config: {cfg.CONFIG_FILE} ({len(servers)} servers)")
+        shown = cfg.CONFIG_FILE if cfg.CONFIG_FILE.exists() else cfg.CONFIG_FILE_TOML
+        print(f"  ✓ Config: {shown} ({len(servers)} servers)")
     else:
         print("  ✗ No config found. Run: mcptoon quickstart")
         issues += 1
@@ -2606,11 +2742,22 @@ def _cmd_doctor(_rest):
 
         try:
             tools = manifest_mod.get_server_tools(name, use_cache=True)
-            count = len(tools)
-            if count > 0:
-                print(f"  ✓ {name:20s} [{transport:5s}] {count} tools")
+            errs = [t for t in tools if isinstance(t, dict) and "error" in t]
+            if errs:
+                # A server that never started is an *issue*, not an empty server.
+                # It used to print `0 tools (server may be empty)` and leave the
+                # issue count at zero, so `doctor` ended with "All good!" on a
+                # machine whose server binary did not exist (2026-10-02).
+                print(f"  ✗ {name:20s} [{transport:5s}] cannot start: "
+                      f"{str(errs[0].get('error', ''))[:70]}")
+                issues += 1
             else:
-                print(f"  ! {name:20s} [{transport:5s}] 0 tools (server may be empty)")
+                count = len(tools)
+                if count > 0:
+                    print(f"  ✓ {name:20s} [{transport:5s}] {count} tools")
+                else:
+                    print(f"  ! {name:20s} [{transport:5s}] 0 tools "
+                          f"(server started but exposes none)")
         except Exception as e:
             print(f"  ✗ {name:20s} [{transport:5s}] ERROR: {str(e)[:80]}")
             issues += 1

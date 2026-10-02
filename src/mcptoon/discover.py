@@ -696,10 +696,19 @@ def auto_discover(
 # ═══════════════════════════════════════════════════════════════
 
 def probe_http_endpoint(url: str, timeout: float = 2.0) -> dict | None:
-    """Probe an HTTP MCP endpoint and return info if alive.
+    """Probe an HTTP MCP endpoint and return info if it is reachable.
 
     Returns:
-        {"url": ..., "tools_count": N, "alive": True} or None
+        {"url": ..., "alive": True, "tools_count": N | None, "tools_known": bool}
+        or None when the endpoint does not answer an MCP `initialize` at all.
+
+    ``tools_count`` is ``None`` (not ``0``) when the endpoint answered
+    `initialize` but the follow-up `tools/list` failed or returned something that
+    is not a JSON-RPC result. A failed tool-list request used to come back as
+    ``{"alive": True, "tools_count": 0}`` — indistinguishable from a real answer
+    of "zero tools", so an endpoint that cannot list tools was reported as a
+    working one with 0 tools (2026-10-02). Reachability and a readable tool list
+    are two different facts; report both.
     """
     if not url.startswith("http"):
         url = f"http://{url}"
@@ -751,13 +760,16 @@ def probe_http_endpoint(url: str, timeout: float = 2.0) -> dict | None:
             return {
                 "url": url,
                 "tools_count": len(tools),
+                "tools_known": True,
                 "alive": True,
             }
 
-        return {"url": url, "tools_count": 0, "alive": True}
+        return {"url": url, "tools_count": None, "tools_known": False,
+                "alive": True, "error": "endpoint answered, but not with a tool list"}
 
-    except Exception:
-        return {"url": url, "tools_count": 0, "alive": True}
+    except Exception as e:
+        return {"url": url, "tools_count": None, "tools_known": False,
+                "alive": True, "error": str(e)[:120]}
 
 
 def make_http_config(url: str, name: str = "http-endpoint") -> dict:

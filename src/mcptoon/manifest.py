@@ -55,7 +55,15 @@ def get_manifest(use_cache: bool = True) -> dict[str, list[dict]]:
 
 
 def get_server_tools(server: str, use_cache: bool = True) -> list[dict]:
-    """Get tools for a single server."""
+    """Get tools for a single server.
+
+    On a failed fetch this returns a single ``{"error": ...}`` entry, the same
+    shape `get_manifest` uses — NOT ``[]``. The empty list used to mean both
+    "the server answered and exposes no tools" and "the server never started",
+    and callers that only saw ``[]`` reported the second as the first: `doctor`
+    printed ``! dead  [stdio] 0 tools (server may be empty)`` and then "All good!"
+    on a machine where that server's binary did not exist (reproduced 2026-10-02).
+    """
     # Try cache
     if use_cache:
         cached = cache_mod.get_cached_tools(server)
@@ -73,8 +81,8 @@ def get_server_tools(server: str, use_cache: bool = True) -> list[dict]:
         cache_mod.set_cached_tools(server, tools)
         pool.close()
         return tools
-    except (MCPError, Exception):
-        return []
+    except (MCPError, Exception) as e:
+        return [{"error": str(e)[:300]}]
 
 
 def inspect_tool(server: str, tool: str) -> dict | None:

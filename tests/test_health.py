@@ -162,6 +162,19 @@ class TestFormatReport:
         assert "✗" in report
         assert "⏱" in report
 
+    def test_no_config_row_is_not_counted_as_healthy(self):
+        """A `no-config` row is neither alive nor dead. The footer keyed off
+        `error_count == 0`, so a report reading "0/1 alive, 0 dead" still ended
+        "All 1 servers healthy." (reproduced 2026-10-02)."""
+        results = [
+            {"server": "ghost", "transport": "?", "status": "no-config",
+             "tools": 0, "latency_ms": 0, "error": "Server not found in config"},
+        ]
+        report = format_health_report(results)
+        assert "1 unknown" in report
+        assert "All 1 servers healthy" not in report
+        assert "not in the config" in report
+
     def test_latency_displayed(self):
         """Latency is shown in report."""
         results = [

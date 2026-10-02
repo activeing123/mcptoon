@@ -18,6 +18,7 @@ A3 one-line installers."""
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -90,6 +91,40 @@ class _A1Celebration(unittest.TestCase):
         self.assertEqual(cli._manifest_tool_count([1, 2]), 2)
         self.assertEqual(cli._manifest_tool_count(None), 0)
         self.assertEqual(cli._manifest_tool_count("x"), 0)
+
+    def test_manifest_unreachable_count_only_counts_all_error_servers(self):
+        """A server that never answered must be counted, and a partly-broken one not.
+
+        Reproduced 2026-10-02: one working server + one with a missing binary made
+        the celebration say "across 2 servers" when one was dead. The tool count
+        already skipped errors; the server count did not.
+        """
+        self.assertEqual(cli._manifest_unreachable_count(
+            {"dead": [{"error": "boom"}],
+             "good": [{"name": "x"}]}), 1)
+        # A server that answered with one good and one bad tool is reachable.
+        self.assertEqual(cli._manifest_unreachable_count(
+            {"partial": [{"name": "x"}, {"error": "one tool blew up"}]}), 0)
+        self.assertEqual(cli._manifest_unreachable_count({}), 0)
+        self.assertEqual(cli._manifest_unreachable_count(None), 0)
+        self.assertEqual(cli._manifest_unreachable_count("x"), 0)
+
+    def test_celebration_names_the_servers_that_could_not_start(self):
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli._quickstart_celebration(11, 2, unreachable=1)
+        out = buf.getvalue()
+        self.assertIn("11 tools ready across 1 server (1 could not start)", out)
+
+    def test_celebration_pluralises_one_ready_server(self):
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli._quickstart_celebration(None, 1)
+        self.assertIn("1 MCP server configured", buf.getvalue())
 
 
 class _FakeResult:
@@ -414,9 +449,22 @@ class _A3Installers(unittest.TestCase):
         bash = shutil.which("bash")
         if not bash:
             self.skipTest("bash not available")
-        r = subprocess.run([bash, "-n", str(REPO_ROOT / "install.sh")],
-                           capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=30)
+        # On Windows `bash` on PATH is usually the WSL stub at
+        # %SystemRoot%\System32\bash.exe. With no distro installed it does not
+        # report "command not found" (exit 127, which this test used to catch) —
+        # it *hangs*, so the run hit the 30s timeout and the suite went red on a
+        # machine whose only sin is not having WSL. It is not a bash; skip it.
+        if sys.platform == "win32" and Path(bash).name.lower() == "bash.exe" \
+                and "system32" in str(Path(bash).parent).lower():
+            self.skipTest("bash on PATH is the Windows WSL stub, not a real bash")
+        try:
+            r = subprocess.run([bash, "-n", str(REPO_ROOT / "install.sh")],
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=30)
+        except subprocess.TimeoutExpired:
+            # A real `bash -n` on this 65-line script returns in milliseconds; a
+            # hang means we are talking to a stub. Treat it as unusable, not broken.
+            self.skipTest("bash did not respond in 30s (WSL stub?)")
         if r.returncode == 127:
             self.skipTest("bash unusable (WSL stub on Windows)")
         self.assertEqual(r.returncode, 0, f"bash -n failed: {r.stderr}")

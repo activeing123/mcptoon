@@ -616,6 +616,38 @@ class TestServeHttpMode:
         assert "servers" in health
         assert "tools" in health
 
+    def test_health_calls_an_alive_but_empty_server_ok(self):
+        """A server that connects and exposes no tools is not a failure.
+
+        `failed` used to be inferred from "absent from `_tool_index`", which is
+        also true of an empty-but-alive server, so one such server made /health
+        report `status: "error"` (reproduced 2026-10-02). Failure is now tracked
+        where the fetch actually raises."""
+        from mcptoon.serve import MCPServerBridge
+        bridge = MCPServerBridge.__new__(MCPServerBridge)
+        bridge._initialized = True
+        bridge._servers = {"empty": {"transport": "stdio"}}
+        bridge._tool_index = {}
+        bridge._server_fetch_errors = {}
+        bridge._start_time = 0.0
+        health = bridge._handle_health()
+        assert health["status"] == "ok"
+        assert health["failed_servers"] == 0
+        assert health["servers"] == 1 and health["tools"] == 0
+
+    def test_health_reports_a_server_whose_fetch_failed(self):
+        from mcptoon.serve import MCPServerBridge
+        bridge = MCPServerBridge.__new__(MCPServerBridge)
+        bridge._initialized = True
+        bridge._servers = {"empty": {}, "dead": {}}
+        bridge._tool_index = {}
+        bridge._server_fetch_errors = {"dead": "cannot spawn"}
+        bridge._start_time = 0.0
+        health = bridge._handle_health()
+        assert health["status"] == "degraded"
+        assert health["failed_servers"] == 1
+        assert health["errors"]["dead"] == "cannot spawn"
+
 
 # ═══════════════════════════════════════════════════
 # Install by Name Tests

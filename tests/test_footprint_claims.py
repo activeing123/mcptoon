@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB", "307KB", "308KB")
+              "304KB", "306KB", "307KB", "308KB", "322KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -129,7 +129,13 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # packaging, not bloat: 0.2.0's decoder alone is 23.7KB of source, and the old
 # single-file copy had been kept in sync by hand. 308KB is retired like every value
 # before it — and CHANGELOG.md keeps saying 308KB, because that is what 0.8.5 shipped.
-WHEEL_KB = "322KB"
+# 2026-10-02 (0.8.8 honesty sweep): 322KB → 327KB. The pre-release audit fixed ten
+# reported defects (a TOML config deleted by quickstart, failed writes reported as
+# successes, an unreachable server counted in three places) plus the tests that pin
+# them, and the LF build now measures 335,476 bytes = 327.61 KB — past the 327 line
+# by ~630 bytes, well outside the ±100-byte noise. 322KB is retired; CHANGELOG.md
+# keeps saying 322KB, because that is what 0.8.7 shipped.
+WHEEL_KB = "327KB"
 
 
 def modules() -> list[Path]:

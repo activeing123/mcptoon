@@ -198,9 +198,15 @@ def format_health_report(results: list[dict]) -> str:
 
     ok_count = sum(1 for r in results if r["status"] == "ok")
     error_count = sum(1 for r in results if r["status"] in ("error", "timeout"))
+    # A row whose server is not in the config is neither alive nor dead. It used to
+    # fall into neither counter, so the footer keyed off `error_count == 0` and a
+    # report reading "0/1 alive, 0 dead" still ended "All 1 servers healthy."
+    # (reproduced 2026-10-02). Unknown is its own state; say so.
+    unknown_count = sum(1 for r in results if r["status"] == "no-config")
     total = len(results)
 
-    lines = [f"── mcptoon health: {ok_count}/{total} alive, {error_count} dead ──", ""]
+    lines = [f"── mcptoon health: {ok_count}/{total} alive, {error_count} dead"
+             + (f", {unknown_count} unknown ──" if unknown_count else " ──"), ""]
 
     status_icons = {
         "ok": "✓",
@@ -225,9 +231,13 @@ def format_health_report(results: list[dict]) -> str:
         lines.append(line)
 
     lines.append("")
-    if error_count == 0:
+    if error_count == 0 and unknown_count == 0:
         lines.append(f"  All {total} servers healthy.")
+    elif error_count == 0:
+        lines.append(f"  {ok_count}/{total} servers healthy; {unknown_count} not in the config.")
     else:
         lines.append(f"  {error_count}/{total} servers unreachable. Remove with: mcptoon remove <name>")
+        if unknown_count:
+            lines.append(f"  {unknown_count} more are not in the config.")
 
     return "\n".join(lines)
