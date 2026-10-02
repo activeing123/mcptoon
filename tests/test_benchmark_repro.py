@@ -32,7 +32,17 @@ REPO = ROOT.parent.parent / "mcptoon"
 ASSETS = ROOT / "assets"
 HISTORICAL = ASSETS / "benchmark_tiktoken.json"
 
-tiktoken = pytest.importorskip("tiktoken", reason="the benchmark needs tiktoken")
+@pytest.fixture(scope="module")
+def tk():
+    """Skip per-test, never at module import.
+
+    A module-level ``pytest.importorskip`` drops the whole file out of *collection*
+    when tiktoken is absent, and CI does not install it. That made the collected count
+    environment-dependent — 1752 here, 1740 on CI — which turned
+    test_footprint_claims' suite-total guard red on a completely green codebase.
+    Collection must be identical everywhere; only execution may skip.
+    """
+    return pytest.importorskip("tiktoken")
 
 
 def _load_generator():
@@ -50,7 +60,7 @@ def gen():
 
 
 class TestBenchmarkIsReproducible:
-    def test_schema_asset_matches_a_fresh_run(self, gen):
+    def test_schema_asset_matches_a_fresh_run(self, gen, tk):
         committed = json.loads((ASSETS / "benchmark_schemas_repro.json").read_text("utf-8"))
         fresh = gen.measure(gen.build_corpus(gen.SEED))
         assert [r["tools"] for r in committed] == [r["tools"] for r in fresh]
@@ -59,7 +69,7 @@ class TestBenchmarkIsReproducible:
             assert c["toon"] == f["toon"]
             assert c["toon_save"] == f["toon_save"]
 
-    def test_result_asset_matches_a_fresh_run(self, gen):
+    def test_result_asset_matches_a_fresh_run(self, gen, tk):
         committed = json.loads((ASSETS / "benchmark_results.json").read_text("utf-8"))
         fresh = gen.measure_results(gen.build_result_corpus(gen.SEED))
         assert committed["json"] == fresh["json"]
@@ -67,7 +77,7 @@ class TestBenchmarkIsReproducible:
         assert committed["toon_save"] == fresh["toon_save"]
         assert set(committed["by_shape"]) == {"record", "list", "records_table", "blob"}
 
-    def test_the_generator_is_deterministic(self, gen):
+    def test_the_generator_is_deterministic(self, gen, tk):
         a = gen.measure(gen.build_corpus(gen.SEED))
         b = gen.measure(gen.build_corpus(gen.SEED))
         assert a == b, "same seed must give the same corpus; otherwise it is not reproducible"
