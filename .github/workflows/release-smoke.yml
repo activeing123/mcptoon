@@ -78,7 +78,21 @@ jobs:
         # A release run knows the exact tag; a manual run verifies whatever pip picked.
         WANT: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.version }}
       run: |
-        python -c "import os, pathlib, mcptoon; p = pathlib.Path(mcptoon.__file__).resolve(); assert 'site-packages' in str(p), f'imported from the tree, not PyPI: {p}'; want = os.environ.get('WANT', '').lstrip('v'); assert not want or mcptoon.__version__ == want, f'installed {mcptoon.__version__} but wanted {want} - the index served a stale copy'; print('PyPI install OK:', mcptoon.__version__, 'at', p)"
+        # 2026-10-02: 这条断言对 0.8.7 失败过一次（installed <wanted>，索引给了旧包），
+        # 但同一 commit 手工重跑三平台全绿 —— 说明它是**时序**问题，不是逻辑错误。
+        # 上面那步轮询的是 simple 索引上的**文件名出现**，而 pip 自己解析要走的链路
+        # 另有 CDN 缓存，两边不是同一时刻可见。单次断言一旦撞上就必然报红，
+        # 于是每次发版都留一条假红，久而久之没人再看这个 job。
+        # 改成带重试：装不上/版本不对就重装，6 次 × 20s 内没转正才判失败。
+        for i in 1 2 3 4 5 6; do
+          if python -c "import os, pathlib, mcptoon; p = pathlib.Path(mcptoon.__file__).resolve(); assert 'site-packages' in str(p), f'imported from the tree, not PyPI: {p}'; want = os.environ.get('WANT', '').lstrip('v'); assert not want or mcptoon.__version__ == want, f'installed {mcptoon.__version__} but wanted {want} - the index served a stale copy'; print('PyPI install OK:', mcptoon.__version__, 'at', p)"; then
+            exit 0
+          fi
+          echo "  attempt $i: not yet the released version; reinstalling in 20s"
+          python -m pip install --upgrade --force-reinstall mcptoon || true
+          sleep 20
+        done
+        echo "the index never served the released version"; exit 1
 
     - name: Install pytest
       run: python -m pip install pytest
