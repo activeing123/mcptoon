@@ -1,7 +1,6 @@
 """Tests for mcptoon discover — auto-discovery module."""
 import json
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -158,37 +157,43 @@ class TestLocalDetection:
             assert "memory" in names
             assert "sequential-thinking" in names
 
-    def test_git_repo_detection(self):
-        # The git-repo bonus entry is gated on `uvx` (the runner that actually
-        # provides mcp-server-git). Assert that contract directly instead of
-        # depending on whatever the test machine happens to have installed:
-        # with uvx -> git appears from the repo scan; without uvx -> it must not.
-        with tempfile.TemporaryDirectory() as tmpdir:
-            git_dir = Path(tmpdir) / ".git"
-            git_dir.mkdir()
+    def test_git_is_offered_once_and_only_when_the_git_binary_exists(self):
+        """`git` is one entry in the uvx table, gated on the git binary itself.
 
-            original = Path.cwd()
-            try:
-                os.chdir(tmpdir)
+        Two regressions are pinned here, both found 2026-10-02 on a clean Windows
+        box where `quickstart` printed the git server **twice** and then showed it
+        dead (`[PROCESS_DIED] … All git commands will error until this is
+        rectified`) while still counting it as a working server:
 
-                with patch.object(discover_mod, "_which",
-                                  side_effect=lambda c: "uvx" if c == "uvx" else None):
-                    results = _detect_local_tools()
-                git_results = [r for r in results if r["name"] == "git"]
-                repo_entries = [r for r in git_results
-                                if "git repository" in r["reason"].lower()]
-                assert len(repo_entries) == 1, (
-                    "the repo scan should add exactly one git entry"
-                )
-                assert repo_entries[0]["config"]["command"] == ["uvx"]
+        1. `git` was added *twice* — once from the uvx table and once from a
+           leftover "we are in a git repository" special case that `a106dc5`
+           (2026-09-18) forgot to delete when it moved git off npx. The duplicate
+           stayed invisible because the old assertion filtered on the phrase
+           "git repository", which only matched the leftover copy.
+        2. `git` was offered whenever `uvx` existed, even with no git binary —
+           `mcp-server-git` starts, but every tool errors, and the celebration
+           still counted the server as ready.
 
-                with patch.object(discover_mod, "_which", return_value=None):
-                    results = _detect_local_tools()
-                assert not [r for r in results if r["name"] == "git"], (
-                    "git must not be offered when its runner (uvx) is absent"
-                )
-            finally:
-                os.chdir(original)
+        Assert on the *count* of git entries (not on a phrase in the reason), so a
+        second copy can never hide behind a filter again.
+        """
+        with patch.object(discover_mod, "_which",
+                          side_effect=lambda c: "uvx" if c == "uvx" else None):
+            names = [r["name"] for r in _detect_local_tools()]
+        assert "git" not in names, (
+            "git must not be offered when the git binary is absent — uvx cannot "
+            "stand in for it, and every mcp-server-git tool errors without it"
+        )
+
+        with patch.object(discover_mod, "_which",
+                          side_effect=lambda c: c if c in ("uvx", "git") else None):
+            results = _detect_local_tools()
+        git_entries = [r for r in results if r["name"] == "git"]
+        assert len(git_entries) == 1, (
+            f"git must appear exactly once, got {len(git_entries)}: "
+            f"{[r['reason'] for r in git_entries]}"
+        )
+        assert git_entries[0]["config"]["command"] == ["uvx"]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -217,7 +222,7 @@ class TestNoDeadPackagesOffered:
 
     def test_pypi_servers_use_uvx_not_npx(self):
         # fetch/time/git live on PyPI; they must be launched with uvx.
-        for name, command, _args, _reason in discover_mod._UVX_ZERO_CONFIG_SERVERS:
+        for name, command, _args, _reason, _requires in discover_mod._UVX_ZERO_CONFIG_SERVERS:
             assert command == ["uvx"], f"{name} should run via uvx, got {command}"
 
     def test_live_packages_still_offered(self):

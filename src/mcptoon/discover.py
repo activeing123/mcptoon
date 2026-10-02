@@ -473,13 +473,21 @@ _NPX_ZERO_CONFIG_SERVERS = [
 ]
 
 # Python reference servers, run through `uvx` (no global install).
+# Each entry is (name, command, args, reason, requires).
+#   `requires` = an extra executable that must exist *besides* the runner, or None.
+#   `git` is why this field exists: `mcp-server-git` starts fine without the git
+#   binary but every one of its tools then errors with "h-to-git-executable", and
+#   quickstart still counted it as a working server. Offering it on a machine that
+#   has no git is worse than not offering it (measured 2026-10-02 on a clean
+#   Windows box: `[PROCESS_DIED] … All git commands will error until this is
+#   rectified`). `uvx` cannot stand in for `git`.
 _UVX_ZERO_CONFIG_SERVERS = [
     ("fetch", ["uvx"], ["mcp-server-fetch"],
-     "Zero-config (no API key needed)"),
+     "Zero-config (no API key needed)", None),
     ("time", ["uvx"], ["mcp-server-time"],
-     "Zero-config (time and timezone)"),
+     "Zero-config (time and timezone)", None),
     ("git", ["uvx"], ["mcp-server-git"],
-     "Zero-config (git operations on current repo)"),
+     "Zero-config (git operations on current repo)", "git"),
 ]
 
 
@@ -490,6 +498,9 @@ def _detect_local_tools() -> list[dict]:
     are offered only when `npx` exists, PyPI servers only when `uvx` exists.
     Recommending a runner that is not installed (or a package that is not on
     the registry) is what made `quickstart` show a wall of `npm error 404`.
+
+    A candidate may also need a second executable *besides* its runner — see
+    `_UVX_ZERO_CONFIG_SERVERS` for why `git` is gated on the git binary too.
     """
     found = []
     has_npx = _which("npx") is not None
@@ -509,7 +520,9 @@ def _detect_local_tools() -> list[dict]:
             })
 
     if has_uvx:
-        for name, command, args, reason in _UVX_ZERO_CONFIG_SERVERS:
+        for name, command, args, reason, requires in _UVX_ZERO_CONFIG_SERVERS:
+            if requires and _which(requires) is None:
+                continue
             found.append({
                 "name": name,
                 "config": {
@@ -520,20 +533,6 @@ def _detect_local_tools() -> list[dict]:
                 "source": "local",
                 "reason": reason,
             })
-
-    # In a git repository the git server is extra useful — but only when uvx
-    # (its real runner) is present.
-    if has_uvx and Path.cwd().is_dir() and (Path.cwd() / ".git").exists():
-        found.append({
-            "name": "git",
-            "config": {
-                "transport": "stdio",
-                "command": ["uvx"],
-                "args": ["mcp-server-git"],
-            },
-            "source": "local",
-            "reason": "Currently in a git repository",
-        })
 
     return found
 
