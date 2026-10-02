@@ -94,14 +94,18 @@ _POISONING_INDICATORS = [
     "forget your instructions",
     "forget all previous",
     # ── Role hijacking ──
+    # fix 2026-10-01: `"you are a "` 与 `"act as "` 这**两个裸子串已从本表移除**，
+    # 下方 `_POISONING_REGEXES` 以"句首锚定"形式重新收编（见该文件内注释）。
+    # 原因（实测误报）：它们是英语里极常见的普通短语，字面匹配会在正常技术文本上
+    # 恒命中 —— 例 ollama issue #18676 正文
+    #   "this makes `done` act as a parsing short-circuit rather than a terminal signal"
+    # 与 #18715/#18620 中被引用的 system prompt 片段 ("you are a coding agent ...")。
+    # 两处都不是注入，却把整份 issues 结果拦成 TOOL_POISONING，真数据一条都拿不到。
     "you are now",
-    "you are a ",  # "you are a DAN" etc
-    "act as ",
     "pretend you are",
     "new role:",
     "new instructions:",
     "system prompt:",
-    "you have been",
     # ── Hidden instructions (HTML comments, tags) ──
     "<!-- assistant:",
     "<!-- ignore",
@@ -113,14 +117,16 @@ _POISONING_INDICATORS = [
     "<|im_start|",
     "<|system|",
     # ── Data exfiltration attempts ──
+    # fix 2026-10-01: `"curl http"` / `"wget http"` 同样过宽 —— GitHub issue 与
+    # release notes 里满是可复现用的 curl/wget 命令（实测 ollama #18718 与
+    # v0.35.0/v0.34.3 发布说明均被它拦成 TOOL_POISONING，真数据一条都拿不到）。
+    # 已收编到下方 `_POISONING_REGEXES`：仅当与"外传动作"同现时才算。
     "send this to",
     "post this to",
     "call this url",
     "fetch this url",
     "upload to ",
     "exfiltrate",
-    "curl http",
-    "wget http",
     # ── Credential harvesting ──
     "read your env",
     "cat ~/.ssh",
@@ -146,6 +152,38 @@ _POISONING_INDICATORS_ZH = [
     "无视之前", "无视以上",
     "你的系统提示", "你的api key", "你的密钥",
 ]
+
+# ── 句首锚定的角色劫持判定（2026-10-01 收窄） ──
+# 这三个短语在英语里太常见，做**裸子串**匹配会在正常内容上恒命中（误报实例见上方
+# `_POISONING_INDICATORS` 的 Role hijacking 注释）。这里改成：只有出现在**句首**
+# （文本开头，或紧跟在 . / ! / ? / 换行 之后）才算 —— 真正的注入是写给模型的独立
+# 指令，通常就落在句首；而误报那几例都是嵌在从句/被引文本里的普通描述。
+#
+# ⚠️ 性质声明（advisory）：本函数整体是**启发式安全网，不是安全边界**（见下方
+# docstring）。这类宽泛判定**曾经误判过**，按 R5 纪律仅作提示性拦截，
+# 宁可漏拦也不要把正常数据整块吞掉。
+_POISONING_REGEXES = [
+    re.compile(r"(?:^|[.!?。！？\n])\s*you are a\b"),
+    re.compile(r"(?:^|[.!?。！？\n])\s*act as\b"),
+    re.compile(r"(?:^|[.!?。！？\n])\s*you have been\b"),
+    # curl/wget 本身无害（技术文档里满地都是），只有"传到本地以外的地址"且带
+    # 外传/凭据意图时才是真注入信号。故要求：外传动作 + 非本地目标，两者同现。
+    re.compile(r"curl\s+https?://[^\n]{0,200}", re.I),
+    re.compile(r"wget\s+https?://[^\n]{0,200}", re.I),
+]
+
+# 与上面 curl/wget 正则配套的判定（2026-10-01 收窄）：
+# ① 外传/凭据类动词 —— 光有 curl 不算，得有"把东西送出去/偷出来"的意图
+_EXFIL_VERBS = (
+    "send this", "post this", "upload this", "upload to", "exfiltrate",
+    "leak the", "steal the", "your api key", "your token", "print your api key",
+    "show your token", "read your env", "~/.ssh", "/etc/passwd",
+)
+# ② 本地目标不算外传：localhost / 127.0.0.1 / ::1 / 私有网段 / example.com
+_LOCAL_TARGET_RE = re.compile(
+    r"https?://(?:localhost|127\.0\.0\.1|\[?::1\]?|0\.0\.0\.0|"
+    r"10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|"
+    r"example\.com|example\.org|example\.net)", re.I)
 
 
 # Zero-width and invisible characters used to split keywords past substring
@@ -201,6 +239,19 @@ def _check_poisoning(result: Any) -> str | None:
     for indicator in _POISONING_INDICATORS_ZH:
         if indicator in normalized:
             return f"potential prompt injection detected: contains '{indicator}'"
+    # 句首锚定的宽泛角色劫持判定（2026-10-01 收窄后新增，见 _POISONING_REGEXES）
+    for rx in _POISONING_REGEXES:
+        if not rx.search(normalized):
+            continue
+        if rx.pattern.startswith(("curl", "wget")):
+            # curl/wget 单独出现是正常技术内容（发布说明/复现步骤里满地都是）。
+            # 仅当 ① 含外传意图 ② 且目标不是本机/私有地址 时才判为注入。
+            match = rx.search(normalized)
+            if not match or _LOCAL_TARGET_RE.search(match.group()):
+                continue
+            if not any(w in normalized for w in _EXFIL_VERBS):
+                continue
+        return f"potential prompt injection detected: matches pattern '{rx.pattern}'"
 
     return None
 

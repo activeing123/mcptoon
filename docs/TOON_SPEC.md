@@ -1,6 +1,14 @@
 # TOON Format Specification
 
-**Version:** 1.1 (aligned with [toon-format/toon](https://github.com/toon-format/toon) community spec v4.1, vendored python-toon v0.1.1 encoder/decoder)
+**Version:** 1.1 — aligned with [toon-format/spec](https://github.com/toon-format/spec)
+v4.1, implemented by vendored **python-toon v0.2.0** (`src/mcptoon/_toon/`).
+
+> This line used to claim "spec v4.1, vendored python-toon **v0.1.1**" — and that
+> combination was the whole problem. v0.2.0 (2026-09-29) is the release whose own note
+> reads "conform to TOON spec 4.1"; v0.1.1 predates it. The doc therefore advertised a
+> conformance the shipped encoder did not have, which is exactly what the toon
+> maintainer objected to when closing our PR. The claim and the code now match, and
+> `VENDORED_VERSION` in `src/mcptoon/toon_vendored.py` is the value to trust.
 
 **Full name:** Token-Oriented Object Notation
 

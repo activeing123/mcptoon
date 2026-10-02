@@ -66,6 +66,11 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py310"
 src = ["src", "tests"]
+# `_toon/` is python-toon v0.2.0, vendored verbatim (MIT). It is not our code and is
+# replaced wholesale on every re-vendor, so linting it buys nothing and reformatting it
+# would mean hand-merging style drift at the next upgrade. Our own wrapper lives in
+# `src/mcptoon/toon_vendored.py` and is linted normally.
+extend-exclude = ["src/mcptoon/_toon"]
 
 [tool.ruff.lint]
 # F821 = undefined-name (BUG: must be zero)

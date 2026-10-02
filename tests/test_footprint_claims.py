@@ -56,7 +56,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB", "307KB")
+              "304KB", "306KB", "307KB", "308KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -123,11 +123,25 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # validates the URL, and a config file we cannot honor is preserved as `.bak`
 # instead of dropped — pushed the LF build to 315,707 bytes = 308.31 KB, past the
 # 308 line by ~318 bytes (again beyond the ±100-byte noise). 307KB is retired.
-WHEEL_KB = "308KB"
+# 2026-10-02 (TOON re-vendor): 308KB → 322KB. The vendored TOON encoder moved from a
+# single 855-line `toon_vendored.py` into python-toon v0.2.0's real package layout under
+# `_toon/` (9 modules). The LF build now measures 329,878 bytes = 322.15 KB. The jump is
+# packaging, not bloat: 0.2.0's decoder alone is 23.7KB of source, and the old
+# single-file copy had been kept in sync by hand. 308KB is retired like every value
+# before it — and CHANGELOG.md keeps saying 308KB, because that is what 0.8.5 shipped.
+WHEEL_KB = "322KB"
 
 
 def modules() -> list[Path]:
-    return sorted(SRC.glob("*.py"))
+    """Every shipped .py under src/mcptoon, **recursively**.
+
+    Was `SRC.glob("*.py")`, which is not recursive and therefore silently ignored
+    subpackages. That was harmless while src/mcptoon had none; `_toon/` (the vendored
+    python-toon package, added 2026-10-02) made it the first one, and the README's
+    "N lines across M modules" claim would have kept describing a codebase that no
+    longer existed. A guard that cannot see part of the tree is not a guard.
+    """
+    return sorted(p for p in SRC.rglob("*.py") if "__pycache__" not in p.parts)
 
 
 def physical_lines() -> int:
@@ -179,7 +193,7 @@ class TestFootprintClaims(unittest.TestCase):
                 seen += 1
                 self.assertAlmostEqual(
                     n, self.lines, delta=self.lines * 0.02,
-                    msg=(f"{rel} claims {n:,} lines; src/mcptoon/*.py is {self.lines:,} "
+                    msg=(f"{rel} claims {n:,} lines; src/mcptoon/**/*.py is {self.lines:,} "
                          "physical lines"))
         self.assertGreater(seen, 0, "no line-count claim found - did the wording change?")
 
