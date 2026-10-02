@@ -5,6 +5,41 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.10] - 2026-10-02
+
+### Fixed
+
+- **A handle could name a stored original that no longer existed.** Found by attacking the
+  0.8.9 code instead of testing it: eviction sorts by file mtime, files written inside the
+  same clock tick tie, and a tie can sort the *newest* entry first — so the eviction pass
+  that runs at the end of `store_ex` could delete the very entry whose handle was about to
+  be returned. Reproduced with a 6,000-byte budget and a 5,911-byte payload: `store_ex`
+  answered with a handle and the store was left holding **zero files**. That is precisely
+  the silent dead end this module exists to prevent, and it only showed up when the store
+  was full enough to evict — which a long session reaches on its own. The entry a call
+  just wrote is now exempt from that call's eviction pass; the byte budget still holds,
+  because an entry is only written when it fits the budget alone, so keeping it while
+  evicting everything else cannot leave the store over budget.
+- **The store budget was compared against the payload rather than the bytes written.**
+  The JSON wrapper adds a couple of hundred bytes, so a result that "fit" was written and
+  then immediately evicted by its own cleanup pass — handing back a handle to nothing. The
+  budget is now checked against the size of the entry that actually lands on disk.
+
+### Changed
+
+- `store_ex` now re-checks that the entry exists after cleanup, and if it somehow does not,
+  reports `write-failed` instead of returning a handle. Belt and braces on top of the two
+  fixes above: a caller that gets a handle can rely on that handle reading back as `ok`.
+
+### Tests
+
+- `test_ccr_lossless.py` grows four tests for the property these fixes exist to guarantee:
+  **every handle `store_ex` returns reads back byte-identical**, checked across twelve
+  payloads under a budget small enough to force eviction constantly; another asserts the
+  kept entry survives even when it is deliberately backdated to be the oldest file in the
+  store; another asserts the budget is judged on bytes written; another asserts the store
+  is within budget after a successful write.
+
 ## [0.8.9] - 2026-10-02
 
 ### Added

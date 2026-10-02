@@ -315,15 +315,18 @@ def store_ex(original: Any, *, server: str, tool: str,
     Never raises: a busy temp file must not fail a tool call. The one refusal
     that survives is "larger than the whole store budget", because keeping such
     an entry would evict everything else and still not fit it.
+
+    The entry this call just wrote is **exempt from the eviction pass**. That is
+    not politeness: eviction sorts by mtime, files written in the same clock tick
+    tie, and a tie can put the new entry first — which deleted the entry whose
+    handle was about to be returned (reproduced 2026-10-02: budget 6,000, a 5,911
+    byte payload, `store_ex` answered with a handle and the store was left with
+    zero files). A handle that points at nothing is the exact failure this module
+    exists to prevent.
     """
     blob = _payload_blob(original)
     if blob is None:
         return StoreOutcome(None, REASON_UNSERIALISABLE)
-
-    size = len(blob.encode("utf-8"))
-    budget = _max_store_bytes()
-    if size > budget:
-        return StoreOutcome(None, REASON_TOO_BIG, size)
 
     handle = _handle_for(server, tool, blob)
     path = _store_dir() / f"{handle}.json"
@@ -333,9 +336,18 @@ def store_ex(original: Any, *, server: str, tool: str,
     # wrapper: for a large result that second copy is the expensive part.
     head = json.dumps({
         "handle": handle, "server": server, "tool": tool,
-        "ts": time.time(), "ttl": entry_ttl, "bytes": size,
+        "ts": time.time(), "ttl": entry_ttl, "bytes": len(blob),
     }, ensure_ascii=False)
     text = f'{head[:-1]}, "original": {blob}}}'
+
+    # The budget is compared against the bytes that actually land on disk, not
+    # the payload alone: the wrapper adds a couple of hundred bytes, and judging
+    # by the payload let an entry that "fits" be written and then immediately
+    # evicted by its own cleanup pass.
+    size = len(text.encode("utf-8"))
+    budget = _max_store_bytes()
+    if size > budget:
+        return StoreOutcome(None, REASON_TOO_BIG, size)
 
     try:
         _store_dir().mkdir(parents=True, exist_ok=True)
@@ -345,7 +357,11 @@ def store_ex(original: Any, *, server: str, tool: str,
     except OSError:
         return StoreOutcome(None, REASON_WRITE_FAILED, size)
 
-    _maybe_evict()
+    _maybe_evict(keep=handle)
+    # Belt and braces: if the entry is somehow gone anyway, do not hand out a
+    # handle to nothing — say it was not stored, so the notice is honest.
+    if not path.exists():
+        return StoreOutcome(None, REASON_WRITE_FAILED, size)
     return StoreOutcome(handle, None, size)
 
 
@@ -418,12 +434,19 @@ def sweep() -> int:
     return removed
 
 
-def _maybe_evict() -> int:
+def _maybe_evict(keep: str | None = None) -> int:
     """Evict oldest entries while the store is over budget. Returns the count.
 
     This is the only way an entry disappears under the default configuration, so
     it is also the only way a previously issued handle can go stale. Handles that
     do go stale report ``never-stored`` on read.
+
+    ``keep`` names a handle that must survive this pass — :func:`store_ex` passes
+    the entry it just wrote, because mtime ties make "newest" a guess rather than
+    a fact, and evicting the entry whose handle is about to be returned produces
+    exactly the silent dead end this module exists to prevent. The byte budget
+    still holds: an entry is only ever written when it fits the budget alone, so
+    keeping it while evicting everything else cannot leave the store over budget.
     """
     d = _store_dir()
     budget = _max_store_bytes()
@@ -434,10 +457,13 @@ def _maybe_evict() -> int:
     total = sum(size for _, _, size in files)
     if total <= budget:
         return 0
+    keep_name = f"{keep}.json" if keep else None
     removed = 0
     for path, _, size in sorted(files, key=lambda f: f[1]):
         if total <= budget:
             break
+        if keep_name and path.name == keep_name:
+            continue
         try:
             path.unlink()
             total -= size

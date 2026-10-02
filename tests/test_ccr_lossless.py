@@ -166,6 +166,80 @@ class TestBoundary3Oversize(LosslessBase):
 class TestBoundary4Eviction(LosslessBase):
     """Evicted entries must fail loudly and specifically, never silently empty."""
 
+    def test_a_returned_handle_always_points_at_a_readable_entry(self):
+        """The property, over a store small enough to force eviction constantly.
+
+        Found by attacking the 0.8.9 code: with the budget judged on the *payload*
+        size, a 5,911-byte payload under a 6,000-byte budget was written, then
+        deleted by that same call's eviction pass (the wrapper pushes the file
+        past the budget), and `store_ex` returned a handle anyway — the store was
+        left with zero files. Judging by the bytes actually written fixes the
+        arithmetic; exempting the new entry from its own eviction pass fixes the
+        mtime-tie case, where "newest" is a guess.
+        """
+        budget = 8000
+        with mock.patch.dict(os.environ, {"MCPTOON_CCR_MAX_BYTES": str(budget)}):
+            for i in range(12):
+                payload = [{"i": i, "n": j, "t": "D" * 400} for j in range(i + 2)]
+                outcome = ccr.store_ex(payload, server="demo", tool=f"t{i}")
+                if outcome.handle is None:
+                    continue
+                with self.subTest(i=i, handle=outcome.handle):
+                    status, original = ccr.retrieve_status(outcome.handle)
+                    self.assertEqual(
+                        status, "ok",
+                        f"store_ex returned {outcome.handle} but it reads as {status}")
+                    self.assertEqual(json.dumps(original, ensure_ascii=False),
+                                     json.dumps(payload, ensure_ascii=False))
+
+    def test_eviction_spares_the_entry_it_was_asked_to_keep(self):
+        """Directly: a backdated 'newest' entry still survives its own eviction."""
+        with mock.patch.dict(os.environ, {"MCPTOON_CCR_MAX_BYTES": "12000"}):
+            fresh = [{"n": i, "t": "N" * 3000} for i in range(2)]
+            handle = ccr.store(fresh, server="demo", tool="fresh")
+            self.assertIsNotNone(handle)
+
+            # Make the new entry the *oldest* by mtime, so nothing but `keep`
+            # can save it.
+            path = ccr._store_dir() / f"{handle}.json"
+            ancient = time.time() - 10_000
+            os.utime(path, (ancient, ancient))
+
+            # Push the store over budget without going through `store`, because
+            # `store` runs its own eviction pass and would leave it under budget
+            # again before the call under test.
+            decoy = ccr._store_dir() / "decoy0000.json"
+            decoy.write_text(json.dumps({"original": "D" * 9000}), encoding="utf-8")
+            total = sum(p.stat().st_size for p in ccr._store_dir().glob("*.json"))
+            self.assertGreater(total, 12000)
+
+            removed = ccr._maybe_evict(keep=handle)
+            self.assertGreater(removed, 0, "the pass should have evicted the decoy")
+            self.assertTrue(path.exists(), "eviction deleted the entry it was told to keep")
+            self.assertEqual(ccr.retrieve_status(handle)[0], "ok")
+
+    def test_budget_is_judged_on_the_bytes_written(self):
+        """A payload that 'fits' but whose file does not must be refused, not lost."""
+        with mock.patch.dict(os.environ, {"MCPTOON_CCR_MAX_BYTES": "1500"}):
+            # Payload clearly under the budget; the JSON wrapper pushes it over.
+            payload = {"pad": "b" * 1400}
+            outcome = ccr.store_ex(payload, server="demo", tool="t")
+            if outcome.handle is not None:
+                # If it was accepted it must be readable — that is the invariant.
+                self.assertEqual(ccr.retrieve_status(outcome.handle)[0], "ok")
+            else:
+                self.assertEqual(outcome.reason, ccr.REASON_TOO_BIG)
+                self.assertGreater(outcome.bytes, 1500)
+
+    def test_the_store_stays_within_budget_after_a_successful_store(self):
+        budget = 9000
+        with mock.patch.dict(os.environ, {"MCPTOON_CCR_MAX_BYTES": str(budget)}):
+            for i in range(8):
+                ccr.store([{"i": i, "t": "S" * 2000}], server="demo", tool=f"s{i}")
+            total = sum(p.stat().st_size for p in ccr._store_dir().glob("*.json"))
+        self.assertLessEqual(total, budget,
+                             "eviction left the store over its own budget")
+
     def test_evicted_handle_reports_never_stored(self):
         # Budget fits the payload, then one more pushes it over. The first entry
         # is backdated so eviction order does not depend on two files sharing an

@@ -143,6 +143,9 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # per-request session scoping that keeps concurrent HTTP agents apart. The LF build
 # measures 341,580 bytes = 333.57 KB — past the 334 line. 327KB is retired like every
 # value before it; CHANGELOG.md keeps saying 327KB for 0.8.8, because that shipped.
+# 2026-10-02 (0.8.10): 342,209 bytes = 334.19 KB — same claim, 629 bytes further
+# from the boundary. The 0.8.10 fixes add one eviction guard and a size accounting
+# correction, so the wheel grew without crossing a KB line.
 WHEEL_KB = "334KB"
 
 
