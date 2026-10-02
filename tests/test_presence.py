@@ -265,7 +265,14 @@ class TestFirstRunSelfHeal(_IsolatedHome):
     """
 
     def _run(self, argv):
-        """Run a command with self-heal forced on and every touched path sandboxed."""
+        """Run a command with self-heal forced on and every touched path sandboxed.
+
+        `MCPTOON_SKILLS_VIEWS` is a single *existing* directory: `install_self` writes
+        only into views that are already there (2026-10-02 — it used to create six
+        agent folders on a machine that had none of the six agents). Tests that want
+        a specific view create it first; `views_missing_our_skill` is what makes a
+        view that appears *later* still get the skill.
+        """
         views = self.home / "views"
         roots = self.home / "skills"
         env = {
@@ -279,6 +286,7 @@ class TestFirstRunSelfHeal(_IsolatedHome):
             return _run_main(argv)
 
     def test_first_command_installs_the_skill_and_builds_the_index(self):
+        (self.home / "views").mkdir(parents=True)
         roots = self.home / "skills" / "demo"
         roots.mkdir(parents=True)
         (roots / "SKILL.md").write_text(
@@ -292,7 +300,55 @@ class TestFirstRunSelfHeal(_IsolatedHome):
         self.assertIn("Skill catalog indexed", out)
         self.assertTrue(cfg.selfheal_done())
 
+    def test_no_view_yet_says_so_instead_of_claiming_six_agents(self):
+        """The 2026-10-02 clean-box bug, from the message side.
+
+        With no agent folder on the machine, the old code created all six view roots
+        and printed "installed for 6 agent(s)". It must now write nothing, claim
+        nothing, and point at the escape hatch for an agent we do not know about.
+        """
+        out = self._run(["list"])
+
+        self.assertFalse((self.home / "views" / "mcptoon").exists(),
+                         "a view that did not exist must not be created")
+        self.assertNotIn("installed for", out)
+        self.assertIn("install-self --view", out)
+
+    def test_an_agent_installed_after_mcptoon_still_gets_the_skill(self):
+        """The hole in "only write where a folder exists", closed by the self-heal.
+
+        The marker is written once per release, so if the heal only ran when the
+        marker was absent, a user who installed Cursor *after* mcptoon would never
+        get the skill — every later command would see a matching marker and return.
+        `views_missing_our_skill` makes the heal re-check for an existing view that
+        lacks our file, so the copy lands on the first command after the agent appears.
+        """
+        claude = self.home / "views-claude"
+        cursor = self.home / "views-cursor"
+        claude.mkdir(parents=True)
+        env = {
+            "MCPTOON_FORCE_SELF_HEAL": "1",
+            "MCPTOON_SKILLS_VIEWS": os.pathsep.join([str(claude), str(cursor)]),
+            "MCPTOON_SKILLS_ROOTS": str(self.home / "skills"),
+            "MCPTOON_SKILLS_INDEX": str(self.home / "index.json"),
+            "MCPTOON_SKILLS_USAGE": str(self.home / "usage.json"),
+        }
+        with patch.dict(os.environ, env):
+            first = _run_main(["list"])
+            self.assertIn("mcptoon skill installed", first)
+            self.assertTrue(cfg.selfheal_done())
+
+            # Same release, but the user installs Cursor: its view now exists.
+            cursor.mkdir(parents=True)
+            second = _run_main(["list"])
+
+        self.assertTrue(
+            (cursor / "mcptoon" / "SKILL.md").is_file(),
+            "the agent installed after mcptoon never received the skill")
+        self.assertIn("mcptoon skill installed", second)
+
     def test_it_runs_once_per_machine(self):
+        (self.home / "views").mkdir(parents=True)
         self._run(["list"])
         second = self._run(["list"])
         self.assertNotIn("mcptoon skill installed", second,
@@ -306,6 +362,7 @@ class TestFirstRunSelfHeal(_IsolatedHome):
         defaults. Simulate the upgrade by changing the packaged skill's content —
         the next command must notice and refresh the view.
         """
+        (self.home / "views").mkdir(parents=True)
         self._run(["list"])
         view = self.home / "views" / "mcptoon" / "SKILL.md"
         self.assertTrue(view.is_file())
@@ -323,6 +380,7 @@ class TestFirstRunSelfHeal(_IsolatedHome):
 
     def test_an_unchanged_skill_does_not_heal_again(self):
         """Same release, second command: the fingerprint matches, so nothing runs."""
+        (self.home / "views").mkdir(parents=True)
         self._run(["list"])
         again = self._run(["list"])
         self.assertNotIn("mcptoon skill", again)

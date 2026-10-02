@@ -11,6 +11,7 @@
 import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -199,6 +200,42 @@ class TestInstallSelf:
         assert [r["written"] for r in rows] == [True, True]
         for v in views:
             assert (v / "mcptoon" / "SKILL.md").is_file()
+
+    def test_it_does_not_create_a_view_for_an_agent_that_is_not_installed(self, tmp_path):
+        """Default views only — an explicit `--view` is still honoured.
+
+        On a machine with none of the six agents, `install_self` used to `mkdir` all
+        six default view roots and report "installed for 6 agent(s)". A default root
+        that is not there means the agent is not installed, and an empty `.codex/skills`
+        shell helps nobody. An explicit `views=` (the CLI's `--view`, for an agent we do
+        not know about) is a deliberate instruction and must still create the folder.
+        """
+        with patch.object(skills, "_view_roots",
+                          return_value=[tmp_path / "there" / "skills",
+                                        tmp_path / "absent" / "skills"]):
+            (tmp_path / "there" / "skills").mkdir(parents=True)
+            rows = skills.install_self()
+
+        assert rows[0]["written"] is True
+        assert not (tmp_path / "absent" / "skills").exists(), (
+            "a default view that did not exist must not be created")
+
+        # Explicit views are a different contract: the user named the folder.
+        explicit = tmp_path / "explicit" / "skills"
+        skills.install_self(views=[explicit])
+        assert (explicit / "mcptoon" / "SKILL.md").is_file()
+
+    def test_views_missing_our_skill_tracks_only_existing_views(self, tmp_path):
+        present = self._view(tmp_path, "present")
+        absent = tmp_path / "absent" / "skills"
+        with patch.object(skills, "_view_roots", return_value=[present, absent]):
+            assert skills.views_missing_our_skill() is True
+            skills.install_self()
+            assert skills.views_missing_our_skill() is False, (
+                "an absent view is not 'missing our skill' — there is no agent to miss it")
+            (absent).mkdir(parents=True)
+            assert skills.views_missing_our_skill() is True, (
+                "a view that just appeared must be reported as missing our skill")
 
     def test_never_overwrites_a_skill_that_is_not_ours(self, tmp_path):
         """Another manager may own that folder — a foreign skill stays put.

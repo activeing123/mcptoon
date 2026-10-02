@@ -256,7 +256,7 @@ def _first_run_self_heal() -> None:
         from . import skills as skills_mod
 
         fingerprint = skills_mod.self_fingerprint()
-        if cfg.selfheal_done(fingerprint):
+        if cfg.selfheal_done(fingerprint) and not skills_mod.views_missing_our_skill():
             return
 
         rows = skills_mod.install_self()
@@ -264,11 +264,15 @@ def _first_run_self_heal() -> None:
         refreshed = [r for r in wrote if r.get("updated")]
         fresh = len(wrote) - len(refreshed)
         if fresh:
-            print(f"  ✓ mcptoon skill installed for {fresh} agent(s) — "
+            print(f"  ✓ mcptoon skill installed for {fresh} agent folder(s) — "
                   f"they can read what the defaults are")
         if refreshed:
-            print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent(s) — "
+            print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent folder(s) — "
                   f"they now read the current defaults")
+        if not rows:
+            print("  · no known agent skill folder here yet — for any agent mcptoon "
+                  "does not know about, run: mcptoon skills install-self "
+                  "--view <that agent's skills folder>")
         if skills_mod.ensure_index():
             n = len(skills_mod.load_index().get("skills") or [])
             if n:
@@ -1187,11 +1191,15 @@ def _cmd_quickstart(rest, fmt="auto"):
             refreshed = [r for r in wrote if r.get("updated")]
             fresh = len(wrote) - len(refreshed)
             if fresh:
-                print(f"  ✓ mcptoon skill installed for {fresh} agent(s) — "
+                print(f"  ✓ mcptoon skill installed for {fresh} agent folder(s) — "
                       f"they can read what the defaults are")
             if refreshed:
-                print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent(s) — "
+                print(f"  ✓ mcptoon skill updated for {len(refreshed)} agent folder(s) — "
                       f"they now read the current defaults")
+            if not installed:
+                print("  · no known agent skill folder here yet — run "
+                      "`mcptoon skills install-self --view <your agent's skills folder>` "
+                      "to place it for an agent mcptoon does not know about")
             # Record the same marker the first-run self-heal uses, so onboarding
             # does not leave a machine that heals all over again on the next
             # command. Best-effort like the rest of this block.

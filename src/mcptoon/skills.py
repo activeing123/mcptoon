@@ -195,6 +195,45 @@ def _default_roots() -> list[Path]:
     return [p for p in _view_roots() if p.is_dir()]
 
 
+def _existing_view_roots() -> list[Path]:
+    """The view roots that already exist — the agents actually on this machine.
+
+    `install_self` writes only to these. A folder that is not there means the agent
+    is not installed, and creating `<home>/.codex/skills` for a Codex that is not on
+    the machine helps nobody. Measured 2026-10-02 on a clean Windows box: quickstart
+    created six such folders (`.claude`, `.agents`, `.codex`, `.cursor`, `.catpaw`,
+    `.codeium/windsurf`) and reported "installed for 6 agent(s)" — none of the six
+    agents existed. The folders were empty shells and the number was a falsehood.
+
+    The "I installed the agent *after* mcptoon" case is **not** lost by this filter:
+    `_first_run_self_heal` re-checks for a view that exists but lacks our skill on
+    every command, so the copy appears as soon as the agent's folder does. See the
+    `views_missing_our_skill` note there.
+
+    Overridable with ``MCPTOON_SKILLS_VIEWS`` (through `_view_roots`) — that is what
+    tests use to stay in a sandbox, and what `--view` bypasses for an agent we do not
+    know about.
+    """
+    return [p for p in _view_roots() if p.is_dir()]
+
+
+def views_missing_our_skill(views: list[Path] | None = None) -> bool:
+    """True when an existing agent view does not hold our skill yet.
+
+    This is the cheap half of the self-heal's "is there anything left to do?" check
+    — a stat per existing view, no file reads. It exists because the self-heal marker
+    is written **once per release**, so without it a user who installs their agent
+    *after* mcptoon would never get the skill: the marker would match on every later
+    command and the heal would return early, forever.
+
+    A view that holds a *different* skill under our folder name is not "missing" —
+    `install_self` deliberately leaves another manager's file alone, so re-healing
+    for it would be a no-op every command.
+    """
+    roots = _existing_view_roots() if views is None else list(views)
+    return any(not (Path(v) / "mcptoon" / "SKILL.md").exists() for v in roots)
+
+
 def _view_roots() -> list[Path]:
     """Every agent skill folder a synced catalog should appear in.
 
@@ -309,6 +348,12 @@ def install_self(views: list[Path] | None = None,
                  dry_run: bool = False) -> list[dict]:
     """Make mcptoon's own skill visible to every agent that has a skill folder.
 
+    "Has a skill folder" means the folder **exists on this machine** — see
+    `_existing_view_roots`. Creating one for an agent that is not installed produced
+    six empty shells and the false line "installed for 6 agent(s)" on a clean box
+    (measured 2026-10-02). Callers that want to write somewhere we do not know about
+    pass `views=` (the CLI exposes it as `--view`).
+
     Why this is not `sync`: a catalog sync distributes *the user's* skills from one
     source. This installs exactly one file — mcptoon's own — and only where an
     agent looks. Without it a `pip install mcptoon` leaves no skill anywhere.
@@ -331,7 +376,7 @@ def install_self(views: list[Path] | None = None,
     ``skipped`` is True when the view was deliberately left alone.
     """
     source = packaged_skill_path()
-    roots = _view_roots() if views is None else list(views)
+    roots = _existing_view_roots() if views is None else list(views)
     results: list[dict] = []
 
     if not source.is_file():
@@ -1411,6 +1456,10 @@ def _cmd_skills_install_self(args: list[str], fmt: str) -> None:
         return
     print(f"  mcptoon skill: {len(created)} installed, {len(refreshed)} refreshed, "
           f"{len(skipped)} left alone, {len(failed)} failed")
+    if not rows:
+        print("  No agent skill folder found on this machine yet. If your agent keeps "
+              "skills elsewhere, name that folder:\n"
+              "    mcptoon skills install-self --view <that agent's skills folder>")
     if skipped:
         print("  A view is left alone when it already holds our current skill, or "
               "when it holds a different one (another manager may own that folder).")

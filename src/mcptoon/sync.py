@@ -865,13 +865,19 @@ def detect_installed_agents() -> list[dict]:
             "exists": p.parent.exists() or p.exists(),
         })
 
-    # Cline
+    # Cline — the extension's own globalStorage folder, not VS Code's.
+    #
+    # The check used to be `path.parent.parent.parent.parent.exists()` — the VS Code
+    # *User* directory, true on every machine with VS Code installed, Cline or not.
+    # `quickstart` therefore wrote a Cline config (and claimed it had detected Cline)
+    # for hosts that only ever had VS Code. `saoudrizwan.claude-dev` is Cline's
+    # extension folder; its existence is the actual evidence.
     path = _cline_path()
     agents.append({
         "id": "cline",
         "name": "Cline",
         "config_path": str(path),
-        "exists": path.parent.parent.parent.parent.exists() if path.parts else False,
+        "exists": path.parent.parent.exists() if path.parts else False,
     })
 
     # Windsurf
@@ -1347,6 +1353,22 @@ def sync_to_all(dry_run: bool = False, config: dict | None = None,
         if key in seen_paths:
             continue
         seen_paths.add(key)
+        # Only write where the agent is actually installed. `detect_installed_agents`
+        # already answers that per agent; until 2026-10-02 the answer was only *stored*
+        # (`config_exists`) and never acted on, so `quickstart` created a config file
+        # for all five hosts on a machine that had none of them — including
+        # `%APPDATA%\Code\User\settings.json`, which a user may later open in a real
+        # VS Code and find an `mcp` block they never wrote. Skipping keeps the promise
+        # the output makes ("every agent it detects"); `not installed` is already the
+        # right row to print.
+        if agent.get("exists") is False:
+            results.append({
+                "agent": agent["id"], "agent_name": agent["name"],
+                "path": str(_agent_config_path(agent["id"]) or ""),
+                "servers_synced": 0, "taken_over": 0, "written": False,
+                "error": None, "config_exists": False, "skipped_not_installed": True,
+            })
+            continue
         result = sync_to_agent(agent["id"], dry_run=dry_run, config=config,
                                include_self=include_self, takeover=takeover)
         result["agent_name"] = agent["name"]

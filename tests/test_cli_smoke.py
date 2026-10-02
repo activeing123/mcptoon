@@ -189,6 +189,12 @@ class TestAgentLoadsTheGateway(unittest.TestCase):
                             "mcptoon", "demo-server")
         self.assertEqual(add.returncode, 0, add.stdout + add.stderr)
 
+        # `sync` now writes only where an agent is installed, and this temp HOME has
+        # no agent — so make one exist. `detect_installed_agents` reads the host's
+        # config *directories* (e.g. `~/.cursor`), so creating the parent is enough;
+        # the file itself is what sync writes, and `_find_self_entry` looks for it.
+        (self.home / ".cursor").mkdir(parents=True, exist_ok=True)
+
         sync = self._mcptoon("sync", "--self")
         self.assertEqual(sync.returncode, 0, sync.stdout + sync.stderr)
 

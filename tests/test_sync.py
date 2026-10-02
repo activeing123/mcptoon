@@ -14,6 +14,7 @@ from mcptoon.sync import (
     format_sync_report,
     SELF_SERVER_NAME,
 )
+from mcptoon import sync as sync_mod
 
 
 # ─── Config conversion tests ───
@@ -190,14 +191,29 @@ class TestSyncToAgent:
 
 
 class TestSyncToAll:
-    def test_sync_all_dry_run(self):
-        """Every agent that syncs servers reports one; codex reports none by design."""
+    def test_sync_all_dry_run(self, tmp_path):
+        """Every *installed* agent that syncs servers reports one; codex reports none.
+
+        `sync_to_all` writes only where `detect_installed_agents` says the agent is
+        installed (see `test_it_does_not_write_a_config_for_an_agent_that_is_not_there`).
+        The developer's machine may have none of the five, so pin the presence the
+        test needs rather than depending on the host's `~/.claude` etc.
+        """
         config = {
             "servers": {
                 "fetch": {"transport": "stdio", "command": ["npx"], "args": ["-y", "@mcp/fetch"]},
             }
         }
-        results = sync_to_all(dry_run=True, config=config)
+        fake_agents = [
+            {"id": "claude-desktop", "name": "Claude Desktop",
+             "config_path": str(tmp_path / "claude.json"), "exists": True},
+            {"id": "cursor", "name": "Cursor (global)",
+             "config_path": str(tmp_path / "cursor.json"), "exists": True},
+            {"id": "codex", "name": "Codex",
+             "config_path": str(tmp_path / ".codex" / "AGENTS.md"), "exists": True},
+        ]
+        with patch.object(sync_mod, "detect_installed_agents", return_value=fake_agents):
+            results = sync_to_all(dry_run=True, config=config)
         assert len(results) > 0
         for r in results:
             if r["agent"] == "codex":
@@ -206,6 +222,31 @@ class TestSyncToAll:
                 assert r["servers_synced"] == 0
             else:
                 assert r["servers_synced"] == 1
+
+    def test_it_does_not_write_a_config_for_an_agent_that_is_not_there(self, tmp_path):
+        """The 2026-10-02 clean-box bug: five config files, zero agents installed.
+
+        `detect_installed_agents` reported `exists: False` for every host, and
+        `sync_to_all` stored that fact as `config_exists` and then wrote anyway —
+        creating `%APPDATA%\\Code\\User\\settings.json` on a machine with no VS Code.
+        """
+        config = {"servers": {"fetch": {"transport": "stdio", "command": ["npx"],
+                                        "args": ["-y", "@mcp/fetch"]}}}
+        fake_agents = [
+            {"id": "claude-desktop", "name": "Claude Desktop",
+             "config_path": str(tmp_path / "claude.json"), "exists": False},
+            {"id": "cursor", "name": "Cursor (global)",
+             "config_path": str(tmp_path / "cursor.json"), "exists": False},
+        ]
+        with patch.object(sync_mod, "detect_installed_agents", return_value=fake_agents), \
+                patch.object(sync_mod, "sync_to_agent") as fake_sync:
+            results = sync_to_all(dry_run=False, config=config)
+
+        fake_sync.assert_not_called()
+        assert not (tmp_path / "claude.json").exists()
+        assert not (tmp_path / "cursor.json").exists()
+        assert all(r["written"] is False for r in results)
+        assert all(r.get("skipped_not_installed") for r in results)
 
 
 class TestCodexSkillPointer:
@@ -305,6 +346,32 @@ class TestClaudeCodeTarget:
         with patch("mcptoon.sync._claude_code_path", return_value=tmp_path / "nope.json"):
             ids = [a["id"] for a in detect_installed_agents()]
         assert "claude-code" not in ids
+
+    def test_cline_needs_its_own_extension_folder_not_just_vs_code(self, tmp_path):
+        """VS Code installed ≠ Cline installed.
+
+        The old check was the VS Code *User* directory
+        (`path.parent.parent.parent.parent.exists()`), which is true on any machine
+        with VS Code — so `quickstart` claimed to detect Cline and wrote it a config
+        on hosts that never had it. `saoudrizwan.claude-dev` is the evidence.
+        """
+        from mcptoon.sync import detect_installed_agents
+
+        user_dir = tmp_path / "Code" / "User"
+        cline = (user_dir / "globalStorage" / "saoudrizwan.claude-dev"
+                 / "settings" / "cline_mcp_settings.json")
+
+        # VS Code present, Cline's extension folder absent → not detected.
+        user_dir.mkdir(parents=True)
+        with patch("mcptoon.sync._cline_path", return_value=cline):
+            cline_rows = [a for a in detect_installed_agents() if a["id"] == "cline"]
+        assert cline_rows and cline_rows[0]["exists"] is False
+
+        # Cline's extension folder present → detected.
+        (cline.parent.parent).mkdir(parents=True)
+        with patch("mcptoon.sync._cline_path", return_value=cline):
+            cline_rows = [a for a in detect_installed_agents() if a["id"] == "cline"]
+        assert cline_rows and cline_rows[0]["exists"] is True
 
 
 class TestTwoLegs:

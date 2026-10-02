@@ -63,7 +63,11 @@ def test_report_gateway_is_the_headline_not_the_slim_row():
 def test_per_turn_is_the_two_halves_added():
     data = report.build(query="zzz-no-match")
     pt = data["per_turn"]
-    assert pt["native_tokens"] == data["tools"]["full_tokens"] + data["skills"]["full_tokens"]
+    # `full_tokens` is None when that half has nothing cached — a third state,
+    # distinct from 0 ("measured, empty"). `build` adds it as 0, so the test must
+    # too, or it fails on a machine with no tool catalog and passes on one with.
+    native = (data["tools"]["full_tokens"] or 0) + (data["skills"]["full_tokens"] or 0)
+    assert pt["native_tokens"] == native
     assert pt["saved_tokens"] == pt["native_tokens"] - pt["after_tokens"]
 
 
