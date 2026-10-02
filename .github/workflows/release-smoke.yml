@@ -66,10 +66,19 @@ jobs:
     - name: Install mcptoon from PyPI (not from the checkout)
       shell: bash
       run: |
+        # `--no-cache-dir` on every install here. pip's HTTP cache stores the
+        # **simple index page**, and a release is visible at different moments on
+        # different CDN edges. On 0.8.9 the Windows runner cached that page while
+        # it still advertised 0.8.8; the retry loop below then re-resolved from
+        # the cached page on every attempt ("Using cached
+        # mcptoon-0.8.8-py3-none-any.whl") and burned all 6 tries, while ubuntu
+        # and macos installed 0.8.9 at the very same second. A retry that cannot
+        # observe new data is not a retry — it is a fixed coin flip that leaves a
+        # permanent false red on every release.
         if [ -n "${{ github.event.inputs.version }}" ]; then
-          python -m pip install "mcptoon==${{ github.event.inputs.version }}"
+          python -m pip install --no-cache-dir "mcptoon==${{ github.event.inputs.version }}"
         else
-          python -m pip install mcptoon
+          python -m pip install --no-cache-dir mcptoon
         fi
 
     - name: Confirm the import came from PyPI, not this checkout
@@ -89,7 +98,7 @@ jobs:
             exit 0
           fi
           echo "  attempt $i: not yet the released version; reinstalling in 20s"
-          python -m pip install --upgrade --force-reinstall mcptoon || true
+          python -m pip install --no-cache-dir --upgrade --force-reinstall mcptoon || true
           sleep 20
         done
         echo "the index never served the released version"; exit 1
