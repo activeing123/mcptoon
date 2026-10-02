@@ -44,6 +44,10 @@ _*.bat
 preview.html
 # Exception: __main__.py is NOT a temp script
 !src/mcptoon/__main__.py
+# 2026-10-02 事故：上面 `_*.py` 把 `src/mcptoon/_toon/__init__.py` 一并吃掉了，于是
+# v0.8.6 少打一个文件进 wheel，`mcptoon --version` 直接 ImportError（PyPI 上已坏）。
+# 包目录的前导下划线是包名的一部分，不是临时脚本 —— 名字带下划线的包要显式放行。
+!src/mcptoon/_toon/
 
 # Scratch workspace: task briefs, probe scripts and throwaway venvs. Nothing
 # here ships, and it only ever showed up as untracked noise in `git status`.
