@@ -2259,7 +2259,8 @@ def _cmd_skills_remove(source: Path, name: str, fmt: str, *,
 
 
 def _cmd_skills_list(index: dict, fmt: str, show_usage: bool,
-                     include_aliases: bool = False) -> None:
+                     include_aliases: bool = False, head_n: int = 0,
+                     max_chars: int = 0, full: bool = False) -> None:
     skills_list = index.get("skills", [])
     usage = _load_skill_usage() if show_usage else {}
     rows = []
@@ -2276,8 +2277,15 @@ def _cmd_skills_list(index: dict, fmt: str, show_usage: bool,
             row["lastUsed"] = u.get("last", "")
         rows.append(row)
     rows.sort(key=lambda r: (-r.get("uses", 0), r["slug"]) if show_usage else (r["slug"],))
+    if head_n > 0:
+        # Capped here, not in `render`, because the human table below shares `rows`.
+        rows = rows[:head_n]
     if fmt == "json":
-        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        from . import output
+        # Through `render` (not `json.dumps`) so `--max-chars`/`--full` work here too;
+        # the catalog is 400+ records, the biggest `--json` payload the CLI emits, and
+        # the global flags used to do nothing on it.
+        print(output.render(rows, fmt="json", max_chars=max_chars, full=full))
         return
     if show_usage:
         print(f"{'uses':>5}  {'last':<11}  skill")
@@ -2291,7 +2299,8 @@ def _cmd_skills_list(index: dict, fmt: str, show_usage: bool,
         print(f"\n  {len(rows)} skills (alias cards hidden; --all to include)")
 
 
-def _cmd_skills(rest: list[str], fmt: str) -> None:
+def _cmd_skills(rest: list[str], fmt: str, head_n: int = 0, max_chars: int = 0,
+                full: bool = False) -> None:
     action = rest[0] if rest else ""
     args = rest[1:]
 
@@ -2495,7 +2504,8 @@ def _cmd_skills(rest: list[str], fmt: str) -> None:
 
     if action == "list":
         _cmd_skills_list(index, fmt, show_usage="--usage" in args,
-                         include_aliases="--all" in args)
+                         include_aliases="--all" in args,
+                         head_n=head_n, max_chars=max_chars, full=full)
         return
 
     if action == "stats":

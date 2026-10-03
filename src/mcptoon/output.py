@@ -23,7 +23,8 @@ Output modes:
   --compact    Space-separated names only (~2.3 tokens per tool: 581 for 255)
   --raw        Raw response body (no JSON parsing)
   --head N     Limit array output to first N records
-  --max-chars N  Truncate output to N chars (default: 4000, use --full for unlimited)
+  --max-chars N  Truncate output to N chars (default: 4000 for human-readable
+                 formats; --json/--toon are never char-truncated by default)
   --full       Disable truncation
 
 Adaptive format: MCPTOON_AGENT_TYPE env var (optional, defaults to JSON)
@@ -832,13 +833,36 @@ def compact(obj, max_items=30):
     return str(obj)[:200]
 
 
-# ─── Head (array limiter) ───
+# ─── Head (item limiter) ───
 
 def head(obj, n=10):
-    """Limit output to first N items (for lists)."""
+    """Limit output to the first N items.
+
+    Two shapes, because a payload is not always a list:
+
+    * a **list** — its first N elements.
+    * a **mapping of records** (`{"filesystem": {...}, "memory": {...}}`) — the
+      first N keys in *sorted* order. Sorted, not insertion order, because dict
+      order is file order, which is arbitrary: "the first N servers" would then
+      mean "whichever N happened to be written first", and the same command run
+      twice could keep different records.
+
+    A mapping whose values are **lists** (a manifest of tools per server) keeps the
+    older behaviour — each list is capped — because that answers a different
+    question ("how many tools per server") and reshaping it would silently change
+    what `manifest --head` returns.
+
+    Found by attacking the flags: `--head` is documented as a global output flag but
+    did nothing on any mapping-shaped payload, so `install --list --head 1` printed
+    all three servers and `skills list --head 2` printed all 421 skills.
+    """
     if isinstance(obj, list):
         return obj[:n]
     if isinstance(obj, dict):
+        values = list(obj.values())
+        records = bool(values) and all(isinstance(v, dict) for v in values)
+        if records and len(obj) > n:
+            return {k: obj[k] for k in sorted(obj)[:n]}
         for k in list(obj.keys()):
             if isinstance(obj[k], list) and len(obj[k]) > n:
                 obj[k] = obj[k][:n]
@@ -847,7 +871,14 @@ def head(obj, n=10):
 
 # ─── Adaptive format ───
 
-_DEFAULT_MAX_CHARS = 4000  # default truncation threshold
+_DEFAULT_MAX_CHARS = 4000  # default truncation threshold (human-readable formats only)
+
+# Formats a script parses. Char-truncating any of these produces something that no
+# longer parses — see the note in `render`. `compact`/`slim`/`mcptoon` are TOON-ish
+# line formats that a parser *could* read, but they are the context-saving views and
+# are not the documented machine-readable contract; leaving them capped keeps
+# `--head`/`--max-chars` meaningful for them.
+_MACHINE_READABLE_FORMATS = frozenset({"json", "toon"})
 
 
 def _auto_format():
@@ -903,11 +934,24 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
         # that land here get their payload whole.
         return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
-    # Truncation threshold
+    # Truncation threshold.
+    #
+    # Machine-readable formats (`json`, `toon`) are NOT char-truncated by default.
+    # A JSON document cut at 4,000 characters is not a shorter answer, it is
+    # *invalid JSON* — `mcptoon install --list --json | jq` fails outright, which is
+    # the exact opposite of what a machine-readable flag promises. So the default
+    # cap applies only to the formats a human reads in a terminal. An explicit
+    # `--max-chars N` still truncates anything, because there the user has asked.
+    #
+    # `--head N` is the format-agnostic way to shrink a large payload: it cuts
+    # structure (fewer records) rather than bytes, so the result stays valid in
+    # every format — including the machine-readable ones.
     if full:
         effective_max = 0
     elif max_chars > 0:
         effective_max = max_chars
+    elif fmt in _MACHINE_READABLE_FORMATS:
+        effective_max = 0
     else:
         effective_max = _DEFAULT_MAX_CHARS
 

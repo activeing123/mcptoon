@@ -57,7 +57,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
-              "337KB")
+              "337KB", "339KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -158,7 +158,12 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # crossed the 338 line, so the claim moves 337KB → 339KB. The growth is the new
 # `mcptoon retrieve` command, the `--raw`/`--full` wiring and the shared notice
 # table; `output.render` losing its compressor branch gave some back.
-WHEEL_KB = "339KB"
+# 2026-10-02 (unreleased, machine-readable output): 349,540 bytes = 341.35 KB — the
+# wheel crossed the 340 line, so the claim moves 339KB → 341KB. The growth is the
+# global output flags now reaching every handler that renders records (new
+# parameters, the flag-coverage probe's fixes, and the guard suite), plus `head()`
+# learning the mapping-of-records shape.
+WHEEL_KB = "341KB"
 
 
 def modules() -> list[Path]:

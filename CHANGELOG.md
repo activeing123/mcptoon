@@ -24,6 +24,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--json` is never char-truncated.** The 4,000-character default cap lived in
+  `output.render` and applied to every format, so a JSON payload past it came back with
+  `... [truncated, N chars total, use --full]` glued on — which is **not a shorter
+  document, it is invalid JSON**. Measured: `mcptoon install --list --json` was 4,048
+  bytes and `json.loads` raised `JSONDecodeError`; `mcptoon install --list --json | jq`
+  fails outright. The default cap now applies only to the formats a human reads in a
+  terminal (`compact` / `mcptoon` / `slim` / `raw`); `--json` and `--toon` are returned
+  whole, so `json.loads` and `toon_decode` both round-trip. An explicit `--max-chars N`
+  still truncates anything, because there the user asked.
+- **`--head N`, `--max-chars N` and `--full` are no longer silently ignored.** These are
+  documented global output flags, but several handlers never received them and
+  `output.head()` only understood lists — so on a mapping-shaped payload it did nothing.
+  Measured before the fix: `install --list --head 1` printed all 3 servers, `skills list
+  --head 2` printed all 421 skills, `install --list --max-chars 500` changed nothing.
+  `head()` now caps a mapping of records too (first N keys in **sorted** order, so "the
+  first N servers" is deterministic rather than file-order), and every handler that
+  renders a record collection — `install`, `skills list`, `health`, `discover`, `import`,
+  `config`, `stats`, `report`, `usage`, `footer-facts`, `retrieve` — accepts and forwards
+  the flags. `--head N` is now the format-agnostic way to shrink a large payload: it cuts
+  records, not bytes, so the result stays valid in every format.
 - **`--full` was a lie for `mcptoon install`.** `_cmd_install` never received `full`, so the
   truncation notice "use --full" pointed at a flag that changed nothing. Measured: `install --list`
   with and without `--full` produced byte-identical stdout (4,048 bytes, notice still present);
@@ -50,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- New `tests/test_machine_readable_output.py` pins the two promises above. It checks that
+  `--json`/`--toon` are not char-truncated while `compact`/`slim`/`mcptoon` still are, that an
+  explicit `--max-chars` still wins, that `head()` caps a mapping of records in sorted order
+  without reshaping a mapping of lists, that the CLI's `--json` actually parses, and that
+  `--head`/`--max-chars` shrink the payload. The flag-forwarding rule is checked
+  **structurally** — it enumerates every `output.render(` site in `cli.py`, walks back to the
+  enclosing `def`, and fails if any site drops a global flag — because reading the code to
+  answer the equivalent reachability question was wrong twice in this repo.
 - New `tests/test_next_step_works.py` pins the three promises above, grouped by the promise rather
   than by module: what the output tells the user to do next, and whether doing it works. It checks
   that `_cmd_install` accepts and forwards `full`, that `--raw` reaches `skip_poisoning_check` on

@@ -408,7 +408,7 @@ def _run(state: dict) -> None:
     elif command in ("manifest", "tools"):
         _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format)
     elif command == "inspect":
-        _cmd_inspect(rest, fmt, max_chars, full)
+        _cmd_inspect(rest, fmt, max_chars, full, head_n)
     elif command == "search":
         _cmd_search(rest, fmt, head_n, max_chars, full)
     elif command == "call":
@@ -422,18 +422,18 @@ def _run(state: dict) -> None:
     elif command == "remove":
         _cmd_remove(rest)
     elif command == "usage":
-        _cmd_usage(rest, fmt)
+        _cmd_usage(rest, fmt, head_n, max_chars, full)
     elif command in ("status", "brief"):
         _cmd_status(rest, fmt)
     elif command == "stats":
-        _cmd_stats(rest, fmt)
+        _cmd_stats(rest, fmt, head_n, max_chars, full)
     elif command == "report":
         from . import report as report_mod
-        report_mod.run(rest, fmt)
+        report_mod.run(rest, fmt, head_n, max_chars, full)
     elif command == "retrieve":
-        _cmd_retrieve(rest, fmt)
+        _cmd_retrieve(rest, fmt, max_chars)
     elif command == "footer-facts":
-        _cmd_footer_facts(rest, fmt)
+        _cmd_footer_facts(rest, fmt, max_chars)
     elif command == "toggle":
         _cmd_toggle(rest, fmt)
     elif command == "policy":
@@ -442,15 +442,15 @@ def _run(state: dict) -> None:
         if "--health" in rest:
             # Legacy health-check mode
             health_args = [a for a in rest if a != "--health"]
-            _cmd_health_check(health_args, fmt)
+            _cmd_health_check(health_args, fmt, head_n, max_chars, full)
         else:
-            _cmd_auto_discover(rest, fmt)
+            _cmd_auto_discover(rest, fmt, head_n, max_chars, full)
     elif command == "import":
-        _cmd_import(rest, fmt)
+        _cmd_import(rest, fmt, head_n, max_chars, full)
     elif command == "doctor":
         _cmd_doctor(rest)
     elif command == "install":
-        _cmd_install(rest, fmt, full)
+        _cmd_install(rest, fmt, full, head_n, max_chars)
     elif command == "update":
         from . import update as update_mod
         update_mod.run(rest, fmt)
@@ -476,12 +476,12 @@ def _run(state: dict) -> None:
         _cmd_plugin(rest, fmt)
     elif command == "skills":
         from .skills import _cmd_skills
-        _cmd_skills(rest, fmt)
+        _cmd_skills(rest, fmt, head_n, max_chars, full)
     elif command == "bench":
         from .bench import run_bench
         run_bench(rest, fmt)
     elif command == "config":
-        _cmd_config(rest, fmt)
+        _cmd_config(rest, fmt, head_n, max_chars, full)
     elif command in ("help", "-h", "--help"):
         _print_help()
     else:
@@ -665,8 +665,14 @@ def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
             print(text)
 
 
-def _cmd_inspect(rest, fmt, max_chars, full):
-    """Show tool schema."""
+def _cmd_inspect(rest, fmt, max_chars, full, head_n=0):
+    """Show tool schema.
+
+    `head_n` is the global `--head` flag. `inspect`'s payload is a single tool's
+    schema — a mapping, not a record collection — so `--head` has nothing to cap
+    here; it is accepted and forwarded for uniformity, not because it shrinks
+    anything. See `_cmd_install` for why the flags travel together.
+    """
     if len(rest) < 2:
         print("Usage: mcptoon inspect <server> <tool>")
         print("       mcptoon inspect <server>           (list all tools)")
@@ -697,7 +703,8 @@ def _cmd_inspect(rest, fmt, max_chars, full):
                 print(f"Could not reach {server}: {str(errs[0].get('error', ''))[:120]}")
         sys.exit(1)
 
-    print(output.render(info, fmt=fmt if fmt != "auto" else "json", max_chars=max_chars, full=full))
+    print(output.render(info, fmt=fmt if fmt != "auto" else "json", head_n=head_n,
+                        max_chars=max_chars, full=full))
 
 
 def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json=False):
@@ -1482,8 +1489,12 @@ def _maybe_offer_takeover(rest, fmt):
     _cmd_sync(["--takeover", "--yes"], fmt)
 
 
-def _cmd_health_check(rest, fmt):
+def _cmd_health_check(rest, fmt, head_n=0, max_chars=0, full=False):
     """Health check for configured servers (legacy discover behavior).
+
+    `head_n`/`max_chars`/`full` are the global output flags, threaded through so
+    `--head`, `--max-chars` and `--full` do not silently do nothing here. See
+    `_cmd_install` for why all three travel together.
 
     Usage:
         mcptoon discover --health           # check all servers
@@ -1532,9 +1543,9 @@ def _cmd_health_check(rest, fmt):
         })
 
     if fmt in ("toon", "mcptoon", "compact"):
-        print(output.render(results, fmt=fmt))
+        print(output.render(results, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
     elif fmt == "json":
-        print(output.render(results, fmt="json"))
+        print(output.render(results, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
     else:
         print(f"Health check: {len(results)} server(s)")
         print()
@@ -1740,11 +1751,16 @@ def _cmd_remove(rest):
         sys.exit(1)
 
 
-def _cmd_usage(_rest, fmt):
-    """Show usage stats."""
+def _cmd_usage(_rest, fmt, head_n=0, max_chars=0, full=False):
+    """Show usage stats.
+
+    `head_n`/`max_chars`/`full` are the global output flags. `--usage`'s JSON view
+    is the one machine-readable output long enough to matter here; without them
+    `--max-chars` was a no-op on it (found by the flag-coverage probe).
+    """
     stats = usage_mod.get_usage_stats()
     if fmt in ("toon", "mcptoon", "compact"):
-        print(output.render(stats, fmt=fmt))
+        print(output.render(stats, fmt=fmt, head_n=head_n, max_chars=max_chars, full=full))
     else:
         calls = int(stats.get("total_calls") or 0)
         print(f"Total calls: {calls}")
@@ -1764,7 +1780,7 @@ def _cmd_usage(_rest, fmt):
                 print(f"  {t:30s} {c}")
 
 
-def _cmd_retrieve(rest, fmt):
+def _cmd_retrieve(rest, fmt, max_chars=0):
     """mcptoon retrieve <handle> — the CLI's read half of compression.
 
     Why this exists: every `--smart` output can end with
@@ -1818,10 +1834,14 @@ def _cmd_retrieve(rest, fmt):
         else:
             print(json.dumps(original, ensure_ascii=False))
         return
-    print(output.render(original, fmt="json", full=True))
+    # The original is handed back whole — that is the point of a retrieve — unless
+    # the user asks for a cap with --max-chars. `fmt="json"` is machine-readable, so
+    # the default 4,000-char cap does not apply here anyway; passing `full=True`
+    # would be wrong, because it is checked first and would override --max-chars.
+    print(output.render(original, fmt="json", max_chars=max_chars))
 
 
-def _cmd_footer_facts(_rest, fmt):
+def _cmd_footer_facts(_rest, fmt, max_chars=0):
     """One line of real numbers for the per-turn savings footer. Never blocks.
 
     Usage:
@@ -1848,7 +1868,9 @@ def _cmd_footer_facts(_rest, fmt):
     f = footer_mod.facts()
 
     if fmt == "json":
-        print(json.dumps(f, indent=2, ensure_ascii=False))
+        # Routed through `render` rather than `json.dumps` so `--max-chars` works
+        # here too; `fmt="json"` keeps it machine-readable (no default cap).
+        print(output.render(f, fmt="json", max_chars=max_chars))
         return
 
     # Human line — the whole point is that this is pasteable into a turn.
@@ -1863,8 +1885,12 @@ def _cmd_footer_facts(_rest, fmt):
         print(f"note: {n}")
 
 
-def _cmd_stats(_rest, fmt):
+def _cmd_stats(_rest, fmt, head_n=0, max_chars=0, full=False):
     """Token savings dashboard — shows how much mcptoon saves vs raw JSON.
+
+    `head_n`/`max_chars`/`full` are the global output flags, threaded through so
+    they are not silently ignored (this dashboard's `by_server` map is the record
+    collection `--head` caps). See `_cmd_install` for why the three travel together.
 
     Usage:
         mcptoon stats              Human-readable dashboard
@@ -1948,7 +1974,7 @@ def _cmd_stats(_rest, fmt):
             "disabled_tools": len(disabled),
             "by_server": {s: {"full": by_server_full.get(s, 0), "slim": by_server_slim.get(s, 0)} for s in by_server_full},
         }
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print(output.render(data, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
     else:
         print("╔══════════════════════════════════════════╗")
         print("║      mcptoon — Token Savings Dashboard   ║")
@@ -2460,8 +2486,11 @@ def _gateway_wired_in() -> bool:
     return False
 
 
-def _cmd_config(rest, fmt):
+def _cmd_config(rest, fmt, head_n=0, max_chars=0, full=False):
     """Read or write gateway settings (footer, welcome, lang).
+
+    `head_n`/`max_chars`/`full` are the global output flags, forwarded so
+    `config --json` honours them. See `_cmd_install` for why they travel together.
 
     Usage:
         mcptoon config                 Show every setting
@@ -2475,7 +2504,8 @@ def _cmd_config(rest, fmt):
     if action in ("", "show", "list"):
         values = load_settings()
         if fmt == "json":
-            print(json.dumps(values, indent=2, ensure_ascii=False))
+            print(output.render(values, fmt="json", head_n=head_n,
+                                max_chars=max_chars, full=full))
             return
         print("mcptoon settings")
         for key in sorted(values):
@@ -2580,8 +2610,11 @@ def _cmd_toggle(rest, fmt):
     print(f"{server}:{tool} → {status}")
 
 
-def _cmd_auto_discover(rest, fmt):
+def _cmd_auto_discover(rest, fmt, head_n=0, max_chars=0, full=False):
     """Auto-discover MCP servers (network probe + config scan + env detection).
+
+    `head_n`/`max_chars`/`full` are the global output flags, threaded through so
+    `discover --json` honours them. See `_cmd_install` for why they travel together.
 
     Usage:
         mcptoon discover                  # auto-discover, print results
@@ -2642,9 +2675,11 @@ def _cmd_auto_discover(rest, fmt):
             print("    (the URL is recorded in the note below, but not as a server)")
 
     if fmt in ("toon", "mcptoon", "compact", "slim"):
-        print(output.render(list(result.servers.keys()), fmt=fmt))
+        print(output.render(list(result.servers.keys()), fmt=fmt,
+                            head_n=head_n, max_chars=max_chars, full=full))
     elif fmt == "json":
-        print(output.render(result.servers, fmt="json"))
+        print(output.render(result.servers, fmt="json",
+                            head_n=head_n, max_chars=max_chars, full=full))
     else:
         print(result.summary())
 
@@ -2658,8 +2693,11 @@ def _cmd_auto_discover(rest, fmt):
         print("Run: mcptoon manifest --slim")
 
 
-def _cmd_import(rest, fmt="auto"):
+def _cmd_import(rest, fmt="auto", head_n=0, max_chars=0, full=False):
     """Import MCP servers from another client's config.
+
+    `head_n`/`max_chars`/`full` are the global output flags, threaded through so
+    `import --json` honours them. See `_cmd_install` for why they travel together.
 
     Usage:
         mcptoon import                      # scan every known client (dry run)
@@ -2724,7 +2762,7 @@ def _cmd_import(rest, fmt="auto"):
 
     # ─── Report ───
     if fmt == "json":
-        print(output.render(servers, fmt="json"))
+        print(output.render(servers, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
         if do_write and servers:
             cfg.merge_servers(servers, overwrite=do_force)
         return
@@ -3015,16 +3053,20 @@ def _cmd_install_pack(pack_name, *, dry_run, fmt, list_only=False):
     print("  Next: mcptoon sync   (hand the new servers to your agents)")
 
 
-def _cmd_install(rest, fmt, full=False):
+def _cmd_install(rest, fmt, full=False, head_n=0, max_chars=0):
     """Install/list/remove MCP servers with auto-handler generation.
 
-    ``full`` comes from the global ``--full`` flag. It has to be forwarded rather
-    than assumed: these paths render through `_render_result`, which truncates at
-    the default 4,000 chars and prints "use --full" when it does. Before this
-    parameter existed the notice was a lie for every `install` subcommand — the
-    handler had no `full` to pass on, so `--full` changed nothing. Confirmed by
-    running `install --list` with and without it: byte-identical stdout, notice
-    still present.
+    ``full``, ``head_n`` and ``max_chars`` come from the global output flags. They
+    have to be forwarded rather than assumed: these paths render through
+    `_render_result`, which caps output and prints "use --full" when it does.
+
+    Why all three and not just ``full``: before this, only ``full`` was threaded
+    through, so `--head` and `--max-chars` were silently ignored here — the two
+    remaining global output flags that did not work on this one command. They were
+    fixed together because they are one defect (this handler did not receive the
+    output flags), not three. Confirmed by running `install --list` with each flag
+    and diffing stdout: `--full` changed nothing, `--head 1` changed nothing,
+    `--max-chars 500` changed nothing.
 
     Usage:
         mcptoon install <name> --npm <package>   Install from npm (npx)
@@ -3111,14 +3153,14 @@ def _cmd_install(rest, fmt, full=False):
         # calling it here would silently turn `--smart` into plain JSON.
         # Measured on this machine: `install --list` is 32,835 bytes and does get
         # compressed, so this is not a theoretical path.
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="list")
         return
 
     if do_remove:
         from .installer import remove_installed
         result = remove_installed(server_name)
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="remove")
         return
 
@@ -3156,21 +3198,21 @@ def _cmd_install(rest, fmt, full=False):
     if http_url:
         from .installer import install_http
         result = install_http(http_url, server_name, headers=http_headers)
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="http")
         return
 
     if npm_pkg:
         from .installer import install_npm
         result = install_npm(npm_pkg, server_name)
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="npm")
         return
 
     if pip_pkg:
         from .installer import install_pip
         result = install_pip(pip_pkg, server_name)
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="pip")
         return
 
@@ -3201,7 +3243,7 @@ def _cmd_install(rest, fmt, full=False):
             print(f"  Found: {results[0].get('name', server_name)} — {(results[0].get('description', '') or '')[:80]}")
 
         result = install_by_name(server_name)
-        _render_result(result, fmt, 0, 0, full, True,
+        _render_result(result, fmt, head_n, max_chars, full, True,
                        server="install", tool="by-name")
         from .errors import is_error
         if is_error(result):
@@ -3507,11 +3549,11 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
         return
 
     if any(kw in text for kw in ["发现", "搜索服务器", "discover", "auto-discover"]):
-        _cmd_auto_discover(rest, fmt)
+        _cmd_auto_discover(rest, fmt, head_n, max_chars, full)
         return
 
     if any(kw in text for kw in ["健康", "health", "check"]):
-        _cmd_health_check(rest, fmt)
+        _cmd_health_check(rest, fmt, head_n, max_chars, full)
         return
 
     print(f"Unknown command: {command}")
@@ -3616,11 +3658,14 @@ Output flags:
     --mcptoon      Legacy mcptoon pipe format (saves 20-40% tokens)
     --slim         Ultra-compact tool manifests (saves 88.5% tokens, measured)
     --smart        Structure-aware result compression (keeps keys, cuts payload)
-    --json         JSON output
+    --json         JSON output (never char-truncated — pipe it into jq)
     --compact      Names only
     --stdin        Read JSON args from stdin (for large payloads)
-    --head N       Limit to N items
-    --max-chars N  Truncate to N chars
+    --head N       Limit to the first N items — the format-agnostic way to shrink
+                          a big payload (cuts records, not bytes, so the result stays
+                          valid in every format)
+    --max-chars N  Truncate to N chars (default 4000 for human-readable formats;
+                          --json/--toon are capped only when you pass this)
     --full         No truncation
     --format X     Export: openai|openapi|mcp|json|human
     --fallback-json  Fall back to JSON if TOON encoding fails

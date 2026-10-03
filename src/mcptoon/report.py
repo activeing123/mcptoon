@@ -31,8 +31,6 @@ through the gateway) is reported as counted.
 
 from __future__ import annotations
 
-import json
-
 __all__ = ["build", "render", "run"]
 
 
@@ -214,8 +212,13 @@ def render(data: dict, lng: str = "en") -> str:
     return "\n".join(L)
 
 
-def run(rest: list[str], fmt: str = "auto") -> None:
-    """CLI entry: `mcptoon report [--query Q] [-k N] [--json]`."""
+def run(rest: list[str], fmt: str = "auto", head_n: int = 0, max_chars: int = 0,
+        full: bool = False) -> None:
+    """CLI entry: `mcptoon report [--query Q] [-k N] [--json]`.
+
+    `head_n`/`max_chars`/`full` are the global output flags, forwarded so they are
+    not silently ignored on this command (its `skills` list is what `--head` caps).
+    """
     query = "make a PDF"
     k = 5
     for i, a in enumerate(rest):
@@ -236,7 +239,11 @@ def run(rest: list[str], fmt: str = "auto") -> None:
 
     data = build(query=query, k=k)
     if fmt == "json":
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        # Through `render` rather than `json.dumps` so the global output flags work
+        # here; `fmt="json"` keeps it machine-readable (no default cap).
+        from . import output
+        print(output.render(data, fmt="json", head_n=head_n, max_chars=max_chars,
+                            full=full))
         return
     from . import config as cfg
     print(render(data, lng=cfg.resolve_lang()))
