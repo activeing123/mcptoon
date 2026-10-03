@@ -8,7 +8,7 @@
 
 **Install 1,000 skills and 1,000 MCP tools locally — and don't worry about the token context. mcptoon manages it all.**
 
-**Its own compact format cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number); no line of config to write for any desktop or command-line agent.**
+**Its own compact format does token optimization, tool discovery and context compression at once: it cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number) and writes no line of config for any desktop or command-line agent.**
 
 **Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
 
