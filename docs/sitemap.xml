@@ -5,12 +5,28 @@
     <loc>https://activeing123.github.io/mcptoon/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://activeing123.github.io/mcptoon/"/>
     <xhtml:link rel="alternate" hreflang="zh" href="https://activeing123.github.io/mcptoon/index-zh.html"/>
-    <lastmod>2026-09-16</lastmod>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://activeing123.github.io/mcptoon/"/>
+    <lastmod>2026-10-03</lastmod>
   </url>
   <url>
     <loc>https://activeing123.github.io/mcptoon/index-zh.html</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://activeing123.github.io/mcptoon/"/>
     <xhtml:link rel="alternate" hreflang="zh" href="https://activeing123.github.io/mcptoon/index-zh.html"/>
-    <lastmod>2026-09-16</lastmod>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://activeing123.github.io/mcptoon/"/>
+    <lastmod>2026-10-03</lastmod>
+  </url>
+  <url>
+    <loc>https://activeing123.github.io/mcptoon/tools/token-tax/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://activeing123.github.io/mcptoon/tools/token-tax/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://activeing123.github.io/mcptoon/tools/token-tax/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://activeing123.github.io/mcptoon/tools/token-tax/"/>
+    <lastmod>2026-10-03</lastmod>
+  </url>
+  <url>
+    <loc>https://activeing123.github.io/mcptoon/tools/token-tax/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://activeing123.github.io/mcptoon/tools/token-tax/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://activeing123.github.io/mcptoon/tools/token-tax/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://activeing123.github.io/mcptoon/tools/token-tax/"/>
+    <lastmod>2026-10-03</lastmod>
   </url>
 </urlset>
