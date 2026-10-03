@@ -42,9 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatter has no `server:tool` to key a handle on, so it cannot offer a way back — which makes
   the notice mandatory, not optional. It now appends the same "original not stored — this view
   is all there is" line that `compress_with_ccr` appends when its store refuses, and returns the
-  original untouched when nothing was applied. Reachability, stated plainly: the default format
-  is `json`, and both the CLI and the MCP bridge route `smart` through `compress_with_ccr`, so
-  this was a defective public entry point rather than a live path users were hitting.
+  original untouched when nothing was applied. Reachability, corrected after the release: an
+  earlier draft of this entry said the default format was `json` and that this was therefore only
+  a defective public entry point. That was wrong. `auto_smart_enabled()` is true, so
+  `resolve_output_format` returns `smart` for the default, and `mcptoon call` really does default
+  to smart — it is safe only because `call` routes through `compress_with_ccr`, which carries a
+  handle. Every *other* command that is passed `--smart` calls `output.render(result, fmt="smart")`
+  directly, and that path was the silent one. So this was a path users could hit, not a latent
+  one; after the fix it at least states that the dropped text is unrecoverable.
 - **A property defined by `anyOf` / `oneOf` collapsed to `{}`.** That is JSON Schema for "any
   value" — the least informative thing `schema_simplifier.py` can emit, for a property that is
   frequently *required*. The remove list at the top of the module never said combinators
