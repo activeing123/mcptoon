@@ -5,6 +5,36 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`--smart` on `mcptoon install` printed a compressed view with no way back.** `output.render`
+  was a second compression entry point next to `compressor.compress_with_ccr`, and the two had
+  drifted: the formatter discarded the stats, so a payload could come back cut with no retrieve
+  handle and nothing saying it had been cut. Measured on this machine, `mcptoon install --list`
+  is **32,835 bytes and does compress**, so this was a reachable path, not a theoretical one.
+  `_cmd_install`'s six render sites now go through `_render_result` — the same path `mcptoon call`
+  uses — so the compressed view carries `full text: mcptoon_retrieve handle=<id>`.
+- **`output.render(fmt="smart")` no longer compresses.** It has no `server:tool` to key a handle
+  on, so it cannot honour the contract that makes compression safe: whatever it hides must be
+  fetchable. It previously compressed and appended an "original not stored" admission — honest
+  about the loss, but still a loss, and a second entry point. There is one entry point now:
+  callers that want compression call `compress_with_ccr`; callers that reach the formatter get
+  their payload whole. Anyone relying on `render(fmt="smart")` to shrink a payload should call
+  `compress_with_ccr` instead.
+
+### Tests
+
+- New `tests/test_smart_reachability.py` pins the rule **structurally** rather than by inspection:
+  it enumerates every `render(` call site in the package, walks back to the enclosing `def`, and
+  fails if a `fmt=fmt` call has no `fmt` guard in between — i.e. if anything can hand `"smart"`
+  to a formatter that cannot return what it dropped. It also asserts `output.render` is not a
+  compression entry point and that `compress_with_ccr` is. This exists because reachability was
+  stated wrongly twice from reading the code (first missing that `auto_smart_enabled()` makes
+  `call` default to smart, then missing the `elif fmt == "json"` branches); the third answer came
+  from a script, so the script is the durable form.
+
 ## [0.8.11] - 2026-10-02
 
 ### Fixed

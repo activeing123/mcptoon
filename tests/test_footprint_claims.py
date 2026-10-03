@@ -151,6 +151,8 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # schema_simplifier.py added the per-string binary guard, the "applied False
 # means untouched" contract, the render(fmt='smart') admission, the combinator
 # preservation and the tests pinning each one.
+# 2026-10-02 (unreleased, smart reachability): 345,302 bytes = 337.21 KB — the
+# claim does not move (still 337KB), 35 KB of headroom before the next line.
 WHEEL_KB = "337KB"
 
 

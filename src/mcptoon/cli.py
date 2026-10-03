@@ -3025,13 +3025,22 @@ def _cmd_install(rest, fmt):
     if do_list:
         from .installer import list_installed
         result = list_installed()
-        print(output.render(result, fmt=fmt))
+        # Routed through `_render_result` rather than `output.render` directly:
+        # `--smart` must go down the *same* path as `call`, so the compressed view
+        # carries a retrieve handle. `output.render(fmt="smart")` no longer
+        # compresses at all (it has no store context to key a handle on), so
+        # calling it here would silently turn `--smart` into plain JSON.
+        # Measured on this machine: `install --list` is 32,835 bytes and does get
+        # compressed, so this is not a theoretical path.
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="list")
         return
 
     if do_remove:
         from .installer import remove_installed
         result = remove_installed(server_name)
-        print(output.render(result, fmt=fmt))
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="remove")
         return
 
     # mcptoon install --search <keyword>  → list matches, install nothing
@@ -3068,19 +3077,22 @@ def _cmd_install(rest, fmt):
     if http_url:
         from .installer import install_http
         result = install_http(http_url, server_name, headers=http_headers)
-        print(output.render(result, fmt=fmt))
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="http")
         return
 
     if npm_pkg:
         from .installer import install_npm
         result = install_npm(npm_pkg, server_name)
-        print(output.render(result, fmt=fmt))
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="npm")
         return
 
     if pip_pkg:
         from .installer import install_pip
         result = install_pip(pip_pkg, server_name)
-        print(output.render(result, fmt=fmt))
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="pip")
         return
 
     # mcptoon install <name>  (no --npm/--pip/--url) → auto-search & install
@@ -3110,7 +3122,8 @@ def _cmd_install(rest, fmt):
             print(f"  Found: {results[0].get('name', server_name)} — {(results[0].get('description', '') or '')[:80]}")
 
         result = install_by_name(server_name)
-        print(output.render(result, fmt=fmt))
+        _render_result(result, fmt, 0, 0, False, True,
+                       server="install", tool="by-name")
         from .errors import is_error
         if is_error(result):
             sys.exit(1)

@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from mcptoon import ccr, compressor, config as cfg, native_tools, output, serve
+from mcptoon import ccr, config as cfg, native_tools, output, serve
 
 
 def search_rows(n=25):
@@ -47,36 +47,29 @@ class EnvIsolated(unittest.TestCase):
 
 
 class TestSmartFormat(EnvIsolated):
-    def test_render_smart_is_valid_json_and_smaller(self):
-        rows = search_rows()
-        plain = json.dumps(rows, ensure_ascii=False)
-        smart = output.render(rows, fmt="smart")
-        self.assertLess(len(smart), len(plain))
-        self.assertIsInstance(json.loads(smart.splitlines()[0]), list)
+    def test_render_smart_does_not_compress(self):
+        """`output.render` is not a compression entry point any more.
 
-    def test_render_smart_says_what_it_dropped_is_unrecoverable(self):
-        """This formatter cannot reach the CCR store, so it cannot hand out a handle.
-
-        Without the trailing admission it returns a silently trimmed payload — the one
-        outcome the lossless contract forbids, and the reason `compress_with_ccr`
-        appends the same line when its store refuses. Found 2026-10-02: `render` had
-        discarded the stats entirely (`crushed, _stats = ...`), so not even the fact
-        that something was cut left a mark on the output.
+        It has no store context to key a retrieve handle on, so it cannot honour the
+        contract that makes compression safe — that whatever it hides can be fetched
+        back. It used to compress anyway and append an "original not stored"
+        admission: honest about the loss, but still a loss, and a *second* entry
+        point next to `compressor.compress_with_ccr`. Two entry points is what let
+        the bug in (this one discarded the stats and rendered a crushed payload with
+        no handle and no notice, on the reachable `mcptoon install … --smart` path).
         """
         rows = search_rows()
+        plain = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
         smart = output.render(rows, fmt="smart")
-        body = smart.splitlines()[0]
-        self.assertEqual(len(json.loads(body)), compressor.DEFAULT_KEEP_HEAD)
-        tail = smart.splitlines()[-1]
-        self.assertIn("original not stored", tail)
-        self.assertIn("nothing to retrieve", tail)
+        self.assertEqual(smart, plain)
+        self.assertEqual(len(json.loads(smart)), len(rows))
+        self.assertNotIn("nothing to retrieve", smart)
+        self.assertNotIn("mcptoon_retrieve", smart)
 
-    def test_render_smart_returns_the_input_when_compression_does_not_help(self):
-        """`applied` False means the returned object is the input. `render` used to
-        render the crushed form regardless, which is how a payload could come back
-        edited with nothing saying so."""
-        payload = {"ok": True, "n": 1}
-        self.assertEqual(json.loads(output.render(payload, fmt="smart")), payload)
+    def test_render_smart_keeps_a_payload_compression_would_have_cut(self):
+        payload = [{"id": i, "image": "A" * 400} for i in range(3)]
+        rendered = json.loads(output.render(payload, fmt="smart"))
+        self.assertEqual(rendered, payload)
 
     def test_smart_is_a_valid_policy(self):
         self.assertIn("smart", cfg.VALID_POLICIES)

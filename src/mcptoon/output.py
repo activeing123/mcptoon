@@ -887,27 +887,21 @@ def render(obj, fmt="auto", compact_mode=False, head_n=0, max_chars=0, full=Fals
         fmt = _auto_format()
 
     if fmt == "smart":
-        # Structure-aware compression (compressor.py): keep navigation, compress
-        # payload. Never char-truncated — that would cut valid JSON mid-object.
+        # This formatter does NOT compress. It has no store context (`server:tool`)
+        # to key a retrieve handle on, so it cannot honour the contract that makes
+        # compression safe to ship — that whatever it hides can be fetched back.
         #
-        # This pure formatter cannot reach the CCR store (it has no server:tool to
-        # key a handle on), so it cannot offer a way back. That makes the notice
-        # mandatory rather than optional: without it a caller receives a silently
-        # trimmed payload — the one outcome the lossless contract forbids. The
-        # line is the same one `compressor.compress_with_ccr` appends when its
-        # store refuses, so the two paths read alike.
+        # It used to compress anyway and append an "original not stored" admission.
+        # That was honest about the loss, but it was still a loss, and it made this
+        # a *second* compression entry point next to `compressor.compress_with_ccr`.
+        # Two entry points is what let the bug in: this one discarded the stats and
+        # rendered a crushed payload with no handle and no notice at all, on a path
+        # (`mcptoon install … --smart`) a user could actually reach.
         #
-        # The stats used to be discarded (`crushed, _stats = ...`), which meant a
-        # payload that was not actually shrunk was still rendered in its crushed
-        # form. `compress()` now returns the input untouched in that case, and the
-        # flag is consulted here so the original is what gets rendered.
-        from . import compressor as _compressor
-        crushed, stats = _compressor.compress(obj)
-        if not stats.get("applied"):
-            return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
-        text = json.dumps(crushed, ensure_ascii=False, separators=(",", ":"))
-        line = _compressor.notice(stats, None)
-        return f"{text}\n{line}" if line else text
+        # So there is one entry point now. Callers that want compression call
+        # `compress_with_ccr` (the CLI reaches it through `_render_result`); callers
+        # that land here get their payload whole.
+        return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
     # Truncation threshold
     if full:
