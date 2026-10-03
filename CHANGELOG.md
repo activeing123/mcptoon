@@ -42,14 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatter has no `server:tool` to key a handle on, so it cannot offer a way back — which makes
   the notice mandatory, not optional. It now appends the same "original not stored — this view
   is all there is" line that `compress_with_ccr` appends when its store refuses, and returns the
-  original untouched when nothing was applied. Reachability, corrected after the release: an
-  earlier draft of this entry said the default format was `json` and that this was therefore only
-  a defective public entry point. That was wrong. `auto_smart_enabled()` is true, so
-  `resolve_output_format` returns `smart` for the default, and `mcptoon call` really does default
-  to smart — it is safe only because `call` routes through `compress_with_ccr`, which carries a
-  handle. Every *other* command that is passed `--smart` calls `output.render(result, fmt="smart")`
-  directly, and that path was the silent one. So this was a path users could hit, not a latent
-  one; after the fix it at least states that the dropped text is unrecoverable.
+  original untouched when nothing was applied. Reachability, corrected twice after the release.
+  The first draft said the default format was `json` and this was therefore only a public-entry-point
+  defect — wrong: `auto_smart_enabled()` is true, so `mcptoon call` really does default to smart
+  (safe, because `call` routes through `compress_with_ccr`, which carries a handle). The second draft
+  said "every other command that is passed `--smart`" — also wrong, and this time in the direction of
+  overstating. Mapping all 21 `output.render` call sites in `cli.py` shows the format whitelists in
+  `manifest` / `inspect` / `search` / `health-check` / `usage` / `discover` / `import` already send
+  smart down their prose branch; the sites that can receive it unfiltered are the six in
+  **`_cmd_install`** (`--list`, `--remove`, `--url`, `--npm`, `--pip`, and install-by-name). So the
+  silent path was `mcptoon install … --smart`, a narrow but genuinely reachable one.
 - **A property defined by `anyOf` / `oneOf` collapsed to `{}`.** That is JSON Schema for "any
   value" — the least informative thing `schema_simplifier.py` can emit, for a property that is
   frequently *required*. The remove list at the top of the module never said combinators
