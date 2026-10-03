@@ -7,7 +7,7 @@ description: "Compress MCP tool discovery with the mcptoon CLI. Trigger when a s
 # mcptoon — MCP tool-catalog compression
 
 mcptoon is a zero-dependency CLI. If it is not installed yet, one command sets
-it up: `pip install mcptoon` (337KB, installs in seconds, nothing else pulled
+it up: `pip install mcptoon` (339KB, installs in seconds, nothing else pulled
 in). It gives you a compressed view of the user's MCP tools and calls them
 back.
 
@@ -156,7 +156,10 @@ objects. It **leaves alone** a single source file, one long prose answer, an
 image/base64 blob, and any lone short value — those pass through byte-for-byte.
 A compressed result is *reversible*: the full original is cached and the result
 carries `full text: mcptoon_retrieve handle=<id>`; call the `mcptoon_retrieve`
-tool with that handle to get it back exactly. Cached originals **no longer expire
+tool with that handle to get it back exactly. Driving the **CLI** instead of an
+MCP session? `mcptoon retrieve <handle>` reads the same store and prints the same
+original — the handle is redeemable from either side (`mcptoon retrieve --list`
+shows what the store holds). Cached originals **no longer expire
 on a timer** — the store is bounded by size instead (`MCPTOON_CCR_MAX_BYTES`,
 default 200 MB, evicted oldest-first), so an original stays retrievable for the
 whole session. `MCPTOON_CCR_TTL` restores timer-based expiry for anyone who wants
@@ -231,7 +234,7 @@ and only when `mcptoon serve` is actually registered with that agent.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  337KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  339KB, installs in seconds). Confirm the upgrade before running it — pinning a
   version here would only go stale, but a bare `--upgrade` should be your call,
   not an automatic one.
 - Source: this package is published to PyPI by GitHub Actions from

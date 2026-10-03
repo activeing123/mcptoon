@@ -87,8 +87,8 @@ _COMPLETION_COMMANDS = (
     "add", "bench", "call", "completion", "config", "demo", "demo-server",
     "discover", "doctor", "footer-facts", "health", "help", "import", "init",
     "inspect", "install", "list", "manifest", "off", "plugin", "policy",
-    "quickstart", "remove", "report", "restore", "search", "serve", "skills",
-    "stats", "status", "sync", "toggle", "uninstall", "update", "usage",
+    "quickstart", "remove", "report", "restore", "retrieve", "search", "serve",
+    "skills", "stats", "status", "sync", "toggle", "uninstall", "update", "usage",
     # aliases the dispatch chain also accepts
     "servers", "tools", "qs", "brief",
 )
@@ -119,7 +119,11 @@ def unknown_flag_warnings(args):
 # preceded by "hi, here's what I configured for you" — greeting someone on the way
 # out is the same obliviousness this release is about.
 _WELCOME_EXEMPT = frozenset({"serve", "demo", "demo-server", "completion",
-                             "help", "-h", "--help", "off", "restore", "uninstall"})
+                             "help", "-h", "--help", "off", "restore", "uninstall",
+                             # `retrieve` prints a payload on stdout, so the
+                             # one-time greeting must not land in front of it —
+                             # the same reason `serve` is here.
+                             "retrieve"})
 
 
 def _maybe_welcome(command: str, fmt: str) -> None:
@@ -426,6 +430,8 @@ def _run(state: dict) -> None:
     elif command == "report":
         from . import report as report_mod
         report_mod.run(rest, fmt)
+    elif command == "retrieve":
+        _cmd_retrieve(rest, fmt)
     elif command == "footer-facts":
         _cmd_footer_facts(rest, fmt)
     elif command == "toggle":
@@ -444,7 +450,7 @@ def _run(state: dict) -> None:
     elif command == "doctor":
         _cmd_doctor(rest)
     elif command == "install":
-        _cmd_install(rest, fmt)
+        _cmd_install(rest, fmt, full)
     elif command == "update":
         from . import update as update_mod
         update_mod.run(rest, fmt)
@@ -767,7 +773,8 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
 
         from .router import call_tool_auto
         result = call_tool_auto(tool, args, is_destructive=is_destructive,
-                                return_envelope=return_envelope)
+                                return_envelope=return_envelope,
+                                skip_poisoning_check=(fmt == "raw"))
 
         if is_error(result):
             err = result["_error"]
@@ -836,7 +843,14 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
     result = call_tool(server, tool, args, is_destructive=is_destructive,
                        return_envelope=return_envelope,
                        input_responses=input_responses,
-                       request_state=request_state)
+                       request_state=request_state,
+                       # `--raw` is the documented way past the safety screen — the
+                       # CREDENTIAL_LEAK/TOOL_POISONING fix hint says so verbatim.
+                       # It was never wired: `--raw` only set the *output* format, so
+                       # the screen still blocked the result and the advertised escape
+                       # hatch did nothing. A hint that names a flag the code does not
+                       # read is worse than no hint — the user already failed once.
+                       skip_poisoning_check=(fmt == "raw"))
 
     if is_error(result):
         err = result["_error"]
@@ -1748,6 +1762,63 @@ def _cmd_usage(_rest, fmt):
             print("\nTop tools:")
             for t, c in stats["top_tools"].items():
                 print(f"  {t:30s} {c}")
+
+
+def _cmd_retrieve(rest, fmt):
+    """mcptoon retrieve <handle> — the CLI's read half of compression.
+
+    Why this exists: every `--smart` output can end with
+    `full text: mcptoon_retrieve handle=<id>`, and that handle was only
+    redeemable from an MCP session, because `mcptoon_retrieve` is a native MCP
+    tool and the CLI had no counterpart. A shell-only user (or an agent driving
+    the CLI, which is how most of mcptoon is actually used) was told exactly how
+    to get their data back and then had no way to do it. The command closes that
+    hole: same store, same handle, same failure sentences (they live in
+    `ccr.RETRIEVE_NOTICES` so the two paths cannot drift).
+
+    Usage:
+        mcptoon retrieve <handle>            # print the original
+        mcptoon retrieve <handle> --json     # as JSON (default is also JSON)
+        mcptoon retrieve --list              # what is in the store right now
+    """
+    from . import ccr
+
+    if not rest or rest[0] in ("-h", "--help"):
+        print("Usage: mcptoon retrieve <handle>")
+        print("       mcptoon retrieve --list        Show what is in the store")
+        print("")
+        print("  Handles are printed by any --smart command, e.g.:")
+        print("      mcptoon install --list --smart")
+        print("      mcptoon call <server> <tool> --smart")
+        return
+
+    if rest[0] == "--list":
+        info = ccr.stats()
+        policy = ccr.policy()
+        ttl = policy.get("ttl") or 0
+        print(f"Stored originals: {info['count']}")
+        print(f"Store size:       {info['bytes']:,} bytes")
+        print(f"Oldest entry:     {info['oldest_age']}s")
+        print(f"Retention:        {'never expires' if not ttl else f'{ttl}s TTL'}")
+        print(f"Store dir:        {ccr._store_dir()}")
+        return
+
+    handle = rest[0]
+    status, original = ccr.retrieve_status(handle)
+    if status != ccr.STATUS_OK:
+        # A miss is an error, not an empty success: `mcptoon retrieve <h> && ...`
+        # must not look like it worked. Same exit-code rule as `remove`/`config get`.
+        print(f"❌ {ccr.retrieve_notice(status)}", file=sys.stderr)
+        print(f"   status: {status}", file=sys.stderr)
+        sys.exit(1)
+
+    if fmt in ("raw",):
+        if isinstance(original, str):
+            print(original)
+        else:
+            print(json.dumps(original, ensure_ascii=False))
+        return
+    print(output.render(original, fmt="json", full=True))
 
 
 def _cmd_footer_facts(_rest, fmt):
@@ -2944,8 +3015,16 @@ def _cmd_install_pack(pack_name, *, dry_run, fmt, list_only=False):
     print("  Next: mcptoon sync   (hand the new servers to your agents)")
 
 
-def _cmd_install(rest, fmt):
+def _cmd_install(rest, fmt, full=False):
     """Install/list/remove MCP servers with auto-handler generation.
+
+    ``full`` comes from the global ``--full`` flag. It has to be forwarded rather
+    than assumed: these paths render through `_render_result`, which truncates at
+    the default 4,000 chars and prints "use --full" when it does. Before this
+    parameter existed the notice was a lie for every `install` subcommand — the
+    handler had no `full` to pass on, so `--full` changed nothing. Confirmed by
+    running `install --list` with and without it: byte-identical stdout, notice
+    still present.
 
     Usage:
         mcptoon install <name> --npm <package>   Install from npm (npx)
@@ -3032,14 +3111,14 @@ def _cmd_install(rest, fmt):
         # calling it here would silently turn `--smart` into plain JSON.
         # Measured on this machine: `install --list` is 32,835 bytes and does get
         # compressed, so this is not a theoretical path.
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="list")
         return
 
     if do_remove:
         from .installer import remove_installed
         result = remove_installed(server_name)
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="remove")
         return
 
@@ -3077,21 +3156,21 @@ def _cmd_install(rest, fmt):
     if http_url:
         from .installer import install_http
         result = install_http(http_url, server_name, headers=http_headers)
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="http")
         return
 
     if npm_pkg:
         from .installer import install_npm
         result = install_npm(npm_pkg, server_name)
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="npm")
         return
 
     if pip_pkg:
         from .installer import install_pip
         result = install_pip(pip_pkg, server_name)
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="pip")
         return
 
@@ -3122,7 +3201,7 @@ def _cmd_install(rest, fmt):
             print(f"  Found: {results[0].get('name', server_name)} — {(results[0].get('description', '') or '')[:80]}")
 
         result = install_by_name(server_name)
-        _render_result(result, fmt, 0, 0, False, True,
+        _render_result(result, fmt, 0, 0, full, True,
                        server="install", tool="by-name")
         from .errors import is_error
         if is_error(result):
@@ -3485,6 +3564,8 @@ Usage:
     mcptoon stats                         Token-savings dashboard (vs raw JSON)
     mcptoon report                        Whole savings account on one screen
     mcptoon footer-facts                  One line of savings for a chat footer
+    mcptoon retrieve <handle>             Get back the original behind a --smart handle
+    mcptoon retrieve --list               Show what the retrieve store holds right now
     mcptoon config                        Show gateway settings (footer, welcome)
     mcptoon config set footer off         Silence the per-turn savings line
     mcptoon toggle <server> <tool>        Enable/disable one tool (--list to show)

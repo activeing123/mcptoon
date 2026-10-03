@@ -7,8 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`mcptoon retrieve <handle>` — the CLI's half of compression.** Every `--smart` output can end
+  with `full text: mcptoon_retrieve handle=<id>`, but that handle was only redeemable from an MCP
+  session: `mcptoon_retrieve` is a native MCP tool and the CLI had no counterpart. A shell user (or
+  an agent driving the CLI, which is how most of mcptoon is used) was told exactly how to get their
+  data back and then had no command to run. Now `mcptoon retrieve <handle>` reads the same store and
+  prints the same original; `mcptoon retrieve --list` shows what the store holds. A miss exits 1
+  with the specific reason (`bad-handle` / `never-stored` / `expired` / `unreadable`), so
+  `mcptoon retrieve <typo> && …` cannot look like it worked.
+- The failure sentences now live in **one place** (`ccr.RETRIEVE_NOTICES` + `ccr.retrieve_notice`).
+  The MCP tool and the CLI answer the same question, so a second copy would be a drift waiting to
+  happen — and the empty-handle path in `native_tools` already had one, which is how the new
+  agreement test caught it.
+
 ### Fixed
 
+- **`--full` was a lie for `mcptoon install`.** `_cmd_install` never received `full`, so the
+  truncation notice "use --full" pointed at a flag that changed nothing. Measured: `install --list`
+  with and without `--full` produced byte-identical stdout (4,048 bytes, notice still present);
+  with the fix the same command returns 49,876 bytes and no notice.
+- **`--raw` was never wired to the safety screen.** The `CREDENTIAL_LEAK` / `TOOL_POISONING` fix
+  hint says "use --raw to bypass" verbatim, but `--raw` only set the *output format* — the screen
+  still blocked the result, so the advertised escape hatch did nothing. `--raw` now reaches the
+  router as `skip_poisoning_check=True`, on both the `call` and `call --auto` paths; the default
+  call still screens.
 - **`--smart` on `mcptoon install` printed a compressed view with no way back.** `output.render`
   was a second compression entry point next to `compressor.compress_with_ccr`, and the two had
   drifted: the formatter discarded the stats, so a payload could come back cut with no retrieve
@@ -26,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- New `tests/test_next_step_works.py` pins the three promises above, grouped by the promise rather
+  than by module: what the output tells the user to do next, and whether doing it works. It checks
+  that `_cmd_install` accepts and forwards `full`, that `--raw` reaches `skip_poisoning_check` on
+  both routing paths while a normal call still screens, that `mcptoon retrieve` returns the original
+  byte-identically, and that the CLI and the MCP tool answer every failure status with the *same*
+  sentence.
 - New `tests/test_smart_reachability.py` pins the rule **structurally** rather than by inspection:
   it enumerates every `render(` call site in the package, walks back to the enclosing `def`, and
   fails if a `fmt=fmt` call has no `fmt` guard in between — i.e. if anything can hand `"smart"`

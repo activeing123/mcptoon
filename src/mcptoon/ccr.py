@@ -411,6 +411,39 @@ def retrieve_status(handle: str) -> tuple[str, Any | None]:
     return STATUS_OK, entry.get("original")
 
 
+# One sentence per failure status, and **only one copy of them**. The MCP tool
+# (`native_tools._retrieve`) and the CLI (`mcptoon retrieve`) both answer the same
+# question — "why can't I have my data back?" — and the read half originally kept
+# that text in `native_tools` alone, so a CLI entry point would have needed a
+# second copy. Two copies of a message that must stay identical is exactly the
+# drift this module exists to prevent, so the sentences live here, next to the
+# closed status set they describe.
+#
+# The status is only useful if it changes what the reader does next: retype it,
+# fetch it again, or stop asking.
+RETRIEVE_NOTICES = {
+    STATUS_BAD_HANDLE: "That handle is not a handle (they are 12 lowercase hex "
+                       "characters, copied from a 'mcptoon_retrieve handle=...' line).",
+    STATUS_NEVER_STORED: "No stored result for that handle. Either it was never "
+                         "compressed, or the store evicted it to stay under its size "
+                         "budget — call the tool again to regenerate it.",
+    STATUS_EXPIRED: "That stored result expired and was deleted. Set "
+                    "MCPTOON_CCR_TTL=0 (or unset it) to keep originals indefinitely.",
+    STATUS_UNREADABLE: "The stored entry exists but could not be read (damaged or "
+                       "unreadable file). Call the tool again to regenerate it.",
+}
+
+
+def retrieve_notice(status: str) -> str:
+    """The one-sentence explanation for a failed :func:`retrieve_status`.
+
+    Unknown statuses fall back to the ``unreadable`` sentence, because "the store
+    exists but I cannot use it" is the honest description of any outcome this
+    table does not name.
+    """
+    return RETRIEVE_NOTICES.get(status, RETRIEVE_NOTICES[STATUS_UNREADABLE])
+
+
 def sweep() -> int:
     """Delete expired entries. Returns how many were removed.
 

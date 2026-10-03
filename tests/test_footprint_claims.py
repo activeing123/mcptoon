@@ -56,7 +56,8 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 # the CI job now builds is 297KB. The retired-value list keeps the old figure out.
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
-              "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB")
+              "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
+              "337KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -153,7 +154,11 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # preservation and the tests pinning each one.
 # 2026-10-02 (unreleased, smart reachability): 345,302 bytes = 337.21 KB — the
 # claim does not move (still 337KB), 35 KB of headroom before the next line.
-WHEEL_KB = "337KB"
+# 2026-10-02 (unreleased, next-step works): 347,304 bytes = 339.16 KB — the wheel
+# crossed the 338 line, so the claim moves 337KB → 339KB. The growth is the new
+# `mcptoon retrieve` command, the `--raw`/`--full` wiring and the shared notice
+# table; `output.render` losing its compressor branch gave some back.
+WHEEL_KB = "339KB"
 
 
 def modules() -> list[Path]:

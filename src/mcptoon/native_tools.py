@@ -806,11 +806,14 @@ def _retrieve(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform s
     forever.
     """
     handle = _as_str(arguments.get("handle"))
-    if not handle:
-        return {"found": False, "status": "bad-handle", "handle": "",
-                "notice": "Pass the handle from a result's "
-                "'mcptoon_retrieve handle=...' line."}
     from . import ccr as _ccr
+    if not handle:
+        # "You passed nothing" and "you passed a malformed handle" are the same
+        # failure from the reader's side, so they get the same sentence — from
+        # `ccr`, next to the status set, so the CLI's `mcptoon retrieve` says the
+        # same thing. A second wording here is a drift waiting to happen.
+        return {"found": False, "status": _ccr.STATUS_BAD_HANDLE, "handle": "",
+                "notice": _ccr.retrieve_notice(_ccr.STATUS_BAD_HANDLE)}
     try:
         status, original = _ccr.retrieve_status(handle)
     except Exception:  # pragma: no cover - defensive
@@ -818,23 +821,10 @@ def _retrieve(arguments: dict, state: dict) -> dict:  # noqa: ARG001 - uniform s
     if status == "ok":
         return {"found": True, "status": status, "handle": handle,
                 "original": original}
+    # The sentence comes from `ccr`, not from a copy kept here: the CLI's
+    # `mcptoon retrieve` answers the same question and must not be able to drift.
     return {"found": False, "status": status, "handle": handle,
-            "notice": _RETRIEVE_NOTICES.get(status, _RETRIEVE_NOTICES["unreadable"])}
-
-
-# One sentence per status, because the status is only useful if it changes what
-# the model does next: retype it, fetch it again, or stop asking.
-_RETRIEVE_NOTICES = {
-    "bad-handle": "That handle is not a handle (they are 12 lowercase hex "
-                  "characters, copied from a 'mcptoon_retrieve handle=...' line).",
-    "never-stored": "No stored result for that handle. Either it was never "
-                    "compressed, or the store evicted it to stay under its size "
-                    "budget — call the tool again to regenerate it.",
-    "expired": "That stored result expired and was deleted. Set "
-               "MCPTOON_CCR_TTL=0 (or unset it) to keep originals indefinitely.",
-    "unreadable": "The stored entry exists but could not be read (damaged or "
-                  "unreadable file). Call the tool again to regenerate it.",
-}
+            "notice": _ccr.retrieve_notice(status)}
 
 
 _HANDLERS = {
