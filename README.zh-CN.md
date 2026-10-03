@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1899%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1901%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -279,7 +279,7 @@ mcptoon manifest      # 看全部工具（名字索引，最省 token）
 
 mcptoon 省下的 token 分三处，混在一起比数字没有意义。
 
-「省了多少」有两个读法，回答的是两个不同的问题。**网关口径**——完整 schema 对比 agent 默认 `compact` 暴露下真正加载的东西——才是装上 mcptoon 买到的那个数，是诚实的头条（本机实测 89%）。**瘦身 schema 口径**（同一批工具、描述更短）是更小的次要口径（24%），对应 `manifest --slim`。`mcptoon status` 把两者并排打印，来自同一次测量，因此永远不会各说各话。
+「省了多少」有两个读法，回答的是两个不同的问题。**网关口径**——完整 schema 对比 agent 默认 `compact` 暴露下真正加载的东西——才是装上 mcptoon 买到的那个数，是诚实的头条（本机实测 89%）。**瘦身 schema 口径**（同一批工具、描述更短）是更小的次要口径（88.5%），对应 `manifest --slim`。`mcptoon status` 把两者并排打印，来自同一次测量，因此永远不会各说各话。
 
 ### 第一笔 · 工具发现（`manifest`）：默认省 99.2%
 
@@ -377,8 +377,8 @@ mcptoon 是 **CLI 工具**——是管理器，不是代理——也不是客户
 | Agent | 怎么接 |
 |---|---|
 | Claude Desktop | `mcptoon sync --self` 往 `claude_desktop_config.json` 加一条 `mcptoon` 记录 |
-| Claude Code | 把 `mcptoon` 命令写进 `SKILL.md`（技能目录 `~/.claude/skills`） |
-| Codex | 写进 `AGENTS.md` |
+| Claude Code | `mcptoon sync --self` 写它的配置，并往 `~/.claude/CLAUDE.md` 写一条指针 |
+| Codex | `mcptoon sync --self` 往 `~/.codex/AGENTS.md` 写一条指针 |
 | Cursor | `mcptoon sync --self` 写进 Cursor 的 MCP 配置；或写进 `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` 写 `mcp_config.json` |
 | Cline | `mcptoon sync --self` 写 Cline 的 MCP 配置 |
@@ -511,12 +511,12 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1899 passed, 2 skipped
+python -m pytest tests/ -v   # 1901 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-代码规模：**43 个模块、25,224 行 Python**，零第三方依赖。
+代码规模：**43 个模块、25,227 行 Python**，零第三方依赖。
 
 ---
 

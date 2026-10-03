@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1899%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1901%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -320,8 +320,8 @@ There are two ways to read "how much does this save?", and they answer different
 questions. **The gateway figure** — full schemas versus what the agent actually loads
 under the default `compact` exposure — is what installing mcptoon buys, and it is the
 honest headline (89% on the machine this was written on). **The slim-schema figure**
-(same tools, terser descriptions) is the smaller, secondary claim (24%), and it is what
-`manifest --slim` buys. `mcptoon status` prints both, side by side, from one
+(same tools, terser descriptions) is the smaller, secondary claim (88.5%), and it is
+what `manifest --slim` buys. `mcptoon status` prints both, side by side, from one
 measurement, so the two can never drift apart.
 
 ### Bill 1 · Tool discovery (`manifest`): 99.2% smaller by default
@@ -427,8 +427,8 @@ connect to MCP servers; it runs `mcptoon` commands. So the config is written onc
 | Agent | How it hooks up |
 |---|---|
 | Claude Desktop | `mcptoon sync --self` adds one `mcptoon` entry to `claude_desktop_config.json` |
-| Claude Code | put the `mcptoon` command in a `SKILL.md` (skills live in `~/.claude/skills`) |
-| Codex | put it in `AGENTS.md` |
+| Claude Code | `mcptoon sync --self` writes its config and a pointer into `~/.claude/CLAUDE.md` |
+| Codex | `mcptoon sync --self` writes a pointer into `~/.codex/AGENTS.md` |
 | Cursor | `mcptoon sync --self` adds it to Cursor's MCP config; or put it in `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` writes `mcp_config.json` |
 | Cline | `mcptoon sync --self` writes Cline's MCP config |
@@ -579,7 +579,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1899 passed, 2 skipped
+python -m pytest tests/ -v   # 1901 passed, 2 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows
@@ -587,7 +587,7 @@ is a first-class target. New here? Start with
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: **25,224 lines of Python across 43 modules**, zero third-party dependencies.
+The codebase: **25,227 lines of Python across 43 modules**, zero third-party dependencies.
 
 ---
 

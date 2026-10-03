@@ -385,7 +385,7 @@
         Agent 的两个痛点，<span class="teal nw">mcptoon 一次解决。</span>
       </h1>
       <p class="sub">
-        <b>你的上下文，测试过有没有浪费 token？</b>工具装了一堆，完整 schema 全量塞进去——白花的 token，哪些能省，测试过吗？mcptoon 把工具清单<b>砍掉 99.2%</b>，schema 不进上下文；调用返回的输出，<b>TOON 编码再省约 34%</b>。（255 工具真实参考清单实测：全字段对比只列名，cl100k 尺；压缩往返测试无损。）<br><br>
+        <b>你的上下文，测试过有没有浪费 token？</b>工具装了一堆，完整 schema 全量塞进去——白花的 token，哪些能省，测试过吗？mcptoon 把工具清单<b>砍掉 99.2%</b>，schema 不进上下文；调用返回的输出，<b>TOON 编码再省约 5.7%</b>（随结果形状 1.8%–48.6%）。（255 工具真实参考清单实测：全字段对比只列名，cl100k 尺；压缩往返测试无损。）<br><br>
         <b>装了好几台 agent——Claude、Codex、Hermes、OpenClaw 等等——每台都要 AI 重新配一遍？</b>有没有配一次就全部通用的办法？有：<b>装一次 mcptoon，一份配置喂给你的全部 agent</b>——<code class="mono">quickstart</code> 自动发现已装的 agent 和你机器上已有的 MCP 服务器，一次写全；以后加工具，在 mcptoon 配一次，一条 <code class="mono">sync</code> 推到全部机器——agent 会敲命令就能用，免插件、一台都不用再配。
       </p>
       <div class="numline">
@@ -650,7 +650,7 @@ Client initialized notification received</code>
     <h2 style="margin-top:10px">参数表——把小字放大写。</h2>
     <p class="lead">下面每一行，要么有 CI 强制，要么钉在公开记录里。没有营销算术。</p>
     <div class="panel plist">
-      <div class="row"><div class="lhs"><b>测试套件</b> — 在造这页的机器上当场复跑（v0.8.12，2026-10-02）</div><div class="rhs">1899 passed · 2 skipped</div></div>
+      <div class="row"><div class="lhs"><b>测试套件</b> — 在造这页的机器上当场复跑（v0.8.12，2026-10-02）</div><div class="rhs">1901 passed · 2 skipped</div></div>
       <div class="row"><div class="lhs"><b>第三方依赖</b> — 谁塞进来一个，CI 就让构建红一次</div><div class="rhs">零</div></div>
       <div class="row"><div class="lhs"><b>平台</b> — Windows 是一等公民；CI 矩阵跑 Windows / Linux / macOS</div><div class="rhs">win · mac · linux</div></div>
       <div class="row"><div class="lhs"><b>协议</b> — 实现的 spec 版本</div><div class="rhs">MCP 2026-07-28</div></div>

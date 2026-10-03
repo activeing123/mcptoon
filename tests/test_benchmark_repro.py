@@ -108,6 +108,12 @@ class TestNoFlatPercentageClaimedForCallResults:
     SHIPPED = [
         "README.md", "README.zh-CN.md", "docs/TOON_SPEC.md", "docs/comparison.md",
         "docs/README-details.md", "src/mcptoon/cli.py", "src/mcptoon/output.py",
+        # Added 2026-10-03. Both landing pages were MISSING from this list, and both
+        # shipped the exact conflation this class exists to prevent: the hero said
+        # `--toon` saves "~34% more" on *call outputs*. The README was clean, so the
+        # defect was invisible — a guard that covers the doc you remember is not a
+        # guard. If a surface can be read without the repo, it belongs here.
+        "docs/index.html", "docs/index-zh.html",
     ]
 
     # A line may still mention 34% when it is NOT claiming it: denying the flat figure,

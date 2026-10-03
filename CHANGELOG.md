@@ -5,6 +5,34 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The four claims a stranger meets in the first 30 seconds now agree with each other.**
+  A star-curve review found that the surfaces a newcomer reads *before* running anything —
+  the GitHub description, the landing page, the README — contradicted themselves. Re-measured
+  rather than taken on faith; two of the reported contradictions were false positives, one
+  quoted a value that had already moved, and one real defect was not in the report at all:
+  - **GitHub description said `227KB`.** That was true for 0.8.1; the wheel is now 341KB.
+    The description is the first line anyone reads and it was nine releases stale.
+  - **Both landing pages sold `--toon` as "~34% more" on *call outputs*.** 34% is the
+    *manifest* (schema) figure; the call-result corpus measures 5.7% (1.8–48.6% by shape,
+    `assets/benchmark_results.json`). Quoting a schema number for results is the exact
+    conflation that got our upstream TOON PR closed — and both pages were **missing from
+    `test_no_bare_34_percent_attached_to_toon`'s file list**, which is why it survived. The
+    guard now covers them.
+  - **The README's agent table told you to hand-write Claude Code's and Codex's files.**
+    `sync --self` writes both automatically (measured in an isolated HOME: `.claude.json` +
+    `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`). The row also named the wrong file
+    (`SKILL.md` instead of `CLAUDE.md`). Fixed in both READMEs.
+  - **The README said the slim-schema figure is 24%** while four other places on the same
+    page said 88.5%. 24% appears nowhere else; the number was simply wrong.
+- Claim surfaces moved to the tree's measured values: **1901 passed** (1903 collected − 2
+  environment skips) and **25,227 physical lines**. The line figure had been 25,224 —
+  measured *before* the 0.8.12 help-text edit landed, so it was 3 lines stale and the
+  guard's 2% tolerance never noticed. Corrected here rather than left as a known-wrong number.
+
 ## [0.8.12] - 2026-10-02
 
 ### Added
