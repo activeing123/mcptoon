@@ -31,6 +31,32 @@ The numtide bot turns PyPI releases into Nix bump PRs automatically. A version t
 exists on main but not on PyPI (or the reverse) leaves a broken bump in that channel.
 Breaking changes must land as deprecation warnings one minor version before removal.
 
+### Batch the release, don't ship every finding (added 2026-10-02)
+
+**A release is the unit of a finished topic, not of a single fix.** Ship one version per
+topic once the topic is exhausted — not one version per discovery. Measured cost of the
+alternative: **six releases on 2026-10-02** (0.8.6 → 0.8.11), each one a full ritual
+(version in 5 places, 3 claim surfaces, CHANGELOG, tag, GitHub Release, 3 workflow runs,
+tap dispatch, drift gate, ledger in 2 places) — roughly an hour of mechanical work per
+version, and most of it repeated. Worse, every release resets the numtide grace window,
+so the bot that packages us stayed pinned at 0.8.7 all day and could never catch up.
+
+Rules that follow:
+
+- **Finish the attack surface before you bump.** If you are probing one module (or one
+  class of defect), keep finding and fixing until the probe reports nothing, *then*
+  release once. 0.8.10 and 0.8.11 were both products of the same adversarial technique on
+  adjacent code and could have shipped together.
+- **Same topic, same version.** A fix and the test that pins it and the docstring it
+  corrects belong to one release. Splitting them across versions is what "one finding,
+  one release" looks like from the outside.
+- **Cap the cadence at one release per day** unless a shipped defect is actively
+  corrupting data or blocking installs. If a second release seems necessary the same day,
+  the honest question is whether the first one should have waited.
+- **Do not batch unrelated work into one version to satisfy this rule.** The rule is
+  "finish the topic", not "hoard changes". A release with two unrelated themes is harder
+  to reason about than two releases with one theme each.
+
 ### Step 6 (added 2026-10-01) — run the drift gate, don't eyeball the channels
 
 ```powershell
