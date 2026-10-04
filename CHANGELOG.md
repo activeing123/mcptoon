@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Both READMEs and both landing pages now say the same thing about how your agent reaches
+  your tools.** A blind review of the README (one reader, product only, no source) read the
+  product confidently as "a CLI" — correctly — but that turned out to be because the README
+  described only *one* of the two paths `quickstart` actually wires. `sync` writes a pointer
+  into the hosts that read one (Claude Code, Codex) **and** registers mcptoon's own `serve`
+  entry with every host that takes an MCP entry; the README never mentioned the second path,
+  and one line flatly denied it ("Your agent doesn't connect to MCP servers"). Meanwhile the
+  landing page had the opposite drift — its `Cut:` heading framed the two paths as
+  `know which one you're on`, i.e. a choice the user has to make, which is the one framing
+  ADR 0012 explicitly rejected ("the user does not understand the difference between CLI Mode
+  and Serve Mode, so choosing is not a real option"). Fixed in one pass:
+  - **README (both languages): a new "Two ways in — and you don't pick one" block** after
+    `quickstart`, stating that the CLI is the primary way in, that `serve` is registered
+    alongside it wherever the host takes one, and that the MCP entry ships in `compact`
+    exposure (upstream tools stay out of context; reach them via
+    `mcptoon_manifest → inspect → call`).
+  - **README positioning line rewritten** so it no longer claims the agent never touches an
+    MCP server; it now names both paths and points at the host table for which host takes which.
+  - **README takeover line rewritten** — it had said takeover "is the mode that actually saves
+    tokens", which compares two different ledgers (the CLI manifest count and the serve
+    `tools/list` count) and therefore reads as a promise about *how much*. It now gives the
+    real, checkable reason: skip takeover and the same tools appear twice, direct and through
+    the gateway, which costs more rather than less.
+  - **Both landing pages: the `Cut:` heading** changed from `know which one you're on` /
+    `看清你走哪条` to `both wired, and the books stay separate` / `装完都铺好`. The paragraph
+    body was already right (the two ledgers' numbers genuinely don't transfer) and is untouched.
+  - `CONTEXT.md`'s `CLI Mode` entry said "the only mode mcptoon has" — wording from before
+    `serve` existed, contradicting the `Serve Mode` and `Two Legs Always On` entries in the
+    same file. Corrected to "the product's defining mode", which is what ADR 0001 actually says.
+  - Verified mechanical: heading swap is 4 lines across the two pages, tag balance unchanged
+    (7 sections / 6 copy buttons / 5 images each), ZH banned-word law still clean, and the
+    project's own `mcptoon_gate.py` reports **zero new violations** on either README (29 and
+    34 pre-existing, unchanged).
+
 - **The four claims a stranger meets in the first 30 seconds now agree with each other.**
   A star-curve review found that the surfaces a newcomer reads *before* running anything —
   the GitHub description, the landing page, the README — contradicted themselves. Re-measured

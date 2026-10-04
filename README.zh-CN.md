@@ -189,7 +189,9 @@ mcptoon call everything echo '{"message":"hi"}'
 
 `quickstart` 也是让 mcptoon **被看见**的那一步：它把 `mcptoon serve` 作为一个名为 `mcptoon` 的保留服务器写进每个 Agent 的配置，于是你的 Agent 能看见 mcptoon 本身。已经同步过？用 `mcptoon sync --self` 重新登记（不带 `--self` 的 `mcptoon sync` 只写你自己的服务器）；任何时候用 `mcptoon status` 看状态。
 
-**而且它完全可逆。** 安装会登记网关，默认还会「接管」——把你已有的服务器改走网关、摘掉它们原来的直连记录（这才是真正省 token 的模式）。这一步会列清单、要你确认一次，而且能撤销：**`mcptoon restore` 摘掉网关记录、把你的服务器原样放回去**；你之后往配置里加的东西一概不动。`mcptoon off` 是更轻的开关——只摘网关记录，服务器留在原地。两者都能加 `--dry` 预览；`mcptoon uninstall --dry` 会先打印完整移除计划。
+**两条路都通 —— 而且不用你选。** mcptoon **首先是个 CLI**：能敲命令的 Agent 直接跑 `mcptoon`，这是最省的一条路——schema 根本不进上下文。`quickstart` 还会把 mcptoon 自己的 MCP 条目（`mcptoon serve`）登记进每个收得下的 Agent，让只认 MCP 服务器的客户端也能用上你的工具。MCP 那条默认走 `compact` 档：不把上游工具清单塞进模型上下文，改成让它走 `mcptoon_manifest → inspect → call`。`mcptoon status` 两条账一起看。
+
+**而且它完全可逆。** 安装会登记网关，默认还会「接管」——把你已有的服务器改走网关、摘掉它们原来的直连记录（不摘的话，同一批工具会同时以直连和网关两种身份出现，反而更贵）。这一步会列清单、要你确认一次，而且能撤销：**`mcptoon restore` 摘掉网关记录、把你的服务器原样放回去**；你之后往配置里加的东西一概不动。`mcptoon off` 是更轻的开关——只摘网关记录，服务器留在原地。两者都能加 `--dry` 预览；`mcptoon uninstall --dry` 会先打印完整移除计划。
 
 还不想装？那就先看它干活（需要 Node）：
 
@@ -372,7 +374,7 @@ pip install -e . --no-build-isolation
 
 ## 所有 AI Agent 都能用
 
-mcptoon 是 **CLI 工具**——是管理器，不是代理——也不是客户端库。你的 Agent 不连接 MCP 服务器——它跑 `mcptoon` 命令。所以配置写一次，全员共享：
+mcptoon 是 **CLI 工具**——是管理器，不是常驻代理或服务——也不是客户端库。你的 Agent 从不直连上游 MCP 服务器：它要么跑 `mcptoon` 命令，要么经 mcptoon 自己的 MCP 条目（`mcptoon serve`）够到它们。两条都由 `quickstart` 登记，不用你选（哪台收得下哪条见下表）。所以配置写一次，全员共享：
 
 | Agent | 怎么接 |
 |---|---|
@@ -391,7 +393,7 @@ mcptoon add github --url https://api.githubcopilot.com/mcp/
 # 完事。不用编辑 JSON。不用重启。上下文不丢。
 ```
 
-`mcptoon serve` 是另一个方向：把你所有已配置的服务器藏在一个 MCP 端点后面，带连接池和按 Agent 分发的密钥，给那些坚持要代理的客户端用。
+`mcptoon serve` 是另一个方向：把你所有已配置的服务器藏在一个 MCP 端点后面，带连接池和按 Agent 分发的密钥，给那些坚持要代理的客户端用。两条你不用二选一——CLI 始终是主入口，桥在收得下的宿主上跟它并排铺好。
 
 ---
 
@@ -404,7 +406,7 @@ MCP 的前提是：每个能力都是一个*服务器*，你的 Agent 必须被�
 - [Firecrawl](https://firecrawl.dev/blog/mcp-vs-cli)：同一件事，**命令行 1,365 token vs MCP 44,026 token——32 倍**
 - [Scalekit](https://scalekit.com/blog/mcp-vs-cli-use)：命令行**便宜 10–32 倍，可靠性 100% vs MCP 的 72%**
 
-如果你确实需要代理形态，`mcptoon serve` 就是那个模式——所有已配置服务器藏在一个 MCP 端点后面。
+代理形态也有——`mcptoon serve` 把所有已配置服务器藏在一个 MCP 端点后面——而 `quickstart` 会把它和 CLI 一起铺好，你不需要在两者之间选。这一节讲的是 mcptoon 的立身形态，不是一个要你去拨的开关。
 
 ---
 

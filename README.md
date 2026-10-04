@@ -199,9 +199,17 @@ agent's config as the reserved server `mcptoon`, so your agent can see mcptoon i
 Already synced? Re-register with `mcptoon sync --self` (plain `mcptoon sync` only writes
 your servers); check the state any time with `mcptoon status`.
 
+**Two ways in — and you don't pick one.** mcptoon is **a CLI first**: a shell-capable agent
+runs `mcptoon` commands, and that is the cheapest path — the schemas never enter context.
+`quickstart` also registers mcptoon's own MCP entry (`mcptoon serve`) with each agent that
+takes one, so a client that can only see MCP servers still reaches your tools. The MCP entry
+ships in `compact` mode: it keeps your upstream tool list out of the model's context and
+sends it to `mcptoon_manifest → inspect → call` instead. `mcptoon status` shows both ledgers.
+
 **And it is fully reversible.** The install registers the gateway, and by default
 quickstart also *takes over* — it routes your existing servers through the gateway
-and removes their direct entries (that is the mode that actually saves tokens). It
+and removes their direct entries (without that step your agent sees the same tools
+twice, once direct and once through the gateway, which costs *more*, not less). It
 is a listed, confirmed step, and it is undoable: **`mcptoon restore` drops the
 gateway entry and puts your servers back exactly where they were.** Anything you
 added to a config afterwards is left untouched. `mcptoon off` is the lighter
@@ -421,8 +429,11 @@ pip install -e . --no-build-isolation
 
 ## Works with every AI agent
 
-mcptoon is a **CLI tool** — a manager, not a proxy — not a client library. Your agent doesn't
-connect to MCP servers; it runs `mcptoon` commands. So the config is written once and shared:
+mcptoon is a **CLI tool** — a manager, not a resident proxy or service, and not a client
+library. Your agent never talks to your upstream MCP servers directly: it either runs
+`mcptoon` commands, or reaches them through mcptoon's own MCP entry (`mcptoon serve`). Both
+are registered by `quickstart`; you don't pick one (see the table for which host takes
+which). So the config is written once and shared:
 
 | Agent | How it hooks up |
 |---|---|
@@ -443,6 +454,8 @@ mcptoon add github --url https://api.githubcopilot.com/mcp/
 
 `mcptoon serve` is the other direction: run all your configured servers behind one MCP
 endpoint, with connection pooling and per-agent keys, for clients that insist on a proxy.
+You don't have to choose between the two — the CLI stays the primary way in, and the bridge
+is wired alongside it wherever the host can take one.
 
 ---
 
@@ -458,8 +471,9 @@ measurably cheaper on its own, before mcptoon does anything:
 - [Firecrawl](https://firecrawl.dev/blog/mcp-vs-cli): the same task cost **1,365 tokens via CLI vs 44,026 via MCP — 32×**
 - [Scalekit](https://scalekit.com/blog/mcp-vs-cli-use): CLI **10–32× cheaper, 100% reliable vs MCP's 72%**
 
-If you genuinely need the proxy form, `mcptoon serve` is exactly that — all configured
-servers behind one MCP endpoint.
+The proxy form exists too — `mcptoon serve` puts all configured servers behind one MCP
+endpoint — and `quickstart` wires it alongside the CLI, so you never have to choose. This
+section is about the shape mcptoon is built around, not a switch you have to flip.
 
 ---
 
