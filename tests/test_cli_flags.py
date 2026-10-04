@@ -1,10 +1,16 @@
-"""Unknown CLI flags must be reported, not swallowed.
+"""Unknown CLI flags — and a dropped `--smart` — must be reported, not swallowed.
 
 Background: the README advertised `mcptoon manifest --compact --tokens` as the way
 to reproduce the headline token numbers. --tokens was never implemented, and the
 parser dropped unknown flags silently, so the command "worked" and printed no
 count. These tests keep both halves honest: the parser warns, and the warning
 allowlist cannot drift away from the flags the CLI actually implements.
+
+The second silent drop is the same shape. The format flags are one family and the last
+one wins, so `--smart` followed by `--json` compresses nothing and says nothing — the
+output is still valid JSON, just larger, so the caller cannot notice. The sibling file
+`tests/test_smart_reachability.py` pins that `smart` *reaches* the compressor; these
+tests pin that it is not *silently removed before* it gets there.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ import io
 import re
 import sys
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -120,6 +126,68 @@ class TestVersionFlag(unittest.TestCase):
         with patch.object(sys, "argv", ["mcptoon", "-V"]), redirect_stdout(buf):
             cli.main()
         self.assertEqual(buf.getvalue().strip(), f"mcptoon {mcptoon.__version__}")
+
+
+class TestSmartFlagOverride(unittest.TestCase):
+    """A superseded `--smart` must say so; a superseded `--toon` need not.
+
+    `--smart`'s only effect is a smaller payload, so losing it is invisible: the command
+    still exits 0 and prints well-formed JSON. The other format flags lose visibly — ask
+    for TOON after `--json` and you can see you got JSON — so they stay quiet, and so does
+    the order that works (`--json --smart`, which is how the gateway calls).
+    """
+
+    def test_smart_then_json_is_reported(self):
+        note = cli.format_flag_override_note("--smart", "--json")
+        self.assertIn("'--smart'", note)
+        self.assertIn("'--json'", note)
+
+    def test_the_note_names_the_consequence_not_just_the_order(self):
+        note = cli.format_flag_override_note("--smart", "--toon")
+        self.assertIn("NOT compressed", note)
+        self.assertIn("put '--smart' last", note)
+
+    def test_the_working_order_is_silent(self):
+        self.assertEqual(cli.format_flag_override_note("--json", "--smart"), "")
+
+    def test_pairs_that_lose_visibly_are_silent(self):
+        self.assertEqual(cli.format_flag_override_note("--json", "--toon"), "")
+        self.assertEqual(cli.format_flag_override_note("--compact", "--raw"), "")
+
+    def test_nothing_to_supersede_is_silent(self):
+        self.assertEqual(cli.format_flag_override_note("", "--json"), "")
+        self.assertEqual(cli.format_flag_override_note("--smart", "--smart"), "")
+
+    def test_every_format_flag_is_registered(self):
+        """Pinned as a literal: the parse loop dispatches on this map now.
+
+        A flag that is neither in the map nor anywhere else in the parser would silently
+        stop selecting a format, which is the very failure this file exists to catch.
+        """
+        self.assertEqual(
+            set(cli._FORMAT_FLAGS),
+            {"--json", "--compact", "--toon", "--mcptoon", "--slim", "--smart", "--raw"},
+        )
+
+    def test_the_note_actually_reaches_stderr(self):
+        """The unit is not enough — prove the parse loop prints it.
+
+        `manifest --help` returns straight after the help guard, before the welcome and
+        the first-run self-heal, so this drives the real parse loop with no network and
+        no config writes.
+        """
+        err = io.StringIO()
+        with patch.object(sys, "argv", ["mcptoon", "manifest", "--smart", "--json", "--help"]), \
+                redirect_stdout(io.StringIO()), redirect_stderr(err):
+            cli.main()
+        self.assertIn("overrides '--smart'", err.getvalue())
+
+    def test_the_working_order_end_to_end_is_silent(self):
+        err = io.StringIO()
+        with patch.object(sys, "argv", ["mcptoon", "manifest", "--json", "--smart", "--help"]), \
+                redirect_stdout(io.StringIO()), redirect_stderr(err):
+            cli.main()
+        self.assertNotIn("overrides", err.getvalue())
 
 
 if __name__ == "__main__":

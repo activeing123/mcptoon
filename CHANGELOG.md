@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--smart` can no longer be dropped without a word.** The output-format flags are one
+  mutually exclusive family and the last one wins, so `mcptoon call s t --smart --json`
+  compressed nothing and said nothing: the command exited 0 and printed well-formed JSON,
+  merely larger. The caller had no way to notice — unlike every other member of the family,
+  where losing a flag is visible (ask for TOON after `--json` and you can see you got JSON).
+  The parse loop now reports that one loss on stderr, naming both the consequence and the
+  fix: `mcptoon: '--json' overrides '--smart', so the result is NOT compressed (format flags
+  are last-wins; put '--smart' last) - see 'mcptoon --help'`.
+  - **Only the `--smart` loss is reported, and only when it actually happens.** Warning on
+    every disagreeing pair would nag the order that *works* — `--json --smart` is how the
+    gateway itself calls — about a flag that did exactly what was asked.
+  - Verified against the real CLI, both orders: the note lands on stderr for
+    `--smart --json`, and stderr stays empty for `--json --smart`.
+  - stdout is untouched in both orders. The flags themselves behave exactly as before: the
+    change replaces seven `elif fmt = ...` assignments with one look-up table, and
+    `_effective_fmt` still gives an explicit flag the same precedence over per-tool policy.
+  - `tests/test_cli_flags.py` gains 8 tests — the note's wording, the pairs that must stay
+    quiet, a literal pin on the format-flag table (a format flag missing from the map would
+    silently stop selecting a format), and two end-to-end runs through `main()` proving the
+    note reaches stderr. Suite total: **1909 passed · 2 skipped**, so the claim surfaces move
+    with it.
+
 - **Both READMEs and both landing pages now say the same thing about how your agent reaches
   your tools.** A blind review of the README (one reader, product only, no source) read the
   product confidently as "a CLI" — correctly — but that turned out to be because the README

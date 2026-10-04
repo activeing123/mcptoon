@@ -113,6 +113,43 @@ def unknown_flag_warnings(args):
     return found
 
 
+# The output-format flags are one mutually exclusive family: each sets `fmt`, and the
+# last one on the command line wins. Last-wins is a fine convention, so the ordering is
+# not itself the bug — the bug is that one member of the family loses *invisibly*.
+# `--smart` is the flag people reach for to turn compression ON, and its whole effect is
+# a size difference, so `mcptoon call s t --smart --json` looks like success: valid JSON,
+# and no hint that nothing was compressed. The other flags lose visibly — ask for TOON
+# after `--json` and you can see you got JSON. So only the `--smart` loss is reported,
+# and only it: warning on every disagreeing pair would nag the *correct* order
+# (`--json --smart`, which is how the gateway itself calls) about a flag that worked.
+# Same silent-degradation class as `fmt="smart"` reaching `output.render` directly
+# (see tests/test_smart_reachability.py).
+_FORMAT_FLAGS = {
+    "--json": "json",
+    "--compact": "compact",
+    "--toon": "toon",
+    "--mcptoon": "mcptoon",
+    "--slim": "slim",
+    "--smart": "smart",
+    "--raw": "raw",
+}
+
+
+def format_flag_override_note(previous, current):
+    """Return the stderr note when a later format flag drops `--smart`, else "".
+
+    ``previous``/``current`` are the spellings as typed (``--smart``, ``--json``, ...),
+    in command-line order. Quiet unless ``--smart`` is the flag being superseded: that
+    is the one loss the caller cannot see for themselves.
+    """
+    if previous != "--smart" or current == "--smart":
+        return ""
+    return (
+        f"mcptoon: '{current}' overrides '--smart', so the result is NOT compressed "
+        f"(format flags are last-wins; put '--smart' last) - see 'mcptoon --help'"
+    )
+
+
 # Commands whose whole job is to make noise already; the one-time welcome would
 # only be in the way (and `serve` speaks over stdio, so stdout must stay clean).
 # `off` and `uninstall` are here for a different reason: a farewell should not be
@@ -312,6 +349,7 @@ def _run(state: dict) -> None:
 
     # ─── Parse global output flags ───
     fmt = "auto"
+    fmt_flag = ""
     head_n = 0
     max_chars = 0
     full = False
@@ -323,20 +361,12 @@ def _run(state: dict) -> None:
     i = 0
     while i < len(args):
         a = args[i]
-        if a == "--json":
-            fmt = "json"
-        elif a == "--compact":
-            fmt = "compact"
-        elif a == "--toon":
-            fmt = "toon"
-        elif a == "--mcptoon":
-            fmt = "mcptoon"
-        elif a == "--slim":
-            fmt = "slim"
-        elif a == "--smart":
-            fmt = "smart"
-        elif a == "--raw":
-            fmt = "raw"
+        if a in _FORMAT_FLAGS:
+            note = format_flag_override_note(fmt_flag, a)
+            if note:
+                print(note, file=sys.stderr)
+            fmt = _FORMAT_FLAGS[a]
+            fmt_flag = a
         elif a == "--full":
             full = True
         elif a == "--stdin":
