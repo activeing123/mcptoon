@@ -31,6 +31,21 @@ The numtide bot turns PyPI releases into Nix bump PRs automatically. A version t
 exists on main but not on PyPI (or the reverse) leaves a broken bump in that channel.
 Breaking changes must land as deprecation warnings one minor version before removal.
 
+### Release notes are in English (added 2026-10-04)
+
+**The GitHub Release title and body are English — always.** The body is the `CHANGELOG.md`
+block for that version, verbatim; the title is `vX.Y.Z — <short English summary>`. Do not
+paste a commit subject into the title, and do not hand-write a translated body.
+
+Why this is a rule and not a preference: the Release is a *global* surface. The numtide
+packaging bot and its maintainers, the PyPI project page (which renders this body), the MCP
+Registry, Glama's reviewers and every upstream PR author read it. The Chinese-facing surface
+already exists and is `README.zh-CN.md`. Measured drift this rule prevents: v0.8.12 shipped
+with a Chinese title (the `release:` commit subject, pasted into `name`) and v0.8.11 with a
+fully Chinese body that was never in `CHANGELOG.md` at all — 2 of 47 releases, both fixed
+2026-10-04. `CHANGELOG.md` itself has stayed 0.0% CJK throughout, so following it is enough
+to stay English; the failure mode is bypassing it.
+
 ### Batch the release, don't ship every finding (added 2026-10-02)
 
 **A release is the unit of a finished topic, not of a single fix.** Ship one version per
