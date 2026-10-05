@@ -8,7 +8,7 @@
 
 **在本地装上 1,000 个技能、1,000 个 MCP 工具，也不必担心 token 上下文——统统由 mcptoon 管理。**
 
-**独有的紧凑格式一次做完三件事——token 优化、工具发现、上下文压缩：把工具上下文砍掉约 90%（255 工具样本上 99.2%；你自己的数看 `mcptoon status`），且不为任意桌面 Agent、命令行 Agent 写一行配置。**
+**独有的紧凑格式一次做完三件事——token 优化、工具发现、上下文压缩：把工具上下文砍掉约 90%（255 工具样本上 99.2%；你自己的数看 `mcptoon status`），而任意桌面 Agent、命令行 Agent 你都不用写一行配置。**
 
 **直连 17,000+ 个 MCP 工具注册表，技能按需检索安装——原生 0 预装，装什么由你定。**
 
@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1909%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-1922%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -63,7 +63,7 @@ mcptoon 是一个 **342KB、零依赖的原生 CLI**，管理你电脑上的每�
 - **[Scalekit 基准](https://scalekit.com/blog/mcp-vs-cli-use)** —— 命令行便宜 10–32 倍，可靠性 100% 对比 MCP 的 72%
 - **[MCP-Zero（arXiv:2506.01056）](https://arxiv.org/abs/2506.01056)** —— 按需取工具，成本与工具总数几乎无关
 
-mcptoon 是今天就能用、一次覆盖所有 Agent 的那个。
+mcptoon 是今天就能用的那个：能跑 shell 的 Agent 全都覆盖，认得出的主流桌面客户端各写一行登记。
 
 ---
 
@@ -75,7 +75,7 @@ mcptoon 是今天就能用、一次覆盖所有 Agent 的那个。
 
 <h3>🧑‍💻 我只是 AI 工具的用户</h3>
 
-装一次，你电脑上每个桌面 AI——**Claude Desktop、Claude Code、Codex、Cursor、Windsurf、Cline、VS Code Copilot 等任意 Agent**——就都能共用你原有的全部工具和技能。任何 Agent 的配置，你都不用写。
+装一次，你电脑上每个 AI——**Claude Desktop、Claude Code、Codex、Cursor、Windsurf、Cline、VS Code Copilot、Gemini CLI、Qwen Code、Zed、Crush、opencode 等任意 Agent**——就都能共用你原有的全部工具和技能。任何 Agent 的配置，你都不用写。
 
 **[→ 安装即用](#30-秒上手)**
 
@@ -374,13 +374,49 @@ pip install -e . --no-build-isolation
 
 ## 所有 AI Agent 都能用
 
-mcptoon 是 **CLI 工具**——是管理器，不是常驻代理或服务——也不是客户端库。你的 Agent 从不直连上游 MCP 服务器：它要么跑 `mcptoon` 命令，要么经 mcptoon 自己的 MCP 条目（`mcptoon serve`）够到它们。两条都由 `quickstart` 登记，不用你选（哪台收得下哪条见下表）。所以配置写一次，全员共享：
+mcptoon 只用两条路够到 Agent，下面每个客户端都落在其中一条上。不用你选——`quickstart` 两条都登记，哪台能收哪条就收哪条：
+
+- **CLI 腿——Agent 自己跑 `mcptoon`。** 任何有 shell 的（命令行 Agent，或带终端的编程 IDE）**零配置**：它自己跑 `mcptoon call`、`mcptoon search`、`mcptoon skills resolve`。**一个字节都不写进它。**
+- **serve 腿——客户端跑不了 shell。** 聊天类、图形界面客户端改用挂载 MCP，那就给它**一条入口**：把 `mcptoon serve` 当成一个 MCP 服务器。一行，一处。
+
+**全市场覆盖。** 共 **103** 个客户端，名单取自
+[awesome-mcp-clients](https://github.com/punkpeye/awesome-mcp-clients)，加上该清单之后才出现的编程 Agent（查各家厂商文档补入）；开发者用的**库**（mcp-agent、mcp-client-go）不计入，因为用户不直接运行它们。证据逐条标注——我们写明**查证过什么**，不写"假设如此"。
+
+**CLI 腿——42 个，零配置**（它们自己跑 `mcptoon`）：
+
+AdaL · Aider · Amazon Q Developer · auggie · Autohand Code CLI · Claude Code · Claude Code Open ·
+ClaudeMind · Cline · Codex · ContextKit · Continue · Copilot CLI · Copilot-MCP · Crush · Cursor ·
+Dexto · Dolphin-MCP · Enola · Gemini CLI · Goose · JDBCX · Junie · KiloCode · Kiro · McPico ·
+MCPOmni Connect · mistral-vibe · Nerve · Octomind · opencode · OpenHands · PraisonAI · Qwen Code ·
+Roo Code · Slack MCP Client · SwarmClaw · Trae · VS Code GitHub Copilot · Warp · Windsurf · Zed
+
+**serve 腿——61 个，一条 `mcptoon serve` 入口**（没有 shell，改用挂载 MCP）：
+
+5ire · Agent Bridge · Agent-cli · AgentOne · AIaW · Ano · AnythingLLM · Argo-LocalAI · askit-mcp ·
+AstrBot · BoltAI · BrowseWiz · Canvas MCP Client · CarrotAI · Chainlit · ChatMCP · Cherry Studio ·
+Claude Desktop · console-chat-gpt · DeepChat · DocsGPT · eechat · Enconvo · Fastchat MCP · FLUJO ·
+Glue · HyperChat · kibitz · Klavis AI · LangBot · LibreChat · LobeHub · Lutra · MCP Chatbot ·
+MCP CLI client · MCP Playground · MCP Simple Slackbot · MCP SuperAssistant · MCPCLIHost · MCPHost ·
+Memex · MindPal · NextChat · OpenClaw · oterm · Qordinate · Runbear · SeekChat · Simple AI ·
+Superinterface · Tambo · Taskade · Tester MCP Client · Tiles Notebook · Tome · Vercade · WhatsMCP ·
+Witsy · y-cli · Yume · Zin-MCP-Client
+
+**证据状态**——`sync --self` 只往我们**对着厂商文档核对过**的 12 个宿主写登记行；上表其余宿主都靠 CLI 或 `mcptoon serve` 接入，不需要宿主专属文件，也就没有"逐台核验"这回事。
+
+### 逐台看：mcptoon 到底写了什么
+
+mcptoon 是 **CLI 工具**——是管理器，不是常驻代理或服务——也不是客户端库。你的 Agent 从不直连上游 MCP 服务器：它要么跑 `mcptoon` 命令，要么经 mcptoon 自己的 MCP 条目（`mcptoon serve`）够到它们。对收文件的宿主，具体写在哪就是下面这张表：
 
 | Agent | 怎么接 |
 |---|---|
 | Claude Desktop | `mcptoon sync --self` 往 `claude_desktop_config.json` 加一条 `mcptoon` 记录 |
 | Claude Code | `mcptoon sync --self` 写它的配置，并往 `~/.claude/CLAUDE.md` 写一条指针 |
 | Codex | `mcptoon sync --self` 往 `~/.codex/AGENTS.md` 写一条指针 |
+| Gemini CLI | `mcptoon sync --self` 往 `~/.gemini/GEMINI.md` 写一条指针 |
+| Qwen Code | `mcptoon sync --self` 往 `~/.qwen/QWEN.md` 写一条指针 |
+| Zed | `mcptoon sync --self` 往 Zed 的 `AGENTS.md` 写一条指针 |
+| Crush | `mcptoon sync --self` 往 `~/.config/crush/CRUSH.md` 写一条指针 |
+| opencode | `mcptoon sync --self` 往 `~/.config/opencode/AGENTS.md` 写一条指针 |
 | Cursor | `mcptoon sync --self` 写进 Cursor 的 MCP 配置；或写进 `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` 写 `mcp_config.json` |
 | Cline | `mcptoon sync --self` 写 Cline 的 MCP 配置 |
@@ -513,12 +549,25 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1909 passed, 2 skipped
+python -m pytest tests/ -v   # 1922 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
 代码规模：**43 个模块、25,257 行 Python**，零第三方依赖。
+
+---
+
+## 支持
+
+mcptoon 是个人业余项目，个人使用一直免费。要是它砍掉了你的上下文账单：
+
+- **[在 GitHub 上赞助](https://github.com/sponsors/activeing123)** —— 一次性或按月都行。
+- **[给个 star](https://github.com/activeing123/mcptoon)** —— 别的开发者就是靠这个找到小工具的。
+
+**团队功能还没做。** 一份服务器清单同步到全队每台机器；谁在什么时候加载了什么工具的记录。没有报价、没有候补名单页——发邮件到
+[activeing123@gmail.com](mailto:activeing123@gmail.com?subject=mcptoon%20team%20features)
+，真有人要就往前排。
 
 ---
 

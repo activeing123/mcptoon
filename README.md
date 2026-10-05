@@ -8,7 +8,7 @@
 
 **Install 1,000 skills and 1,000 MCP tools locally — and don't worry about the token context. mcptoon manages it all.**
 
-**Its own compact format does token optimization, tool discovery and context compression at once: it cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number) and writes no line of config for any desktop or command-line agent.**
+**Its own compact format does token optimization, tool discovery and context compression at once: it cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number) and you write no config line for any desktop or command-line agent.**
 
 **Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
 
@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1909%20passed-brightgreen)](#contributing)
+[![Tests](https://img.shields.io/badge/Tests-1922%20passed-brightgreen)](#contributing)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -65,7 +65,7 @@ a claim only we make:
 - **[Scalekit's benchmark](https://scalekit.com/blog/mcp-vs-cli-use)** — CLI 10–32× cheaper, 100% reliable vs MCP's 72%
 - **[MCP-Zero (arXiv:2506.01056)](https://arxiv.org/abs/2506.01056)** — on-demand tool retrieval, near-constant cost regardless of tool count
 
-mcptoon is the one you can use today, covering every agent at once.
+mcptoon is the one you can use today: it covers any agent that can run a shell, and writes a single hookup line into the mainstream GUI clients it knows.
 
 ---
 
@@ -77,7 +77,7 @@ mcptoon is the one you can use today, covering every agent at once.
 
 <h3>🧑‍💻 I just use AI tools</h3>
 
-Install once, and every desktop AI you have — **Claude Desktop, Claude Code, Codex, Cursor, Windsurf, Cline, VS Code Copilot and any other agent** — shares all the tools and skills you already have. You write nothing in any agent's config.
+Install once, and every AI you have — **Claude Desktop, Claude Code, Codex, Cursor, Windsurf, Cline, VS Code Copilot, Gemini CLI, Qwen Code, Zed, Crush, opencode and any other agent** — shares all the tools and skills you already have. You write nothing in any agent's config.
 
 **[→ Install and go](#30-seconds-up-and-running)**
 
@@ -429,17 +429,61 @@ pip install -e . --no-build-isolation
 
 ## Works with every AI agent
 
+mcptoon reaches an agent one of two ways, and every client below falls into one of them.
+You don't pick — `quickstart` registers both, and each host takes whichever it can:
+
+- **CLI leg — the agent runs `mcptoon` itself.** Anything with a shell (a CLI agent, or a
+  coding IDE with a terminal) needs **zero config**: it runs `mcptoon call`, `mcptoon search`,
+  `mcptoon skills resolve`. Nothing is written into it at all.
+- **serve leg — the client can't run a shell.** A chat app or GUI mounts MCP instead, so it
+  gets **one entry**: `mcptoon serve` as a single MCP server. One line, one place.
+
+**The market, covered.** 103 clients, taken from
+[awesome-mcp-clients](https://github.com/punkpeye/awesome-mcp-clients) plus vendor docs for
+the coding agents that postdate it; developer *libraries* (mcp-agent, mcp-client-go) are
+excluded because a user does not run them. Evidence is per client — we name what we verified,
+not what we assumed.
+
+**CLI leg — 42 clients, zero config** (they run `mcptoon` themselves):
+
+AdaL · Aider · Amazon Q Developer · auggie · Autohand Code CLI · Claude Code · Claude Code Open ·
+ClaudeMind · Cline · Codex · ContextKit · Continue · Copilot CLI · Copilot-MCP · Crush · Cursor ·
+Dexto · Dolphin-MCP · Enola · Gemini CLI · Goose · JDBCX · Junie · KiloCode · Kiro · McPico ·
+MCPOmni Connect · mistral-vibe · Nerve · Octomind · opencode · OpenHands · PraisonAI · Qwen Code ·
+Roo Code · Slack MCP Client · SwarmClaw · Trae · VS Code GitHub Copilot · Warp · Windsurf · Zed
+
+**serve leg — 61 clients, one `mcptoon serve` entry** (no shell, so they mount MCP):
+
+5ire · Agent Bridge · Agent-cli · AgentOne · AIaW · Ano · AnythingLLM · Argo-LocalAI · askit-mcp ·
+AstrBot · BoltAI · BrowseWiz · Canvas MCP Client · CarrotAI · Chainlit · ChatMCP · Cherry Studio ·
+Claude Desktop · console-chat-gpt · DeepChat · DocsGPT · eechat · Enconvo · Fastchat MCP · FLUJO ·
+Glue · HyperChat · kibitz · Klavis AI · LangBot · LibreChat · LobeHub · Lutra · MCP Chatbot ·
+MCP CLI client · MCP Playground · MCP Simple Slackbot · MCP SuperAssistant · MCPCLIHost · MCPHost ·
+Memex · MindPal · NextChat · OpenClaw · oterm · Qordinate · Runbear · SeekChat · Simple AI ·
+Superinterface · Tambo · Taskade · Tester MCP Client · Tiles Notebook · Tome · Vercade · WhatsMCP ·
+Witsy · y-cli · Yume · Zin-MCP-Client
+
+**Evidence status** — `sync --self` writes a hookup line into the 12 hosts we have verified
+against their own docs; every other host above is reached by the CLI or by `mcptoon serve`
+without a host-specific file, so there is nothing to verify per host.
+
+### What mcptoon writes, host by host
+
 mcptoon is a **CLI tool** — a manager, not a resident proxy or service, and not a client
 library. Your agent never talks to your upstream MCP servers directly: it either runs
-`mcptoon` commands, or reaches them through mcptoon's own MCP entry (`mcptoon serve`). Both
-are registered by `quickstart`; you don't pick one (see the table for which host takes
-which). So the config is written once and shared:
+`mcptoon` commands, or reaches them through mcptoon's own MCP entry (`mcptoon serve`).
+For the hosts that take a file, this is exactly what lands where:
 
 | Agent | How it hooks up |
 |---|---|
 | Claude Desktop | `mcptoon sync --self` adds one `mcptoon` entry to `claude_desktop_config.json` |
 | Claude Code | `mcptoon sync --self` writes its config and a pointer into `~/.claude/CLAUDE.md` |
 | Codex | `mcptoon sync --self` writes a pointer into `~/.codex/AGENTS.md` |
+| Gemini CLI | `mcptoon sync --self` writes a pointer into `~/.gemini/GEMINI.md` |
+| Qwen Code | `mcptoon sync --self` writes a pointer into `~/.qwen/QWEN.md` |
+| Zed | `mcptoon sync --self` writes a pointer into Zed's `AGENTS.md` |
+| Crush | `mcptoon sync --self` writes a pointer into `~/.config/crush/CRUSH.md` |
+| opencode | `mcptoon sync --self` writes a pointer into `~/.config/opencode/AGENTS.md` |
 | Cursor | `mcptoon sync --self` adds it to Cursor's MCP config; or put it in `AGENTS.md` |
 | Windsurf | `mcptoon sync --self` writes `mcp_config.json` |
 | Cline | `mcptoon sync --self` writes Cline's MCP config |
@@ -593,7 +637,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1909 passed, 2 skipped
+python -m pytest tests/ -v   # 1922 passed, 2 skipped
 ```
 
 Three hard rules: zero dependencies (CI-enforced), new behavior ships with tests, Windows
@@ -602,6 +646,21 @@ is a first-class target. New here? Start with
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
 The codebase: **25,257 lines of Python across 43 modules**, zero third-party dependencies.
+
+---
+
+## Support
+
+mcptoon is a one-person side project and stays free for individuals. If it cut your
+context bill:
+
+- **[Sponsor it on GitHub](https://github.com/sponsors/activeing123)** — one-off or monthly.
+- **[Star the repo](https://github.com/activeing123/mcptoon)** — that's how other builders find small tools.
+
+**Team features are not built yet.** One shared server list synced to every teammate's
+machine; a log of what got hydrated when. No pricing and no waitlist page — mail
+[activeing123@gmail.com](mailto:activeing123@gmail.com?subject=mcptoon%20team%20features)
+and it moves up the list.
 
 ---
 

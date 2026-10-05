@@ -77,15 +77,19 @@ BENCHMARK_ROWS = [
      "toon_save_pct": 34.0, "slim_save_pct": 88.5, "compact_save_pct": 99.2},
 ]
 
-# The agent targets `mcptoon sync` knows about. Values are the path helpers in
-# sync.py, which only read environment variables — nothing is opened or stat'd.
-AGENT_PATH_HELPERS = (
-    ("claude-desktop", "_claude_desktop_path"),
-    ("cursor", "_cursor_path"),
-    ("cline", "_cline_path"),
-    ("windsurf", "_windsurf_path"),
-    ("vscode-copilot", "_vscode_copilot_path"),
-)
+# The MCP-mount agent targets `mcptoon sync` knows about, derived from
+# `sync._AGENT_SPECS` so this list cannot drift from the table. Values are the
+# path helpers in sync.py, which only read environment variables — nothing is
+# opened or stat'd. Pointer-only hosts (Codex, Gemini CLI, ...) are excluded on
+# purpose: their "path" is a prose instruction file, not a mountable config, so
+# reporting it as a `config_path` here would misdescribe it.
+def _agent_path_helpers():
+    from .sync import _AGENT_SPECS
+
+    return tuple((spec.id, spec.path_fn) for spec in _AGENT_SPECS if spec.mcp)
+
+
+AGENT_PATH_HELPERS = _agent_path_helpers()
 
 _PREVIEW_CHARS = 500
 

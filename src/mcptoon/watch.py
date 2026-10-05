@@ -39,7 +39,7 @@ import time
 from pathlib import Path
 
 from .config import CONFIG_DIR
-from .sync import sync_to_all, detect_installed_agents
+from .sync import sync_to_all, detect_installed_agents, _is_cli_only
 
 DEFAULT_INTERVAL = 2.0
 DEBOUNCE = 0.3
@@ -58,13 +58,19 @@ def fingerprint(path: Path):
 def collect_watch_paths(config_path=None) -> list[Path]:
     """Paths to watch: canonical config + every agent's native config.
 
-    Codex (AGENTS.md append-once) is intentionally excluded: its writer
-    self-stabilizes and there is nothing meaningful to re-sync.
+    CLI-only hosts (Codex and the other pointer hosts) are intentionally
+    excluded: their writer appends a fixed block once and self-stabilizes, so
+    there is nothing meaningful to re-sync — and watching their instruction
+    files would make the watcher fire on the user's own edits to them.
+
+    The test is `_is_cli_only`, not `id == "codex"`: that literal only knew
+    about the one host that existed when it was written, so adding the other
+    five pointer rows silently started watching their AGENTS.md/CLAUDE.md/etc.
     """
     paths = [Path(config_path) if config_path else CONFIG_DIR / "config.json"]
     seen = {str(paths[0])}
     for agent in detect_installed_agents():
-        if agent.get("id") == "codex":
+        if _is_cli_only(agent.get("id", "")):
             continue
         p = Path(agent["config_path"])
         if str(p) not in seen:

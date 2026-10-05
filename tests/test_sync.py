@@ -1233,3 +1233,192 @@ class TestRestoreNeverDeletesWhatItCannotRead:
         assert "Deploy runbook" in text, "undo deleted user content below the pointer"
         assert "step 1" in text
         assert "My rules" in text
+
+
+# ─── The agent table is the single source of truth ───
+#
+# The refactor's whole claim is "a host is one row". These tests are what keeps
+# that claim true: they fail if a row is added that the dispatchers cannot drive,
+# if a hardcoded id creeps back in beside the table, or if detection and the table
+# drift apart.
+
+class TestAgentTable:
+    def test_every_row_resolves_a_config_path(self):
+        """Each row's `path_fn` must exist and return a usable path."""
+        from mcptoon.sync import _AGENT_SPECS, _agent_config_path
+
+        for spec in _AGENT_SPECS:
+            path = _agent_config_path(spec.id)
+            assert path is not None, f"{spec.id}: no config path"
+            assert path.is_absolute(), f"{spec.id}: path is not absolute ({path})"
+
+    def test_shapes_are_a_closed_set(self):
+        """A typo'd shape would silently fall back to `mcpServers` — pin the set."""
+        from mcptoon.sync import _AGENT_SPECS
+
+        for spec in _AGENT_SPECS:
+            assert spec.shape in ("mcpServers", "mcp.servers", "pointer"), spec
+
+    def test_a_cli_only_host_must_carry_a_pointer(self):
+        """No MCP config and no pointer = the host receives nothing at all."""
+        from mcptoon.sync import _AGENT_SPECS
+
+        for spec in _AGENT_SPECS:
+            if not spec.mcp:
+                assert spec.pointer_fn is not None, \
+                    f"{spec.id} is CLI-only but has no pointer_fn: unreachable host"
+
+    def test_pointer_path_agrees_with_the_table(self):
+        """`pointer_path` is driven by `pointer_fn` — one rule, no second list."""
+        from mcptoon.sync import _AGENT_SPECS, pointer_path
+
+        for spec in _AGENT_SPECS:
+            got = pointer_path(spec.id)
+            if spec.pointer_fn is None:
+                assert got is None, f"{spec.id}: unexpected pointer {got}"
+            else:
+                assert got is not None and got.is_absolute(), spec.id
+
+    def test_detection_only_reports_hosts_in_the_table(self):
+        """`detect_installed_agents` must not invent an id the table does not hold."""
+        from mcptoon.sync import _AGENT_SPEC_BY_ID, detect_installed_agents
+
+        for agent in detect_installed_agents():
+            assert agent["id"] in _AGENT_SPEC_BY_ID, agent
+
+    def test_adding_a_row_is_enough_to_support_a_host(self, tmp_path, monkeypatch):
+        """The actual claim: a new host is one row, no branch anywhere else.
+
+        A synthetic row is spliced into the table and then driven through the
+        public-ish entry points (`_agent_config_path`, `_servers_section`,
+        `_write_servers_section`, `sync_to_agent`) without touching any other
+        function — which is only possible because the dispatchers read the table.
+        """
+        from mcptoon import sync as sync_mod
+
+        fake_cfg = tmp_path / "brandnew" / "mcp.json"
+        monkeypatch.setattr(sync_mod, "_brandnew_path", lambda: fake_cfg,
+                            raising=False)
+        row = sync_mod._AgentSpec("brandnew", "Brand New", "_brandnew_path")
+        monkeypatch.setattr(sync_mod, "_AGENT_SPECS", sync_mod._AGENT_SPECS + (row,))
+        monkeypatch.setattr(sync_mod, "_AGENT_SPEC_BY_ID",
+                            {**sync_mod._AGENT_SPEC_BY_ID, "brandnew": row})
+
+        assert sync_mod._agent_config_path("brandnew") == fake_cfg
+        data = sync_mod._write_servers_section({}, "brandnew", {"fetch": {"command": "npx"}})
+        assert data["mcpServers"] == {"fetch": {"command": "npx"}}
+        assert sync_mod._servers_section(data, "brandnew") == {"fetch": {"command": "npx"}}
+
+        config = {"servers": {"fetch": {"transport": "stdio", "command": ["npx"],
+                                        "args": ["-y", "@mcp/fetch"]}}}
+        result = sync_mod.sync_to_agent("brandnew", dry_run=False, config=config)
+        assert result["written"] is True, result
+        assert "fetch" in json.loads(fake_cfg.read_text())["mcpServers"]
+
+    def test_write_servers_section_round_trips_both_shapes(self):
+        """Write then read must land in the same place for both storage shapes."""
+        from mcptoon.sync import _servers_section, _write_servers_section
+
+        payload = {"fetch": {"command": "npx"}}
+        flat = _write_servers_section({}, "cursor", dict(payload))
+        assert flat["mcpServers"] == payload
+        assert _servers_section(flat, "cursor") == payload
+
+        nested = _write_servers_section({}, "vscode-copilot", dict(payload))
+        assert nested["mcp"]["servers"] == payload
+        assert "mcpServers" not in nested
+        assert _servers_section(nested, "vscode-copilot") == payload
+
+    def test_write_servers_section_keeps_unrelated_vscode_settings(self):
+        """The VS Code shape must edit in place, not replace the whole settings file."""
+        from mcptoon.sync import _write_servers_section
+
+        live = {"editor.fontSize": 15, "mcp": {"servers": {"keep": {}}}}
+        out = _write_servers_section(live, "vscode-copilot", {"fetch": {"command": "npx"}})
+        assert out["editor.fontSize"] == 15
+        assert "keep" not in out["mcp"]["servers"]
+
+    def test_every_pointer_host_names_a_distinct_instruction_file(self):
+        """Two pointer rows writing the same file would silently double-write.
+
+        Also pins the *shape* of the CLI leg: a pointer host's `path_fn` and
+        `pointer_fn` must agree, or `detect` would report one file while `sync`
+        edits another (the exact class of bug `_codex_agents_path` fixed).
+        """
+        from mcptoon.sync import _AGENT_SPECS, _agent_config_path, pointer_path
+
+        seen: dict[Path, str] = {}
+        for spec in _AGENT_SPECS:
+            if spec.mcp:
+                continue
+            p = pointer_path(spec.id)
+            assert p is not None and p.is_absolute(), spec.id
+            assert _agent_config_path(spec.id) == p, \
+                f"{spec.id}: sync writes a different file than the pointer names"
+            assert p not in seen, f"{spec.id} and {seen.get(p)} share {p}"
+            seen[p] = spec.id
+
+    def test_pointer_hosts_carry_a_txt_or_md_file_not_json(self):
+        """A pointer host's file is prose the agent reads — not a JSON config."""
+        from mcptoon.sync import _AGENT_SPECS, pointer_path
+
+        for spec in _AGENT_SPECS:
+            if spec.mcp:
+                continue
+            assert pointer_path(spec.id).suffix.lower() in (".md", ".txt"), spec.id
+
+    def test_config_dir_honours_xdg_config_home(self, monkeypatch, tmp_path):
+        """A moved XDG_CONFIG_HOME must move the XDG hosts' pointer with it.
+
+        Writing to `~/.config` while the host reads `$XDG_CONFIG_HOME` is the
+        silent no-op this module keeps guarding against, so the env var is
+        load-bearing, not decorative.
+        """
+        from mcptoon import sync as s
+
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        assert s._config_dir() == tmp_path
+        assert s._crush_path() == tmp_path / "crush" / "CRUSH.md"
+        assert s._opencode_path() == tmp_path / "opencode" / "AGENTS.md"
+
+    def test_pointer_hosts_get_the_same_block_as_codex(self, tmp_path, monkeypatch):
+        """One delivery mechanism for every CLI host — not a per-host copy."""
+        from mcptoon import sync as s
+
+        for host, helper in (("gemini", "_gemini_path"), ("qwen", "_qwen_path"),
+                             ("zed", "_zed_path"), ("crush", "_crush_path"),
+                             ("opencode", "_opencode_path")):
+            target = tmp_path / host / "AGENTS.md"
+            monkeypatch.setattr(s, helper, lambda t=target: t)
+            result = s.sync_to_agent(host, config={"servers": {}}, include_self=True)
+            assert result["written"] is True, (host, result)
+            assert s._SKILL_POINTER_HEADING in target.read_text(encoding="utf-8"), host
+            # Opt-in: a plain sync must not touch the file.
+            target.unlink()
+            s.sync_to_agent(host, config={"servers": {}}, include_self=False)
+            assert not target.exists(), host
+
+    def test_readme_agent_table_names_every_host_in_the_table(self):
+        """The README's "Works with" table is a promise; a missing row is a broken one.
+
+        The five pointer rows landed in the code first, and the README kept listing
+        seven hosts — the exact drift this pins shut. Only the *name* is checked
+        (the prose per row is free), so a wording change cannot fail it.
+        """
+        from mcptoon.sync import _AGENT_SPECS
+
+        readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+        # Target the per-host *table* (the "host by host" subsection), not the market
+        # lists above it — a name appearing in the long list must not satisfy a row
+        # the hookup table is missing.
+        section = readme.split("### What mcptoon writes, host by host", 1)
+        assert len(section) == 2, "the README table heading changed"
+        table = section[1].split("```", 1)[0]
+
+        def present(spec) -> bool:
+            # A report-only parenthetical ("Codex (AGENTS.md)") is not a README name;
+            # accept either the bare display name or the row id.
+            return spec.name.split(" (", 1)[0] in table or spec.id in table
+
+        missing = [spec.name for spec in _AGENT_SPECS if not present(spec)]
+        assert not missing, f"README table omits: {missing}"

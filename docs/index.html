@@ -234,6 +234,10 @@
   .foot-cmd button:hover{color:#E8F4F8}
   .foot-links{margin-top:30px;display:flex;gap:22px;flex-wrap:wrap;font-size:14.5px}
   .foot-links a{color:#E8F4F8}
+  .foot-support{margin-top:30px;padding-top:20px;border-top:1px solid rgba(232,244,248,.14);max-width:640px}
+  .foot-support h3{font-size:15px;font-weight:800;color:#E8F4F8;margin:0 0 8px}
+  .foot-support p{margin:0;font-size:13.5px;color:#9AB4BF}
+  .foot-support a{color:#818CF8}
   .foot-meta{margin-top:34px;padding-top:18px;border-top:1px solid rgba(232,244,248,.14);
     font-size:13px;color:#9AB4BF;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
   .foot-colophon{margin-top:16px;font-size:12.5px;color:#9AB4BF;max-width:640px}
@@ -335,7 +339,7 @@
      "name": "Does it touch my client settings?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Scanning (quickstart) reads existing configs and writes only its own ~/.mcptoon/config.json — no edits to clients. Writing into clients is sync's job, and it only moves when you run it: it prints a report of what it wrote, supports a --dry preview, touches only the mcpServers key, and by default writes every detected client in one pass — name one with --agent <client> to go narrower. Codex is the exception — it writes the project's AGENTS.md. Scope the escape hatch honestly: deleting ~/.mcptoon/ removes mcptoon's own config and cache, but entries sync already wrote stay in your clients until you remove them — the report says where."
+      "text": "Scanning (quickstart) reads existing configs and writes only its own ~/.mcptoon/config.json — no edits to clients. Writing into clients is sync's job, and it only moves when you run it: it prints a report of what it wrote, supports a --dry preview, touches only the mcpServers key, and by default writes every detected client in one pass — name one with --agent <client> to go narrower. Codex is the exception — it writes the user-level ~/.codex/AGENTS.md. Scope the escape hatch honestly: deleting ~/.mcptoon/ removes mcptoon's own config and cache, but entries sync already wrote stay in your clients until you remove them — the report says where."
      }
     },
     {
@@ -691,9 +695,10 @@ Client initialized notification received</code>
     </div>
     <p class="note" style="margin-top:18px"><b><span class="nw">What mcptoon writes to directly</span></b>
     (<code class="mono">mcptoon sync</code>): Claude Desktop · Cursor · Cline · Windsurf · VS Code
-    Copilot — Cursor gets the global <code class="mono">~/.cursor/mcp.json</code>. One project-level
-    exception: Codex, written into the project's <code class="mono">AGENTS.md</code>. Everything else
-    that can launch a stdio MCP server — OpenClaw and Hermes included — connects through
+    Copilot — Cursor gets the global <code class="mono">~/.cursor/mcp.json</code>. Separately, a
+    machine-wide pointer goes into the user-level instruction file of Codex, Claude Code, Gemini CLI,
+    Qwen Code, Zed, Crush and opencode. Everything else that can launch a stdio MCP server — OpenClaw
+    and Hermes included — connects through
     <code class="mono">mcptoon serve</code>: one entry, zero hand-written per-agent config.</p>
   </div>
 </section>
@@ -701,7 +706,7 @@ Client initialized notification received</code>
 <!-- ============ COMPAT ============ -->
 <div class="compat">
   <div class="wrap in">
-    <div class="agents">Claude Desktop<span class="dot">·</span> Cursor<span class="dot">·</span> Cline<span class="dot">·</span> Windsurf<span class="dot">·</span> Copilot<span class="dot">·</span> Codex<span class="dot">·</span> any stdio MCP client</div>
+    <div class="agents">Claude Desktop<span class="dot">·</span> Cursor<span class="dot">·</span> Cline<span class="dot">·</span> Windsurf<span class="dot">·</span> Copilot<span class="dot">·</span> Codex<span class="dot">·</span> Gemini CLI<span class="dot">·</span> Qwen Code<span class="dot">·</span> Zed<span class="dot">·</span> Crush<span class="dot">·</span> opencode<span class="dot">·</span> any stdio MCP client</div>
     <span class="note">Windows · macOS · Linux</span>
   </div>
 </div>
@@ -712,7 +717,7 @@ Client initialized notification received</code>
     <h2>The spec sheet — small print, written large.</h2>
     <p class="lead">Every row below is CI-enforced or pinned in the public record. No marketing math.</p>
     <div class="panel plist">
-      <div class="row"><div class="lhs"><b>Test suite</b> — re-counted on the machine that built this page (v0.8.13, 2026-10-05)</div><div class="rhs">1909 passed · 2 skipped</div></div>
+      <div class="row"><div class="lhs"><b>Test suite</b> — re-counted on the machine that built this page (v0.8.13, 2026-10-05)</div><div class="rhs">1922 passed · 2 skipped</div></div>
       <div class="row"><div class="lhs"><b>Third-party dependencies</b> — CI turns the build red if one ever appears</div><div class="rhs">zero</div></div>
       <div class="row"><div class="lhs"><b>Platforms</b> — Windows is a first-class citizen; CI matrix runs Windows / Linux / macOS</div><div class="rhs">win · mac · linux</div></div>
       <div class="row"><div class="lhs"><b>Protocol</b> — spec version implemented</div><div class="rhs">MCP 2026-07-28</div></div>
@@ -782,7 +787,7 @@ Client initialized notification received</code>
         supports a <code class="mono">--dry</code> preview, touches only the <code class="mono">mcpServers</code>
         key, and by default writes every detected client in one pass — name one with
         <code class="mono">--agent &lt;client&gt;</code> to go narrower. Codex is the exception — it writes
-        the project's <code class="mono">AGENTS.md</code>. Scope the escape hatch honestly: deleting
+        the user-level <code class="mono">~/.codex/AGENTS.md</code>. Scope the escape hatch honestly: deleting
         <code class="mono">~/.mcptoon/</code> removes mcptoon's own config and cache, but entries
         <code>sync</code> already wrote stay in your clients until you remove them — the report says where.</p>
       </details>
@@ -790,6 +795,10 @@ Client initialized notification received</code>
         <summary>Is it free?</summary>
         <p>Yes. Apache-2.0, open source. All the code is on GitHub, and <code class="mono">mcptoon stats</code>
         reads your own servers — so you never have to take anyone's word for your token bill. Including ours.</p>
+        <p>Free for individuals, and it stays that way. The parts one machine can't do — one shared server
+        list synced to every teammate's machine, a log of what got hydrated when — are <em>not built</em>.
+        If your team needs them, say so and they move up the list:
+        <a href="mailto:activeing123@gmail.com?subject=mcptoon%20team%20features">activeing123@gmail.com</a>.</p>
       </details>
     </div>
   </div>
@@ -814,6 +823,20 @@ Client initialized notification received</code>
       <a href="https://pypi.org/project/mcptoon/">PyPI</a>
       <a href="https://activeing123.github.io/mcptoon/tools/token-tax/">Token calculator</a>
       <a href="#how">Four steps</a>
+    </div>
+    <div class="foot-support">
+      <h3>Team features are not built yet — say the word and they move up</h3>
+      <p>One shared server list synced to every teammate's machine; a log of what got hydrated when.
+      No pricing, no waitlist page — just mail
+      <a href="mailto:activeing123@gmail.com?subject=mcptoon%20team%20features">activeing123@gmail.com</a>
+      and it gets built. The single-machine tool stays free and open.</p>
+    </div>
+    <div class="foot-support">
+      <h3>Did this save you money?</h3>
+      <p>mcptoon is one person's side project. If it cut your context bill,
+      <a href="https://github.com/sponsors/activeing123">sponsor it</a> or
+      <a href="https://github.com/activeing123/mcptoon">star the repo</a> — that's how other builders
+      find small tools.</p>
     </div>
     <div class="foot-meta">
       <span>mcptoon — the CLI that tests and cuts your MCP token bill</span>

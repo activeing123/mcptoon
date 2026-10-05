@@ -235,6 +235,10 @@
   .foot-cmd button:hover{color:#E8F4F8}
   .foot-links{margin-top:30px;display:flex;gap:22px;flex-wrap:wrap;font-size:14.5px}
   .foot-links a{color:#E8F4F8}
+  .foot-support{margin-top:30px;padding-top:20px;border-top:1px solid rgba(232,244,248,.14);max-width:640px}
+  .foot-support h3{font-size:15px;font-weight:800;color:#E8F4F8;margin:0 0 8px}
+  .foot-support p{margin:0;font-size:13.5px;color:#9AB4BF}
+  .foot-support a{color:#818CF8}
   .foot-meta{margin-top:34px;padding-top:18px;border-top:1px solid rgba(232,244,248,.14);
     font-size:13px;color:#9AB4BF;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
   .foot-colophon{margin-top:16px;font-size:12.5px;color:#9AB4BF;max-width:640px}
@@ -338,7 +342,7 @@
      "name": "它会改动我客户端的设置吗？",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "扫描（quickstart）读已有配置，写的是它自己的 ~/.mcptoon/config.json，不回头改客户端。往客户端里写是 sync 的职责，只有你跑了它才动：当场打报告、带 --dry 预览；只动 mcpServers 那一个键；不加参数默认一次写它探到的全部客户端，想只写一个，用 --agent 点名。Codex 例外——它写的是当前项目的 AGENTS.md。退路说清楚：删 ~/.mcptoon/ 清掉的是 mcptoon 自己的配置与缓存；sync 写进客户端的条目留在原地，照报告里的位置删掉即可。"
+      "text": "扫描（quickstart）读已有配置，写的是它自己的 ~/.mcptoon/config.json，不回头改客户端。往客户端里写是 sync 的职责，只有你跑了它才动：当场打报告、带 --dry 预览；只动 mcpServers 那一个键；不加参数默认一次写它探到的全部客户端，想只写一个，用 --agent 点名。Codex 例外——它写的是用户级的 ~/.codex/AGENTS.md。退路说清楚：删 ~/.mcptoon/ 清掉的是 mcptoon 自己的配置与缓存；sync 写进客户端的条目留在原地，照报告里的位置删掉即可。"
      }
     },
     {
@@ -631,14 +635,14 @@ Client initialized notification received</code>
         <p class="note">这一条在 <code class="mono">hermes mcp list</code> 里现在显示 <code class="mono">disabled</code>。所以这个说法很窄、但真实：它在那里握过手，也注册在那里——不代表它此刻正在运行。</p>
       </div>
     </div>
-    <p class="note" style="margin-top:18px"><b><span class="nw">mcptoon 直接写入的对象</span></b>（<code class="mono">mcptoon sync</code>）：Claude Desktop · Cursor · Cline · Windsurf · VS Code Copilot，其中 Cursor 写的是全局 <code class="mono">~/.cursor/mcp.json</code>。项目级只有一个例外：Codex，写当前项目的 <code class="mono">AGENTS.md</code>。其余任何能拉起 stdio MCP 服务器的客户端——包括 OpenClaw 和 Hermes——都通过 <code class="mono">mcptoon serve</code> 接入：一条入口，零手写每客户端配置。</p>
+    <p class="note" style="margin-top:18px"><b><span class="nw">mcptoon 直接写入的对象</span></b>（<code class="mono">mcptoon sync</code>）：Claude Desktop · Cursor · Cline · Windsurf · VS Code Copilot，其中 Cursor 写的是全局 <code class="mono">~/.cursor/mcp.json</code>。另有一类：往 Codex、Claude Code、Gemini CLI、Qwen Code、Zed、Crush、opencode 的用户级指令文件里各写一条机器级指针。其余任何能拉起 stdio MCP 服务器的客户端——包括 OpenClaw 和 Hermes——都通过 <code class="mono">mcptoon serve</code> 接入：一条入口，零手写每客户端配置。</p>
   </div>
 </section>
 
 <!-- ============ COMPAT ============ -->
 <div class="compat">
   <div class="wrap in">
-    <div class="agents">Claude Desktop<span class="dot">·</span> Cursor<span class="dot">·</span> Cline<span class="dot">·</span> Windsurf<span class="dot">·</span> Copilot<span class="dot">·</span> Codex<span class="dot">·</span> 任何 stdio MCP 客户端</div>
+    <div class="agents">Claude Desktop<span class="dot">·</span> Cursor<span class="dot">·</span> Cline<span class="dot">·</span> Windsurf<span class="dot">·</span> Copilot<span class="dot">·</span> Codex<span class="dot">·</span> Gemini CLI<span class="dot">·</span> Qwen Code<span class="dot">·</span> Zed<span class="dot">·</span> Crush<span class="dot">·</span> opencode<span class="dot">·</span> 任何 stdio MCP 客户端</div>
     <span class="note">Windows · macOS · Linux</span>
   </div>
 </div>
@@ -650,7 +654,7 @@ Client initialized notification received</code>
     <h2 style="margin-top:10px">参数表——把小字放大写。</h2>
     <p class="lead">下面每一行，要么有 CI 强制，要么钉在公开记录里。没有营销算术。</p>
     <div class="panel plist">
-      <div class="row"><div class="lhs"><b>测试套件</b> — 在造这页的机器上当场复跑（v0.8.13，2026-10-05）</div><div class="rhs">1909 passed · 2 skipped</div></div>
+      <div class="row"><div class="lhs"><b>测试套件</b> — 在造这页的机器上当场复跑（v0.8.13，2026-10-05）</div><div class="rhs">1922 passed · 2 skipped</div></div>
       <div class="row"><div class="lhs"><b>第三方依赖</b> — 谁塞进来一个，CI 就让构建红一次</div><div class="rhs">零</div></div>
       <div class="row"><div class="lhs"><b>平台</b> — Windows 是一等公民；CI 矩阵跑 Windows / Linux / macOS</div><div class="rhs">win · mac · linux</div></div>
       <div class="row"><div class="lhs"><b>协议</b> — 实现的 spec 版本</div><div class="rhs">MCP 2026-07-28</div></div>
@@ -691,11 +695,12 @@ Client initialized notification received</code>
       </details>
       <details>
         <summary>它会改动我客户端的设置吗？</summary>
-        <p>扫描（<code>quickstart</code>）读已有配置，写的是它自己的 <code class="mono">~/.mcptoon/config.json</code>，不回头改客户端。往客户端里写是 <code>sync</code> 的职责，只有你跑了它才动：当场打报告、带 <code class="mono">--dry</code> 预览；只动 <code class="mono">mcpServers</code> 那一个键；不加参数默认一次写它探到的全部客户端，想只写一个，用 <code class="mono">--agent</code> 点名。Codex 例外——它写的是当前项目的 <code class="mono">AGENTS.md</code>。退路说清楚：删 <code class="mono">~/.mcptoon/</code> 清掉的是 mcptoon 自己的配置与缓存；<code>sync</code> 写进客户端的条目留在原地，照报告里的位置删掉即可。</p>
+        <p>扫描（<code>quickstart</code>）读已有配置，写的是它自己的 <code class="mono">~/.mcptoon/config.json</code>，不回头改客户端。往客户端里写是 <code>sync</code> 的职责，只有你跑了它才动：当场打报告、带 <code class="mono">--dry</code> 预览；只动 <code class="mono">mcpServers</code> 那一个键；不加参数默认一次写它探到的全部客户端，想只写一个，用 <code class="mono">--agent</code> 点名。Codex 例外——它写的是用户级的 <code class="mono">~/.codex/AGENTS.md</code>。退路说清楚：删 <code class="mono">~/.mcptoon/</code> 清掉的是 mcptoon 自己的配置与缓存；<code>sync</code> 写进客户端的条目留在原地，照报告里的位置删掉即可。</p>
       </details>
       <details>
         <summary>免费吗？</summary>
         <p>是。Apache-2.0 开源。全部代码都在 GitHub 上，<code class="mono">mcptoon stats</code> 读的是你自己的服务器，所以 token 这笔账你永远不用听谁说的，自己看。</p>
+        <p>个人用免费，而且一直免费。一台机器做不了的那两件事——一份服务器清单同步到全队每台机器、谁在什么时候加载了什么工具的记录——<b>还没做</b>。团队真要，说一声就往前排：<a href="mailto:activeing123@gmail.com?subject=mcptoon%20team%20features">activeing123@gmail.com</a>。</p>
       </details>
     </div>
   </div>
@@ -720,6 +725,19 @@ Client initialized notification received</code>
       <a href="https://pypi.org/project/mcptoon/">PyPI</a>
       <a href="https://activeing123.github.io/mcptoon/tools/token-tax/zh/">Token 计算器（中文）</a>
       <a href="#how">四步上手</a>
+    </div>
+    <div class="foot-support">
+      <h3>团队功能还没做——你说一声，它往前排</h3>
+      <p>一份服务器清单同步到全队每台机器；谁在什么时候加载了什么工具的记录。
+      没有报价、没有候补名单页——直接发邮件给
+      <a href="mailto:activeing123@gmail.com?subject=mcptoon%20team%20features">activeing123@gmail.com</a>，
+      真有人要就做。单机版永远免费开源。</p>
+    </div>
+    <div class="foot-support">
+      <h3>帮你省下钱了？</h3>
+      <p>mcptoon 是个人业余项目。要是它砍掉了你的上下文账单，
+      <a href="https://github.com/sponsors/activeing123">赞助它</a>，或者
+      <a href="https://github.com/activeing123/mcptoon">给个 star</a>——别的开发者就是靠这个找到小工具的。</p>
     </div>
     <div class="foot-meta">
       <span>mcptoon — 管 MCP 工具配置与 token 的命令行</span>

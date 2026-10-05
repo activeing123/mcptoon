@@ -26,7 +26,9 @@ Supported targets:
   - Cline (.cline/mcp_config.json or VS Code settings)
   - Windsurf (.codeium/windsurf/mcp_config.json)
   - VS Code Copilot (settings.json → mcp.servers)
-  - Codex (AGENTS.md — mentions mcptoon as the tool manager)
+  - Codex, Claude Code, Gemini CLI, Qwen Code, Zed, Crush, opencode
+    (no MCP mount: a skill pointer in the instruction file each reads every
+     session — see `_AGENT_SPECS`)
 
 Usage:
     from mcptoon.sync import sync_to_all, sync_to_agent
@@ -37,6 +39,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 from .config import load_config
 
@@ -53,6 +56,119 @@ def _appdata() -> Path:
     if sys.platform == "win32":
         return Path(os.environ.get("APPDATA", str(_home() / "AppData" / "Roaming")))
     return _home()
+
+
+def _config_dir() -> Path:
+    """The XDG-style config root: `$XDG_CONFIG_HOME`, else `~/.config`.
+
+    Used by the hosts that follow the XDG Base Directory spec (Crush, opencode,
+    Zed on Linux). Honouring `XDG_CONFIG_HOME` is not optional: a user who moved
+    it gets their pointer written to a directory the host never reads — the
+    silent no-op this module keeps having to guard against.
+    """
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg)
+    return _home() / ".config"
+
+
+# ─── The agent table (one row per supported host) ───
+#
+# Every supported host is one row here instead of one `if agent_id == ...` per
+# call site. The old shape hardcoded the same id in up to ten places (vscode-copilot
+# nine times, codex ten), so adding a host meant finding all of them; a row is now
+# the whole definition, and the dispatchers below read it.
+#
+# `path_fn`/`pointer_fn` are **function names, not function objects**, on purpose:
+# a table built at import time would capture the original functions, so a test that
+# patches `_claude_code_path` would silently keep writing to the real home directory.
+# `_resolve` looks the name up at call time so patching keeps working.
+
+class _AgentSpec(NamedTuple):
+    """One supported host. See `_AGENT_SPECS` for the rows."""
+
+    id: str
+    name: str
+    path_fn: str                  # module-level fn returning its config Path
+    shape: str = "mcpServers"     # how servers are stored: mcpServers | mcp.servers | pointer
+    detected_by: str = "parent"   # which path proves it is installed (see _detect_exists)
+    multi: bool = False           # path_fn returns a list of paths, not one
+    only_when_present: bool = False  # hidden entirely when not installed (no exists:False row)
+    pointer_fn: str | None = None  # fn returning its per-session instruction file, if it has one
+
+    @property
+    def mcp(self) -> bool:
+        """True when this host carries MCP servers (False for CLI-only hosts)."""
+        return self.shape != "pointer"
+
+
+_AGENT_SPECS: tuple[_AgentSpec, ...] = (
+    _AgentSpec("claude-desktop", "Claude Desktop", "_claude_desktop_path"),
+    _AgentSpec("cursor", "Cursor", "_cursor_path", multi=True,
+               detected_by="parent_or_file"),
+    _AgentSpec("cline", "Cline", "_cline_path", detected_by="grandparent"),
+    _AgentSpec("windsurf", "Windsurf", "_windsurf_path"),
+    _AgentSpec("vscode-copilot", "VS Code Copilot", "_vscode_copilot_path",
+               shape="mcp.servers"),
+    _AgentSpec("claude-code", "Claude Code", "_claude_code_path",
+               detected_by="file", only_when_present=True,
+               pointer_fn="_claude_code_memory_path"),
+    _AgentSpec("codex", "Codex (AGENTS.md)", "_codex_agents_path",
+               shape="pointer", detected_by="file", only_when_present=True,
+               pointer_fn="_codex_agents_path"),
+    # CLI-leg hosts: no MCP mount at all. Each reads one machine-wide instruction
+    # file on every session, so a pointer there is the whole delivery. Paths are
+    # vendor-doc-confirmed, not guessed — a pointer into a file the host never
+    # reads is a silent no-op (see the note above `pointer_path`). `detected_by`
+    # is `parent` because the config *directory* existing proves the host has run
+    # on this machine, while the instruction file itself is what we create.
+    _AgentSpec("gemini", "Gemini CLI", "_gemini_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_gemini_path"),
+    _AgentSpec("qwen", "Qwen Code", "_qwen_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_qwen_path"),
+    _AgentSpec("zed", "Zed", "_zed_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_zed_path"),
+    _AgentSpec("crush", "Crush", "_crush_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_crush_path"),
+    _AgentSpec("opencode", "opencode", "_opencode_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_opencode_path"),
+)
+
+_AGENT_SPEC_BY_ID: dict[str, _AgentSpec] = {spec.id: spec for spec in _AGENT_SPECS}
+
+
+def _resolve(fn_name: str):
+    """Look a table-named function up at call time (so tests can patch it)."""
+    return globals()[fn_name]
+
+
+def _detect_exists(path: Path, how: str) -> bool:
+    """Does `path` prove its host is installed? One rule per `detected_by` value."""
+    if how == "file":
+        return path.exists()
+    if how == "parent_or_file":
+        return path.parent.exists() or path.exists()
+    if how == "grandparent":
+        return path.parent.parent.exists() if path.parts else False
+    return path.parent.exists()  # "parent"
+
+
+def _shape_of(agent_id: str) -> str:
+    """The config shape for an id, defaulting to the common `mcpServers` one."""
+    spec = _AGENT_SPEC_BY_ID.get(agent_id)
+    return spec.shape if spec is not None else "mcpServers"
+
+
+def _paths_for(agent_id: str) -> list[Path]:
+    """Every config path a host reads (Cursor has a global and a project one)."""
+    spec = _AGENT_SPEC_BY_ID[agent_id]
+    out = _resolve(spec.path_fn)()
+    return list(out) if spec.multi else [out]
 
 
 # ─── Agent config file paths ───
@@ -87,13 +203,81 @@ def _claude_code_memory_path() -> Path:
     return _home() / ".claude" / "CLAUDE.md"
 
 
+# ─── The CLI-leg hosts' instruction files ───
+#
+# Each of these hosts loads one machine-wide file on every session, so the skill
+# pointer is the whole delivery. Every path below is taken verbatim from the
+# vendor's own documentation (not inferred from the tool's name), because writing
+# a pointer into a file the host does not read produces no error and no effect.
+# The vendor and the doc each came from are named in the docstring.
+
+def _gemini_path() -> Path:
+    """Gemini CLI's global context file.
+
+    `docs/cli/gemini-md.md`: "Global context file ... `~/.gemini/GEMINI.md` (in
+    your user home directory). Scope: provides default instructions for all your
+    projects." `GEMINI_DIR` is the constant `.gemini` in `utils/paths.ts`.
+    """
+    return _home() / ".gemini" / "GEMINI.md"
+
+
+def _qwen_path() -> Path:
+    """Qwen Code's global context file.
+
+    `docs/users/features/memory.md` lists `~/.qwen/QWEN.md` as the file that
+    "applies to you, across all your projects"; `QWEN_DIR = '.qwen'` in
+    `packages/core/src/utils/paths.ts`.
+    """
+    return _home() / ".qwen" / "QWEN.md"
+
+
+def _zed_path() -> Path:
+    """Zed's global rules file.
+
+    `docs/src/ai/rules.md`: "Default Rules are appended to your global `AGENTS.md`
+    file (`~/.config/zed/AGENTS.md` on macOS and Linux, `%APPDATA%\\Zed\\AGENTS.md`
+    on Windows)." `crates/paths/src/paths.rs` confirms `%APPDATA%\\Zed` is the
+    Windows config dir. Zed keeps rules as Skills by default now, but the global
+    `AGENTS.md` is still read, which is what a pointer needs.
+    """
+    if sys.platform == "win32":
+        return _appdata() / "Zed" / "AGENTS.md"
+    return _config_dir() / "zed" / "AGENTS.md"
+
+
+def _crush_path() -> Path:
+    """Crush's global context file.
+
+    `README.md` ("Global context files"): "`~/.config/crush/CRUSH.md`: Crush-specific
+    rules ... If you only use Crush, this is the only one you need to edit." Crush
+    honours the XDG spec, so `$XDG_CONFIG_HOME` wins when set (same README).
+    """
+    return _config_dir() / "crush" / "CRUSH.md"
+
+
+def _opencode_path() -> Path:
+    """opencode's global rules file.
+
+    `packages/web/src/content/docs/rules.mdx`: "You can also have global rules in a
+    `~/.config/opencode/AGENTS.md` file. This gets applied across all opencode
+    sessions." The same doc notes opencode falls back to `~/.claude/CLAUDE.md` when
+    this file is absent — which is exactly the file `claude-code`'s row writes, so
+    the two legs reinforce rather than fight.
+    """
+    return _config_dir() / "opencode" / "AGENTS.md"
+
+
 # Hosts whose agent reads a machine-wide instruction file every session: the hosts
 # the CLI leg can actually reach (CONTEXT.md: Two Legs Always On). Every other host
 # reaches mcptoon through MCP alone.
 #
-# The list is short and evidence-based rather than aspirational:
+# The list is evidence-based rather than aspirational, and it now spans two kinds
+# of host:
 # * `codex` — AGENTS.md is Codex's documented channel, and mcptoon already used it.
 # * `claude-code` — CLAUDE.md, evidenced by Claude Code's own config state.
+# * `gemini`, `qwen`, `zed`, `crush`, `opencode` — each vendor documents one global
+#   instruction file by exact path; see the `_<host>_path` docstrings for the file
+#   each claim came from.
 # * Cursor is NOT here on purpose. `~/.cursorrules` exists on some machines but is
 #   the legacy form (current Cursor uses `.cursor/rules`), so writing there risks a
 #   pointer into a file the host no longer reads — a silent no-op, which is worse
@@ -103,21 +287,21 @@ def _claude_code_memory_path() -> Path:
 #   stay MCP-only rather than risk editing a file the user shares with everything
 #   else on the machine.
 #
-# `pointer_path` dispatches by name rather than holding a table of function objects:
-# that table would capture the *original* functions at import time, so a test (or a
-# future refactor) patching `_claude_code_memory_path` would silently keep writing
-# to the real home directory. This repo has already been bitten once by a pointer
-# landing somewhere unexpected — see the note on `_codex_agents_path`.
-_SKILL_POINTER_HOSTS = ("codex", "claude-code")
+# Which hosts those are is now the `pointer_fn` column of `_AGENT_SPECS`, so the
+# list cannot drift from the table. `pointer_path` resolves the function *by name*
+# at call time: a table of function objects built at import would capture the
+# original functions, so a test (or a future refactor) patching
+# `_claude_code_memory_path` would silently keep writing to the real home
+# directory. This repo has already been bitten once by a pointer landing somewhere
+# unexpected — see the note on `_codex_agents_path`.
 
 
 def pointer_path(agent_id: str) -> Path | None:
     """The instruction file `agent_id` reads every session, if it has one."""
-    if agent_id == "codex":
-        return _codex_agents_path()
-    if agent_id == "claude-code":
-        return _claude_code_memory_path()
-    return None
+    spec = _AGENT_SPEC_BY_ID.get(agent_id)
+    if spec is None or spec.pointer_fn is None:
+        return None
+    return _resolve(spec.pointer_fn)()
 
 
 def _write_skill_pointer(path: Path) -> dict:
@@ -421,28 +605,18 @@ def _merge_self_entry(mcp_servers: dict) -> dict:
 
 def _agent_config_path(agent_id: str) -> Path | None:
     """The config file a given agent id writes to (None when unknown)."""
-    if agent_id == "claude-desktop":
-        return _claude_desktop_path()
-    if agent_id == "cursor":
-        return _cursor_path()[0]
-    if agent_id == "cline":
-        return _cline_path()
-    if agent_id == "windsurf":
-        return _windsurf_path()
-    if agent_id == "vscode-copilot":
-        return _vscode_copilot_path()
-    if agent_id == "claude-code":
-        return _claude_code_path()
-    if agent_id == "codex":
-        return _codex_agents_path()
-    return None
+    if agent_id not in _AGENT_SPEC_BY_ID:
+        return None
+    return _paths_for(agent_id)[0]
 
 
 def _servers_section(data: dict, agent_id: str) -> dict:
     """The mcpServers-shaped mapping inside an agent's config (read-only view).
 
     Cursor/Claude/Cline/Windsurf keep servers at ``mcpServers``; VS Code keeps
-    them at ``mcp.servers`` inside its shared settings.json.
+    them at ``mcp.servers`` inside its shared settings.json. Which one is the
+    ``shape`` column of `_AGENT_SPECS` — a host's shape is declared once, not
+    re-derived at each read site.
 
     Type-safe by construction: a config whose ``mcpServers`` / ``mcp`` / ``servers``
     is not a mapping (a list, a string, ``null``) yields ``{}`` rather than raising
@@ -450,7 +624,7 @@ def _servers_section(data: dict, agent_id: str) -> dict:
     """
     if not isinstance(data, dict):
         return {}
-    if agent_id == "vscode-copilot":
+    if _shape_of(agent_id) == "mcp.servers":
         mcp = data.get("mcp")
         if not isinstance(mcp, dict):
             return {}
@@ -458,6 +632,29 @@ def _servers_section(data: dict, agent_id: str) -> dict:
         return servers if isinstance(servers, dict) else {}
     servers = data.get("mcpServers")
     return servers if isinstance(servers, dict) else {}
+
+
+def _write_servers_section(data: dict, agent_id: str, section: dict) -> dict:
+    """Put ``section`` back where `_servers_section` reads it from.
+
+    The write-side twin of `_servers_section`, and the one place that knows VS
+    Code's servers live under ``mcp.servers`` while every other host's live at
+    the root ``mcpServers``. Returns the mutated config.
+    """
+    if _shape_of(agent_id) == "mcp.servers":
+        mcp = data.get("mcp")
+        if not isinstance(mcp, dict):
+            mcp = {}
+        mcp["servers"] = section
+        data["mcp"] = mcp
+    else:
+        data["mcpServers"] = section
+    return data
+
+
+def _is_cli_only(agent_id: str) -> bool:
+    """True for hosts with no MCP config at all (their delivery is the pointer)."""
+    return _shape_of(agent_id) == "pointer"
 
 
 def gateway_present_in(agent_id: str) -> bool:
@@ -469,7 +666,7 @@ def gateway_present_in(agent_id: str) -> bool:
     path = _agent_config_path(agent_id)
     if path is None or not path.exists():
         return False
-    if agent_id == "codex":
+    if _is_cli_only(agent_id):
         try:
             return _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8")
         except OSError:
@@ -502,7 +699,7 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
 
     # Codex: the undo is removing the skill-pointer block, not a JSON key. Kept
     # to exactly the block `sync --self` wrote, so nothing else in the file moves.
-    if agent_id == "codex":
+    if _is_cli_only(agent_id):
         if dry_run:
             if path.exists() and _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8"):
                 return {"agent": agent_id, "path": str(path), "removed": True,
@@ -518,10 +715,7 @@ def remove_gateway_from_agent(agent_id: str, dry_run: bool = False,
         return {"agent": agent_id, "path": str(path), "removed": False,
                 "written": False, "error": None}
 
-    if agent_id == "vscode-copilot":
-        section = (data.get("mcp") or {}).get("servers")
-    else:
-        section = data.get("mcpServers")
+    section = _servers_section(data, agent_id)
     has_gateway = (isinstance(section, dict) and SELF_SERVER_NAME in section
                    and _is_gateway_entry(section.get(SELF_SERVER_NAME)))
 
@@ -636,7 +830,7 @@ def _restore_view(agent_id: str, path: Path) -> dict | None:
         # Unreadable / not an object: we cannot safely compute or perform an undo.
         return None
     section = _servers_section(live, agent_id)
-    gateway = (agent_id != "codex"
+    gateway = (not _is_cli_only(agent_id)
                and SELF_SERVER_NAME in section
                and _is_gateway_entry(section.get(SELF_SERVER_NAME)))
 
@@ -751,7 +945,7 @@ def restore_agent_from_backup(agent_id: str, dry_run: bool = False,
                 "add_back": view["add_back"], "pointer_removed": view["pointer"]}
 
     changed = False
-    if agent_id != "codex" and (view["remove"] or view["add_back"]):
+    if not _is_cli_only(agent_id) and (view["remove"] or view["add_back"]):
         live = _read_json_obj(target)
         if live is None:
             # Between the plan and the write the file became unreadable. Do not
@@ -768,14 +962,7 @@ def restore_agent_from_backup(agent_id: str, dry_run: bool = False,
             for name in view["add_back"]:
                 if name not in section and name in bak_section:
                     section[name] = bak_section[name]
-        if agent_id == "vscode-copilot":
-            mcp = live.get("mcp")
-            if not isinstance(mcp, dict):
-                mcp = {}
-            mcp["servers"] = section
-            live["mcp"] = mcp
-        else:
-            live["mcpServers"] = section
+        _write_servers_section(live, agent_id, section)
 
         # Delete an empty stub ONLY when the file was mcptoon's own creation: the
         # `.bak` must be a readable object whose server section is empty, proving
@@ -844,85 +1031,41 @@ def detect_installed_agents() -> list[dict]:
     """Detect which AI agents are installed on this machine.
 
     Returns list of {id, name, config_path, exists}.
+
+    Driven by `_AGENT_SPECS`: each row declares how its install is proven
+    (``detected_by``) and whether it is listed at all when absent
+    (``only_when_present``). Two rules that used to live only in prose here:
+
+    * Claude Code is detected by its config *file* — the binary may be on PATH
+      without any dotted folder existing yet, and a machine that runs `claude`
+      has `.claude.json`, so the file is the evidence.
+    * Codex is listed only when `~/.codex/AGENTS.md` already exists: creating it
+      out of nothing would be an unasked-for write into a home the user may not
+      use for Codex at all.
+
+    Cline is proved by its own extension folder (`saoudrizwan.claude-dev`), not
+    by VS Code's *User* directory — that check was true on every machine with VS
+    Code installed, so `quickstart` wrote a Cline config for hosts that never had
+    Cline. That is the ``grandparent`` rule.
     """
     agents = []
-
-    # Claude Desktop
-    path = _claude_desktop_path()
-    agents.append({
-        "id": "claude-desktop",
-        "name": "Claude Desktop",
-        "config_path": str(path),
-        "exists": path.parent.exists(),
-    })
-
-    # Cursor
-    for p in _cursor_path():
-        agents.append({
-            "id": "cursor",
-            "name": f"Cursor ({'project' if p == _cursor_path()[-1] else 'global'})",
-            "config_path": str(p),
-            "exists": p.parent.exists() or p.exists(),
-        })
-
-    # Cline — the extension's own globalStorage folder, not VS Code's.
-    #
-    # The check used to be `path.parent.parent.parent.parent.exists()` — the VS Code
-    # *User* directory, true on every machine with VS Code installed, Cline or not.
-    # `quickstart` therefore wrote a Cline config (and claimed it had detected Cline)
-    # for hosts that only ever had VS Code. `saoudrizwan.claude-dev` is Cline's
-    # extension folder; its existence is the actual evidence.
-    path = _cline_path()
-    agents.append({
-        "id": "cline",
-        "name": "Cline",
-        "config_path": str(path),
-        "exists": path.parent.parent.exists() if path.parts else False,
-    })
-
-    # Windsurf
-    path = _windsurf_path()
-    agents.append({
-        "id": "windsurf",
-        "name": "Windsurf",
-        "config_path": str(path),
-        "exists": path.parent.exists(),
-    })
-
-    # VS Code Copilot
-    path = _vscode_copilot_path()
-    agents.append({
-        "id": "vscode-copilot",
-        "name": "VS Code Copilot",
-        "config_path": str(path),
-        "exists": path.parent.exists(),
-    })
-
-    # Claude Code — detected by the config file itself, since the binary may be
-    # on PATH without any dotted folder existing yet. A machine that runs
-    # `claude` has `.claude.json`; the file is the evidence.
-    path = _claude_code_path()
-    if path.exists():
-        agents.append({
-            "id": "claude-code",
-            "name": "Claude Code",
-            "config_path": str(path),
-            "exists": True,
-        })
-
-    # Codex — the global instruction file, so a machine-wide pointer is possible.
-    # Only when the file already exists: creating `~/.codex/AGENTS.md` out of
-    # nothing would be an unasked-for write into a home the user may not use for
-    # Codex at all.
-    path = _codex_agents_path()
-    if path.exists():
-        agents.append({
-            "id": "codex",
-            "name": "Codex (AGENTS.md)",
-            "config_path": str(path),
-            "exists": True,
-        })
-
+    for spec in _AGENT_SPECS:
+        paths = _paths_for(spec.id)
+        for path in paths:
+            exists = _detect_exists(path, spec.detected_by)
+            if spec.only_when_present and not exists:
+                continue
+            name = spec.name
+            if spec.multi:
+                # Cursor lists a global and a project-level config; label which
+                # is which so a user reading `status` can tell them apart.
+                name = f"{spec.name} ({'project' if path == paths[-1] else 'global'})"
+            agents.append({
+                "id": spec.id,
+                "name": name,
+                "config_path": str(path),
+                "exists": exists,
+            })
     return agents
 
 
@@ -1075,8 +1218,8 @@ def _drop_managed_servers(section: dict, new_servers: dict) -> list[str]:
 
 
 def _merge_mcp_servers(existing: dict, new_servers: dict,
-                       takeover: bool = False) -> dict:
-    """Merge new servers into existing config's mcpServers.
+                       takeover: bool = False, agent_id: str = "") -> dict:
+    """Merge new servers into existing config's server section.
 
     Default (``takeover=False``): preserves existing servers not in mcptoon,
     updates existing ones that are in mcptoon, and adds new ones. The gateway,
@@ -1093,10 +1236,13 @@ def _merge_mcp_servers(existing: dict, new_servers: dict,
     host. Servers mcptoon does not manage are left alone. The pre-change file is
     preserved as ``<config>.bak`` by ``_write_json_safe``; that backup is the
     undo.
+
+    ``agent_id`` selects the write location via `_write_servers_section`
+    (``mcp.servers`` for VS Code, root ``mcpServers`` for everyone else). It
+    defaults to the common shape so the function stays usable standalone.
     """
     result = dict(existing)
-    existing_section = result.get("mcpServers")
-    current_servers = dict(existing_section) if isinstance(existing_section, dict) else {}
+    current_servers = dict(_servers_section(result, agent_id))
     if takeover:
         _drop_managed_servers(current_servers, new_servers)
         # Under takeover the gateway replaces the direct entries — re-adding the
@@ -1106,8 +1252,7 @@ def _merge_mcp_servers(existing: dict, new_servers: dict,
             current_servers[SELF_SERVER_NAME] = new_servers[SELF_SERVER_NAME]
     else:
         current_servers.update(new_servers)
-    result["mcpServers"] = current_servers
-    return result
+    return _write_servers_section(result, agent_id, current_servers)
 
 
 def takeover_plan(agent_id: str | None = None, config: dict | None = None) -> list[dict]:
@@ -1193,10 +1338,10 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
 
     mcp_servers = _build_mcp_servers_dict(config)
 
-    if not mcp_servers and agent_id != "codex":
-        # Codex writes a skill pointer, not a server list, so an empty config is
-        # not a reason to skip it — that is exactly the first-run case where the
-        # pointer matters most.
+    if not mcp_servers and not _is_cli_only(agent_id):
+        # A CLI-only host writes a skill pointer, not a server list, so an empty
+        # config is not a reason to skip it — that is exactly the first-run case
+        # where the pointer matters most.
         return {
             "agent": agent_id,
             "path": "",
@@ -1213,19 +1358,12 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
     # `mcp.servers`) and differs only in *which file* — so one branch drives them
     # all. `_merge_mcp_servers` already knows how to update, add, and (under
     # takeover) drop entries; the old per-agent copies of that logic had drifted.
-    _path_fns = {
-        "claude-desktop": _claude_desktop_path,
-        "cursor": lambda: _cursor_path()[0],
-        "claude-code": _claude_code_path,
-        "cline": _cline_path,
-        "windsurf": _windsurf_path,
-    }
-
-    if agent_id in _path_fns:
-        path = _path_fns[agent_id]()
+    if agent_id in _AGENT_SPEC_BY_ID and not _is_cli_only(agent_id):
+        path = _agent_config_path(agent_id)
         existing = _read_json_safe(path)
         before = set(_servers_section(existing, agent_id))
-        merged = _merge_mcp_servers(existing, mcp_servers, takeover=takeover)
+        merged = _merge_mcp_servers(existing, mcp_servers, takeover=takeover,
+                                    agent_id=agent_id)
         taken_over = len(before - set(_servers_section(merged, agent_id)))
         # The MCP leg and the CLI leg are independent, and this host can carry
         # both: Claude Code reads `~/.claude/CLAUDE.md` every session, so it can be
@@ -1248,55 +1386,32 @@ def sync_to_agent(agent_id: str, dry_run: bool = False, config: dict | None = No
                 "taken_over": taken_over, "written": ok,
                 "error": None if ok else "Write failed", "pointer": pointer}
 
-    elif agent_id == "vscode-copilot":
-        path = _vscode_copilot_path()
-        existing = _read_json_safe(path)
-        # VS Code stores MCP servers under "mcp.servers" in settings.json.
-        # The user's settings.json is a large shared file, so this one is edited
-        # in place rather than rewritten: a full re-serialisation would reorder
-        # keys and reformat comments. An existing backup is left untouched.
-        # (`_write_json_safe` additionally refuses to write if the file is JSONC
-        # or otherwise not a plain object, so a shared settings.json survives.)
-        mcp_section = existing.get("mcp")
-        if not isinstance(mcp_section, dict):
-            mcp_section = {}
-        current_servers = dict(_servers_section(existing, "vscode-copilot"))
-        before = set(current_servers)
-        if takeover:
-            _drop_managed_servers(current_servers, mcp_servers)
-            if SELF_SERVER_NAME in mcp_servers:
-                current_servers[SELF_SERVER_NAME] = mcp_servers[SELF_SERVER_NAME]
-        else:
-            current_servers.update(mcp_servers)
-        taken_over = len(before - set(current_servers))
-        mcp_section["servers"] = current_servers
-        existing["mcp"] = mcp_section
-        if dry_run:
-            return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
-                    "taken_over": taken_over, "written": False, "error": None}
-        ok = _write_json_safe(path, existing)
-        return {"agent": agent_id, "path": str(path), "servers_synced": len(mcp_servers),
-                "taken_over": taken_over, "written": ok, "error": None if ok else "Write failed"}
-
-    elif agent_id == "codex":
-        # Codex has no MCP mount; its agent context comes from AGENTS.md. So this
-        # branch does not sync *servers* — it writes the skill pointer, which is
-        # the only thing that makes a CLI-only host able to find a skill at all.
+    elif _is_cli_only(agent_id):
+        # A CLI-only host has no MCP mount; its agent context comes from a
+        # machine-wide instruction file. So this branch does not sync *servers* —
+        # it writes the skill pointer, which is the only thing that makes such a
+        # host able to find a skill at all.
         #
-        # Three things the old writer got wrong: it targeted `Path.cwd()` (the
-        # pointer landed in a random project, or nowhere), its text named only
+        # Three things the old codex writer got wrong: it targeted `Path.cwd()`
+        # (the pointer landed in a random project, or nowhere), its text named only
         # `mcptoon manifest` and never the catalog, and it fired on every `sync`
-        # rather than behind `--self`. Now: global path, skill pointer included,
-        # and written only when `include_self` is set — the same opt-in the MCP
-        # gateway registration uses, because both are "let this host see mcptoon".
-        path = _codex_agents_path()
+        # rather than behind `--self`. Now: the path comes from the table row
+        # (`_agent_config_path`, so codex/gemini/qwen/zed/crush/opencode each get
+        # their own documented file), the skill pointer is included, and it is
+        # written only when `include_self` is set — the same opt-in the MCP gateway
+        # registration uses, because both are "let this host see mcptoon".
+        path = _agent_config_path(agent_id)
+        if path is None:
+            return {"agent": agent_id, "path": "", "servers_synced": 0,
+                    "taken_over": 0, "written": False,
+                    "error": f"Unknown agent: {agent_id}"}
         if not include_self:
             return {"agent": agent_id, "path": str(path), "servers_synced": 0,
                     "taken_over": 0, "written": False, "error": None}
         if dry_run:
-            # Report the pointer honestly in a preview: Codex's whole delivery *is*
-            # the pointer, so "nothing to write" would be a lie about the one host
-            # this branch exists for.
+            # Report the pointer honestly in a preview: a CLI-only host's whole
+            # delivery *is* the pointer, so "nothing to write" would be a lie about
+            # the one host this branch exists for.
             try:
                 already = (path.exists() and
                            _SKILL_POINTER_HEADING in path.read_text(encoding="utf-8"))

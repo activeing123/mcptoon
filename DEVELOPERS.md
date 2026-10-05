@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.8.13 · 1909 passed + 2 skipped · 0 依赖 · 342KB wheel · 43 模块 · Apache 2.0
+- 版本：v0.8.13 · 1922 passed + 2 skipped · 0 依赖 · 342KB wheel · 43 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -173,7 +173,7 @@ mcptoon config set footer on    # 打开
 
 ## Works with
 
-**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex · Gemini CLI · OpenCode** —— 外加 aider、shell 脚本、CI、cron 和一切能执行命令的环境，包括完全不支持 MCP 的。
+**Claude Desktop · Claude Code · Cursor · Cline · Windsurf · VS Code Copilot · Codex · Gemini CLI · Qwen Code · Zed · Crush · opencode** —— 外加 aider、shell 脚本、CI、cron 和一切能执行命令的环境，包括完全不支持 MCP 的。
 
 ---
 
@@ -190,7 +190,7 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-everything"]) a
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 1909 tests, green expected
+python -m pytest tests/ -v          # 1922 tests, green expected
 
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
