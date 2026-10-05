@@ -5,6 +5,46 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.14] - 2026-10-05
+
+### Added
+
+- **Five more instruction-file hosts: Gemini CLI, Qwen Code, Zed, Crush and opencode.** `sync --self`
+  now writes its one-line pointer into the file each of these actually reads —
+  `~/.gemini/GEMINI.md`, `~/.qwen/QWEN.md`, Zed's `AGENTS.md`, `~/.config/crush/CRUSH.md`,
+  `~/.config/opencode/AGENTS.md` — and only when that file already exists. The agent table goes from
+  7 rows to 12; adding a host is now a table row, not a code path.
+- **The README states the whole market, not just what we configure.** The "Works with every AI
+  agent" section now opens with the two delivery legs and the clients each one reaches: 42 on the
+  CLI leg (the agent runs `mcptoon` itself — zero config) and 61 on the serve leg (a GUI client that
+  cannot run a shell gets one `mcptoon serve` entry). 103 clients in total, taken from the public
+  `punkpeye/awesome-mcp-clients` list plus vendor docs for coding agents that postdate it; the two
+  developer libraries in that list (`mcp-agent`, `mcp-client-go`) are excluded because a user does
+  not run them. The Contents entry and the Path 1 intro carry the count and a link, so a reader can
+  tell whether their tool is covered without scrolling to the list.
+
+### Fixed
+
+- **The CLI-only sync branch no longer assumes Codex is the only such host.** It hardcoded both
+  Codex's path and its pointer text, so it fired on every sync (writing a pointer for a host that
+  was not installed) and named only a `mcptoon manifest` — the wrong instruction. It now resolves
+  the path from the table and skips hosts that are not CLI-only.
+- **`watch` no longer starts watching instruction files it never used to watch.** The skip was a
+  literal `id == "codex"`; adding pointer rows silently brought their files into the watch set. It
+  now asks the table (`_is_cli_only`).
+- **`demo_server` derives its agent-path helpers from the table** instead of restating them, so the
+  two cannot drift apart.
+
+### Tests
+
+- `tests/test_sync.py` gains 13 tests over the agent table: every row resolves a config path, the
+  shapes are a closed set, a CLI-only host must carry a pointer, pointer paths agree with the table,
+  detection only reports hosts in the table, each pointer host names a distinct `.md`/`.txt`
+  instruction file, `XDG_CONFIG_HOME` is honoured, the pointer block matches Codex's, and the README
+  table names every host in the table.
+- Suite: **1922 passed + 2 skipped**. `SKIP_SLACK` moves 2 → 3 for the intermittent registry-network
+  skip; the two deterministic skips are the case-insensitive NTFS collision and the WSL-stub bash.
+
 ## [0.8.13] - 2026-10-05
 
 ### Fixed
