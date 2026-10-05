@@ -57,7 +57,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
-              "337KB", "339KB")
+              "337KB", "339KB", "341KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -163,7 +163,13 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # global output flags now reaching every handler that renders records (new
 # parameters, the flag-coverage probe's fixes, and the guard suite), plus `head()`
 # learning the mapping-of-records shape.
-WHEEL_KB = "341KB"
+# 2026-10-05 (0.8.13): 350,759 bytes = 342.54 KB — the claim moves 341KB → 342KB.
+# The delta over the 0.8.12 tree (349,638 B by this same method, which reproduces the
+# 349,540 B in that release commit and the 349,666 B PyPI serves) is +1,121 bytes:
+# one look-up table and one pure function in cli.py, the 8 tests that pin them, and
+# the claim-surface updates. 341KB joins RETIRED_KB like every value before it;
+# CHANGELOG.md keeps saying 341KB for 0.8.12, because that is what shipped.
+WHEEL_KB = "342KB"
 
 
 def modules() -> list[Path]:

@@ -5,7 +5,7 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.13] - 2026-10-05
 
 ### Fixed
 
@@ -84,10 +84,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`SKILL.md` instead of `CLAUDE.md`). Fixed in both READMEs.
   - **The README said the slim-schema figure is 24%** while four other places on the same
     page said 88.5%. 24% appears nowhere else; the number was simply wrong.
-- Claim surfaces moved to the tree's measured values: **1901 passed** (1903 collected − 2
-  environment skips) and **25,227 physical lines**. The line figure had been 25,224 —
-  measured *before* the 0.8.12 help-text edit landed, so it was 3 lines stale and the
-  guard's 2% tolerance never noticed. Corrected here rather than left as a known-wrong number.
+- Claim surfaces moved to the tree's measured values: **1909 passed** (1911 collected − 2
+  environment skips) and **25,257 physical lines**, with the wheel claim at **342KB**. The
+  line figure had been 25,224 — measured *before* the 0.8.12 help-text edit landed, so it
+  was 3 lines stale and the guard's 2% tolerance never noticed. Corrected here rather than
+  left as a known-wrong number; the `--smart` fix in this same release then moved all three
+  a second time (1901 → 1909 tests, 25,227 → 25,257 lines, 341KB → 342KB).
+
+- **The published wheel-size claim moved with the wheel.** The tree is now **350,759 bytes
+  = 342.54 KB** by the guard's own method — normalise the checkout to LF, then really build
+  the wheel — which is past the 342 line, so the claim moves **341KB → 342KB** on all ten
+  surfaces that state it and 341KB retires. The method was validated against the outgoing
+  release before being trusted: run on the 0.8.12 tree it yields 349,638 bytes, agreeing
+  with the 349,540 bytes recorded in that release commit and the 349,666 bytes PyPI serves.
+  Physical lines moved with it (25,227 → 25,257).
 
 ## [0.8.12] - 2026-10-02
 
