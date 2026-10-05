@@ -108,7 +108,7 @@ mcptoon 是今天就能用的那个：能跑 shell 的 Agent 全都覆盖，认�
 
 ## 路径一 · 我只是 AI 工具的用户
 
-你有一个桌面 AI——Claude、Codex、Cursor、Windsurf、Cline、VS Code Copilot。今天，加一个工具或技能，就得去手改那个 Agent 的 JSON。mcptoon 把这步去掉：
+你有一个桌面 AI——Claude、Codex、Cursor、Windsurf、Cline、VS Code Copilot，**还有另外 97 个**（[103 个完整名单 →](#所有-ai-agent-都能用)）。今天，加一个工具或技能，就得去手改那个 Agent 的 JSON。mcptoon 把这步去掉：
 
 1. **装一次。**
    ```bash
@@ -162,7 +162,7 @@ mcptoon serve                       # 把所有已配置的服务器收在同一
 - [工具从哪来](#工具从哪来搜-17000一条命令装上)
 - [三笔账](#三笔账为什么不能混着比)
 - [安装方式](#安装方式)
-- [所有 AI Agent 都能用](#所有-ai-agent-都能用)
+- [所有 AI Agent 都能用](#所有-ai-agent-都能用) — **103 个客户端**（CLI 42 · serve 61）
 - [为什么是 CLI，不是代理](#为什么是-cli不是代理)
 - [全部命令](#全部命令)
 - [信任与安全](#信任与安全)

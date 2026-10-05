@@ -112,7 +112,9 @@ Skills work the same way: **926,232 tokens** of `SKILL.md` text → **39** resid
 
 ## Path 1 · I just use AI tools
 
-You have a desktop AI — Claude, Codex, Cursor, Windsurf, Cline, VS Code Copilot. Today, adding a tool or a skill means hand-editing that agent's JSON. mcptoon removes that step:
+You have a desktop AI — Claude, Codex, Cursor, Windsurf, Cline, VS Code Copilot, and
+**97 more** ([full list of 103 →](#works-with-every-ai-agent)). Today, adding a tool or a
+skill means hand-editing that agent's JSON. mcptoon removes that step:
 
 1. **Install once.**
    ```bash
@@ -168,7 +170,7 @@ Full reference: [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/mai
 - [Where the tools come from](#where-the-tools-come-from--search-17000-install-with-one-command)
 - [The three bills](#the-three-bills-and-why-you-must-not-mix-them)
 - [Install](#install)
-- [Works with every AI agent](#works-with-every-ai-agent)
+- [Works with every AI agent](#works-with-every-ai-agent) — **103 clients** (42 CLI · 61 serve)
 - [Why a CLI, not a proxy](#why-a-cli-not-a-proxy)
 - [All commands](#all-commands)
 - [Trust and safety](#trust-and-safety)
