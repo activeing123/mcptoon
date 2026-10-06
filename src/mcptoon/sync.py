@@ -398,6 +398,35 @@ def _vscode_copilot_path() -> Path:
 
 # ─── Config conversion ───
 
+def _prefer_installed_runner(entry: dict) -> dict:
+    """Swap a ``uvx <pkg>`` entry for ``python -m <module>`` when the package is installed.
+
+    The third place a ``uvx`` entry can enter a host config (after `quickstart`'s
+    discovery and `install`'s registry rows) is the user's own mcptoon config, or a
+    config written by an older version. `sync` is what pushes those out to every
+    host, so it is the last place the fetch-runner can be intercepted before it
+    becomes "open my agent and it fetches N packages at once".
+
+    Only the *runner* changes; a non-uvx entry, an entry whose package is not
+    installed, or a machine that opted out (``runners=allow-fetch``) is returned
+    untouched. Never raises — an unparseable package name is just "not installed".
+    """
+    from .config import prefer_installed_runners
+    if entry.get("command") != "uvx" or not prefer_installed_runners():
+        return entry
+    args = entry.get("args")
+    if not isinstance(args, list) or not args:
+        return entry
+    from .discover import _resolve_local_module
+    local = _resolve_local_module(str(args[0]).strip().replace("-", "_"))
+    if local is None:
+        return entry
+    out = dict(entry)
+    out["command"] = local[0]
+    out["args"] = list(local[1:]) + [str(a) for a in args[1:]]
+    return out
+
+
 def _mcptoon_to_agent_format(server_name: str, server_cfg: dict) -> dict:
     """Convert mcptoon server config to agent-native format.
 
@@ -467,7 +496,10 @@ def _build_mcp_servers_dict(config: dict) -> dict:
     for name, cfg in servers.items():
         agent_cfg = _mcptoon_to_agent_format(name, cfg)
         if agent_cfg:
-            result[name] = agent_cfg
+            # A `uvx <pkg>` entry becomes `python -m <module>` when the package is
+            # installed locally — see `_prefer_installed_runner` for why sync, of
+            # all places, has to do this.
+            result[name] = _prefer_installed_runner(agent_cfg)
     return result
 
 

@@ -1422,3 +1422,57 @@ class TestAgentTable:
 
         missing = [spec.name for spec in _AGENT_SPECS if not present(spec)]
         assert not missing, f"README table omits: {missing}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Prefer-installed runner (found 2026-10-06)
+# ═══════════════════════════════════════════════════════════════
+#
+# `sync` is the last place a uvx entry can be intercepted before it reaches every
+# host config. A user's own mcptoon config — or one written by an older version —
+# may hold `uvx <pkg>` rows; sync rewrites them to `python -m <module>` when the
+# package is installed, so opening an agent stops meaning "fetch N packages".
+
+class TestSyncPrefersInstalledRunner:
+    def test_uvx_entry_is_rewritten_when_the_package_is_installed(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        with patch.object(sync_mod, "_prefer_installed_runner",
+                          wraps=sync_mod._prefer_installed_runner):
+            from mcptoon import discover as disc
+            with patch.object(disc, "_resolve_local_module",
+                              side_effect=lambda m: ["/py", "-m", m] if m == "mcp_server_time" else None):
+                cfg = {"servers": {"time": {"transport": "stdio", "command": ["uvx"],
+                                            "args": ["mcp-server-time"]}}}
+                out = _build_mcp_servers_dict(cfg)
+        assert out["time"]["command"] == "/py"
+        assert out["time"]["args"] == ["-m", "mcp_server_time"]
+
+    def test_uvx_entry_survives_when_the_package_is_absent(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        from mcptoon import discover as disc
+        with patch.object(disc, "_resolve_local_module", return_value=None):
+            cfg = {"servers": {"time": {"transport": "stdio", "command": ["uvx"],
+                                        "args": ["mcp-server-time"]}}}
+            out = _build_mcp_servers_dict(cfg)
+        assert out["time"]["command"] == "uvx"
+        assert out["time"]["args"] == ["mcp-server-time"]
+
+    def test_allow_fetch_keeps_the_uvx_entry(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        from mcptoon import config as cfg_mod
+        cfg_mod.set_setting("runners", "allow-fetch")
+        from mcptoon import discover as disc
+        with patch.object(disc, "_resolve_local_module",
+                          return_value=["/py", "-m", "mcp_server_time"]):
+            cfg = {"servers": {"time": {"transport": "stdio", "command": ["uvx"],
+                                        "args": ["mcp-server-time"]}}}
+            out = _build_mcp_servers_dict(cfg)
+        assert out["time"]["command"] == "uvx"
+
+    def test_a_non_uvx_entry_is_untouched(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        cfg = {"servers": {"fs": {"transport": "stdio", "command": ["npx"],
+                                  "args": ["-y", "@modelcontextprotocol/server-filesystem"]}}}
+        out = _build_mcp_servers_dict(cfg)
+        assert out["fs"]["command"] == "npx"
+        assert out["fs"]["args"] == ["-y", "@modelcontextprotocol/server-filesystem"]

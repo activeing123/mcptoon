@@ -104,3 +104,29 @@ def test_welcome_off_via_cli_actually_disables(capsys):
     `welcome_enabled()` false, so the banner is really suppressed."""
     cli._cmd_config(["set", "welcome", "off"], "auto")
     assert cfg.welcome_enabled() is False
+
+
+# ─── runners: the uvx opt-out must be a real, validated switch ───
+
+def test_config_set_rejects_an_unknown_runner_mode(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli._cmd_config(["set", "runners", "always"], "auto")
+    assert exc.value.code == 1
+    assert "not one of" in capsys.readouterr().out
+    assert cfg.get_setting("runners") == cfg.SETTING_DEFAULTS["runners"]
+
+
+@pytest.mark.parametrize("mode", ["prefer-installed", "allow-fetch"])
+def test_config_set_accepts_both_runner_modes(mode):
+    cli._cmd_config(["set", "runners", mode], "auto")
+    assert cfg.get_setting("runners") == mode
+
+
+def test_runners_default_is_prefer_installed():
+    assert cfg.get_setting("runners") == "prefer-installed"
+    assert cfg.prefer_installed_runners() is True
+
+
+def test_runners_allow_fetch_flips_the_gate():
+    cli._cmd_config(["set", "runners", "allow-fetch"], "auto")
+    assert cfg.prefer_installed_runners() is False

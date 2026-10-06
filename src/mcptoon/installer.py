@@ -315,6 +315,35 @@ def _resolve_runner(command):
     return command
 
 
+def _prefer_local_package(command, args):
+    """Rewrite ``uvx <pkg>`` to ``python -m <module>`` when the package is installed.
+
+    A registry row that ships a PyPI package is launched with ``uvx <pkg>``, which
+    fetches and unpacks into a fresh temp environment on every cold run. When that
+    package is *already* importable in the interpreter running mcptoon, the same
+    server runs with no download and no second interpreter — see
+    ``discover._resolve_local_module`` for the freeze that motivates this.
+
+    Returns ``(command, args)`` unchanged when the package is not installed, when
+    the user opted out via ``runners=allow-fetch``, or when the row is not a uvx
+    row at all. Never raises: a package name that is not a valid module is just
+    "not installed locally".
+    """
+    from .config import prefer_installed_runners
+    if command != "uvx" or not prefer_installed_runners():
+        return command, args
+    args = list(args or [])
+    if not args:
+        return command, args
+    from .discover import _resolve_local_module
+    local = _resolve_local_module(str(args[0]).strip().replace("-", "_"))
+    if local is None:
+        return command, args
+    # Anything after the package name is a real argument to the server (a path,
+    # a flag) and must survive the runner swap.
+    return local[0], list(local[1:]) + [str(a) for a in args[1:]]
+
+
 def install_by_name(name, server_name=None):
     """Install a server by name from a registry (auto-discover source).
 
@@ -358,7 +387,9 @@ def install_by_name(name, server_name=None):
         return install_http(url, key)
     #    Local package: npx for npm, uvx for pypi (both fetch-on-first-run, no install).
     if command:
-        return install_custom(key, _resolve_runner(command), args, match.get("env", {}))
+        resolved = _resolve_runner(command)
+        resolved, args = _prefer_local_package(resolved, args)
+        return install_custom(key, resolved, args, match.get("env", {}))
     #    Nothing runnable: refuse rather than write a broken config.
     return make_error("NOT_INSTALLABLE",
         f"'{match.get('name')}' is listed but ships no package or URL, so it cannot "

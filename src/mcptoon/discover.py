@@ -34,6 +34,7 @@ CLI:
     mcptoon init --auto --dry   # discover + print, don't write
     mcptoon discover            # show discovered servers (alias for --dry)
 """
+import importlib.util
 import json
 import os
 import shutil
@@ -294,6 +295,21 @@ def _normalize_imported_config(cfg: dict) -> dict | None:
     if env:
         result["env"] = env
 
+    # A `uvx <pkg>` row imported from another client becomes `python -m <module>`
+    # when that package is already installed here — see `_resolve_local_module`.
+    # This is the path the 2026-10-06 incident used: `mcptoon import --write` read
+    # the uvx rows out of Claude Desktop / Cline and merged them verbatim into
+    # mcptoon's own config, and the next `sync` pushed them to all six hosts. Doing
+    # it here means the fetch runner never enters mcptoon's config in the first place.
+    from .config import prefer_installed_runners
+    if prefer_installed_runners() and result.get("command") == ["uvx"]:
+        pkg = result.get("args") or []
+        if pkg:
+            local = _resolve_local_module(str(pkg[0]).strip().replace("-", "_"))
+            if local is not None:
+                result["command"] = local[:1]
+                result["args"] = local[1:] + [str(a) for a in pkg[1:]]
+
     return result
 
 
@@ -473,22 +489,59 @@ _NPX_ZERO_CONFIG_SERVERS = [
 ]
 
 # Python reference servers, run through `uvx` (no global install).
-# Each entry is (name, command, args, reason, requires).
+# Each entry is (name, command, args, reason, requires, local_module).
 #   `requires` = an extra executable that must exist *besides* the runner, or None.
-#   `git` is why this field exists: `mcp-server-git` starts fine without the git
-#   binary but every one of its tools then errors with "h-to-git-executable", and
-#   quickstart still counted it as a working server. Offering it on a machine that
-#   has no git is worse than not offering it (measured 2026-10-02 on a clean
+#   `local_module` = the importable module that runs the same server, or None.
+#   `git` is why the `requires` field exists: `mcp-server-git` starts fine without
+#   the git binary but every one of its tools then errors with "h-to-git-executable",
+#   and quickstart still counted it as a working server. Offering it on a machine
+#   that has no git is worse than not offering it (measured 2026-10-02 on a clean
 #   Windows box: `[PROCESS_DIED] … All git commands will error until this is
 #   rectified`). `uvx` cannot stand in for `git`.
+#
+# `local_module` is why the whole table has a second column at all (2026-10-06):
+# every one of these is a plain PyPI package that is often *already installed*, and
+# `python -m <module>` runs it with no download, no second interpreter, and no
+# temp environment — see `_resolve_local_module` for the freeze this prevents.
 _UVX_ZERO_CONFIG_SERVERS = [
     ("fetch", ["uvx"], ["mcp-server-fetch"],
-     "Zero-config (no API key needed)", None),
+     "Zero-config (no API key needed)", None, "mcp_server_fetch"),
     ("time", ["uvx"], ["mcp-server-time"],
-     "Zero-config (time and timezone)", None),
+     "Zero-config (time and timezone)", None, "mcp_server_time"),
     ("git", ["uvx"], ["mcp-server-git"],
-     "Zero-config (git operations on current repo)", "git"),
+     "Zero-config (git operations on current repo)", "git", "mcp_server_git"),
 ]
+
+
+def _resolve_local_module(module: str) -> list[str] | None:
+    """Return ``[python, "-m", module]`` when *module* is installed and runnable.
+
+    "Runnable" means two things, and both are checked because a package can
+    satisfy one and not the other:
+
+    * the module resolves at all — ``find_spec(module) is not None``;
+    * it exposes a ``__main__`` — ``find_spec(module + ".__main__") is not None``,
+      which is what ``python -m <module>`` actually executes. A library with no
+      ``__main__`` (``json``, ``requests``, ``yaml``) imports fine but exits with
+      "No module named X.__main__", so without this second check mcptoon would
+      write a server entry that dies on first launch.
+
+    Uses ``sys.executable`` rather than a bare ``python``: the interpreter running
+    mcptoon is the one whose site-packages we just proved contains the module, and
+    a bare ``python`` on Windows frequently is not on the PATH a host inherits.
+
+    Returns ``None`` when the module is absent, so the caller falls back to the
+    fetch runner. Never raises: a broken ``find_spec`` (a malformed installed
+    package raising on import) must not take discovery down with it.
+    """
+    try:
+        if importlib.util.find_spec(module) is None:
+            return None
+        if importlib.util.find_spec(module + ".__main__") is None:
+            return None
+    except (ImportError, ValueError, AttributeError, ModuleNotFoundError):
+        return None
+    return [sys.executable, "-m", module]
 
 
 def _detect_local_tools() -> list[dict]:
@@ -501,10 +554,19 @@ def _detect_local_tools() -> list[dict]:
 
     A candidate may also need a second executable *besides* its runner — see
     `_UVX_ZERO_CONFIG_SERVERS` for why `git` is gated on the git binary too.
+
+    When the PyPI package is already importable, the entry is written as
+    ``python -m <module>`` instead of ``uvx <pkg>`` (unless the user set
+    ``runners=allow-fetch``). That is the difference between a server entry that
+    launches instantly and one that unpacks a package into a fresh temp
+    environment on every cold start — see `_resolve_local_module`.
     """
+    from .config import prefer_installed_runners
+
     found = []
     has_npx = _which("npx") is not None
     has_uvx = _which("uvx") is not None
+    prefer_local = prefer_installed_runners()
 
     if has_npx:
         for name, command, args, reason in _NPX_ZERO_CONFIG_SERVERS:
@@ -520,9 +582,14 @@ def _detect_local_tools() -> list[dict]:
             })
 
     if has_uvx:
-        for name, command, args, reason, requires in _UVX_ZERO_CONFIG_SERVERS:
+        for name, command, args, reason, requires, local_module in _UVX_ZERO_CONFIG_SERVERS:
             if requires and _which(requires) is None:
                 continue
+            command, args = list(command), list(args)
+            if prefer_local and local_module:
+                local = _resolve_local_module(local_module)
+                if local is not None:
+                    command, args = local[:1], local[1:]
             found.append({
                 "name": name,
                 "config": {

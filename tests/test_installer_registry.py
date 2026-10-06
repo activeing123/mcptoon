@@ -284,5 +284,69 @@ class TestConfiguredHosts(unittest.TestCase):
             self.assertNotIn(dead, SMITHERY_API_URL + MCP_REGISTRY_URL)
 
 
+class TestPreferLocalPackage(unittest.TestCase):
+    """A registry PyPI row must not write `uvx <pkg>` when the package is installed.
+
+    `uvx` fetches and unpacks into a fresh temp environment on every cold run; a
+    host config full of uvx entries turns "open my agent" into "fetch N packages
+    at once" (the shape of the 2026-10-06 freeze). `_prefer_local_package` swaps
+    the runner for `python -m <module>` when the module is already importable.
+    """
+
+    def _settings(self, tmp):
+        return patch.dict(os.environ, {"MCPTOON_SETTINGS_FILE": str(tmp / "s.json")})
+
+    def test_installed_package_becomes_python_m(self):
+        import tempfile
+        from pathlib import Path
+        from mcptoon.installer import _prefer_local_package
+        with tempfile.TemporaryDirectory() as tmp, self._settings(Path(tmp)), \
+             patch("mcptoon.discover._resolve_local_module",
+                   side_effect=lambda m: ["/py", "-m", m] if m == "mcp_server_git" else None):
+            cmd, args = _prefer_local_package("uvx", ["mcp-server-git"])
+        self.assertEqual(cmd, "/py")
+        self.assertEqual(args, ["-m", "mcp_server_git"])
+
+    def test_absent_package_keeps_uvx(self):
+        import tempfile
+        from pathlib import Path
+        from mcptoon.installer import _prefer_local_package
+        with tempfile.TemporaryDirectory() as tmp, self._settings(Path(tmp)), \
+             patch("mcptoon.discover._resolve_local_module", return_value=None):
+            cmd, args = _prefer_local_package("uvx", ["mcp-server-git"])
+        self.assertEqual(cmd, "uvx")
+        self.assertEqual(args, ["mcp-server-git"])
+
+    def test_allow_fetch_keeps_uvx_even_when_installed(self):
+        import tempfile
+        from pathlib import Path
+        from mcptoon.installer import _prefer_local_package
+        from mcptoon import config as cfg_mod
+        with tempfile.TemporaryDirectory() as tmp, self._settings(Path(tmp)):
+            cfg_mod.set_setting("runners", "allow-fetch")
+            with patch("mcptoon.discover._resolve_local_module",
+                       return_value=["/py", "-m", "mcp_server_git"]):
+                cmd, args = _prefer_local_package("uvx", ["mcp-server-git"])
+        self.assertEqual(cmd, "uvx")
+
+    def test_a_non_uvx_runner_is_untouched(self):
+        from mcptoon.installer import _prefer_local_package
+        cmd, args = _prefer_local_package("npx", ["-y", "@scope/pkg"])
+        self.assertEqual(cmd, "npx")
+        self.assertEqual(args, ["-y", "@scope/pkg"])
+
+    def test_trailing_server_args_survive_the_swap(self):
+        """A path or flag after the package name is the server's, not the runner's."""
+        import tempfile
+        from pathlib import Path
+        from mcptoon.installer import _prefer_local_package
+        with tempfile.TemporaryDirectory() as tmp, self._settings(Path(tmp)), \
+             patch("mcptoon.discover._resolve_local_module",
+                   side_effect=lambda m: ["/py", "-m", m] if m == "mcp_server_git" else None):
+            cmd, args = _prefer_local_package("uvx", ["mcp-server-git", "--repository", "/repo"])
+        self.assertEqual(cmd, "/py")
+        self.assertEqual(args, ["-m", "mcp_server_git", "--repository", "/repo"])
+
+
 if __name__ == "__main__":
     unittest.main()

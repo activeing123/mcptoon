@@ -193,7 +193,13 @@ class TestLocalDetection:
             f"git must appear exactly once, got {len(git_entries)}: "
             f"{[r['reason'] for r in git_entries]}"
         )
-        assert git_entries[0]["config"]["command"] == ["uvx"]
+        # The *runner* is what matters here, not the literal string: when the
+        # package is installed locally the entry is `python -m mcp_server_git`
+        # (see `_resolve_local_module`), and either is a working launcher.
+        cmd = git_entries[0]["config"]["command"]
+        assert cmd == ["uvx"] or (cmd and "python" in cmd[0].lower()), (
+            f"git must launch via uvx or a local python, got {cmd!r}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -222,7 +228,7 @@ class TestNoDeadPackagesOffered:
 
     def test_pypi_servers_use_uvx_not_npx(self):
         # fetch/time/git live on PyPI; they must be launched with uvx.
-        for name, command, _args, _reason, _requires in discover_mod._UVX_ZERO_CONFIG_SERVERS:
+        for name, command, _args, _reason, _requires, _mod in discover_mod._UVX_ZERO_CONFIG_SERVERS:
             assert command == ["uvx"], f"{name} should run via uvx, got {command}"
 
     def test_live_packages_still_offered(self):
@@ -412,3 +418,85 @@ class TestWhich:
 
     def test_which_nonexistent(self):
         assert _which("definitely_not_a_real_command_xyz") is None
+
+
+# ═══════════════════════════════════════════════════════════════
+# Prefer-installed runners (found 2026-10-06)
+# ═══════════════════════════════════════════════════════════════
+#
+# `uvx <pkg>` starts a second interpreter and unpacks the package into a fresh
+# temp environment on every cold run. A config full of uvx entries — which is
+# what `sync` pushes to every host — turns "open my agent" into "fetch N packages
+# at once", which is the shape of the 2026-10-06 freeze. When the package is
+# already importable, `python -m <module>` runs the same server with no fetch.
+#
+# The gate is two facts, not one: the module must resolve AND expose a
+# `__main__` (`python -m` executes that). `json`/`http` resolve but have no
+# `__main__`, so writing them would produce a server that dies on first launch.
+
+class TestPreferInstalledRunners:
+    def test_an_installed_runnable_module_wins_over_uvx(self):
+        with patch.object(discover_mod, "_which", lambda c: "uvx" if c == "uvx" else None), \
+             patch.object(discover_mod, "_resolve_local_module",
+                          side_effect=lambda m: ["/py", "-m", m] if m == "mcp_server_fetch" else None):
+            entries = {r["name"]: r["config"] for r in _detect_local_tools()}
+        assert entries["fetch"]["command"] == ["/py"]
+        assert entries["fetch"]["args"] == ["-m", "mcp_server_fetch"]
+        # time has no local module in this scenario, so it keeps the fetch runner.
+        assert entries["time"]["command"] == ["uvx"]
+        assert entries["time"]["args"] == ["mcp-server-time"]
+
+    def test_nothing_installed_still_offers_uvx(self):
+        with patch.object(discover_mod, "_which", lambda c: "uvx" if c == "uvx" else None), \
+             patch.object(discover_mod, "_resolve_local_module", return_value=None):
+            entries = {r["name"]: r["config"] for r in _detect_local_tools()}
+        assert entries["fetch"]["command"] == ["uvx"]
+        assert entries["time"]["command"] == ["uvx"]
+
+    def test_allow_fetch_keeps_uvx_even_when_installed(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        from mcptoon import config as cfg
+        cfg.set_setting("runners", "allow-fetch")
+        with patch.object(discover_mod, "_which", lambda c: "uvx" if c == "uvx" else None), \
+             patch.object(discover_mod, "_resolve_local_module", return_value=["/py", "-m", "mcp_server_fetch"]):
+            entries = {r["name"]: r["config"] for r in _detect_local_tools()}
+        assert entries["fetch"]["command"] == ["uvx"]
+
+    def test_a_module_without_main_is_not_runnable(self):
+        """`json` resolves but has no `__main__`, so `python -m json` would die.
+
+        Pin the real function (not a mock) against a stdlib module that is
+        importable everywhere — this is the check that keeps a bare
+        `find_spec(module)` from writing a dead server entry.
+        """
+        assert discover_mod._resolve_local_module("json") is None
+        assert discover_mod._resolve_local_module("no_such_module_zzz") is None
+
+    def test_a_runnable_module_returns_the_interpreter_form(self):
+        local = discover_mod._resolve_local_module("unittest")
+        assert local is not None
+        assert local[1:] == ["-m", "unittest"]
+        assert local[0]  # an interpreter path, not a bare name
+
+    def test_imported_uvx_row_becomes_a_local_module(self, monkeypatch, tmp_path):
+        """`mcptoon import` must not carry a uvx row into mcptoon's own config.
+
+        This is the exact route the 2026-10-06 incident took: `import --write`
+        read the uvx rows out of Claude Desktop / Cline, and the next `sync`
+        pushed them to all six hosts.
+        """
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        with patch.object(discover_mod, "_resolve_local_module",
+                          side_effect=lambda m: ["/py", "-m", m] if m == "mcp_server_fetch" else None):
+            out = _normalize_imported_config(
+                {"command": "uvx", "args": ["mcp-server-fetch"]})
+        assert out["command"] == ["/py"]
+        assert out["args"] == ["-m", "mcp_server_fetch"]
+
+    def test_imported_uvx_row_survives_when_not_installed(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MCPTOON_SETTINGS_FILE", str(tmp_path / "settings.json"))
+        with patch.object(discover_mod, "_resolve_local_module", return_value=None):
+            out = _normalize_imported_config(
+                {"command": "uvx", "args": ["mcp-server-fetch"]})
+        assert out["command"] == ["uvx"]
+        assert out["args"] == ["mcp-server-fetch"]

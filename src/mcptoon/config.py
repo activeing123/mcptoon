@@ -154,7 +154,26 @@ FOOTER_STATE_FILE = Path(os.environ.get(
 # order"; see `resolve_lang` for the order and for why an order — not a guess —
 # is what makes the answer stable.
 SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto",
-                    "exposure": "compact", "compress": "smart"}
+                    "exposure": "compact", "compress": "smart",
+                    "runners": "prefer-installed"}
+
+# How mcptoon picks the launcher it writes for a discovered or installed server.
+#
+#   prefer-installed — when the package a server needs is already importable,
+#                      write `python -m <module>`; only reach for `uvx`/`npx`
+#                      when nothing local can run it. This is the default.
+#   allow-fetch      — always write `uvx`/`npx` (fetch-on-first-run). The old
+#                      behavior, kept as an explicit opt-in.
+#
+# Why the default flipped (2026-10-06 incident): `uvx <pkg>` starts a second
+# interpreter that resolves and unpacks the package into a *fresh temp
+# environment* on every cold run. A config full of `uvx` entries — which is what
+# `sync` propagates to every host — therefore turns "open my agent" into "fetch
+# N packages at once", and the 2026-10-06 freeze was a wave of those cold uv
+# environments landing while the machine was already short on commit. Preferring
+# a locally installed module removes the fetch entirely: same tools, no download,
+# no second interpreter, nothing to storm.
+RUNNER_MODES = ("prefer-installed", "allow-fetch")
 
 # Languages the human-facing strings can be written in. "auto" is not a language:
 # it is the request to detect one.
@@ -215,7 +234,8 @@ BOOL_MODES = ("on", "off")
 # not in ("off", "0", "false", "no") as *on*. A typo therefore left the welcome
 # banner showing while the user believed they had turned it off.
 SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES,
-                   "footer": BOOL_MODES, "welcome": BOOL_MODES}
+                   "footer": BOOL_MODES, "welcome": BOOL_MODES,
+                   "runners": RUNNER_MODES}
 
 # Windows LANGID primary-language ids worth naming. Anything unnamed falls back
 # to the locale string and then to English, so an unlisted language degrades to
@@ -517,6 +537,17 @@ def set_setting(key: str, value: str) -> None:
 def footer_enabled() -> bool:
     """Whether the end-of-turn disclosure is on. Default: on."""
     return get_setting("footer").strip().lower() not in ("off", "0", "false", "no")
+
+
+def prefer_installed_runners() -> bool:
+    """Whether discovery/install should prefer a locally installed module over uvx/npx.
+
+    Default: True (see ``RUNNER_MODES`` for why). A machine that genuinely wants
+    the fetch-on-first-run behavior — or one whose packages are installed in an
+    interpreter mcptoon cannot see — flips this with
+    ``mcptoon config set runners allow-fetch``.
+    """
+    return get_setting("runners").strip().lower() != "allow-fetch"
 
 
 def exposure_mode() -> str:
