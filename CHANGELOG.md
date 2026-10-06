@@ -48,9 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   absent package keeps `uvx`, the opt-out wins, an importable module with no `__main__` is not
   runnable, an imported `uvx` row is rewritten on the way in), `tests/test_sync.py` gains 4
   (the sync guard rewrites, keeps, and respects the opt-out), `tests/test_installer_registry.py`
-  gains 4 (the registry row's runner, including that trailing server args survive the swap),
-  and `tests/test_exit_codes.py` gains 5 (the new setting is validated and persisted like every
-  other). 21 new tests; suite: **1946 passed + 2 skipped**.
+  gains 5 (the registry row's runner, including that trailing server args survive the swap),
+  and `tests/test_exit_codes.py` gains 4 (the new setting is validated and persisted like every
+  other). That is 20 tests for the runner change; the version-gate fix adds 3 more in
+  `tests/test_skills.py`. Suite: **1946 passed + 2 skipped**.
 
 ## [0.8.14] - 2026-10-05
 
