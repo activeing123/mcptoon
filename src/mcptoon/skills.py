@@ -1920,7 +1920,7 @@ def version_gate(skills: dict[str, Path], ledger_path: Path, *, force: bool = Fa
     about (gradual enforcement), and a skill absent from the ledger is
     onboarded on first sight. Returns a report dict.
     """
-    from .plugin import parse_skill_frontmatter  # local: import-light
+    from .plugin import parse_skill_frontmatter, strip_yaml_quotes  # local: import-light
     ledger = _load_version_ledger(ledger_path)
     allowed: list[str] = []
     blocked: list[tuple[str, str]] = []
@@ -1932,7 +1932,14 @@ def version_gate(skills: dict[str, Path], ledger_path: Path, *, force: bool = Fa
             meta = parse_skill_frontmatter(skill_dir / "SKILL.md")
         except OSError:
             meta = {}
-        ver = str(meta.get("version") or "").strip()
+        # Strip one matching pair of YAML quotes: `version: "1.1.0"` carries the
+        # quotes as YAML syntax, not as part of the value, so the raw parse gives
+        # `'"1.1.0"'`. tongbu's own gate strips them (sync_skills.py:181) and the
+        # two managers share one ledger — a value mcptoon wrote back with quotes
+        # would make tongbu read `'"1.1.0"' != '1.1.0'` and silently stop blocking
+        # that skill. `strip_yaml_quotes` only removes a *matching* pair, so an
+        # unquoted or internally-quoted value is untouched.
+        ver = strip_yaml_quotes(str(meta.get("version") or "").strip())
         digest = _skill_content_hash(skill_dir)
         rec = ledger.get(slug)
         now = datetime.now().strftime("%Y-%m-%d %H:%M")

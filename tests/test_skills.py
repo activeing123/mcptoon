@@ -1226,6 +1226,40 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("+1 new", out)
         self.assertTrue(skills._is_link(self.base / "v2" / "alpha"))
 
+    def test_a_quoted_version_is_compared_unquoted(self):
+        """`version: "1.1.0"` is YAML syntax, not a different version.
+
+        The two managers share one ledger and tongbu strips the quotes
+        (sync_skills.py:181). If mcptoon kept them it would (a) block a skill
+        tongbu allows and (b) write `'"1.1.0"'` into the shared ledger, after
+        which tongbu reads a version that no longer matches and stops blocking
+        that skill at all — the gate silently defeated across managers.
+        """
+        self._skill("alpha", '"1.0"')
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["blocked"], [])
+        self.assertEqual(rep["allowed"], ["alpha"])
+        # the value written back must be the bare version, not the quoted one
+        ledger = json.loads(self.ledger.read_text(encoding="utf-8"))
+        self.assertEqual(ledger["alpha"]["version"], "1.0")
+
+    def test_a_quoted_version_still_blocks_an_unbumped_change(self):
+        """Stripping quotes must not weaken the gate: content moved, version not."""
+        self._skill("alpha", '"1.0"')
+        skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self._skill("alpha", '"1.0"', body="changed!")
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        self.assertEqual(rep["blocked"], [("alpha", "1.0")])
+        self.assertEqual(rep["allowed"], [])
+
+    def test_internal_quotes_survive_stripping(self):
+        """Only a *matching* wrapping pair is dropped; internal quotes stay."""
+        self._skill("alpha", '1.0"x')
+        rep = skills.version_gate(skills._source_skills(self.src), self.ledger)
+        ledger = json.loads(self.ledger.read_text(encoding="utf-8"))
+        self.assertEqual(ledger["alpha"]["version"], '1.0"x')
+        self.assertEqual(rep["allowed"], ["alpha"])
+
 
 class DerivedViewTests(unittest.TestCase):
     """Roo/OpenCode consume a flat ``<slug>.md`` per skill.
