@@ -5,6 +5,53 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The version gate no longer treats a YAML-quoted version as a different version.**
+  A skill whose frontmatter said `version: "1.1.0"` was read as the literal string
+  `'"1.1.0"'`, which never equals the ledger's `1.1.0` — so the gate blocked a skill
+  that had not moved, and then wrote the quoted value back into the shared
+  `skill_versions.json`. That second half was the worse one: the ledger is shared with
+  `tongbu-skills`, which reads the same file, so a value one manager wrote could make
+  the *other* manager stop blocking that skill — a gate silently switched off by the
+  other gate's write. `version_gate` now strips the quotes with the same
+  `strip_yaml_quotes` the frontmatter reader uses. Verified against the shared ledger:
+  390 skills allowed by both managers, identical sets.
+
+### Changed
+
+- **Discovery, `import`, `install` and `sync` now prefer a locally installed module over
+  `uvx`/`npx`.** When a server's package is already importable in the interpreter running
+  mcptoon, the entry is written as `python -m <module>` instead of `uvx <pkg>`. `uvx` starts a
+  second interpreter and resolves the package into a *fresh temp environment* on every cold
+  run, so a host config full of `uvx` entries turns "open my agent" into "fetch N packages at
+  once" — the shape of a measured machine freeze on 2026-10-06, where a sync'd config with
+  three `uvx` rows and a uv cache building twenty temp environments landed on a box already
+  short on commit. The local form has no fetch, no download and no second interpreter. The
+  gate is two facts, not one: the module must resolve **and** expose a `__main__`
+  (`python -m` executes that), so an importable library with no entry point is never written
+  as a server. Servers whose package is *not* installed are unchanged — `uvx` is still the
+  fallback, and the behavior is preserved verbatim behind `mcptoon config set runners
+  allow-fetch`.
+
+### Added
+
+- **`runners` setting** (`prefer-installed` | `allow-fetch`, default `prefer-installed`) — the
+  opt-out for the change above. `mcptoon config set runners allow-fetch` restores the old
+  fetch-on-first-run behavior for every surface at once.
+
+### Tests
+
+- `tests/test_discover.py` gains 7 tests over the local-runner resolver (installed module wins,
+  absent package keeps `uvx`, the opt-out wins, an importable module with no `__main__` is not
+  runnable, an imported `uvx` row is rewritten on the way in), `tests/test_sync.py` gains 4
+  (the sync guard rewrites, keeps, and respects the opt-out), `tests/test_installer_registry.py`
+  gains 4 (the registry row's runner, including that trailing server args survive the swap),
+  and `tests/test_exit_codes.py` gains 5 (the new setting is validated and persisted like every
+  other). 21 new tests; suite: **1946 passed + 2 skipped**.
+
 ## [0.8.14] - 2026-10-05
 
 ### Added
