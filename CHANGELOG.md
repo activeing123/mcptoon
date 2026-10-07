@@ -49,6 +49,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   top-1 once the Chinese trigger words were added), because this machine's
   high-ranking skills all carry Chinese descriptions.
 
+### Fixed
+
+- **The `342KB` wheel claim had been wrong for two releases — it is `362KB`.**
+  Measured by building each tag's tree with LF endings, which reproduces the
+  guard's own history (v0.8.13 measures 350,785 B here against the 350,759 B
+  recorded in `tests/test_footprint_claims.py` — 26 bytes apart, i.e. build-tool
+  noise rather than a different tree):
+
+  | Tag | Wheel | floor KB | Claim then |
+  |---|---|---|---|
+  | v0.8.13 | 350,785 B | 342KB | 342KB (correct) |
+  | v0.8.14 | 355,132 B | 346KB | 342KB (stale) |
+  | v0.8.15 | 358,743 B | 350KB | 342KB (stale) |
+  | v0.8.16 | 370,855 B | 362KB | this release |
+
+  The guard did not catch it, and could not have: `test_footprint_claims.py` pins a
+  *string* and compares the docs against that constant, so it fires when a claim
+  disagrees with the constant — never when the constant itself has gone stale.
+  `342KB` and `346KB` and `350KB` join `RETIRED_KB`, the claim moves to `362KB` on
+  every surface, and the comment above `WHEEL_KB` records the failure mode so the
+  next release does not repeat it.
+
 ## [0.8.15] - 2026-10-07
 
 ### Fixed
