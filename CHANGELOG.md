@@ -5,6 +5,50 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.16] - 2026-10-08
+
+### Added
+
+- **`mcptoon docs` — index a Markdown tree and route a query to the right file.**
+  A large `AGENTS.md` / `CONTEXT.md` / `docs/` folder is the biggest context tax
+  there is: the agent opens all of it every session to answer one question.
+  Measured on the maintainer's machine (2026-10-07, live sessions): a monolithic
+  554-line context file peaks at **40,467 tokens**; the same question against a
+  router-plus-chapters layout peaks at **17,498**. `mcptoon docs index <dir>`
+  indexes a Markdown tree as first-class entries, and
+  `mcptoon docs resolve "<question>"` returns the few files worth opening.
+
+  It reuses the skill router's BM25 engine rather than copying it — the adapter
+  that presents docs to the ranker is one function — so a machine keeps one
+  ranking behaviour instead of two that drift. The docs index is a separate file
+  from the skill index, so the two catalogs never fight over one signature, and a
+  machine that indexes no docs behaves exactly as before.
+
+  Descriptions are synthesised from the file's own headings and the entry is
+  marked `derived: true`, so a weak match can be told apart from a weak document.
+  The title is the first heading of **any** level: a chapter file conventionally
+  opens at `##` (its parent document owns the `#`), and requiring `#` would
+  silently leave every such file nameless. Inline markup (`**bold**`, `` `code` ``)
+  is stripped from a derived description, because a tokenizer should match words,
+  not asterisks.
+
+  Subcommands: `index` · `resolve` · `list` · `stats` · `doctor` · `clear`.
+  It finds files; it does not read them. No embeddings, no LLM, no network.
+
+  Verified on the maintainer's machine: 4/4 top-1 hits over a 19-chapter context
+  tree; and a fresh agent asked to answer from that tree — **without being told
+  about mcptoon** — ran `mcptoon docs resolve` itself and read 1 file of 19.
+
+### Changed
+
+- **The skill description gains a Chinese/English trigger block for `docs`.**
+  The frontmatter description is all an agent sees before deciding to load a
+  skill, so a capability missing from it is undiscoverable no matter how well it
+  works. The block is bilingual on purpose: a Chinese query matched nothing while
+  it was English-only (measured: 0/4 Chinese queries in the top 10, versus 5/5
+  top-1 once the Chinese trigger words were added), because this machine's
+  high-ranking skills all carry Chinese descriptions.
+
 ## [0.8.15] - 2026-10-07
 
 ### Fixed

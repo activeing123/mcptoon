@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcptoon"
-version = "0.8.15"
+version = "0.8.16"
 description = "One zero-dependency CLI to manage every MCP server and agent skill: token optimization for tool discovery (71,929 -> 581 tokens, -99.2% measured, schemas stay out of context), one config for every agent."
 readme = "README.md"
 license = {text = "Apache-2.0"}

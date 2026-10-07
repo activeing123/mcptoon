@@ -57,7 +57,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
-              "337KB", "339KB", "341KB")
+              "337KB", "339KB", "341KB", "342KB", "346KB", "350KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -175,7 +175,17 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # one look-up table and one pure function in cli.py, the 8 tests that pin them, and
 # the claim-surface updates. 341KB joins RETIRED_KB like every value before it;
 # CHANGELOG.md keeps saying 341KB for 0.8.12, because that is what shipped.
-WHEEL_KB = "342KB"
+# 2026-10-07 (0.8.14/0.8.15 shipped stale; corrected at 0.8.16): the wheel was
+# 355,132 B (346KB) at v0.8.14 and 358,743 B (350KB) at v0.8.15 — both releases moved
+# the wheel past a KB line and neither moved the claim, so every surface kept saying
+# 342KB for two versions after it stopped being true. The guard did not fire because
+# it pins a *string*, not a measurement; it only catches a claim that disagrees with
+# this constant, and nobody updated the constant. Both intermediate values join
+# RETIRED_KB (they are wrong now), and the claim moves straight to the current truth.
+# 2026-10-07 (0.8.16): 370,855 bytes = 362.16 KB by this same method. The delta over
+# v0.8.15 is +12,112 bytes: `docs.py` (the doc router), its test module, and the
+# description/CHANGELOG surface updates.
+WHEEL_KB = "362KB"
 
 
 def modules() -> list[Path]:
