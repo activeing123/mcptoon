@@ -20,7 +20,7 @@
   <a href="https://github.com/activeing123/mcptoon/actions"><img src="https://img.shields.io/github/actions/workflow/status/activeing123/mcptoon/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white" alt="CI Build"></a>
   <a href="#contributing"><img src="https://img.shields.io/badge/tests-2007%20passed-success?style=flat-square&logo=pytest&logoColor=white" alt="Tests"></a>
   <a href="https://github.com/activeing123/mcptoon"><img src="https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-blue?style=flat-square" alt="Zero Dependencies"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-informational?style=flat-square" alt="License"></a>
+  <a href="https://github.com/activeing123/mcptoon/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-informational?style=flat-square" alt="License"></a>
 </p>
 
 <!-- Ecosystem & Directory Badges -->
@@ -40,7 +40,7 @@
 
 <!-- Modern Benchmark SVG -->
 <p align="center">
-  <img src="assets/benchmark.svg" alt="mcptoon Benchmark: 71,929 to 581 tokens (-99.2%)" width="100%" style="max-width: 900px; border-radius: 12px; margin: 16px 0;">
+  <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/benchmark.svg" alt="mcptoon Benchmark: 71,929 to 581 tokens (-99.2%)" width="100%" style="max-width: 960px; border-radius: 12px; margin: 16px 0;">
 </p>
 
 </div>
@@ -49,7 +49,7 @@
 
 | 💰 Token & Context Optimization | 🛠️ Universal Tool Management |
 | :--- | :--- |
-| • ✅ **Schema Slimming (-99.2%)**: 72k tokens → 581 tokens compact index<br>• ✅ **Lossless Compression (CCR)**: Reversible with handle retrieval (`retrieve`)<br>• ✅ **Session Deduplication**: Blocks byte-identical output duplication in turn<br>• ✅ **Honest Measurements**: Real `tiktoken` accounting via `mcptoon bench` | • ✅ **17,000+ Registry Discovery**: Natural language search (`search`)<br>• ✅ **Uniform CLI Execution (`call`)**: Headless driver for any MCP tool<br>• ✅ **On-Demand Inspection (`inspect`)**: Schema pulled only when needed<br>• ✅ **Diagnostic Doctor (`doctor`)**: Self-heals stdio pipes & environments |
+| • ✅ **Compact Name Index (-99.2%)**: 72k tokens → 581 tokens name-only index<br>• ✅ **Lossless Compression (CCR)**: Reversible with handle retrieval (`retrieve`)<br>• ✅ **Session Deduplication**: Blocks byte-identical output duplication in turn<br>• ✅ **Honest Measurements**: Real `tiktoken` accounting via `mcptoon bench` | • ✅ **17,000+ Registry Discovery**: Natural language search (`search`)<br>• ✅ **Uniform CLI Execution (`call`)**: Headless driver for any MCP tool<br>• ✅ **On-Demand Inspection (`inspect`)**: Schema pulled only when needed<br>• ✅ **Diagnostic Doctor (`doctor`)**: Self-heals stdio pipes & environments |
 
 | 🧠 Skills Governance | 📚 Zero-Tax Docs Routing (`mcptoon docs`) |
 | :--- | :--- |
