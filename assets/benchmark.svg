@@ -1,81 +1,129 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" fill="none">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117" />
+      <stop offset="50%" stop-color="#161b22" />
+      <stop offset="100%" stop-color="#0d1117" />
+    </linearGradient>
+
+    <!-- Card Background -->
+    <linearGradient id="card-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#21262d" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#161b22" stop-opacity="0.6" />
+    </linearGradient>
+
+    <!-- Stat Glow -->
+    <linearGradient id="green-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2ea043" />
+      <stop offset="100%" stop-color="#3fb950" />
+    </linearGradient>
+
+    <!-- Bar Gradients -->
+    <linearGradient id="bar-red" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#da3633" />
+      <stop offset="100%" stop-color="#f85149" />
+    </linearGradient>
+
+    <linearGradient id="bar-green" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#238636" />
+      <stop offset="100%" stop-color="#3fb950" />
+    </linearGradient>
+
+    <!-- Filter Shadow -->
+    <filter id="card-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#010409" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
   <style>
-    .bg { fill: #0d1117; }
-    .title { fill: #58a6ff; font: bold 20px sans-serif; }
-    .subtitle { fill: #8b949e; font: 13px sans-serif; }
-    .bar-json { fill: #f85149; }
-    .bar-toon { fill: #3fb950; }
-    .bar-slim { fill: #58a6ff; }
-    .bar-compact { fill: #d2a8ff; }
-    .label { fill: #c9d1d9; font: 11px monospace; }
-    .value { fill: #e6edf3; font: bold 11px monospace; }
-    .axis { fill: #484f58; font: 10px sans-serif; }
-    .legend { fill: #c9d1d9; font: 12px sans-serif; }
+    .font-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; fill: #f0f6fc; }
+    .font-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; fill: #8b949e; }
+    .font-stat-num { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 46px; font-weight: 800; fill: #3fb950; letter-spacing: -1px; }
+    .font-stat-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 600; fill: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .font-stat-label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; fill: #c9d1d9; }
+    .font-bar-label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #e6edf3; }
+    .font-bar-val { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 13px; font-weight: 700; }
+    .font-badge { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; font-weight: 600; }
   </style>
 
-  <!-- Background -->
-  <rect class="bg" width="800" height="420" rx="12"/>
+  <!-- Container Box -->
+  <rect width="900" height="420" rx="16" fill="url(#bg-grad)" stroke="#30363d" stroke-width="1"/>
 
-  <!-- Title -->
-  <text class="title" x="30" y="35">mcptoon Benchmark: 255 tools (tiktoken cl100k_base)</text>
-  <text class="subtitle" x="30" y="55">Token consumption comparison (lower = better)</text>
+  <!-- Header -->
+  <g transform="translate(36, 36)">
+    <!-- Small Tag -->
+    <rect width="112" height="22" rx="11" fill="#1f6feb" fill-opacity="0.15" stroke="#388bfd" stroke-width="1"/>
+    <text x="56" y="15" text-anchor="middle" class="font-badge" fill="#58a6ff">BENCHMARK</text>
 
-  <!-- Legend -->
-  <rect class="bar-json" x="460" y="30" width="12" height="12" rx="2"/>
-  <text class="legend" x="478" y="40">JSON</text>
-  <rect class="bar-toon" x="520" y="30" width="12" height="12" rx="2"/>
-  <text class="legend" x="538" y="40">TOON</text>
-  <rect class="bar-slim" x="580" y="30" width="12" height="12" rx="2"/>
-  <text class="legend" x="598" y="40">SLIM</text>
-  <rect class="bar-compact" x="640" y="30" width="12" height="12" rx="2"/>
-  <text class="legend" x="658" y="40">Compact</text>
+    <text x="0" y="48" class="font-title">Token Tax on Context Window (255 Tools Sample)</text>
+    <text x="0" y="70" class="font-sub">Measured using tiktoken cl100k_base · Real-world tool schemas vs. mcptoon Compact Index</text>
+  </g>
 
-  <!-- Chart area: x=60..740, y=80..360 -->
-  <!-- Max value = 71929, scale: 280px / 71929 = 0.003893 -->
-  <!-- 3 bar groups: 5, 50, 255 -->
+  <!-- Left: Hero Metric Card -->
+  <g transform="translate(36, 130)" filter="url(#card-shadow)">
+    <rect width="260" height="240" rx="12" fill="url(#card-grad)" stroke="#30363d" stroke-width="1"/>
+    
+    <!-- Inner Badge -->
+    <rect x="20" y="24" width="76" height="20" rx="4" fill="#238636" fill-opacity="0.2"/>
+    <text x="58" y="38" text-anchor="middle" class="font-badge" fill="#3fb950">REDUCTION</text>
 
-  <!-- 5 tools: JSON=1519, TOON=1003, SLIM=147, compact=11 -->
-  <!-- Scale: 1519*0.003893=5.9, 1003*0.003893=3.9, 147*0.003893=0.6, 11*0.003893=0.04 -->
-  <rect class="bar-json" x="120" y="354" width="22" height="6" rx="1"/>
-  <text class="value" x="131" y="349" text-anchor="middle">1.5K</text>
-  <rect class="bar-toon" x="146" y="356" width="22" height="4" rx="1"/>
-  <text class="value" x="157" y="351" text-anchor="middle">1.0K</text>
-  <rect class="bar-slim" x="172" y="359" width="22" height="1" rx="1"/>
-  <text class="value" x="183" y="354" text-anchor="middle">147</text>
-  <rect class="bar-compact" x="198" y="359" width="22" height="1" rx="1"/>
-  <text class="value" x="209" y="354" text-anchor="middle">11</text>
-  <text class="label" x="170" y="375" text-anchor="middle">5</text>
+    <!-- Giant Number -->
+    <text x="20" y="98" class="font-stat-num">-99.2%</text>
+    <text x="20" y="122" class="font-stat-sub">Context Flooding Eliminated</text>
 
-  <!-- 50 tools: JSON=14113, TOON=9287, SLIM=1624, compact=114 -->
-  <!-- Scale: 14113*0.003893=54.9, 9287*0.003893=36.1, 1624*0.003893=6.3, 114*0.003893=0.44 -->
-  <rect class="bar-json" x="320" y="305" width="22" height="55" rx="1"/>
-  <text class="value" x="331" y="300" text-anchor="middle">14.1K</text>
-  <rect class="bar-toon" x="346" y="324" width="22" height="36" rx="1"/>
-  <text class="value" x="357" y="319" text-anchor="middle">9.3K</text>
-  <rect class="bar-slim" x="372" y="354" width="22" height="6" rx="1"/>
-  <text class="value" x="383" y="349" text-anchor="middle">1.6K</text>
-  <rect class="bar-compact" x="398" y="359" width="22" height="1" rx="1"/>
-  <text class="value" x="409" y="354" text-anchor="middle">114</text>
-  <text class="label" x="370" y="375" text-anchor="middle">50</text>
+    <!-- Divider Line -->
+    <line x1="20" y1="144" x2="240" y2="144" stroke="#30363d" stroke-width="1" />
 
-  <!-- 255 tools: JSON=71929, TOON=47438, SLIM=8282, compact=581 -->
-  <!-- Scale: 71929*0.003893=280, 47438*0.003893=184.7, 8282*0.003893=32.2, 581*0.003893=2.3 -->
-  <rect class="bar-json" x="520" y="80" width="22" height="280" rx="1"/>
-  <text class="value" x="531" y="75" text-anchor="middle">71.9K</text>
-  <rect class="bar-toon" x="546" y="175" width="22" height="185" rx="1"/>
-  <text class="value" x="557" y="170" text-anchor="middle">47.4K</text>
-  <rect class="bar-slim" x="572" y="328" width="22" height="32" rx="1"/>
-  <text class="value" x="583" y="323" text-anchor="middle">8.3K</text>
-  <rect class="bar-compact" x="598" y="358" width="22" height="2" rx="1"/>
-  <text class="value" x="609" y="353" text-anchor="middle">581</text>
-  <text class="label" x="570" y="375" text-anchor="middle">255</text>
+    <!-- Comparison details -->
+    <text x="20" y="172" class="font-sub">Standard MCP:</text>
+    <text x="240" y="172" text-anchor="end" class="font-bar-val" fill="#f85149">71,929 tokens</text>
 
-  <!-- Baseline -->
-  <line x1="60" y1="360" x2="740" y2="360" stroke="#30363d" stroke-width="1"/>
+    <text x="20" y="200" class="font-sub">mcptoon index:</text>
+    <text x="240" y="200" text-anchor="end" class="font-bar-val" fill="#3fb950">581 tokens</text>
 
-  <!-- X axis label -->
-  <text class="axis" x="400" y="395" text-anchor="middle">Number of MCP tools</text>
+    <text x="20" y="224" class="font-sub" font-size="11px" fill="#6e7681">Room left for prompt: 99.5%</text>
+  </g>
 
-  <!-- Key stat -->
-  <text class="subtitle" x="30" y="412">255 tools: JSON 71,929 tokens → name index 581 tokens = −99.2% reduction (tiktoken cl100k_base)</text>
+  <!-- Right: Comparison Bars Section -->
+  <g transform="translate(324, 130)" filter="url(#card-shadow)">
+    <rect width="540" height="240" rx="12" fill="url(#card-grad)" stroke="#30363d" stroke-width="1"/>
+
+    <!-- Row 1: Traditional MCP (Full Schema) -->
+    <g transform="translate(24, 30)">
+      <text x="0" y="14" class="font-bar-label">Standard MCP Loading</text>
+      <text x="492" y="14" text-anchor="end" class="font-bar-val" fill="#f85149">71,929 tokens (100%)</text>
+      
+      <!-- Track -->
+      <rect x="0" y="26" width="492" height="24" rx="6" fill="#21262d"/>
+      <!-- Bar -->
+      <rect x="0" y="26" width="492" height="24" rx="6" fill="url(#bar-red)"/>
+      <text x="12" y="43" class="font-sub" fill="#ffffff" font-weight="600" font-size="11px">Floods >56% of standard 128k context</text>
+    </g>
+
+    <!-- Row 2: Standard TOON Format -->
+    <g transform="translate(24, 98)">
+      <text x="0" y="14" class="font-bar-label">Raw TOON Transcode</text>
+      <text x="492" y="14" text-anchor="end" class="font-bar-val" fill="#d29922">47,438 tokens (65.9%)</text>
+      
+      <!-- Track -->
+      <rect x="0" y="26" width="492" height="20" rx="5" fill="#21262d"/>
+      <!-- Bar -->
+      <rect x="0" y="26" width="324" height="20" rx="5" fill="#d29922"/>
+    </g>
+
+    <!-- Row 3: mcptoon Compact Index (The Winner) -->
+    <g transform="translate(24, 158)">
+      <text x="0" y="14" class="font-bar-label">mcptoon Compact Index (Default)</text>
+      <text x="492" y="14" text-anchor="end" class="font-bar-val" fill="#3fb950">581 tokens (0.8%)</text>
+      
+      <!-- Track -->
+      <rect x="0" y="26" width="492" height="24" rx="6" fill="#21262d"/>
+      <!-- Bar (0.8% = ~4px min visible) -->
+      <rect x="0" y="26" width="16" height="24" rx="6" fill="url(#bar-green)"/>
+      <!-- Glowing dot -->
+      <circle cx="8" cy="38" r="3" fill="#ffffff"/>
+      <text x="26" y="43" class="font-sub" fill="#3fb950" font-weight="700" font-size="12px">⚡ 99.2% Context Spared · Zero Config</text>
+    </g>
+  </g>
 </svg>

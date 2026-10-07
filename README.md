@@ -6,35 +6,108 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-**Install 1,000 skills and 1,000 MCP tools locally — and don't worry about the token context. mcptoon manages it all.**
+<h3 align="center">Zero-Config Token Optimization & Unified Governance for MCP Tools and Agent Skills</h3>
 
-**Its own compact format does token optimization, tool discovery and context compression at once: it cuts the tool context by ~90% (99.2% on a 255-tool sample; run `mcptoon status` for your own number) and you write no config line for any desktop or command-line agent.**
+<p align="center">
+  <b>Install 1,000 skills and 1,000 MCP tools locally — and never worry about context flooding.</b><br>
+  Cuts tool context by ~90% (99.2% on 255 tools) with zero config across <b>103+ desktop and CLI agents</b>.
+</p>
 
-**Connects to a 17,000+ MCP tool registry and searches skills on demand — nothing pre-installed, you pick what goes in.**
+<!-- Primary Status Badges -->
+<p align="center">
+  <a href="https://pypi.org/project/mcptoon/"><img src="https://img.shields.io/pypi/v/mcptoon?style=flat-square&color=238636&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://github.com/activeing123/mcptoon/stargazers"><img src="https://img.shields.io/github/stars/activeing123/mcptoon?style=flat-square&logo=github&color=58a6ff" alt="GitHub Stars"></a>
+  <a href="https://github.com/activeing123/mcptoon/actions"><img src="https://img.shields.io/github/actions/workflow/status/activeing123/mcptoon/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white" alt="CI Build"></a>
+  <a href="#contributing"><img src="https://img.shields.io/badge/tests-2007%20passed-success?style=flat-square&logo=pytest&logoColor=white" alt="Tests"></a>
+  <a href="https://github.com/activeing123/mcptoon"><img src="https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-blue?style=flat-square" alt="Zero Dependencies"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-informational?style=flat-square" alt="License"></a>
+</p>
 
-**It's just a 362KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.**
+<!-- Ecosystem & Directory Badges -->
+<p align="center">
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet?style=flat-square" alt="MCP Spec"></a>
+  <a href="https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed"><img src="https://img.shields.io/badge/AllMCPs-Listed-orange?style=flat-square" alt="AllMCPs"></a>
+  <a href="https://mcpvault.io/servers/mcptoon/health"><img src="https://img.shields.io/badge/MCPVault-Verified-purple?style=flat-square" alt="MCPVault"></a>
+  <a href="https://mcpservers.org/servers/activeing123/mcptoon"><img src="https://img.shields.io/badge/mcpservers.org-Listed-blue?style=flat-square" alt="mcpservers.org"></a>
+</p>
 
-[![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
-[![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
-[![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-2007%20passed-brightgreen)](#contributing)
-[![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#what-it-does)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
-[![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
-[![MCPVault: verified](https://mcpvault.io/badge/mcptoon.svg)](https://mcpvault.io/servers/mcptoon/health)
-[![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
-[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/activeing123/mcptoon)
+<p align="center">
+  <b><a href="https://activeing123.github.io/mcptoon/">🌐 Official Website</a></b> · 
+  <b><a href="https://activeing123.github.io/mcptoon/tools/token-tax/">🧮 30s Token Tax Calculator</a></b> · 
+  <b><a href="https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md">🇨🇳 中文文档</a></b> · 
+  <b><a href="https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md">📖 Developer Docs</a></b>
+</p>
 
-**👉 See it first: [landing page](https://activeing123.github.io/mcptoon/) · [30-second token calculator](https://activeing123.github.io/mcptoon/tools/token-tax/) · [中文](https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md)**
-
-**👉 Or run it: `pip install mcptoon && mcptoon bench`** — it measures what your own tools and skills cost, on your machine.
-
-**👉 [Developer docs](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [Contributing](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) · [Issues](https://github.com/activeing123/mcptoon/issues)**
-
-![Benchmark: 255 tools, 71,929 → 581 tokens](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/benchmark.svg)
+<!-- Modern Benchmark SVG -->
+<p align="center">
+  <img src="assets/benchmark.svg" alt="mcptoon Benchmark: 71,929 to 581 tokens (-99.2%)" width="100%" style="max-width: 900px; border-radius: 12px; margin: 16px 0;">
+</p>
 
 </div>
+
+### ⚡ Core Capabilities at a Glance
+
+| 💰 Token & Context Optimization | 🛠️ Universal Tool Management |
+| :--- | :--- |
+| • ✅ **Schema Slimming (-99.2%)**: 72k tokens → 581 tokens compact index<br>• ✅ **Lossless Compression (CCR)**: Reversible with handle retrieval (`retrieve`)<br>• ✅ **Session Deduplication**: Blocks byte-identical output duplication in turn<br>• ✅ **Honest Measurements**: Real `tiktoken` accounting via `mcptoon bench` | • ✅ **17,000+ Registry Discovery**: Natural language search (`search`)<br>• ✅ **Uniform CLI Execution (`call`)**: Headless driver for any MCP tool<br>• ✅ **On-Demand Inspection (`inspect`)**: Schema pulled only when needed<br>• ✅ **Diagnostic Doctor (`doctor`)**: Self-heals stdio pipes & environments |
+
+| 🧠 Skills Governance | 📚 Zero-Tax Docs Routing (`mcptoon docs`) |
+| :--- | :--- |
+| • ✅ **Single-Source Multi-Agent Sync**: Claude, Cursor, Roo, OpenCode<br>• ✅ **Self-Installed Skill Included**: Bundles `/mcptoon` official agent skill<br>• ✅ **Offline BM25 Skill Router**: <5ms matching, zero model API costs<br>• ✅ **Version Gate (`--version-gate`)**: Blocks unversioned content drift<br>• ✅ **Tombstone Removal**: Prevents dead skills from reviving via git pull | • ✅ **Markdown Tree Indexing**: Automatic index over large doc directories<br>• ✅ **Targeted Chapter Feeding**: Feeds 1 chapter instead of 19 chapters<br>• ✅ **Zero Model Overhead**: Pure offline BM25 keyword matching engine<br>• ✅ **Context Tax Shield**: Drops 40k doc tokens to 17k per lookup |
+
+| 🔌 103+ AI Clients Supported | 🛡️ Engineering Discipline |
+| :--- | :--- |
+| • ✅ **103+ Clients Out-of-the-Box**: Claude Code, Cursor, Windsurf, Zed, Cline...<br>• ✅ **Dual Modes (CLI & Native MCP)**: 42 CLI direct + 61 MCP serve fallback<br>• ✅ **Transparent Session Footer**: Live savings breakdown printed after turns | • ✅ **Zero Dependencies**: 100% Python standard library (`pyproject.toml` clean)<br>• ✅ **Ultra Lightweight**: Only 362KB total package footprint, installs in 2s<br>• ✅ **100% Local & Private**: No cloud calls, zero telemetry, air-gap ready<br>• ✅ **Strict XDG Compliant**: Sandbox-friendly config isolation via `--dir` |
+
+---
+
+### 🚀 Quick Start (Choose Your Way)
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<h4>🤖 Modern Way: Just Talk to Your Agent (Zero Memorization)</h4>
+
+When installed, mcptoon **automatically injects its own official skill (`/mcptoon`) into your agents**. You never need to memorize terminal commands — just ask directly in **Cursor, Claude Code, Windsurf, or DSH**:
+
+```markdown
+# Ask the built-in skill anytime:
+"Load /mcptoon skill and check what MCP tools I currently have."
+"Help me find an MCP tool that converts HTML to PDF and call it."
+"The tool output was truncated, retrieve the full original copy."
+"How many tokens did mcptoon save for me today?"
+"Doctor self-check: are all my MCP servers connected properly?"
+```
+*Your agent loads `/mcptoon` and drives everything behind the scenes!*
+
+</td>
+<td width="50%" valign="top">
+
+<h4>⚡ Terminal Way: 30-Second Setup</h4>
+
+```bash
+# 1. Install (zero dependencies, 362KB)
+pip install mcptoon
+
+# 2. One command: detect MCP servers & auto-configure agents
+# (Also self-installs `/mcptoon` skill into all detected agents)
+mcptoon quickstart
+
+# 3. View compact tool catalog (-99.2% tokens)
+mcptoon manifest
+
+# 4. Route tasks to skills or doc chapters (<5ms)
+mcptoon skills resolve "write git commit message"
+mcptoon docs resolve "how does release gating work"
+```
+
+</td>
+</tr>
+</table>
+
+---
+
 
 ## Why mcptoon
 

@@ -6,35 +6,108 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-**在本地装上 1,000 个技能、1,000 个 MCP 工具，也不必担心 token 上下文——统统由 mcptoon 管理。**
+<h3 align="center">MCP 工具与 Agent 技能的零配置 Token 压缩与统一调度网关</h3>
 
-**独有的紧凑格式一次做完三件事——token 优化、工具发现、上下文压缩：把工具上下文砍掉约 90%（255 工具样本上 99.2%；你自己的数看 `mcptoon status`），而任意桌面 Agent、命令行 Agent 你都不用写一行配置。**
+<p align="center">
+  <b>在本地安装 1,000 个技能和 1,000 个 MCP 工具 — 彻底告别上下文爆仓。</b><br>
+  独创轻量格式将工具上下文缩减 ~90%（255 工具样本降幅达 99.2%），<b>覆盖 103+ 款主流桌面与终端 Agent</b> 全自动零配置。
+</p>
 
-**直连 17,000+ 个 MCP 工具注册表，技能按需检索安装——原生 0 预装，装什么由你定。**
+<!-- 核心权威徽章 -->
+<p align="center">
+  <a href="https://pypi.org/project/mcptoon/"><img src="https://img.shields.io/pypi/v/mcptoon?style=flat-square&color=238636&logo=pypi&logoColor=white" alt="PyPI 版本"></a>
+  <a href="https://github.com/activeing123/mcptoon/stargazers"><img src="https://img.shields.io/github/stars/activeing123/mcptoon?style=flat-square&logo=github&color=58a6ff" alt="GitHub Stars"></a>
+  <a href="https://github.com/activeing123/mcptoon/actions"><img src="https://img.shields.io/github/actions/workflow/status/activeing123/mcptoon/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white" alt="CI 构建"></a>
+  <a href="#贡献指南"><img src="https://img.shields.io/badge/tests-2007%20passed-success?style=flat-square&logo=pytest&logoColor=white" alt="测试"></a>
+  <a href="https://github.com/activeing123/mcptoon"><img src="https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-blue?style=flat-square" alt="零第三方依赖"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-informational?style=flat-square" alt="许可证"></a>
+</p>
 
-**它只是一个 362KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。**
+<!-- 生态与目录收录徽章 -->
+<p align="center">
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet?style=flat-square" alt="MCP 规范"></a>
+  <a href="https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed"><img src="https://img.shields.io/badge/AllMCPs-已收录-orange?style=flat-square" alt="AllMCPs"></a>
+  <a href="https://mcpvault.io/servers/mcptoon/health"><img src="https://img.shields.io/badge/MCPVault-已认证-purple?style=flat-square" alt="MCPVault"></a>
+  <a href="https://mcpservers.org/servers/activeing123/mcptoon"><img src="https://img.shields.io/badge/mcpservers.org-已收录-blue?style=flat-square" alt="mcpservers.org"></a>
+</p>
 
-[![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
-[![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
-[![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-2007%20passed-brightgreen)](#贡献)
-[![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
-[![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
-[![AllMCPs](https://allmcps.com/api/badge/mcptoon?style=directory)](https://allmcps.com/mcp/mcptoon?verify=7eb0d0d6-5d4e-41a3-a048-2fe3c91a36ed)
-[![MCPVault: verified](https://mcpvault.io/badge/mcptoon.svg)](https://mcpvault.io/servers/mcptoon/health)
-[![mcptoon on AI Agents Listing](https://aiagentslisting.com/mcptoon/badge.svg)](https://aiagentslisting.com/mcp/mcptoon)
-[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/activeing123/mcptoon)
+<p align="center">
+  <b><a href="https://activeing123.github.io/mcptoon/">🌐 官方网站</a></b> · 
+  <b><a href="https://activeing123.github.io/mcptoon/tools/token-tax/zh/">🧮 30秒 Token 浪费计算器</a></b> · 
+  <b><a href="https://github.com/activeing123/mcptoon/blob/main/README.md">🇺🇸 English README</a></b> · 
+  <b><a href="https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md">📖 开发者文档</a></b>
+</p>
 
-**👉 先看效果：[落地页](https://activeing123.github.io/mcptoon/) · [30 秒算你自己的 token 账](https://activeing123.github.io/mcptoon/tools/token-tax/) · [English](https://github.com/activeing123/mcptoon/blob/main/README.md)**
-
-**👉 或直接跑：`pip install mcptoon && mcptoon bench`** —— 量你自己机器上工具和技能到底花了多少 token。
-
-**👉 [开发者文档](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md) · [贡献指南](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) · [Issues](https://github.com/activeing123/mcptoon/issues)**
-
-![基准：255 个工具，71,929 → 581 tokens](https://raw.githubusercontent.com/activeing123/mcptoon/main/assets/benchmark.svg)
+<!-- 现代化 Benchmark SVG -->
+<p align="center">
+  <img src="assets/benchmark.svg" alt="mcptoon Benchmark: 71,929 to 581 tokens (-99.2%)" width="100%" style="max-width: 900px; border-radius: 12px; margin: 16px 0;">
+</p>
 
 </div>
+
+### ⚡ 全能力全景速览
+
+| 💰 Token 极致压缩与成本节流 | 🛠️ MCP 工具统一纳管与调度 |
+| :--- | :--- |
+| • ✅ **Schema 极致瘦身 (-99.2%)**：7.1 万 Token 缩减至 581 Token 极简名字索引<br>• ✅ **结果智能无损压缩 (CCR)**：自动裁剪冗余输出，原件支持 100% 句柄取回 (`retrieve`)<br>• ✅ **会话级重复结果过滤**：同一次对话相同输出自动转引用，杜绝重复扣费<br>• ✅ **真实数据度量 (`bench`)**：内置 `tiktoken` 精确核算本机真实节省 Token 数 | • ✅ **17,000+ 社区工具发现**：支持大白话自然语言检索工具注册表 (`search`)<br>• ✅ **统一命令行执行 (`call`)**：无论目标服务用何种语言编写，均可直接驱动<br>• ✅ **按需参数拉取 (`inspect`)**：仅在 Agent 决定调用时才毫秒级拉取 Schema<br>• ✅ **健康体检自愈 (`doctor`)**：一键排查 stdio 管道、网络连通性与配置冲突 |
+
+| 🧠 技能统一分发与离线治理 | 📚 长文档与开发规范零税路由 (`mcptoon docs`) |
+| :--- | :--- |
+| • ✅ **一套技能，多端共享 (`sync`)**：软链分发给 Claude, Cursor, Roo, OpenCode<br>• ✅ **自带官方内置技能**：安装即自带 `/mcptoon` 技能手册，Agent 自动学习<br>• ✅ **本地离线 BM25 路由 (`resolve`)**：5 毫秒锁定匹配手册，0 模型 API 成本<br>• ✅ **严格版本门禁 (`--version-gate`)**：改动内容但未升版本号时自动拦截<br>• ✅ **防复活墓碑机制 (`--tombstone`)**：永久下线废弃技能，防 Git 拉取复活 | • ✅ **长文档目录树自动索引 (`index`)**：为大型规范与文档目录生成极简索引<br>• ✅ **按需章节投喂 (`resolve`)**：Agent 提问只返回对应单篇路径，免读全书<br>• ✅ **无外部依赖与向量库**：纯本地毫秒级 BM25 关键词匹配引擎<br>• ✅ **上下文税强力护盾**：实测将 4 万 Token 规范文档查询压减至 1.7 万 |
+
+| 🔌 覆盖 103+ 款 AI 客户端 | 🛡️ 极致轻量与工程纪律 |
+| :--- | :--- |
+| • ✅ **103 款客户端开箱即用**：Claude Code, Cursor, Windsurf, Zed, Cline...<br>• ✅ **CLI 原生 + 标准 MCP 双模**：42 款命令行直通 + 61 款 serve 代理回退<br>• ✅ **会话末尾透明播报 (`footer`)**：每轮对话直观展示当前省下的 Token 真实数字 | • ✅ **绝对零第三方依赖**：100% 纯 Python 标准库编写，依赖项为空<br>• ✅ **极致轻巧 (362KB)**：一条命令 2 秒安装完毕，卸载干干净净<br>• ✅ **100% 离线与隐私保护**：所有算法与索引完全单机运行，数据绝不上云<br>• ✅ **严格遵守 XDG 规范**：无缝支持沙盒、自定义 `--dir` 与环境隔离 |
+
+---
+
+### 🚀 快速上手（选择你喜欢的方式）
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<h4>🤖 现代化方式：直接跟 Agent 对话（免记命令）</h4>
+
+mcptoon 安装后**会自动将官方技能（`/mcptoon`）注入到所有检测到的 Agent 目录中**。小白完全不需要背诵任何命令，在 **Cursor, Claude Code, Windsurf, DSH** 聊天框直接对话：
+
+```markdown
+# 随时唤醒内置技能，有问题直接问：
+"加载 /mcptoon 技能，看一下我现在都有哪些 MCP 工具？"
+"帮我找一个能把网页转成 Markdown 的 MCP 工具并执行。"
+"刚才工具返回的日志被截断了，用 mcptoon 把完整原件调出来。"
+"算一下今天 mcptoon 帮我省了多少 Token？"
+"帮我体检自查一下：所有 MCP 服务器连通性正常吗？"
+```
+*Agent 会自动调取 `/mcptoon` 技能手册，在后台替你完成所有操作！*
+
+</td>
+<td width="50%" valign="top">
+
+<h4>⚡ 终端极客方式：30 秒搞定</h4>
+
+```bash
+# 1. 一键安装（零依赖，362KB）
+pip install mcptoon
+
+# 2. 一键检测并自动配置已安装的 Agent
+# （同时自动将 `/mcptoon` 技能分发到各大 Agent 目录中）
+mcptoon quickstart
+
+# 3. 查看极简工具索引（省 99.2% Token）
+mcptoon manifest
+
+# 4. 路由任务对应的技能或规范章节（<5ms）
+mcptoon skills resolve "写 git 提交信息"
+mcptoon docs resolve "版本发布门禁怎么运作"
+```
+
+</td>
+</tr>
+</table>
+
+---
+
 
 ## 为什么要用 mcptoon
 
