@@ -29,3 +29,14 @@ os.environ["USERPROFILE"] = str(_home)                       # Windows Path.home
 os.environ["APPDATA"] = str(_home / "AppData" / "Roaming")   # discover._appdata()
 os.environ["LOCALAPPDATA"] = str(_home / "AppData" / "Local")
 os.environ["XDG_CONFIG_HOME"] = str(_home / ".config")
+
+# `MCPTOON_HOME` pins the layout for the whole suite (issue #25).
+#
+# Before XDG support landed, `config.CONFIG_DIR` was always `$HOME/.mcptoon`, so
+# setting HOME was enough to isolate the suite. Now that `XDG_CONFIG_HOME` is
+# honoured, the line above would silently move every path to `$HOME/.config/…`
+# and shift the expectations of ~1900 tests at once — a green-to-red avalanche
+# with no behaviour change behind it. An explicit root keeps the layout the
+# tests were written against; tests that want XDG behaviour set their own
+# environment (see tests/test_xdg.py).
+os.environ["MCPTOON_HOME"] = str(_home / ".mcptoon")

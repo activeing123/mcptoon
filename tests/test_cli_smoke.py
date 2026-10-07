@@ -51,6 +51,11 @@ def _isolated_env(home: Path, minimal_path: bool = True) -> dict:
     env["APPDATA"] = str(home / "AppData" / "Roaming")   # discover._appdata()
     env["LOCALAPPDATA"] = str(home / "AppData" / "Local")
     env["XDG_CONFIG_HOME"] = str(home / ".config")
+    # `MCPTOON_HOME` outranks XDG, so it must be re-pointed at this sandbox too.
+    # Without this the value inherited from `os.environ` (conftest pins one for
+    # the whole session) silently wins and the CLI reads a directory that is not
+    # this test's `home`.
+    env["MCPTOON_HOME"] = str(home / ".mcptoon")
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     # Keep the CLI from spawning agents or asking for input in CI.

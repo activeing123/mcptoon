@@ -47,7 +47,75 @@ from pathlib import Path
 # ─── Paths ───
 
 HOME_DIR = Path.home()
-CONFIG_DIR = HOME_DIR / ".mcptoon"
+
+# ─── XDG Base Directory support (issue #25) ───
+#
+# mcptoon used to hardcode `~/.mcptoon` and `mkdir` it unconditionally, which
+# cluttered `$HOME` on Linux and left no way to relocate the directory without
+# faking `$HOME` (issue #25). The rules below implement what that issue asked
+# for, in this order of precedence:
+#
+#   1. `MCPTOON_HOME` (env) or `--dir` (CLI) — an explicit root. One directory
+#      for everything, cache underneath it, because that is what "put my
+#      mcptoon files *here*" means to the person typing it.
+#   2. XDG — but only when the variables are actually set. `XDG_CONFIG_HOME`
+#      etc. are absent on a stock Windows box and on plenty of Linux setups;
+#      inventing a default for them would move files nobody asked to move.
+#   3. Legacy `~/.mcptoon` (+ `~/.cache/mcptoon`) — the pre-XDG layout.
+#
+# The subtle rule, and the one that protects existing installs: if the XDG
+# location does not exist yet but the legacy directory does, keep using legacy
+# and do NOT create the XDG directory. Without it, a Linux user upgrading from
+# 0.8.15 would watch their configured servers vanish — the worst kind of bug,
+# because the data is still on disk and nothing says where it went.
+def _xdg_dir(env_var: str) -> "Path | None":
+    """`$<env_var>/mcptoon` when the variable is set and non-empty, else None.
+
+    Returning None (rather than a default) matters: "the variable is unset" and
+    "the variable points at the default" are different states, and only the
+    first one should fall through to the legacy directory. Conflating them is
+    what makes an unset `XDG_CONFIG_HOME` resolve to `~/.config` — an XDG
+    location the user never asked for.
+    """
+    val = os.environ.get(env_var, "").strip()
+    return Path(val) / "mcptoon" if val else None
+
+
+def _legacy_root() -> Path:
+    return HOME_DIR / ".mcptoon"
+
+
+def _resolve_root(env_var: str) -> Path:
+    """Config root: explicit > XDG-if-present > legacy-if-present > XDG-if-set."""
+    explicit = os.environ.get("MCPTOON_HOME", "").strip()
+    if explicit:
+        return Path(explicit)
+    xdg = _xdg_dir(env_var)
+    if xdg is None:
+        return _legacy_root()
+    if xdg.exists() or not _legacy_root().exists():
+        return xdg
+    return _legacy_root()
+
+
+def _resolve_cache_root() -> Path:
+    explicit = os.environ.get("MCPTOON_HOME", "").strip()
+    if explicit:
+        return Path(explicit) / "cache"
+    legacy = HOME_DIR / ".cache" / "mcptoon"
+    xdg = _xdg_dir("XDG_CACHE_HOME")
+    if xdg is None:
+        return legacy
+    if xdg.exists() or not legacy.exists():
+        return xdg
+    return legacy
+
+
+def _xdg_state_dir() -> "Path | None":
+    return _xdg_dir("XDG_STATE_HOME")
+
+
+CONFIG_DIR = _resolve_root("XDG_CONFIG_HOME")
 # Env overrides let CI/tests redirect all config I/O without touching the
 # real ~/.mcptoon (same isolation pattern as MCPTOON_SERVERS). Resolved at
 # CALL time (not import time) so test processes can retarget safely.
@@ -63,9 +131,32 @@ def _config_file() -> Path:
 
 def _config_file_toml() -> Path:
     return Path(os.environ.get("MCPTOON_CONFIG_FILE_TOML", str(CONFIG_FILE_TOML)))
-CACHE_DIR = HOME_DIR / ".cache" / "mcptoon"
-LOG_DIR = CONFIG_DIR / "logs"
-TOGGLE_FILE = CONFIG_DIR / "toggles.json"
+CACHE_DIR = _resolve_cache_root()
+
+
+def _resolve_state_dir(config_dir: Path) -> Path:
+    """Where logs and toggles live.
+
+    Three cases, and only the middle one moves:
+
+    * legacy `~/.mcptoon` — everything stays inside it, exactly as before.
+    * the XDG config root — state follows `XDG_STATE_HOME`, which is the whole
+      point of the spec: logs and toggles are state, not configuration.
+    * an explicit `MCPTOON_HOME` / `--dir` — everything under that one root.
+      "Put my mcptoon files here" must not scatter half of them into
+      `~/.local/state`, which is what an unconditional XDG_STATE_HOME lookup
+      would do.
+    """
+    if config_dir == _legacy_root():
+        return config_dir
+    if config_dir == _xdg_dir("XDG_CONFIG_HOME"):
+        return _xdg_state_dir() or config_dir
+    return config_dir
+
+
+STATE_DIR = _resolve_state_dir(CONFIG_DIR)
+LOG_DIR = STATE_DIR / "logs"
+TOGGLE_FILE = STATE_DIR / "toggles.json"
 
 
 def _cache_dir() -> Path:
@@ -259,10 +350,104 @@ def _footer_state_file() -> Path:
     return Path(os.environ.get(
         "MCPTOON_FOOTER_STATE_FILE", str(FOOTER_STATE_FILE)))
 
-# Ensure dirs exist
-CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure dirs exist.
+#
+# Guarded on purpose (issue #25): the old code `mkdir`'d `~/.mcptoon`
+# unconditionally, so a user who had moved every path elsewhere still got an
+# empty directory in their `$HOME`. Create the directory we are actually going
+# to use, and only that one — but always create it, because a missing config
+# root is how "mcptoon forgot my servers" starts.
+#
+# `_AUTO_CREATED` records every directory this process created. `--dir` cannot be
+# honoured until argv is read, which is after this module is imported, so on a
+# `mcptoon --dir X …` run the legacy directory is created here and only then
+# superseded. Remembering what we made lets `apply_home` undo exactly that much.
+_AUTO_CREATED: list = []
+
+
+def _mkdir_tracked(d: Path) -> None:
+    """`mkdir -p`, remembering every level this call actually created.
+
+    Two details that are load-bearing, both learned the hard way:
+
+    * `parents=True` can create more than one level (`~/.config/mcptoon` needs
+      `~/.config` first), so all of them are recorded, not just the leaf.
+    * the recorded order is **deepest first**, and `apply_home` sorts by depth
+      again before removing. Removing `~/.mcptoon` before `~/.mcptoon/logs`
+      fails with `ENOTEMPTY`, and because the cleanup is best-effort that
+      failure is silent — the directory just survives, which is the exact bug
+      issue #25 was filed about.
+    """
+    missing = []
+    p = Path(d)
+    while not p.exists() and p.parent != p:
+        missing.append(p)
+        p = p.parent
+    Path(d).mkdir(parents=True, exist_ok=True)
+    _AUTO_CREATED.extend(missing)
+
+
+for _d in (CONFIG_DIR, CACHE_DIR, LOG_DIR):
+    _mkdir_tracked(_d)
+del _d
+
+
+def apply_home(root) -> None:
+    """Rebind every path constant to `root` — the implementation of `--dir`.
+
+    `--dir` arrives on the command line, long after this module was imported and
+    its constants computed, so the flag cannot work by setting an environment
+    variable: by then the values are already bound. This re-runs the same
+    resolution with `MCPTOON_HOME` pinned to `root` and writes the results back
+    into the module namespace.
+
+    Two readers have to be re-pointed by hand because they captured the value at
+    import time: `usage._USAGE_FILE` (bound from `CACHE_DIR`) and this module's
+    own `POLICY_FILE`. `usage` is looked up in `sys.modules` rather than
+    imported, because `usage` imports this module — importing it back would be a
+    cycle.
+    """
+    global CONFIG_DIR, CACHE_DIR, STATE_DIR, LOG_DIR, TOGGLE_FILE, POLICY_FILE
+    global CONFIG_FILE, CONFIG_FILE_TOML, SETTINGS_FILE, WELCOME_FILE
+    global SELFHEAL_FILE, FOOTER_STATE_FILE
+
+    os.environ["MCPTOON_HOME"] = str(root)
+    CONFIG_DIR = _resolve_root("XDG_CONFIG_HOME")
+    CACHE_DIR = _resolve_cache_root()
+    STATE_DIR = _resolve_state_dir(CONFIG_DIR)
+    LOG_DIR = STATE_DIR / "logs"
+    TOGGLE_FILE = STATE_DIR / "toggles.json"
+    POLICY_FILE = CONFIG_DIR / "compression.json"
+    CONFIG_FILE = CONFIG_DIR / "config.json"
+    CONFIG_FILE_TOML = CONFIG_DIR / "config.toml"
+    SETTINGS_FILE = CONFIG_DIR / "settings.json"
+    WELCOME_FILE = CONFIG_DIR / ".welcome"
+    SELFHEAL_FILE = CONFIG_DIR / ".selfheal"
+    FOOTER_STATE_FILE = CONFIG_DIR / "footer-state.json"
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Undo the directories this module created at import time, but only where we
+    # made them *and* they are still empty. This is what keeps the promise in
+    # issue #25 for the `--dir` path: on `mcptoon --dir X …` the legacy
+    # `~/.mcptoon` appears during import, before argv is readable, and would
+    # otherwise survive as the empty clutter the report was about. Never removes
+    # a directory that holds anything — the emptiness check is the whole safety.
+    keep = {CONFIG_DIR, CACHE_DIR, LOG_DIR}
+    for d in sorted(_AUTO_CREATED, key=lambda p: len(p.parts), reverse=True):
+        if d in keep:
+            continue
+        try:
+            d.rmdir()
+        except OSError:
+            pass
+    _AUTO_CREATED.clear()
+
+    usage_mod = sys.modules.get("mcptoon.usage")
+    if usage_mod is not None:
+        usage_mod._USAGE_FILE = CACHE_DIR / "usage.json"
 
 
 # ─── Server name aliases ───

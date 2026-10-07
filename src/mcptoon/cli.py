@@ -45,7 +45,7 @@ from .errors import is_error
 KNOWN_FLAGS = frozenset(
     {
         "--agent", "--archive", "--auth", "--auto", "--all", "--check", "--compact", "--copy",
-        "--derived", "--destructive", "--dry",
+        "--derived", "--destructive", "--dir", "--dry",
         "--dry-run", "--endpoint", "--envelope", "--fallback-json", "--file", "--force", "--format",
         "--from",
         "--full", "--head", "--desc",
@@ -395,6 +395,12 @@ def _run(state: dict) -> None:
                 max_chars = int(a.split("=", 1)[1])
             except ValueError:
                 pass
+        elif a == "--dir" and i + 1 < len(args):
+            # Already applied by `_apply_dir_flag` before dispatch; consumed here
+            # only so it is not mistaken for the command name.
+            i += 1
+        elif a.startswith("--dir="):
+            pass
         elif a == "--format" and i + 1 < len(args):
             export_format = args[i + 1]
             i += 1
@@ -519,6 +525,23 @@ def _run(state: dict) -> None:
         _try_natural(command, rest, fmt, head_n, max_chars, full)
 
 
+def _apply_dir_flag(argv: list) -> None:
+    """Honour `--dir <path>` / `--dir=<path>` before anything reads a path.
+
+    Deliberately tolerant: a bare `--dir` with no value, or `--dir` followed by
+    another flag, is left alone for the normal parser to reject with its own
+    message. Doing the validation here would mean two places deciding what a
+    missing argument means.
+    """
+    for i, a in enumerate(argv):
+        if a == "--dir" and i + 1 < len(argv) and not argv[i + 1].startswith("-"):
+            cfg.apply_home(argv[i + 1])
+            return
+        if a.startswith("--dir=") and a[6:]:
+            cfg.apply_home(a[6:])
+            return
+
+
 def main() -> None:
     """Entry point: run the CLI, then emit the savings footer.
 
@@ -538,6 +561,11 @@ def main() -> None:
     failure.
     """
     state: dict = {}
+    # `--dir` must land before any command reads a path, and it has to survive
+    # the 41 `sys.exit()` paths inside `_run` — so it is applied here, once, on
+    # the raw argv. See config.apply_home for why the flag cannot simply set an
+    # environment variable.
+    _apply_dir_flag(sys.argv[1:])
     try:
         _run(state)
     except SystemExit as exc:
