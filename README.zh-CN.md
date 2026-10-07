@@ -17,7 +17,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/activeing123/mcptoon?style=social)](https://github.com/activeing123/mcptoon/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/mcptoon?logo=pypi&logoColor=white&color=1a7f37)](https://pypi.org/project/mcptoon/)
 [![CI](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml/badge.svg)](https://github.com/activeing123/mcptoon/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-1959%20passed-brightgreen)](#贡献)
+[![Tests](https://img.shields.io/badge/Tests-2007%20passed-brightgreen)](#贡献)
 [![Manages](https://img.shields.io/badge/manages-MCP%20tools%20%2B%20agent%20skills-8250df)](#它做什么)
 [![MCP Spec](https://img.shields.io/badge/MCP_Spec-2026--07--28-blueviolet)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/activeing123/mcptoon/blob/main/LICENSE)
@@ -471,6 +471,10 @@ mcptoon serve                   # 作为一个 MCP 服务器运行（stdio/HTTP�
 mcptoon skills list             # 技能目录（--usage 加命中计数）
 mcptoon skills sync <src>       # 把技能目录分发到每个 Agent 的技能文件夹
 mcptoon skills resolve "<任务>" # 技能 BM25 短名单（离线，无 LLM）
+mcptoon docs index <目录>       # 索引一棵 Markdown 树，让 Agent 不再整读
+mcptoon docs resolve "<查询>"   # 查该读哪几个文件（返回路径，离线）
+mcptoon docs list               # 列出已索引的每个文档（按 slug）
+mcptoon docs doctor             # 对照磁盘检查文档索引
 mcptoon bench                   # 在本机验证省了多少（工具 + 技能一张表）
 mcptoon demo                    # 一条命令，在本机现场演示
 mcptoon demo-server             # 同样的自证，零下载（11 个标准库工具）
@@ -549,12 +553,12 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 1959 passed, 2 skipped
+python -m pytest tests/ -v   # 2007 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-代码规模：**43 个模块、25,257 行 Python**，零第三方依赖。
+代码规模：**44 个模块、26,423 行 Python**，零第三方依赖。
 
 ---
 

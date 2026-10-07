@@ -85,8 +85,8 @@ _COMMANDS_WITH_OWN_HELP = frozenset({"demo", "demo-server", "serve"})
 # dispatch set from this file and fails if the two ever disagree.
 _COMPLETION_COMMANDS = (
     "add", "bench", "call", "completion", "config", "demo", "demo-server",
-    "discover", "doctor", "footer-facts", "health", "help", "import", "init",
-    "inspect", "install", "list", "manifest", "off", "plugin", "policy",
+    "discover", "docs", "doctor", "footer-facts", "health", "help", "import",
+    "init", "inspect", "install", "list", "manifest", "off", "plugin", "policy",
     "quickstart", "remove", "report", "restore", "retrieve", "search", "serve",
     "skills", "stats", "status", "sync", "toggle", "uninstall", "update", "usage",
     # aliases the dispatch chain also accepts
@@ -466,6 +466,9 @@ def _run(state: dict) -> None:
     elif command == "report":
         from . import report as report_mod
         report_mod.run(rest, fmt, head_n, max_chars, full)
+    elif command == "docs":
+        from . import docs as docs_mod
+        docs_mod.run(rest, fmt, head_n, max_chars, full)
     elif command == "retrieve":
         _cmd_retrieve(rest, fmt, max_chars)
     elif command == "footer-facts":
@@ -3705,6 +3708,11 @@ Usage:
     mcptoon skills resolve <query>        BM25 shortlist of skills (offline, no LLM)
     mcptoon skills sync [SRC] [VIEW...]   Distribute a skill catalog to every agent's folder
     mcptoon skills add|remove <name>      Create a skill in the source / retire it to the archive
+
+    mcptoon docs index <dir>              Index a Markdown tree so agents stop reading it whole
+    mcptoon docs resolve <query>          Best files for a query (returns paths, offline)
+    mcptoon docs list                     Every indexed document, by slug
+    mcptoon docs doctor                   Check the docs index against the disk
 
     mcptoon bench                         Prove the savings on your own machine (tools + skills)
     mcptoon bench --json                  Machine-readable; --roots/--query/-k tune the skills half

@@ -1,7 +1,7 @@
 ---
 name: mcptoon
 version: 1.2.2
-description: "Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. Also route here when a tool *result* looks truncated, compressed, or \"lost data\": result compression is on by default, originals come back via `mcptoon_retrieve handle=<id>`, and it turns off with `mcptoon config set compress off`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge."
+description: "Compress MCP tool discovery with the mcptoon CLI. Trigger when a session has a large MCP tool catalog (many servers/tools), when the user mentions token cost, tool discovery, mcptoon, or asks to list/call MCP tools efficiently. Also route here when the user says the MCP tool list is too large, the agent context window is filling up with tool schemas, or they need the same MCP servers configured across Claude Code, Cursor, Codex, Cline, Windsurf and other agents. Also covers managing an agent's skill catalog with `mcptoon skills` (list / resolve / sync / add / remove, plus a version gate, derived Roo/OpenCode views, and tombstoned removals). Also route here when a doc folder is too big to read — 文档太多、AGENTS.md / CONTEXT.md / docs/ 太大、不知道该读哪个文件、想省 token 读文档、整读一个目录太贵: `mcptoon docs index <dir>` then `mcptoon docs resolve "<question>"` returns the few files worth opening — read one chapter, not all — offline, no LLM, descriptions derived from headings. Also route here when the user's MCP tools seem to have gone missing: a gateway is mounted in COMPACT exposure by default, so it withholds the upstream tool list from `tools/list` (they stay callable) — explain the preset and switch back with `mcptoon config set exposure full`. Also route here when a tool *result* looks truncated, compressed, or \"lost data\": result compression is on by default, originals come back via `mcptoon_retrieve handle=<id>`, and it turns off with `mcptoon config set compress off`. mcptoon compresses 71,929 tokens of tool schemas to 581 (-99.2%) and serves as an MCP 2026-07-28 stateless-first bridge."
 ---
 
 # mcptoon — MCP tool-catalog compression
@@ -41,6 +41,27 @@ Skills and MCP servers are the same shape — one source, many agent views — s
 | Create / retire a skill | `mcptoon skills add <name> --desc "…"` / `mcptoon skills remove <name>` |
 | Retire a skill so a git sync cannot revive it | `mcptoon skills remove <name> --tombstone` |
 | Park drift/removals in a chosen graveyard | add `--archive DIR` to `sync` or `remove` |
+
+## Stop reading the whole doc tree (mcptoon as the doc router)
+
+A large `AGENTS.md` / `CONTEXT.md` / docs folder is the biggest context tax there
+is: the agent opens all of it every session, to answer one question. `mcptoon docs`
+indexes a Markdown tree and returns the few files worth opening, so the agent reads
+one chapter — not nineteen. It is the same BM25 router as `skills resolve`, pointed
+at documents.
+
+| Situation | Command |
+|---|---|
+| Index a docs folder (once) | `mcptoon docs index <dir>` |
+| Find which file answers a question | `mcptoon docs resolve "<question>"` |
+| See what is indexed | `mcptoon docs list` |
+| Check the index against the disk | `mcptoon docs doctor` |
+
+**This is the command to reach for when a doc folder is big and you are about to
+read several files out of it.** Descriptions are derived from the file's own
+headings (the entry is marked `derived: true`), so a file whose name says nothing is
+still found by the words inside it. It returns **paths** — it finds files, it does
+not read them, and it never calls a model or the network.
 
 Sync views are **links** by default (a junction on Windows, no admin needed), so
 one edit at the source is live everywhere and there is no second copy to drift.

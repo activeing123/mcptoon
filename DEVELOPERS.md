@@ -6,7 +6,7 @@
 mcptoon: 一个零依赖、零配置、CLI 优先的跨 Agent MCP 管理网关。
 `README.md` 面向小白，本文件是完整的技术说明。
 
-- 版本：v0.8.15 · 1959 passed + 2 skipped · 0 依赖 · 342KB wheel · 43 模块 · Apache 2.0
+- 版本：v0.8.15 · 2007 passed + 2 skipped · 0 依赖 · 342KB wheel · 44 模块 · Apache 2.0
 - 仓库：https://github.com/activeing123/mcptoon
 - PyPI：https://pypi.org/project/mcptoon/
 
@@ -190,13 +190,13 @@ with MCPClient(stdio=["npx", "-y", "@modelcontextprotocol/server-everything"]) a
 ```bash
 git clone https://github.com/activeing123/mcptoon.git && cd mcptoon
 pip install -e . --no-build-isolation && pip install pytest
-python -m pytest tests/ -v          # 1959 tests, green expected
+python -m pytest tests/ -v          # 2007 tests, green expected
 
 docker run --rm -v ~/.mcptoon:/root/.mcptoon mcptoon manifest --compact
 ```
 
 零第三方导入是 review 阶段硬性规则。新功能必须带测试。
-25,257 行 Python（物理行，含子包）、43 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+26,423 行 Python（物理行，含子包）、44 模块。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
