@@ -12,7 +12,7 @@
 | Add one server, N agents | edit N files × N formats | 1 command, syncs | 1 form, syncs | **1 command** (`mcptoon add` + auto-detect) |
 | Agent-side setup required | yes (per agent) | yes (per agent) | yes (per agent) | **no — any shell-capable agent works day one** |
 | Platforms | — | usually macOS/Linux-first | often macOS-only (e.g. commercial managers) | **Windows / macOS / Linux equal** (pure Python stdlib) |
-| Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (362KB wheel)** |
+| Dependencies to install | n/a | Node/npm trees common | bundled runtimes | **zero (363KB wheel)** |
 | Token cost of tool discovery | full JSON schemas | full JSON schemas | full JSON schemas | **−88.5% (slim) or −99.2% (name-only manifest)** |
 | Result payload size | raw JSON | raw JSON | raw JSON | **−5.7% (TOON, shape-dependent)** |
 | Security inspection of results | none | none | none | **injection / credential-leak / destructive-op guards on every call** |
@@ -49,7 +49,7 @@ mixed sample (1.8%-48.6% depending on the shape of the result).
 ## Try it
 
 ```bash
-pip install mcptoon      # zero deps, 362KB wheel
+pip install mcptoon      # zero deps, 363KB wheel
 mcptoon quickstart       # import existing configs, see your numbers
 ```
 

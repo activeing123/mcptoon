@@ -57,7 +57,7 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
-              "337KB", "339KB", "341KB", "342KB", "346KB", "350KB")
+              "337KB", "339KB", "341KB", "342KB", "346KB", "350KB", "362KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -182,10 +182,20 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # it pins a *string*, not a measurement; it only catches a claim that disagrees with
 # this constant, and nobody updated the constant. Both intermediate values join
 # RETIRED_KB (they are wrong now), and the claim moves straight to the current truth.
-# 2026-10-07 (0.8.16): 370,855 bytes = 362.16 KB by this same method. The delta over
-# v0.8.15 is +12,112 bytes: `docs.py` (the doc router), its test module, and the
-# description/CHANGELOG surface updates.
-WHEEL_KB = "362KB"
+# 2026-10-07 (0.8.16): 372,376 bytes = 363.65 KB by this same method, against the
+# 372,358 B PyPI actually serves (18 B apart — build-tool noise). The delta over
+# v0.8.15 is +13,633 bytes: `docs.py` (the doc router), its test module, the
+# description/CHANGELOG surface updates, and the README rewrite that rides into
+# the wheel's METADATA (pyproject sets `readme = "README.md"`, so README length is
+# wheel size — the +113-line README is most of the difference).
+#
+# ★ The failure mode this release was *supposed* to fix, and then repeated once:
+# the first measurement for 0.8.16 was taken from the working tree **before** a
+# concurrent session's README rewrite had merged, giving 370,855 B = 362KB. That
+# value shipped in the CHANGELOG and on every surface. The authoritative method is
+# to measure `git archive <tag>` — the tree that actually publishes — never the
+# working tree. 362KB joins RETIRED_KB.
+WHEEL_KB = "363KB"
 
 
 def modules() -> list[Path]:
