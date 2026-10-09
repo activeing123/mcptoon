@@ -1,0 +1,72 @@
+name: Release portable zip (Windows x64)
+
+# Layer 6: produce the self-contained Windows artifact the packaging channels
+# need, and attach it to the Release.
+#
+# Why this exists: `microsoft/winget-pkgs` PR #443014 and the Chocolatey package
+# both install a *zip containing a portable exe*, and only v0.8.3 ever had one.
+# From v0.8.4 to v0.8.16 every release shipped with zero assets, so both channels
+# sat pinned at 0.8.3 while PyPI moved 13 versions ahead — with no error anywhere,
+# exactly the silent-drift failure the Homebrew tap hit in October.
+#
+# This job builds the zip from the release tag and attaches it, so the artifact
+# exists the moment a version is published. It never blocks the release: a failure
+# here shows up as a red workflow, not as a broken PyPI publish.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build for (e.g. v0.8.16). Empty = latest release."
+        required: false
+        default: ""
+
+permissions:
+  contents: write   # attach the asset to the Release
+
+jobs:
+  portable-zip:
+    runs-on: windows-latest
+    steps:
+    - name: Resolve the tag
+      id: tag
+      shell: pwsh
+      run: |
+        $tag = "${{ github.event.inputs.tag }}"
+        if (-not $tag) { $tag = "${{ github.event.release.tag_name }}" }
+        if (-not $tag) {
+          $tag = (gh release view --json tagName -q .tagName)
+        }
+        if (-not $tag) { throw "could not resolve a release tag" }
+        "value=$tag" >> $env:GITHUB_OUTPUT
+        Write-Host "building for $tag"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Check out the tag (never the default branch)
+      uses: actions/checkout@v5
+      with:
+        ref: ${{ steps.tag.outputs.tag }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+
+    - name: Build the wheel from this tree
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade build
+        python -m build --wheel
+
+    - name: Build the portable zip and attach it to the Release
+      shell: pwsh
+      run: |
+        # csc.exe ships with the Windows runner, so the launcher compiles here.
+        # One invocation: build, run the three self-checks, zip, upload.
+        python scripts/build_portable_zip.py --upload `
+          --wheel (Get-ChildItem dist/*.whl).FullName
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
