@@ -28,6 +28,11 @@ COPIES = {
     "plugin": ROOT / "claude-code-plugin" / "skills" / "mcptoon" / "SKILL.md",
 }
 
+# The commands an agent reaches for on the common path. The skill must name all
+# of them; it is free to omit the rest of the CLI (it deliberately does — see
+# `test_the_skill_names_the_core_commands` for why a floor and not a manifest).
+CORE_COMMANDS = ("manifest", "inspect", "search", "select", "call")
+
 
 def yaml_frontmatter_error(frontmatter: str) -> str | None:
     """The first *real* YAML error in a frontmatter block, or None when it parses.
@@ -142,6 +147,59 @@ class TestThreeCopiesAgree:
         assert "exposure" in frontmatter, (
             "the trigger for 'my tools vanished' must be in the frontmatter "
             "description, where routing can see it"
+        )
+
+    def test_the_skill_names_the_core_commands(self):
+        """A command the skill never names may as well not exist.
+
+        Measured failure mode this guards (2026-10-09): `mcptoon select` shipped
+        with its CLI wiring, its `--help` line, both READMEs and the completion
+        table all updated — and the skill still never mentioned it. Nothing went
+        red, because the skill is deliberately *not* a full command list: 37
+        commands are advertised, the skill names ~17. So a missing one is
+        invisible to every other guard, and the agent reading the skill simply
+        never learns the feature exists. It was caught by the user asking
+        "did you update the skill?" — not by CI.
+
+        Scope is deliberately the four commands an agent reaches for on the
+        common path, not all 37. This is a floor, not a manifest: a guard that
+        demanded every command would fight the skill's job of being short, and a
+        guard that fights the file gets deleted. The four are the ones whose
+        absence actually breaks a session:
+
+          manifest - see what tools exist
+          inspect  - get one tool's real parameters
+          search   - find a tool by capability
+          select   - pick the right few when the catalog is too big to list
+          call     - actually run one
+
+        The exposure check above is the same shape; this is its sibling.
+        """
+        text = COPIES["packaged"].read_text(encoding="utf-8")
+        missing = [c for c in CORE_COMMANDS if f"mcptoon {c}" not in text]
+        assert not missing, (
+            f"the skill never mentions these core commands: {missing}. An agent "
+            "that reads only the skill would not know they exist — add a row to "
+            "the 'When to use what' table."
+        )
+
+    def test_the_core_command_guard_actually_bites(self):
+        """The guard above must fail when a command is removed.
+
+        A guard nobody has watched fail is a guard nobody can trust — it might
+        be asserting something vacuous (a typo'd string, a wrong copy). This
+        feeds the check the exact edit it exists to catch: a skill whose table
+        lost its `select` row.
+        """
+        text = COPIES["packaged"].read_text(encoding="utf-8")
+        assert "mcptoon select" in text, "the real skill lost the row this test is about"
+        # Replace with a string that does NOT contain the original as a substring,
+        # or the check still finds "mcptoon select" inside the replacement and
+        # reports no regression — which is exactly how this test failed first.
+        removed = text.replace("mcptoon select", "mcptoon choose")
+        missing = [c for c in CORE_COMMANDS if f"mcptoon {c}" not in removed]
+        assert "select" in missing, (
+            "the guard would not have caught the real regression it was written for"
         )
 
 
