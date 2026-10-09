@@ -51,6 +51,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **mcptoon's own directory now follows the XDG Base Directory spec (issue #25).**
+  `~/.mcptoon` used to be hardcoded and `mkdir`'d unconditionally, so a user who
+  wanted a clean `$HOME` had no way to relocate it short of faking `$HOME` and
+  symlinking around it. `$XDG_CONFIG_HOME/mcptoon` now holds config,
+  `$XDG_STATE_HOME/mcptoon` holds state (logs, toggles) and
+  `$XDG_CACHE_HOME/mcptoon` holds cache; `MCPTOON_HOME` overrides all three, with
+  `--dir` on top of it.
+
+  Two rules exist to protect installs that already work. XDG is honoured **only when
+  the variable is actually set** — an unset `XDG_CONFIG_HOME` means "not set", not
+  "use `~/.config`", because inventing a default moves files nobody asked to move.
+  And when the XDG directory does not exist yet but the legacy one does, legacy keeps
+  winning and the XDG directory is *not* created — without that guard a user
+  upgrading from 0.8.15 would watch their configured servers vanish while the data
+  sat untouched on disk.
+
+  Only the directory actually in use is created now. `--dir` is the one wrinkle: the
+  path constants resolve at import time, so a `mcptoon --dir X …` run creates the
+  default directory first and `config.apply_home` then undoes exactly what it
+  created, once argv has been parsed.
+
 - **The `342KB` wheel claim had been wrong for two releases — it is `363KB`.**
   Measured by building each tag's tree with LF endings, which reproduces the
   guard's own history (v0.8.13 measures 350,785 B here against the 350,759 B
