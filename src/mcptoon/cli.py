@@ -58,9 +58,10 @@ KNOWN_FLAGS = frozenset(
         "--quiet", "--quick", "--query", "--raw", "--remove", "--request-state", "--roots", "--search",
         "--self", "--pack", "--packs",
         "--slim", "--smart",
-        "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--url", "--usage",
+        "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--top",
+        "--url", "--usage",
         "--version", "--version-gate", "--view", "--watch",
-        "--watch-mode", "--write", "--yes",
+        "--watch-mode", "--write", "--yes", "--engine",
     }
 )
 
@@ -87,8 +88,9 @@ _COMPLETION_COMMANDS = (
     "add", "bench", "call", "completion", "config", "demo", "demo-server",
     "discover", "docs", "doctor", "footer-facts", "health", "help", "import",
     "init", "inspect", "install", "list", "manifest", "off", "plugin", "policy",
-    "quickstart", "remove", "report", "restore", "retrieve", "search", "serve",
-    "skills", "stats", "status", "sync", "toggle", "uninstall", "update", "usage",
+    "quickstart", "remove", "report", "restore", "retrieve", "search", "select",
+    "serve", "skills", "stats", "status", "sync", "toggle", "uninstall", "update",
+    "usage",
     # aliases the dispatch chain also accepts
     "servers", "tools", "qs", "brief",
 )
@@ -447,6 +449,8 @@ def _run(state: dict) -> None:
         _cmd_inspect(rest, fmt, max_chars, full, head_n)
     elif command == "search":
         _cmd_search(rest, fmt, head_n, max_chars, full)
+    elif command == "select":
+        _cmd_select(rest, fmt, head_n, max_chars, full)
     elif command == "call":
         _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin, fallback_json)
     elif command in ("quickstart", "qs"):
@@ -1143,6 +1147,103 @@ def _cmd_search(rest, fmt, head_n, max_chars, full):
             if params:
                 print(f"    params: {params}")
             print("")
+
+
+def _cmd_select(rest, fmt="auto", head_n=0, max_chars=0, full=False):
+    """Pick the few tools worth showing an agent for a task.
+
+    Why this is separate from `search`: `search` answers "which tools match this
+    keyword?" and returns up to 20. `select` answers the question that actually
+    decides whether an agent succeeds — "out of everything installed, which 3
+    should I look at for *this* task?" — because past roughly 40-50 tools the
+    model's choice degrades even when the catalog is compressed.
+
+    The engine is configurable (`mcptoon config set select.engine lexical|command`).
+    `lexical` is the built-in pure-stdlib scorer. `command` shells out to a ranker
+    the user supplies, so a machine that already runs embeddings can rank
+    semantically without mcptoon taking a dependency. Whichever engine answers is
+    named in the output, including when a configured `command` engine failed and
+    the built-in one took over — a silent fallback would hide a broken ranker.
+
+    Usage:
+        mcptoon select "find the cheapest flight to Tokyo"
+        mcptoon select "..." --top 3 --json
+        mcptoon select --engine            # show which engine is configured
+    """
+    if "--engine" in rest:
+        from .config import load_settings
+        s = load_settings()
+        print(f"select.engine  = {s.get('select.engine', 'lexical')}")
+        if s.get("select.engine") == "command":
+            cmd = s.get("select.command", "")
+            print(f"select.command = {cmd or '(not set — lexical will be used)'}")
+        return
+
+    top = 3
+    args = list(rest)
+    if "--top" in args:
+        i = args.index("--top")
+        if i + 1 < len(args):
+            try:
+                top = max(1, int(args[i + 1]))
+            except ValueError:
+                pass
+            del args[i:i + 2]
+        else:
+            del args[i]
+    args = [a for a in args if a not in ("--json", "--slim", "--compact", "--toon")]
+
+    if not args:
+        print("Usage: mcptoon select <task description>")
+        print("")
+        print('  mcptoon select "find the cheapest flight to Tokyo"')
+        print('  mcptoon select "..." --top 5 --json')
+        print("  mcptoon select --engine     # show the configured engine")
+        sys.exit(1)
+
+    query = " ".join(args)
+
+    from . import manifest as manifest_mod
+
+    # Flatten the manifest into the shape both engines rank.
+    manifest = manifest_mod.get_manifest(use_cache=True)
+    flat = []
+    for server, tools in sorted(manifest.items()):
+        for t in tools:
+            if not isinstance(t, dict) or "error" in t:
+                continue
+            flat.append({"server": server, "name": t.get("name", ""),
+                         "description": t.get("description", "")})
+
+    if not flat:
+        print("No tools to choose from.")
+        print("  - Check your servers are configured: mcptoon list")
+        sys.exit(0)
+
+    ranked, engine = manifest_mod.rank_tools(query, flat)
+    ranked = ranked[:top]
+
+    # Look the description back up for display; the engines only carry the keys
+    # they need to score, and inventing a description here would be a second
+    # source of truth for the same tool.
+    by_key = {(t["server"], t["name"]): t for t in flat}
+
+    if fmt == "json":
+        rows = [{**r, "description": by_key.get((r["server"], r["name"]), {}).get("description", "")}
+                for r in ranked]
+        print(output.render(rows, fmt="json", head_n=head_n, max_chars=max_chars, full=full))
+        return
+
+    print(f"Top {len(ranked)} tool(s) for: {query}")
+    print(f"  engine: {engine}")
+    print("")
+    for r in ranked:
+        desc = by_key.get((r["server"], r["name"]), {}).get("description", "")
+        print(f"  {r['server']}/{r['name']}  (score: {round(r['score'], 3)})")
+        if desc:
+            print(f"    {desc[:120]}")
+    print("")
+    print(f"  Inspect one: mcptoon inspect {ranked[0]['server']} {ranked[0]['name']}")
 
 
 def _cmd_quickstart(rest, fmt="auto"):
@@ -2585,6 +2686,10 @@ def _cmd_config(rest, fmt, head_n=0, max_chars=0, full=False):
               " auto follows the OS language.")
         print("  compress smart|off|toon controls result compression;"
               " smart (default) shrinks redundant results.")
+        print("  select.engine lexical|command picks how `mcptoon select` ranks"
+              " tools for a task;")
+        print("    lexical (default) is built in and offline, command runs"
+              " select.command yourself.")
         return
 
     if action == "get":
@@ -2605,7 +2710,15 @@ def _cmd_config(rest, fmt, head_n=0, max_chars=0, full=False):
         if len(rest) < 3:
             print("Usage: mcptoon config set <key> <value>")
             sys.exit(1)
-        key, value = rest[1].lower(), rest[2].lower()
+        # The key is always an identifier, so lowercasing it is safe and forgiving.
+        # The value is not: closed-choice settings are lowercase enums and accept
+        # "ON"/"Off" for free, but a free-text setting holds something like a path
+        # or a command line, where lowercasing silently corrupts the value (a path
+        # with uppercase in it would be stored mangled and the user would have no
+        # clue why their ranker never ran). So only lowercase enum values.
+        from .config import SETTING_CHOICES
+        key = rest[1].lower()
+        value = rest[2].lower() if key in SETTING_CHOICES else rest[2]
         if key == "footer" and value not in ("on", "off"):
             print("footer accepts only: on | off")
             sys.exit(1)
@@ -3697,6 +3810,7 @@ Usage:
     mcptoon import --write                Merge imported servers into your config
     mcptoon inspect <server> <tool>       Show tool schema
     mcptoon search <query>                Search tools across all servers
+    mcptoon select "<task>"               Top tools for a task (past ~40 tools models pick wrong)
     mcptoon call <server> <tool> [ARGS]   Call a tool
     mcptoon call --auto <tool> [ARGS]     Call a tool (auto-find server)
     mcptoon call <server> <tool> --stdin  Read args from stdin (large payloads)

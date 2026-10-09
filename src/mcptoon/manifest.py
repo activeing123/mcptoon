@@ -19,10 +19,123 @@ Lists all tools from all configured servers, with optional caching.
 Also provides cross-agent format export and fuzzy matching.
 """
 import json
+import os
+import shlex
+import subprocess
 
 from . import cache as cache_mod
 from .config import load_config
 from .client import MCPClientPool, MCPError
+
+
+# ─── Tool ranking engines (`select.engine`) ──────────────────────────────────
+#
+# "Which tools should the agent look at for this task?" The default scorer is
+# lexical and pure-stdlib; `command` lets a machine that already has an
+# embedding or LLM ranker use it without mcptoon taking a dependency. See
+# `config.SELECT_ENGINES` for why this is an opt-in command and not a model.
+#
+# The command contract is deliberately tiny, because it has to be implemented by
+# whoever writes the external ranker:
+#
+#   stdin  — one JSON object: {"query": str, "tools": [{server, name,
+#            description}, ...]}
+#   stdout — one JSON array of {"server": str, "name": str, "score": number},
+#            best first. Any order is accepted; mcptoon sorts by score.
+#
+# A ranker that fails, prints nothing, or returns malformed JSON is NOT allowed
+# to break the command: the caller falls back to the lexical scorer and says so.
+# Silent degradation is the failure mode this whole project exists to fight, so
+# the fallback is reported, never hidden.
+
+_CMD_TIMEOUT = 30
+
+
+def _lexical_rank(query: str, tools: list[dict]) -> list[dict]:
+    """Rank `tools` for `query` with the built-in scorer. Always succeeds."""
+    query_lower = query.lower().strip()
+    query_tokens = set(_tokenize(query_lower))
+    scored = []
+    for t in tools:
+        score = _search_score(query_lower, query_tokens,
+                              t.get("name", "").lower(),
+                              t.get("description", "").lower())
+        if score > 0:
+            scored.append({"server": t.get("server", ""), "name": t.get("name", ""),
+                           "score": score})
+    scored.sort(key=lambda r: (-r["score"], r["server"], r["name"]))
+    return scored
+
+
+def _command_rank(query: str, tools: list[dict], command: str) -> list[dict] | None:
+    """Ask an external program to rank `tools`. None means "could not".
+
+    Returning None (rather than raising) is the contract `rank_tools` needs: a
+    broken external engine must degrade to the built-in one, not take the command
+    down with it.
+    """
+    payload = json.dumps({
+        "query": query,
+        "tools": [{"server": t.get("server", ""), "name": t.get("name", ""),
+                   "description": t.get("description", "")} for t in tools],
+    }, ensure_ascii=False)
+    try:
+        argv = shlex.split(command, posix=(os.name != "nt"))
+        if not argv:
+            return None
+        proc = subprocess.run(argv, input=payload, capture_output=True, text=True,
+                              timeout=_CMD_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, list):
+        return None
+    out = []
+    for row in data:
+        if not isinstance(row, dict):
+            return None
+        name, server = row.get("name"), row.get("server")
+        score = row.get("score", 0)
+        if not isinstance(name, str) or not isinstance(server, str):
+            return None
+        if not isinstance(score, (int, float)):
+            return None
+        out.append({"server": server, "name": name, "score": float(score)})
+    # The contract says any order is accepted, so honour it: sort here rather
+    # than trusting the ranker to have sorted. An external ranker that returns
+    # its rows in dict order would otherwise put a 0.0 first and make the whole
+    # feature look broken while the engine is fine.
+    out.sort(key=lambda r: (-r["score"], r["server"], r["name"]))
+    return out
+
+
+def rank_tools(query: str, tools: list[dict]) -> tuple[list[dict], str]:
+    """Rank `tools` for `query` using the configured engine.
+
+    Returns `(ranked, engine_note)`. `engine_note` is a short string the caller
+    can print — it names the engine that actually answered, which is not always
+    the one configured: when `select.engine=command` and the external ranker
+    fails, this falls back to lexical and the note says so. A user who configured
+    an engine and silently got another one would have no way to tell that their
+    ranker is broken.
+    """
+    from . import config as cfg
+
+    engine = cfg.load_settings().get("select.engine", "lexical")
+    if engine == "command":
+        command = cfg.load_settings().get("select.command", "")
+        if command:
+            ranked = _command_rank(query, tools, command)
+            if ranked is not None:
+                return ranked, "command"
+            return _lexical_rank(query, tools), "lexical (command failed)"
+        return _lexical_rank(query, tools), "lexical (no select.command set)"
+    return _lexical_rank(query, tools), "lexical"
 
 
 def get_manifest(use_cache: bool = True) -> dict[str, list[dict]]:

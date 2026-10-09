@@ -246,7 +246,27 @@ FOOTER_STATE_FILE = Path(os.environ.get(
 # is what makes the answer stable.
 SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto",
                     "exposure": "compact", "compress": "smart",
-                    "runners": "prefer-installed"}
+                    "runners": "prefer-installed", "select.engine": "lexical",
+                    "select.command": ""}
+
+# How mcptoon ranks candidate tools for a query ("which tools should the agent
+# look at for this task?").
+#
+#   lexical — the built-in scorer (exact > prefix > substring > token overlap >
+#             fuzzy), pure stdlib, no network, no model. This is the default and
+#             the only engine that is guaranteed to exist.
+#   command — call an external program the user supplies, so a machine that
+#             already runs an embedding or LLM ranker can use it without mcptoon
+#             taking a dependency. The contract is one JSON object on stdin, one
+#             JSON array on stdout (see `manifest.rank_tools`).
+#
+# Why an opt-in command instead of a built-in model (the user's decision,
+# 2026-10-09): zero dependencies is one of the four things mcptoon sells
+# (`dependencies = []`, enforced by `scripts/check_zero_deps.py`), and the
+# honest way to keep that while still letting a power user rank semantically is
+# to shell out. Same shape as the optional `tiktoken` in `bench`: the default
+# path is pure stdlib, the better path is a thing you install yourself.
+SELECT_ENGINES = ("lexical", "command")
 
 # How mcptoon picks the launcher it writes for a discovered or installed server.
 #
@@ -326,7 +346,7 @@ BOOL_MODES = ("on", "off")
 # banner showing while the user believed they had turned it off.
 SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES,
                    "footer": BOOL_MODES, "welcome": BOOL_MODES,
-                   "runners": RUNNER_MODES}
+                   "runners": RUNNER_MODES, "select.engine": SELECT_ENGINES}
 
 # Windows LANGID primary-language ids worth naming. Anything unnamed falls back
 # to the locale string and then to English, so an unlisted language degrades to
