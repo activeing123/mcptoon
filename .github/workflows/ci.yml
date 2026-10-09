@@ -73,7 +73,10 @@ jobs:
         pip show mcptoon
 
     - name: Install dev dependencies
-      run: pip install pytest pytest-cov
+      # pytest-timeout is load-bearing: ~65 tests spawn real child processes, and
+      # without a ceiling one wedged child hangs the whole job until the runner's
+      # own 6-hour limit. The ceiling lives in pyproject (`timeout = 120`).
+      run: pip install pytest pytest-cov pytest-timeout
 
     - name: Run tests
       run: python -m pytest tests/ -v --tb=long --cov=mcptoon --cov-report=term-missing

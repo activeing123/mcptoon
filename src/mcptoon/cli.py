@@ -761,7 +761,15 @@ def _cmd_inspect(rest, fmt, max_chars, full, head_n=0):
             if names:
                 print(f"Available tools: {' '.join(names)}")
             elif errs:
-                print(f"Could not reach {server}: {str(errs[0].get('error', ''))[:120]}")
+                # The server never answered. Say why in plain words and what to do
+                # next, instead of echoing a protocol string — this is the moment a
+                # user is most likely to conclude "mcptoon is broken" when the real
+                # cause is their server.
+                raw = str(errs[0].get("error", ""))
+                reason, next_step = manifest_mod.explain_error(raw)
+                print(f"Could not reach {server}: {reason}.")
+                print(f"  → {next_step}")
+                print(f"  (raw: {raw[:120]})")
         sys.exit(1)
 
     print(output.render(info, fmt=fmt if fmt != "auto" else "json", head_n=head_n,
@@ -2861,6 +2869,16 @@ def _cmd_import(rest, fmt="auto", head_n=0, max_chars=0, full=False):
     print("Next: mcptoon manifest --slim    # see all available tools")
 
 
+def _explain_server_error(raw: str) -> tuple[str, str]:
+    """Turn a raw MCP client error into (plain reason, what to do next).
+
+    Thin delegate to `manifest.explain_error` — the table lives there because the
+    failing-server text is rendered in several places (`doctor`, `inspect`,
+    `manifest`), and one table beats four that drift.
+    """
+    return manifest_mod.explain_error(raw)
+
+
 def _cmd_doctor(_rest):
     """Self-diagnose configuration and connectivity."""
     print("mcptoon doctor — running diagnostics...")
@@ -2905,6 +2923,7 @@ def _cmd_doctor(_rest):
 
     # 4. Check each server
     servers = cfg.load_config()
+    broken: list[tuple[str, str]] = []  # (server, plain reason) for the summary
     for name in sorted(servers.keys()):
         s_cfg = servers[name]
         transport = s_cfg.get("transport", "stdio")
@@ -2918,9 +2937,18 @@ def _cmd_doctor(_rest):
                 # It used to print `0 tools (server may be empty)` and leave the
                 # issue count at zero, so `doctor` ended with "All good!" on a
                 # machine whose server binary did not exist (2026-10-02).
-                print(f"  ✗ {name:20s} [{transport:5s}] cannot start: "
-                      f"{str(errs[0].get('error', ''))[:70]}")
+                #
+                # The raw error is kept on the line because it is the only thing
+                # that names the real cause, but it is no longer the *whole*
+                # message: the plain reason and the next step follow it, so the
+                # output is useful to someone who has never seen a JSON-RPC id.
+                raw = str(errs[0].get("error", ""))
+                reason, next_step = _explain_server_error(raw)
+                print(f"  ✗ {name:20s} [{transport:5s}] cannot start: {raw[:70]}")
+                print(f"      {reason}.")
+                print(f"      → {next_step}")
                 issues += 1
+                broken.append((name, reason))
             else:
                 count = len(tools)
                 if count > 0:
@@ -2929,8 +2957,13 @@ def _cmd_doctor(_rest):
                     print(f"  ! {name:20s} [{transport:5s}] 0 tools "
                           f"(server started but exposes none)")
         except Exception as e:
-            print(f"  ✗ {name:20s} [{transport:5s}] ERROR: {str(e)[:80]}")
+            raw = str(e)
+            reason, next_step = _explain_server_error(raw)
+            print(f"  ✗ {name:20s} [{transport:5s}] ERROR: {raw[:80]}")
+            print(f"      {reason}.")
+            print(f"      → {next_step}")
             issues += 1
+            broken.append((name, reason))
 
     # 5. Environment
     checks += 1
@@ -2945,7 +2978,17 @@ def _cmd_doctor(_rest):
     if issues == 0:
         print("  All good! ✓")
     else:
-        print(f"  {issues} issue(s) found. See above for details.")
+        # Name the broken servers together, once, at the end. The per-server
+        # lines scroll away on a machine with a dozen servers, and "see above"
+        # is not an answer when the answer is one line.
+        if broken:
+            print()
+            print(f"  {len(broken)} server(s) need attention:")
+            for name, reason in broken:
+                print(f"    • {name} — {reason}")
+            print("  Start with: mcptoon inspect <server>")
+        else:
+            print(f"  {issues} issue(s) found. See above for details.")
 
     # ─── Smart tips ───
     _doctor_smart_tips(servers)

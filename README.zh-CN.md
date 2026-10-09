@@ -18,7 +18,7 @@
   <a href="https://pypi.org/project/mcptoon/"><img src="https://img.shields.io/pypi/v/mcptoon?style=flat-square&color=238636&logo=pypi&logoColor=white" alt="PyPI 版本"></a>
   <a href="https://github.com/activeing123/mcptoon/stargazers"><img src="https://img.shields.io/github/stars/activeing123/mcptoon?style=flat-square&logo=github&color=58a6ff" alt="GitHub Stars"></a>
   <a href="https://github.com/activeing123/mcptoon/actions"><img src="https://img.shields.io/github/actions/workflow/status/activeing123/mcptoon/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white" alt="CI 构建"></a>
-  <a href="#贡献指南"><img src="https://img.shields.io/badge/tests-2007%20passed-success?style=flat-square&logo=pytest&logoColor=white" alt="测试"></a>
+  <a href="#贡献指南"><img src="https://img.shields.io/badge/tests-2019%20passed-success?style=flat-square&logo=pytest&logoColor=white" alt="测试"></a>
   <a href="https://github.com/activeing123/mcptoon"><img src="https://img.shields.io/badge/dependencies-0%20(stdlib%20only)-blue?style=flat-square" alt="零第三方依赖"></a>
   <a href="https://github.com/activeing123/mcptoon/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-informational?style=flat-square" alt="许可证"></a>
 </p>
@@ -626,7 +626,7 @@ git clone https://github.com/activeing123/mcptoon.git
 cd mcptoon
 pip install -e . --no-build-isolation
 pip install pytest pytest-cov
-python -m pytest tests/ -v   # 2007 passed, 2 skipped
+python -m pytest tests/ -v   # 2019 passed, 2 skipped
 ```
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。

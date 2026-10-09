@@ -40,7 +40,7 @@ Issues = "https://github.com/activeing123/mcptoon/issues"
 PyPI = "https://pypi.org/project/mcptoon/"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov", "ruff>=0.6"]
+dev = ["pytest>=7.0", "pytest-cov", "pytest-timeout>=2.3", "ruff>=0.6"]
 
 [project.scripts]
 mcptoon = "mcptoon.cli:main"
@@ -62,6 +62,19 @@ mcptoon = ["packs.json", "skill/SKILL.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A per-test ceiling, so one wedged test can never hang the whole suite.
+#
+# Why this is not optional: ~65 tests spawn real child processes (`npx`, `uvx`,
+# an MCP server over stdio). A child that never answers used to block its test
+# forever — `python -m pytest tests/` then ran indefinitely, and killing it left
+# the grandchildren orphaned. Observed 2026-10-09: a full run that normally takes
+# ~150s was killed at 600s. With this ceiling the same hang fails in 120s *and
+# names the test*, which is the only way to find it.
+#
+# `thread` because Windows has no SIGALRM; it dumps the stacks on timeout, so the
+# output still says where the process was stuck.
+timeout = 120
+timeout_method = "thread"
 
 [tool.ruff]
 target-version = "py310"

@@ -177,6 +177,71 @@ def _prop_hints(pv: dict) -> str:
     return "".join(parts)
 
 
+def explain_error(raw: str) -> tuple[str, str]:
+    """Turn a raw MCP client error into (plain reason, what to do next).
+
+    The research point: the worst failure mode of an MCP setup is a server that
+    *silently* does not work. mcptoon already detects it — but the detection used
+    to be reported as a protocol string (`[RESPONSE_TIMEOUT] no JSON-RPC response
+    for request id 2 within 30s (server went silent)`), which is written for a
+    protocol engineer, not for the person who just ran `mcptoon call`.
+
+    Matching is on the error code first (`MCPError` prefixes its message with it)
+    and on the human-readable text second, because the codes are stable and the
+    prose is not. Anything unrecognised gets a generic but honest answer — never a
+    guess dressed up as a diagnosis.
+
+    Lives in `manifest` (not `cli`) because the failing-server text is rendered in
+    several places — `doctor`, `inspect`, `manifest` — and one table beats four
+    that drift.
+    """
+    s = raw or ""
+    low = s.lower()
+
+    if "response_timeout" in low or "went silent" in low:
+        return (
+            "the server started but never answered",
+            "It is probably waiting for something: a login, a first-run download, "
+            "or a prompt on a terminal it does not have. Run it once by hand to see "
+            "what it wants.",
+        )
+    if "process_died" in low or "exited" in low or "brokenpipe" in low:
+        return (
+            "the server process exited before it could answer",
+            "Usually a missing command or a bad package name. The last lines it "
+            "printed name the real cause.",
+        )
+    if "filenotfounderror" in low or "no such file" in low or "errno 2" in low:
+        return (
+            "the command in this server's config does not exist on this machine",
+            "Check the command name and that it is on PATH — `mcptoon inspect "
+            "<server>` shows the entry mcptoon is actually using.",
+        )
+    if "permissionerror" in low or "errno 13" in low or "access is denied" in low:
+        return (
+            "this machine refused to run the command",
+            "On Windows this is often a script the shell will not execute directly; "
+            "try running it through `cmd /c` or `npx`.",
+        )
+    if "no numeric id" in low or "protocol_error" in low:
+        return (
+            "the server answered, but not in the MCP protocol",
+            "The command is probably not an MCP server — it may be a normal CLI "
+            "that prints something else. Check the config entry for this server.",
+        )
+    if "timed out" in low or "timeout" in low:
+        return (
+            "the server took too long to respond",
+            "Slow first runs are normal for `npx` (it downloads the package). If it "
+            "happens every time, raise the timeout or pre-install the package.",
+        )
+    return (
+        "the server could not be reached",
+        "The full error is above. `mcptoon inspect <server>` shows the config "
+        "entry mcptoon is actually using.",
+    )
+
+
 def format_manifest(manifest: dict, full: bool = False) -> str:
     """Format manifest as human-readable text."""
     lines = []
@@ -185,7 +250,11 @@ def format_manifest(manifest: dict, full: bool = False) -> str:
             continue
         has_error = any("error" in t for t in tools)
         if has_error:
-            lines.append(f"  {server}: [error: {tools[0].get('error', '?')[:200]}]")
+            raw = str(tools[0].get("error", "?"))
+            reason, next_step = explain_error(raw)
+            lines.append(f"  {server}: cannot start — {reason}.")
+            lines.append(f"    → {next_step}")
+            lines.append(f"    (raw: {raw[:200]})")
             continue
 
         if full:
