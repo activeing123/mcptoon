@@ -105,11 +105,15 @@ def probe(servers: dict, name: str) -> tuple:
 
 
 def _refresh_installed(name: str, tools: list, write: bool) -> bool:
-    """Refresh the installed record + generated handler for ``name`` if it exists.
+    """Refresh the installed record for ``name`` if it exists.
 
-    Returns True when a record was found (and updated, if ``write``). The handler
-    carries a baked SCHEMA, so a server that gained a tool leaves the handler
-    advertising the old set until it is regenerated — this is that regeneration.
+    Returns True when a record was found (and updated, if ``write``). This is the
+    per-server schema cache that `install --list`, `update` and `doctor` read; a
+    server that gained a tool would otherwise keep advertising the old set.
+
+    This used to also regenerate the server's handler module on every update, for
+    the same reason. Nothing ever imported those modules (issue #36), so that half
+    was dropped in 0.8.32 and the cache is now the single source.
     """
     from . import installer
 
@@ -130,16 +134,6 @@ def _refresh_installed(name: str, tools: list, write: bool) -> bool:
     rec["tools_with_schema"] = tools_with_schema
     rec["tool_count"] = len(tools)
     rec["updated_at"] = installer._now_iso()
-
-    if rec.get("url"):
-        installer._generate_http_handler_file(
-            name, tools, rec["url"], rec.get("transport", "auto"),
-            rec.get("headers") or {})
-    else:
-        command = rec.get("command", "")
-        installer._generate_handler_file(
-            name, tools, command, rec.get("args", []), rec.get("env", []),
-            rec.get("source", "custom"))
 
     installer._save_installed(installed)
     return True

@@ -573,11 +573,32 @@ def install_http(url, server_name=None, transport="auto", headers=None):
 
     client.close()
 
-    # Generate handler file — carries the same header mapping, so a call routed
-    # through the handler resolves exactly what verification resolved.
-    _generate_http_handler_file(server_name, tools, url, transport, headers)
+    # Register the server in the user's config — this is what makes it reachable
+    # (issue #36). `install` used to write only a generated handler module into the
+    # state dir, and nothing ever imported that module, so `router._HANDLERS`
+    # stayed empty: the command reported success while `mcptoon list` did not show
+    # the server and `mcptoon call <server>` answered UNKNOWN_SERVER. Config is the
+    # one registry `list`/`call` actually read.
+    #
+    # `transport` is written as "http", not the caller's "auto": the config reader
+    # (`client.MCPClient._make_client`) knows only "stdio" and "http" and raises
+    # BAD_CONFIG for anything else, and its http branch already negotiates SSE vs
+    # streamable HTTP via `http_transport` (default "auto") — which is exactly what
+    # "auto" meant here. Writing the raw value would have produced a server that
+    # lists and then refuses to start.
+    #
+    # Header values may be `${NAME}` templates; they stay templates on disk and are
+    # resolved at request time (issue #24), so no token is written by this.
+    from . import config as _config
+    server_cfg = {"transport": "http", "url": url}
+    if headers:
+        server_cfg["headers"] = dict(headers)
+    replaced_existing = server_name in _config.list_servers()
+    _config.add_server(server_name, server_cfg)
 
-    # Record to installed.json
+    # Record to installed.json. This is the schema cache plus install metadata, and
+    # it is a separate store on purpose: `install --list`, `install --remove`,
+    # `update` and `doctor` read it, while `list`/`call` read the config.
     tools_with_schema = [
         {"name": t.get("name", ""),
          "description": t.get("description", ""),
@@ -606,101 +627,8 @@ def install_http(url, server_name=None, transport="auto", headers=None):
         "url": url,
         "transport": transport,
         "header_names": sorted(headers),
+        "replaced_existing": replaced_existing,
     }
-
-
-def _generate_http_handler_file(server_name, tools, url, transport, headers=None):
-    """Auto-generate HTTP/SSE handler file."""
-    handlers_dir = _handlers_dir()
-    safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
-    handler_file = os.path.join(handlers_dir, f"{safe_name}.py")
-
-    # Generate SCHEMA — use json.dumps for safe handling of newlines/quotes/special chars
-    schema_lines = []
-    for tool in tools:
-        name_str = json.dumps(tool.get("name", "unknown"), ensure_ascii=False)
-        desc_str = json.dumps(tool.get("description", "")[:200], ensure_ascii=False)
-        input_schema = tool.get("inputSchema", {})
-        schema_lines.append(f'    {{"name": {name_str}, "description": {desc_str}, "inputSchema": {repr(input_schema)}}},')
-
-    schema_str = "\n".join(schema_lines) if schema_lines else "    # Tool list will be fetched from HTTP on first call"
-
-    # `repr` of a dict of str→str is a valid Python literal and, because the
-    # values are templates (`${NAME}`), it never contains a secret. `headers` is
-    # not interpolated as f-string text: a header value with braces must not be
-    # able to break the generated file.
-    headers_repr = repr({str(k): str(v) for k, v in (headers or {}).items()})
-
-    # SECURITY (code injection): `server_name`, `url` and `transport` reach this
-    # function from CLI input / a registry / an `--url` someone pasted, and the
-    # generated file is imported later (`from router import register` at the top,
-    # `@register(...)`). Interpolating them raw let a value like
-    #   http://x/sse";import os;os.system("id");_="
-    # produce a syntactically valid handler that runs arbitrary code on import —
-    # verified: such a file compiles. Emit each as a `repr()` literal (never raw
-    # f-string text), exactly like `headers_repr`, so no value can break out of
-    # its string into executable statements. The docstring gets a stripped
-    # display copy because a docstring cannot be a repr.
-    url_repr = repr(str(url))
-    transport_repr = repr(str(transport))
-    name_repr = repr(str(server_name))
-    display_name = re.sub(r"[^\w .:/@+()-]", "_", str(server_name))[:80]
-
-    handler_code = f'''# -*- coding: utf-8 -*-
-"""Auto-generated HTTP/SSE handler for {display_name}"""
-import os, sys
-
-# ─── path setup for local execution ───
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_PARENT_DIR = os.path.dirname(_THIS_DIR)
-_SRC_DIR = os.path.join(os.path.dirname(_PARENT_DIR), "src")
-for p in [_SRC_DIR, _PARENT_DIR]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
-try:
-    from router import register
-except ImportError:
-    try:
-        from ..router import register
-    except ImportError:
-        from mcptoon.router import register
-
-SERVER_NAME = {name_repr}
-ALIASES = ()
-
-SCHEMA = [
-{schema_str}
-]
-
-# HTTP/SSE config
-MCP_URL = {url_repr}
-MCP_TRANSPORT = {transport_repr}
-
-# Header templates. A value may name an environment variable as ${{NAME}}; the
-# client resolves it at request time (issue #24), so no token is ever written
-# into this file.
-MCP_HEADERS = {headers_repr}
-
-
-@register(SERVER_NAME, *ALIASES)
-def handle(tool, args):
-    """Call HTTP/SSE MCP tool."""
-    try:
-        from mcptoon.client import MCPClient
-    except ImportError:
-        from client import MCPClient
-
-    client = MCPClient(http=MCP_URL, headers=MCP_HEADERS)
-    client.initialize()
-    result = client.call_tool(tool, args or {{}})
-    client.close()
-    return result
-'''
-
-    _write_text_atomic(handler_file, handler_code)
-
-    log.info("installer", f"Generated HTTP handler: {handler_file}")
 
 
 def _verify_and_generate(server_name, command, args_list, env, source):
@@ -729,8 +657,22 @@ def _verify_and_generate(server_name, command, args_list, env, source):
 
     client.close()
 
-    # 3. Generate handler file
-    _generate_handler_file(server_name, tools, command, args_list, env, source)
+    # 3. Register in the user's config so the server is actually reachable (#36).
+    #
+    #    `env` is deliberately NOT written to disk. The child process inherits this
+    #    process's environment — `client.MCPClient` starts it with
+    #    `os.environ.copy()` and overrides only the names it is given — which is the
+    #    same source the generated handler read at call time, so behaviour is
+    #    unchanged while a registry-provided value can never be persisted as a
+    #    secret.
+    from . import config as _config
+    server_cfg = {
+        "transport": "stdio",
+        "command": [command],
+        "args": list(args_list or []),
+    }
+    replaced_existing = server_name in _config.list_servers()
+    _config.add_server(server_name, server_cfg)
 
     # 4. Record to installed.json — preserve full inputSchema
     tools_with_schema = [
@@ -758,23 +700,27 @@ def _verify_and_generate(server_name, command, args_list, env, source):
         "tools": len(tools),
         "tool_names": [t.get("name", "") for t in tools][:20],
         "source": source,
+        "replaced_existing": replaced_existing,
     }
 
 
 def _handlers_dir():
-    """The directory generated handler files live in, created on demand.
+    """Where older versions wrote generated handler files; created on demand.
+
+    **Nothing writes here any more.** Up to 0.8.31 `install` generated a handler
+    module per server, but no code ever imported one (the package contains no
+    loader), so ``router._HANDLERS`` was never populated from disk and the servers
+    stayed unreachable — that is issue #36. `install` now registers the server in
+    the user's config instead, which is the registry `list`/`call` actually read.
+
+    The path is kept for one job: ``remove_installed`` deletes a leftover file here
+    so a machine upgraded from ≤ 0.8.31 does not keep stale modules forever.
 
     It lives under the user's state dir (``config.STATE_DIR/handlers``), **not**
     inside the installed package. Writing into the package directory assumed it
     was writable, which is false for every read-only install: a Nix store path
     (issue #35 — ``PermissionError`` on ``site-packages/mcptoon/handlers``), a
-    system-wide ``pip install``, a distro package, or a container image. Generated
-    handlers are per-user state anyway, so they belong with the rest of mcptoon's
-    state and are cleaned up by ``uninstall`` (see ``config.state_paths``).
-
-    The old code also had to ``makedirs`` here because ``handlers/`` is gitignored
-    and absent from a fresh clone / PyPI install; creating the state dir is still
-    required, and it is always writable.
+    system-wide ``pip install``, a distro package, or a container image.
 
     ``MCPTOON_HANDLERS_DIR`` (or ``MCPTOON_HOME``) overrides the location, the same
     way the other state paths are overridable, so tests and CI never write into a
@@ -787,98 +733,6 @@ def _handlers_dir():
     return d
 
 
-def _generate_handler_file(server_name, tools, command, args_list, env_keys, source):
-    """Auto-generate handler file to handlers/ directory."""
-    handlers_dir = _handlers_dir()
-    safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
-    handler_file = os.path.join(handlers_dir, f"{safe_name}.py")
-
-    # Generate SCHEMA — use json.dumps for safe handling of newlines/quotes/special chars
-    schema_lines = []
-    for tool in tools:
-        name = tool.get("name", "unknown")
-        name_str = json.dumps(name, ensure_ascii=False)
-        desc_str = json.dumps(tool.get("description", "")[:200], ensure_ascii=False)
-        input_schema = tool.get("inputSchema", {})
-        schema_lines.append(f'    {{"name": {name_str}, "description": {desc_str}, "inputSchema": {repr(input_schema)}}},')
-
-    schema_str = "\n".join(schema_lines) if schema_lines else "    # Tool list will be fetched from daemon on first call"
-
-    # Generate env keys — json.dumps each key: an env var NAME reaching us from a
-    # registry/config could otherwise carry a quote and break out into code.
-    env_str = ", ".join(f'{json.dumps(str(k))}: ""' for k in env_keys) if env_keys else ""
-
-    # Generate args list — json.dumps each arg for the same reason (an arg such as
-    # `x";import os;os.system("id");_="` must stay a string literal, not code).
-    args_str = ", ".join(json.dumps(str(a)) for a in args_list)
-
-    # SECURITY (code injection): same class as the HTTP handler below — this file
-    # is imported later, so `server_name`, `command` and every arg/env key must be
-    # emitted as repr/json literals, never raw f-string text.
-    name_repr = repr(str(server_name))
-    command_repr = repr(str(command))
-    display_name = re.sub(r"[^\w .:/@+()-]", "_", str(server_name))[:80]
-    display_source = re.sub(r"[^\w .:/@+()-]", "_", str(source))[:40]
-
-    handler_code = f'''# -*- coding: utf-8 -*-
-"""Auto-generated handler for {display_name} (source: {display_source})"""
-import os, sys
-
-# ─── path setup for local execution ───
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_PARENT_DIR = os.path.dirname(_THIS_DIR)
-_SRC_DIR = os.path.join(os.path.dirname(_PARENT_DIR), "src")
-for p in [_SRC_DIR, _PARENT_DIR]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
-try:
-    from router import register
-except ImportError:
-    try:
-        from ..router import register
-    except ImportError:
-        from mcptoon.router import register
-
-SERVER_NAME = {name_repr}
-ALIASES = ()
-
-SCHEMA = [
-{schema_str}
-]
-
-# MCP stdio launch config
-MCP_COMMAND = {command_repr}
-MCP_ARGS = [{args_str}]
-MCP_ENV = {{{env_str}}}
-
-
-@register(SERVER_NAME, *ALIASES)
-def handle(tool, args):
-    """Call MCP stdio tool."""
-    try:
-        from mcptoon.client import MCPClient
-    except ImportError:
-        from client import MCPClient
-
-    env = {{}}
-    for key in MCP_ENV:
-        val = os.environ.get(key, "")
-        if val:
-            env[key] = val
-
-    client = MCPClient(stdio=[MCP_COMMAND] + MCP_ARGS, env=env)
-    client.initialize()
-    result = client.call_tool(tool, args or {{}})
-    client.close()
-    return result
-'''
-
-    _write_text_atomic(handler_file, handler_code)
-
-    log.info("installer", f"Generated handler: {handler_file}")
-
-
 def list_installed():
     """List installed MCP servers."""
     return _load_installed()
@@ -887,16 +741,22 @@ def list_installed():
 def remove_installed(server_name):
     """Remove an installed MCP server.
 
-    Returns ``status: "removed"`` when the registry entry was dropped, and
-    ``handler_removed`` says whether a generated handler file was actually
-    deleted — the two are independent (most registry entries have no handler
-    file), so the caller can report the truth instead of assuming both.
+    Undoes both halves of what ``install`` does: the config entry (what `list` and
+    `call` read) and the ``installed.json`` record (the schema cache that
+    `install --list`, `update` and `doctor` read). The two flags are reported
+    independently because a server can have one without the other — a record written
+    before 0.8.32 has no config entry, and a server added by hand with `mcptoon add`
+    has a config entry but no record here.
+
+    ``handler_removed`` covers a module left by a version ≤ 0.8.31, which generated
+    one per server that nothing ever imported (issue #36). Nothing writes those now;
+    deleting them just keeps an upgraded machine clean.
     """
     installed = _load_installed()
     if server_name not in installed:
         return make_error("NOT_FOUND", f"Server '{server_name}' not installed", "installer")
 
-    # Delete handler file
+    # Delete a handler file left by <= 0.8.31
     safe_name = re.sub(r'[^a-z0-9_]', '_', server_name.lower())
     handler_file = os.path.join(_handlers_dir(), f"{safe_name}.py")
     handler_removed = False
@@ -904,12 +764,18 @@ def remove_installed(server_name):
         os.remove(handler_file)
         handler_removed = True
 
+    # Drop the config entry. Without this the server would still answer
+    # `mcptoon list` and `mcptoon call`, so `--remove` would look like a no-op.
+    from . import config as _config
+    config_removed = _config.remove_server(server_name)
+
     # Remove from installed.json
     del installed[server_name]
     _save_installed(installed)
 
     return {"status": "removed", "server": server_name,
-            "handler_removed": handler_removed}
+            "handler_removed": handler_removed,
+            "config_removed": config_removed}
 
 
 def _now_iso():

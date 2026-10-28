@@ -226,16 +226,19 @@ class TestUpdateEndToEnd:
 
 
 class TestRefreshInstalled:
-    def test_regenerates_the_handler_for_an_installed_server(self, echo_env, tmp_path, monkeypatch):
-        """An installed server whose tools moved must have its handler rewritten,
-        not just its cache — the handler bakes a SCHEMA."""
+    def test_refreshes_the_record_of_an_installed_server(self, echo_env, tmp_path, monkeypatch):
+        """An installed server whose tools moved must have its record rewritten.
+
+        This used to also rewrite a generated handler module. Nothing ever imported
+        those (issue #36), so 0.8.32 dropped that half and the record is the only
+        cache left to keep honest.
+        """
         from mcptoon import installer
 
         old_file = installer._INSTALLED_FILE
         tmp = tempfile.mkdtemp(prefix="mcptoon-upd-inst-")
         installer._INSTALLED_FILE = str(Path(tmp) / "pro_installed.json")
-        # Keep the generated handler out of the source tree (it is a gitignored
-        # private layer in production; a test must not write there either).
+        # Nothing may be written into the source tree by this test.
         monkeypatch.setattr(installer, "_handlers_dir", lambda: str(tmp_path))
         try:
             installer._save_installed({"echo": {
@@ -255,9 +258,10 @@ class TestRefreshInstalled:
             assert rec["tools"] == ["echo", "add", "delete_item"]
             assert rec["tool_count"] == 3
             assert "updated_at" in rec
-            handler = tmp_path / "echo.py"
-            assert handler.exists(), "the handler must be regenerated alongside the record"
-            assert "delete_item" in handler.read_text(encoding="utf-8")
+            assert [t["name"] for t in rec["tools_with_schema"]] == \
+                ["echo", "add", "delete_item"]
+            # The dead handler generator is gone: nothing was written to disk.
+            assert list(tmp_path.glob("*.py")) == []
         finally:
             installer._INSTALLED_FILE = old_file
 

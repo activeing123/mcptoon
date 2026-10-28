@@ -6,9 +6,8 @@ path:
 
 * ``headers.resolve_value`` expands ``${NAME}``, leaves literals alone, escapes
   ``$${NAME}``, and raises naming the variable when it is unset or empty.
-* The **generated handler** and the **config record** carry the ``${NAME}``
-  template, never a resolved secret — that is what makes the feature safe to
-  install into a shared machine.
+* The **config record** carries the ``${NAME}`` template, never a resolved secret —
+  that is what makes the feature safe to install into a shared machine.
 * A **real HTTP MCP server** reached through the real ``MCPClient`` sees the
   expanded header, so install-time verification and call-time resolution cannot
   drift apart.
@@ -186,14 +185,23 @@ class TestInstallWritesTemplatesNotSecrets(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self._installed = Path(self._tmp.name) / "installed.json"
+        self._config = Path(self._tmp.name) / "config.json"
         self._handlers = Path(self._tmp.name) / "handlers"
         self._handlers.mkdir()
         self._p1 = patch.object(installer, "_INSTALLED_FILE", self._installed)
         self._p2 = patch.object(installer, "_handlers_dir", lambda: str(self._handlers))
+        # `install` now registers the server in the config (issue #36), which is the
+        # store `list`/`call` read — so point that at this test's temp dir too and
+        # keep the suite's shared config out of it.
+        self._p3 = patch.dict(os.environ, {
+            "MCPTOON_CONFIG_FILE": str(self._config),
+            "MCPTOON_CONFIG_FILE_TOML": str(Path(self._tmp.name) / "config.toml")})
         self._p1.start()
         self._p2.start()
+        self._p3.start()
         self.addCleanup(self._p1.stop)
         self.addCleanup(self._p2.stop)
+        self.addCleanup(self._p3.stop)
 
     def _install(self, headers):
         class _FakeClient:
@@ -224,16 +232,26 @@ class TestInstallWritesTemplatesNotSecrets(unittest.TestCase):
         self.assertIn("${MCPTOON_T24}", raw)
         self.assertNotIn("sekret-token", raw)
 
-    def test_the_generated_handler_carries_the_template(self):
+    def test_the_config_carries_the_template_and_never_the_secret(self):
+        """The template lands in the config — the store `list`/`call` actually read.
+
+        It used to land in a generated handler module that nothing ever imported
+        (issue #36), which is why `install` could report success on a server that
+        `mcptoon call` then could not find.
+        """
         os.environ["MCPTOON_T24"] = "sekret-token"
         self.addCleanup(os.environ.pop, "MCPTOON_T24", None)
         self._install({"Authorization": "Bearer ${MCPTOON_T24}"})
-        handler = (self._handlers / "svc.py").read_text(encoding="utf-8")
-        self.assertIn("MCP_HEADERS", handler)
-        self.assertIn("${MCPTOON_T24}", handler)
-        self.assertNotIn("sekret-token", handler)
-        # The handler must actually pass the mapping to the client.
-        self.assertIn("headers=MCP_HEADERS", handler)
+
+        raw = self._config.read_text(encoding="utf-8")
+        entry = json.loads(raw)["servers"]["svc"]
+        self.assertEqual(entry["transport"], "http")
+        self.assertEqual(entry["url"], "https://example.com/mcp")
+        self.assertEqual(entry["headers"],
+                         {"Authorization": "Bearer ${MCPTOON_T24}"})
+        # The resolved secret is nowhere on disk, and no handler module was written.
+        self.assertNotIn("sekret-token", raw)
+        self.assertEqual(list(self._handlers.glob("*.py")), [])
 
     def test_a_missing_variable_installs_as_a_named_error_not_a_traceback(self):
         os.environ.pop("MCPTOON_T24", None)
@@ -266,10 +284,10 @@ class TestInstallOnReadOnlyPackage(unittest.TestCase):
 
     A Nix install (the reporter's case), a system-wide pip install, a distro
     package and a container image all put ``mcptoon/`` somewhere the user cannot
-    write. The old generator wrote into ``<package>/handlers`` and raised
-    ``PermissionError`` there. This reproduces that condition — the package's
-    ``handlers`` path is un-writable — and proves install still lands its handler
-    in the writable state dir instead.
+    write. The generator that used to write ``<package>/handlers`` is gone (issue
+    #36), so install no longer writes there at all — this reproduces the unwritable
+    ``handlers`` path and proves install still succeeds and leaves the package tree
+    untouched.
     """
 
     def setUp(self):
@@ -295,19 +313,25 @@ class TestInstallOnReadOnlyPackage(unittest.TestCase):
 
         with patch.object(installer, "_INSTALLED_FILE", self._installed), \
                 patch.dict(os.environ,
-                           {"MCPTOON_HANDLERS_DIR": str(self._state_handlers)}), \
+                           {"MCPTOON_HANDLERS_DIR": str(self._state_handlers),
+                            "MCPTOON_CONFIG_FILE":
+                                str(Path(self._tmp.name) / "config.json"),
+                            "MCPTOON_CONFIG_FILE_TOML":
+                                str(Path(self._tmp.name) / "config.toml")}), \
                 patch.object(installer, "MCPClient", _FakeClient):
             return installer.install_http("https://example.com/mcp", "svc",
                                           headers={})
 
-    def test_install_writes_handler_to_state_dir_when_package_is_read_only(self):
+    def test_install_succeeds_and_writes_nothing_into_a_read_only_package(self):
         package_dir = Path(installer.__file__).resolve().parent
-        # Simulate the read-only package: any makedirs/write under <package>/handlers
+        package_handlers = package_dir / "handlers"
+        existed_before = package_handlers.exists()
+        # Simulate the read-only package: any makedirs under <package>/handlers
         # raises PermissionError exactly as it does on a Nix store path.
         real_makedirs = os.makedirs
 
         def _guard(path, *a, **k):
-            if Path(path).resolve() == (package_dir / "handlers"):
+            if Path(path).resolve() == package_handlers:
                 raise PermissionError(13, "Permission denied", str(path))
             return real_makedirs(path, *a, **k)
 
@@ -315,9 +339,10 @@ class TestInstallOnReadOnlyPackage(unittest.TestCase):
             result = self._install()
 
         self.assertEqual(result["status"], "installed")
-        # The handler landed in the writable state dir, not the package.
-        self.assertTrue((self._state_handlers / "svc.py").is_file())
-        self.assertFalse((package_dir / "handlers" / "svc.py").exists())
+        # Nothing was written into the package tree, and no handler module exists any
+        # more — the server is registered in the config instead.
+        self.assertEqual(package_handlers.exists(), existed_before)
+        self.assertFalse((package_handlers / "svc.py").exists())
 
 
 

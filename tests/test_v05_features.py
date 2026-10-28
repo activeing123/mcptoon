@@ -146,11 +146,16 @@ class TestInstallNpm(unittest.TestCase):
     """Test install_npm with mocked MCPClient."""
 
     @patch("mcptoon.installer.MCPClient")
-    @patch("mcptoon.installer._generate_handler_file")
+    # Config is the store `install` now registers into (issue #36); patch it so this
+    # unit test never writes the suite's shared config file, and so the assertion
+    # below is about install's own contract rather than config's.
+    @patch("mcptoon.config.add_server")
+    @patch("mcptoon.config.list_servers", return_value=[])
     @patch("mcptoon.installer._save_installed")
     @patch("mcptoon.installer._load_installed")
-    def test_install_npm_success(self, mock_load, mock_save, mock_gen, mock_client_cls):
-        """install_npm should connect, get tools, generate handler."""
+    def test_install_npm_success(self, mock_load, mock_save, mock_list, mock_add,
+                                 mock_client_cls):
+        """install_npm should connect, get tools, register the server in config."""
         mock_load.return_value = {}
         mock_client = MagicMock()
         mock_client.list_tools.return_value = [{"name": "search", "description": "Search"}]
@@ -163,6 +168,11 @@ class TestInstallNpm(unittest.TestCase):
         self.assertEqual(result["tools"], 1)
         mock_client.initialize.assert_called_once()
         mock_client.close.assert_called_once()
+        mock_add.assert_called_once_with("test_server", {
+            "transport": "stdio",
+            "command": [mock_client_cls.call_args.kwargs.get("stdio", [None])[0]],
+            "args": ["-y", "@test/mcp-server"],
+        })
 
     @patch("mcptoon.installer.MCPClient")
     def test_install_npm_connection_failure(self, mock_client_cls):
@@ -181,11 +191,13 @@ class TestInstallHttp(unittest.TestCase):
     """Test install_http with mocked MCPClient."""
 
     @patch("mcptoon.installer.MCPClient")
-    @patch("mcptoon.installer._generate_http_handler_file")
+    @patch("mcptoon.config.add_server")
+    @patch("mcptoon.config.list_servers", return_value=[])
     @patch("mcptoon.installer._save_installed")
     @patch("mcptoon.installer._load_installed")
-    def test_install_http_success(self, mock_load, mock_save, mock_gen, mock_client_cls):
-        """install_http should connect, get tools, generate handler."""
+    def test_install_http_success(self, mock_load, mock_save, mock_list, mock_add,
+                                  mock_client_cls):
+        """install_http should connect, get tools, register the server in config."""
         mock_load.return_value = {}
         mock_client = MagicMock()
         mock_client.list_tools.return_value = [{"name": "fetch", "description": "Fetch URL"}]
@@ -196,6 +208,9 @@ class TestInstallHttp(unittest.TestCase):
         self.assertEqual(result["status"], "installed")
         self.assertEqual(result["server"], "test_http")
         self.assertEqual(result["url"], "https://example.com/mcp")
+        # "http", not the caller's "auto": the config reader rejects "auto".
+        mock_add.assert_called_once_with("test_http", {
+            "transport": "http", "url": "https://example.com/mcp"})
 
     def test_install_http_name_from_url(self):
         """install_http should derive name from URL when not provided."""

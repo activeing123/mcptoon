@@ -254,20 +254,24 @@ class TestRunnerResolution(unittest.TestCase):
 
 
 class TestHandlersDir(unittest.TestCase):
-    """A fresh clone has no handlers/ (it is gitignored), so the generator must make it."""
+    """A fresh clone has no handlers/ (it is gitignored), so the path helper must
+    create it on demand.
 
-    def test_generate_creates_missing_handlers_dir(self):
+    Nothing generates handler modules any more (issue #36): the directory survives
+    only as the place `remove_installed` looks for a file left by a version ≤ 0.8.31.
+    """
+
+    def test_handlers_dir_creates_missing_dir(self):
         import tempfile
         from pathlib import Path
-        from mcptoon.installer import _generate_handler_file
+        from mcptoon import installer
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "handlers"
             self.assertFalse(target.exists())
-            with patch("mcptoon.installer._handlers_dir",
-                       side_effect=lambda: (target.mkdir(parents=True, exist_ok=True),
-                                            str(target))[1]):
-                _generate_handler_file("demo", [], "npx", ["-y", "x"], [], "test")
-            self.assertTrue((target / "demo.py").is_file())
+            with patch.dict("os.environ", {"MCPTOON_HANDLERS_DIR": str(target)}):
+                got = Path(installer._handlers_dir())
+            self.assertTrue(target.is_dir())
+            self.assertEqual(got.resolve(), target.resolve())
 
 
 class TestHandlersDirOutsidePackage(unittest.TestCase):
@@ -295,8 +299,13 @@ class TestHandlersDirOutsidePackage(unittest.TestCase):
             # It must be exactly the configured state location.
             self.assertEqual(handlers_dir, target)
 
-    def test_generate_handler_file_writes_to_state_dir(self):
-        """End-to-end: generating a handler touches the state dir, never the package dir."""
+    def test_remove_deletes_a_legacy_handler_and_never_the_package_tree(self):
+        """The issue #35 regression, kept for the upgrade path.
+
+        A module left by ≤ 0.8.31 is deleted from the state dir when the server is
+        removed — and the package tree is never written, which is what #35 was about
+        (a Nix store path raises ``PermissionError`` there).
+        """
         import tempfile
         from pathlib import Path
         from mcptoon import installer
@@ -305,90 +314,22 @@ class TestHandlersDirOutsidePackage(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             handlers_dir = Path(tmp) / "handlers"
-            with patch.dict("os.environ", {"MCPTOON_HANDLERS_DIR": str(handlers_dir)}):
-                installer._generate_handler_file(
-                    "demo", [], "npx", ["-y", "x"], [], "test")
-            # Written under the redirected state dir, not the package...
-            self.assertTrue((handlers_dir / "demo.py").is_file())
-            self.assertFalse((package_dir / "handlers" / "demo.py").exists())
-            # ...and nothing at all was created inside the package tree.
+            handlers_dir.mkdir(parents=True)
+            (handlers_dir / "demo.py").write_text("# left by 0.8.31", encoding="utf-8")
+            with patch.object(installer, "_INSTALLED_FILE",
+                              str(Path(tmp) / "pro_installed.json")), \
+                    patch.dict("os.environ", {
+                        "MCPTOON_HANDLERS_DIR": str(handlers_dir),
+                        "MCPTOON_CONFIG_FILE": str(Path(tmp) / "config.json")}):
+                installer._save_installed({"demo": {"source": "http",
+                                                    "url": "https://e/mcp"}})
+                result = installer.remove_installed("demo")
+
+            self.assertEqual(result["status"], "removed")
+            self.assertTrue(result["handler_removed"])
+            self.assertFalse((handlers_dir / "demo.py").exists())
+            # Nothing at all was created inside the package tree.
             self.assertFalse((package_dir / "handlers").exists())
-
-
-
-class TestHandlerCodeInjection(unittest.TestCase):
-    """The generated handler is imported later, so a value that reaches it from a
-    pasted `--url`, an explicit `--name`, a registry row or an arg must never be
-    able to break out of its string literal into executable code. The payload below
-    raises SystemExit *only if it escapes into code* — a deterministic probe that
-    fails loudly on the old raw-f-string interpolation."""
-
-    PAYLOAD = '";raise SystemExit("INJECTED");_="'
-
-    def _exec_generated(self, src):
-        """Import the generated module in a throwaway namespace (no side effects)."""
-        ns = {"__name__": "not_main", "__file__": "handler.py",
-              "register": lambda *a, **k: (lambda f: f)}
-        exec(compile(src, "handler.py", "exec"), ns)
-        return ns
-
-    def _gen_http(self, name, url, transport="sse"):
-        import tempfile
-        from pathlib import Path
-        from mcptoon.installer import _generate_http_handler_file
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch("mcptoon.installer._handlers_dir", lambda: tmp):
-                _generate_http_handler_file(
-                    name, [{"name": "t", "description": "d", "inputSchema": {}}],
-                    url, transport, {})
-            f = next(Path(tmp).glob("*.py"))
-            return f.read_text(encoding="utf-8")
-
-    def _gen_stdio(self, name, command, args):
-        import tempfile
-        from pathlib import Path
-        from mcptoon.installer import _generate_handler_file
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch("mcptoon.installer._handlers_dir", lambda: tmp):
-                _generate_handler_file(
-                    name, [{"name": "t", "description": "d", "inputSchema": {}}],
-                    command, args, [], "custom")
-            f = next(Path(tmp).glob("*.py"))
-            return f.read_text(encoding="utf-8")
-
-    def test_http_url_cannot_inject_code(self):
-        bad_url = "https://api.example.com/sse" + self.PAYLOAD
-        src = self._gen_http("ok_name", bad_url)
-        ns = self._exec_generated(src)          # must NOT raise SystemExit
-        self.assertEqual(ns["MCP_URL"], bad_url)  # preserved verbatim as data
-
-    def test_http_name_cannot_inject_code(self):
-        src = self._gen_http("x" + self.PAYLOAD, "https://e/sse")
-        ns = self._exec_generated(src)
-        self.assertEqual(ns["SERVER_NAME"], "x" + self.PAYLOAD)
-
-    def test_http_transport_cannot_inject_code(self):
-        src = self._gen_http("ok", "https://e/sse", transport="sse" + self.PAYLOAD)
-        ns = self._exec_generated(src)
-        self.assertEqual(ns["MCP_TRANSPORT"], "sse" + self.PAYLOAD)
-
-    def test_stdio_command_cannot_inject_code(self):
-        src = self._gen_stdio("ok", "npx" + self.PAYLOAD, ["-y", "pkg"])
-        ns = self._exec_generated(src)
-        self.assertEqual(ns["MCP_COMMAND"], "npx" + self.PAYLOAD)
-
-    def test_stdio_arg_cannot_inject_code(self):
-        bad_arg = "--x" + self.PAYLOAD
-        src = self._gen_stdio("ok", "npx", ["-y", bad_arg])
-        ns = self._exec_generated(src)
-        self.assertEqual(ns["MCP_ARGS"], ["-y", bad_arg])
-
-    def test_normal_values_round_trip_exactly(self):
-        src = self._gen_stdio("my_srv", "npx", ["-y", "pkg@1.2", "--flag=a b"])
-        ns = self._exec_generated(src)
-        self.assertEqual(ns["SERVER_NAME"], "my_srv")
-        self.assertEqual(ns["MCP_COMMAND"], "npx")
-        self.assertEqual(ns["MCP_ARGS"], ["-y", "pkg@1.2", "--flag=a b"])
 
 
 class TestConfiguredHosts(unittest.TestCase):
