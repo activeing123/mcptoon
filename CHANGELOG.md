@@ -5,6 +5,42 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.32] - 2026-10-28
+
+### Fixed
+
+- **`mcptoon install` now makes the server reachable (issue #36).** `install` answered
+  `{"status": "installed", …}` and then the server was nowhere: it did not appear in
+  `mcptoon list`, and `mcptoon call <server> <tool>` returned `UNKNOWN_SERVER`. The
+  command only wrote a generated handler module into the state dir plus a record in
+  `~/.mcp-cli/pro_installed.json`. Nothing ever imported that module — the package
+  contains no loader — so `router._HANDLERS` stayed empty, and the **config**, the
+  only store `list` and `call` read, was never touched. `install` now registers the
+  server in the user's config (`transport: http` for URL installs, `stdio` with
+  `command`/`args` otherwise), so the server shows up in `list` and is callable.
+  `install --remove` takes the config entry back out and reports it as
+  `config_removed`. Every property above has a regression test. Reported by @examosa,
+  who traced it into `router.py` instead of only reporting the symptom.
+- **`mcptoon call --destructive` works before the positionals (issue #37).**
+  `mcptoon call --destructive <server> <tool>` fed the flag in as the *server name*
+  and failed with `UNKNOWN_SERVER`, while the identical flag placed after the
+  positionals worked. `--destructive` was the one call-level option not stripped
+  before the positionals were read (`--envelope`, `--stdin`, `--input-responses`,
+  `--request-state` and `--auto` already were). It is now stripped with the others,
+  so option order no longer changes the outcome, and `call --destructive <server>`
+  reports usage instead of reading the server name as the tool. `inspect` and `list`
+  were never affected. Reported by @examosa, with a reproduction in both orders.
+
+### Removed
+
+- **The generated-handler subsystem.** With `install` registering into the config, the
+  per-server handler modules were dead weight — written by `install` and `update`,
+  imported by nobody. They are no longer generated, and `mcptoon install --remove`
+  still deletes a file left by ≤ 0.8.31 so an upgraded machine does not keep stale
+  modules. This removes a code-generation primitive instead of mitigating it: the
+  0.8.29 hardening of those modules defended files that never executed. An install
+  writes no Python to disk at all now.
+
 ## [0.8.31] - 2026-10-27
 
 ### Fixed
