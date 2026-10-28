@@ -1524,6 +1524,18 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
             rest = rest[:i] + rest[i + 2:]
             break
 
+    # `--destructive` is a call-level flag like the four above, so it is stripped
+    # here with them. It used to be recognised only *after* the positionals were
+    # read (`server = rest[0]`), so `mcptoon call --destructive <server> <tool>`
+    # handed the flag in as the server name and died with UNKNOWN_SERVER, while
+    # the identical flag *after* the positionals worked — the order sensitivity
+    # in issue #37. Stripping before the length check below also means
+    # `call --destructive <server>` now reports usage instead of reading the
+    # server name as the tool name. `inspect` and `list` were never affected.
+    is_destructive = "--destructive" in rest
+    if is_destructive:
+        rest = [a for a in rest if a != "--destructive"]
+
     # A JSON object given positionally AND --stdin are two answers to the same
     # question ("what are the arguments?"). --stdin silently won, so
     # `echo '{...A}' | mcptoon call s t '{...B}' --stdin` used A and threw B away
@@ -1547,7 +1559,6 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
             sys.exit(1)
 
         tool = rest[0]
-        is_destructive = "--destructive" in rest
 
         # Parse args (same logic as below)
         args = {}
@@ -1561,8 +1572,6 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
                     sys.exit(1)
         else:
             for item in rest[1:]:
-                if item == "--destructive":
-                    continue
                 if item.startswith("{"):
                     try:
                         args = json.loads(item)
@@ -1625,7 +1634,6 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
 
     server = rest[0]
     tool = rest[1]
-    is_destructive = "--destructive" in rest
 
     # Parse args
     args = {}
@@ -1641,8 +1649,6 @@ def _cmd_call(rest, fmt, head_n, max_chars, full, use_stdin=False, fallback_json
                 sys.exit(1)
     else:
         for item in rest[2:]:
-            if item == "--destructive":
-                continue
             # Try JSON
             if item.startswith("{"):
                 try:
