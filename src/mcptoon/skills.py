@@ -2295,6 +2295,73 @@ def _git_uncommitted_deletions(source: Path) -> list[str]:
     return sorted(out)
 
 
+def count_calibers(source: Path, n_dirs: int) -> dict:
+    """Every skill count this program can honestly produce, each one *named*.
+
+    Issue #40: on one machine, at one moment, four surfaces reported 453, 467,
+    483 and 486, and not one of them said which set it had measured — so the
+    numbers read as wrong while every surface was internally consistent. They
+    are four different questions:
+
+      * ``skillDirs`` — top-level ``skills/<name>/`` directories that hold a
+        ``SKILL.md``. What ``skills doctor`` and ``skills list`` count, and what
+        a person means by "how many skills do I have".
+      * ``skillMdFiles`` — every ``SKILL.md`` under the source, recursively.
+        Higher than ``skillDirs`` when a skill ships sub-skills
+        (``skills/<name>/<sub>/SKILL.md``). A *file* count, not a skill count.
+      * ``nested`` — the gap between those two, shown so it reads as nesting
+        instead of looking like drift.
+      * ``indexEntries`` / ``indexAliases`` — what ``skills resolve`` can route.
+        Alias cards mean one skill is reachable under several names, so this is
+        an *entry* count again, not a skill count.
+      * ``viewFiles`` — distinct ``SKILL.md`` across the agent view roots, i.e.
+        the number the per-turn footer prints. It can exceed the source's own
+        file count when a skill was installed straight into a view.
+
+    Read-only and best-effort: a count that cannot be taken is left out, never
+    guessed as 0 — ``doctor`` has to stay safe on a live machine, and a zero
+    dressed as a measurement is the failure this whole function exists to stop.
+    """
+    out: dict = {"skillDirs": n_dirs}
+
+    try:
+        files = 0
+        for p in source.rglob("SKILL.md"):
+            rel_parent = p.relative_to(source).parts[:-1]
+            if not any(_skip_dir(part) for part in rel_parent):
+                files += 1
+    except (OSError, ValueError):
+        files = None
+    if files is not None:
+        out["skillMdFiles"] = files
+        out["nested"] = max(0, files - n_dirs)
+
+    try:
+        entries = list((load_index() or {}).get("skills") or [])
+    except Exception:  # noqa: BLE001 — a broken index must not break doctor
+        entries = []
+    if entries:
+        out["indexEntries"] = len(entries)
+        out["indexAliases"] = sum(1 for s in entries if s.get("alias_of"))
+
+    # The footer's number, read through the footer's own sidecar (a pure read —
+    # `doctor` promises never to write, so it cannot call the revalidating
+    # accessor). Not a second walk: a hand-rolled count here measured 958 against
+    # the footer's 486, because two of the four view roots are whole-directory
+    # links to the source and every file was reached twice. That is the exact
+    # class of bug this function exists to make visible, so it must not contain
+    # one. `status` reads the same field for the same reason.
+    try:
+        figures = _load_skill_token_cache().get("figures") or {}
+        view_files = int(figures.get("count") or 0)
+        if view_files:
+            out["viewFiles"] = view_files
+    except (OSError, ValueError, TypeError):
+        pass
+
+    return out
+
+
 def skills_doctor(source: Path, views: list[Path] | None = None,
                   derived: dict[str, Path] | None = None,
                   graveyard: Path | None = None) -> dict:
@@ -2332,6 +2399,10 @@ def skills_doctor(source: Path, views: list[Path] | None = None,
     report: dict = {"source": str(source), "skills": len(names), "views": {},
                     "derived": {}, "frontmatter": [], "misdelete": [],
                     "uncommittedDeletes": [], "findings": findings}
+    # Every count this report can produce, each labelled (issue #40). Without it
+    # a reader has four unlabelled numbers from four surfaces and no way to tell
+    # a different question from a wrong answer.
+    report["calibers"] = count_calibers(source, len(names))
 
     for view in views:
         row: dict = {"kind": None, "present": 0, "missing": [], "stale": [],
@@ -2439,7 +2510,24 @@ def _print_doctor_report(report: dict, fmt: str) -> None:
     if fmt == "json":
         print(json.dumps(report, ensure_ascii=False, indent=1))
         return
-    print(f"mcptoon skills doctor — {report['source']}  ({report['skills']} skills)")
+    print(f"mcptoon skills doctor — {report['source']}  "
+          f"({report['skills']} skill dirs)")
+    cal = report.get("calibers") or {}
+    if cal:
+        # One reconciled line, because the counts are only confusing when they
+        # are apart: "453 skill dirs ... 483 SKILL.md files (30 nested) ... index
+        # 483 entries (16 aliases)" answers "why did I see four numbers".
+        bits = [f"{cal['skillDirs']} skill dirs (top level, source root)"]
+        if "skillMdFiles" in cal:
+            bits.append(f"{cal['skillMdFiles']} SKILL.md files on disk "
+                        f"({cal['nested']} nested, not separate skills)")
+        if "indexEntries" in cal:
+            bits.append(f"index {cal['indexEntries']} entries "
+                        f"({cal['indexAliases']} aliases = "
+                        f"{cal['indexEntries'] - cal['indexAliases']} skills routable)")
+        if "viewFiles" in cal:
+            bits.append(f"footer {cal['viewFiles']} SKILL.md across the agent views")
+        print("  calibers: " + " · ".join(bits))
     for view, row in report["views"].items():
         kind = row["kind"]
         if kind == "wholeDirLink":
@@ -2882,9 +2970,14 @@ def _cmd_skills(rest: list[str], fmt: str, head_n: int = 0, max_chars: int = 0,
                   file=sys.stderr)
             sys.exit(1)
         index, path = build_and_save(roots)
+        n_entries = len(index["skills"])
         n_alias = sum(1 for s in index["skills"] if s.get("alias_of"))
-        print(f"indexed {len(index['skills'])} skills "
-              f"({n_alias} alias cards) from {len(index['roots'])} root(s)")
+        # "entries", not "skills", and the alias split shown: an index entry is
+        # not a skill, and quoting the entry count as a skill count is what made
+        # one machine answer 453 / 467 / 483 / 486 to the same question (#40).
+        print(f"indexed {n_entries} entr{'y' if n_entries == 1 else 'ies'} "
+              f"({n_alias} alias card{'' if n_alias == 1 else 's'}, "
+              f"{n_entries - n_alias} skills) from {len(index['roots'])} root(s)")
         print(f"index: {path}")
         if index["warnings"]:
             print(f"warnings: {len(index['warnings'])} "

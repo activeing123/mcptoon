@@ -222,7 +222,8 @@ class _A1QuickstartIntegration(unittest.TestCase):
                 cli._cmd_quickstart([])
         out = buf.getvalue()
         self.assertTrue(index.is_file(), "quickstart must leave an index behind")
-        self.assertIn("Skill catalog indexed: 1 skill(s)", out)
+        self.assertIn("Skill catalog indexed: 1 entry", out,
+                      "the index count is entries, not skills — it carries aliases (#40)")
 
     def test_quickstart_dry_builds_no_index(self):
         """A preview must not write the index — same rule as the config."""

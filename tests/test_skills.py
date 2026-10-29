@@ -642,7 +642,10 @@ class CliTests(unittest.TestCase):
                 "MCPTOON_SKILLS_ROOTS": str(root),
             }
             out = self._cli(["mcptoon", "skills", "index"], env)
-            self.assertIn("indexed 6 skills", out)
+            self.assertIn("indexed 6 entries", out)
+            self.assertIn("1 alias card", out, "the alias split must be visible (#40)")
+            self.assertIn("5 skills", out,
+                          "entry count and skill count are not the same number")
 
             out = self._cli(["mcptoon", "skills", "resolve", "考一下记忆还准吗", "--json"], env)
             payload = json.loads(out)
@@ -1611,6 +1614,54 @@ class DoctorTests(unittest.TestCase):
             (d / "SKILL.md").write_bytes((self.src / slug / "SKILL.md").read_bytes())
         rep = self._doctor(views=[self.view])
         self.assertTrue(rep["ok"], rep["findings"])
+
+    # ── issue #40: every count named, or four correct numbers read as wrong ──
+
+    def test_calibers_count_top_level_dirs_and_every_skill_md(self):
+        cal = self._doctor(views=[])["calibers"]
+        self.assertEqual(cal["skillDirs"], 2)
+        self.assertEqual(cal["skillMdFiles"], 2)
+        self.assertEqual(cal["nested"], 0)
+
+    def test_a_nested_skill_md_is_a_file_not_a_skill(self):
+        """`skills/<name>/<sub>/SKILL.md` is why the file count exceeds the skill
+        count. The gap must be reported as nesting, not left looking like drift."""
+        nested = self.src / "alpha" / "sub"
+        nested.mkdir()
+        (nested / "SKILL.md").write_text("---\nname: sub\ndescription: d\n---\n",
+                                         encoding="utf-8")
+        cal = self._doctor(views=[])["calibers"]
+        self.assertEqual(cal["skillDirs"], 2, "a nested SKILL.md is not a new skill")
+        self.assertEqual(cal["skillMdFiles"], 3)
+        self.assertEqual(cal["nested"], 1)
+
+    def test_calibers_omit_a_count_they_cannot_take(self):
+        """An absent index must leave the key out, never report 0 — a zero dressed
+        as a measurement is the failure this whole function exists to stop."""
+        with patch.object(skills, "load_index", lambda: {}):
+            cal = skills.count_calibers(self.src, 2)
+        self.assertNotIn("indexEntries", cal)
+        self.assertNotIn("indexAliases", cal)
+
+    def test_calibers_split_index_entries_from_routable_skills(self):
+        entries = [{"name": "alpha"}, {"name": "beta"},
+                   {"name": "a", "alias_of": "alpha"}]
+        with patch.object(skills, "load_index", lambda: {"skills": entries}):
+            cal = skills.count_calibers(self.src, 2)
+        self.assertEqual(cal["indexEntries"], 3)
+        self.assertEqual(cal["indexAliases"], 1)
+
+    def test_doctor_prints_every_caliber_it_reports(self):
+        """The numbers are only confusing when they are apart from their labels."""
+        rep = self._doctor(views=[])
+        buf = StringIO()
+        with redirect_stdout(buf):
+            skills._print_doctor_report(rep, "text")
+        out = buf.getvalue()
+        self.assertIn("2 skill dirs", out)
+        self.assertIn("calibers:", out)
+        self.assertNotIn("(2 skills)", out,
+                         "the bare count is the unlabelled form #40 was filed about")
 
     def test_drifted_copy_is_flagged(self):
         self.view.mkdir()

@@ -2519,7 +2519,11 @@ def _cmd_quickstart(rest, fmt="auto"):
             from . import skills as skills_mod
             if skills_mod.ensure_index():
                 n_skills = len(skills_mod.load_index().get("skills") or [])
-                print(f"  ✓ Skill catalog indexed: {n_skills} skill(s) routable "
+                # "entries", not "skills": the index carries alias cards, so this
+                # number is higher than the skill count `skills doctor` prints
+                # (issue #40 — four surfaces, four calibers, none of them named).
+                print(f"  ✓ Skill catalog indexed: {n_skills} "
+                      f"entr{'y' if n_skills == 1 else 'ies'} routable "
                       f"via `mcptoon skills resolve`")
             # Step 4c: give the agents mcptoon's own skill. Indexing makes the
             # catalog answerable; this is what lets the *agent* learn what the
@@ -4413,9 +4417,16 @@ def _cmd_status(_rest, fmt):
     # the filesystem. Absent index → no row, never a guessed 0.
     try:
         from . import skills as skills_mod
-        n_skills = len(skills_mod.load_index().get("skills") or []) or None
+        _entries = skills_mod.load_index().get("skills") or []
+        n_skills = len(_entries) or None
+        # Named, because this number is not the skill count: the index carries
+        # alias cards (one skill under several names) and is recursive, so it
+        # runs higher than the top-level dirs `skills doctor` reports. All of
+        # them are right; unlabelled they just look wrong (issue #40).
+        n_alias = sum(1 for s in _entries if s.get("alias_of"))
     except Exception:
         n_skills = None
+        n_alias = 0
     # The index snapshot can lag the live catalog: `status` reads the built index
     # (no filesystem walk — a status command must stay cheap), while `bench` and
     # the footer re-measure live. Reported 2026-10-17: status said 464 while the
@@ -4507,7 +4518,11 @@ def _cmd_status(_rest, fmt):
     else:
         print("  Managing           : nothing yet — run `mcptoon quickstart`")
     if n_skills:
-        print(f"  Skills in catalog  : {n_skills} (recursive, deduped)  [skills index]")
+        _alias_bit = f", {n_alias} aliases" if n_alias else ""
+        print(f"  Skills in catalog  : {n_skills} index entries "
+              f"(recursive, deduped{_alias_bit})  [skills index]")
+        print(f"                       (skill dirs at the source root are fewer — "
+              f"`mcptoon skills doctor` prints both calibers)")
         if skills_live and skills_live > n_skills:
             # The index is behind the live catalog. Say so, with the fix — the
             # alternative is two surfaces quietly quoting 464 and 469.
