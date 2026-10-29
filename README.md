@@ -6,11 +6,12 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-<h3 align="center">MCP Token Optimization, Tool Discovery &amp; Context Compression — Zero-Config CLI for MCP Tools and Agent Skills</h3>
+<h3 align="center">One Place for All Your Agents' MCP Tools and Skills.</h3>
 
 <p align="center">
-  <b>Install 1,000 skills and 1,000 MCP tools locally — and never worry about context flooding.</b><br>
-  A zero-dependency <b>MCP CLI</b> and <b>MCP client</b> for <b>MCP token optimization</b>: <b>tool discovery</b> through a compact name index plus <b>context compression</b>, cutting tool context by ~90% (99.2% on 255 tools) and keeping schemas out of your context window — zero config across <b>103+ desktop and CLI agents</b>.
+  <b>Tools and skills configured in any single agent just work across Cursor, Claude Code, Codex, and 103+ desktop & terminal agents.</b><br>
+  Pioneering on-demand schema retrieval out of the box — no more stuffing context windows, <b>saving 99% context tokens</b>.<br>
+  Zero dependencies, pure local, offline-first.
 </p>
 
 <!-- Primary Status Badges -->
@@ -66,9 +67,9 @@ It's a <b>native CLI</b>: any agent that can run a shell command gets <b>every f
 <sub>No JSON editing, no restart</sub>
 </td>
 <td align="center" width="33%" valign="top">
-<br><b>③ 🔍 Know there are 17,000+ — but not which one fits?</b><br><br>
-It first <b>picks up the servers you already have</b> (nothing to reinstall), then finds the rest by plain words — install and call on the spot.<br>
-<sub><code>mcptoon discover</code> → <code>search</code> → <code>call</code></sub>
+<br><b>③ 🔍 Overwhelmed by thousands of MCP tools across the web?</b><br><br>
+No more hunting for install docs. It first <b>scans and takes over the tools you already have</b>, then finds the rest by plain language — install and call on the spot.<br>
+<sub><code>mcptoon discover</code> (scan installed) → <code>search</code> (find online) → <code>call</code> (run directly)</sub>
 </td>
 </tr>
 </table>
@@ -84,6 +85,20 @@ It first <b>picks up the servers you already have</b> (nothing to reinstall), th
 <p align="center">
   <sub>Stays current on its own: it tells you when a newer version is out, and <code>mcptoon upgrade</code> updates in one command.</sub>
 </p>
+
+<!-- Common Problem Scenarios & SEO Use-Case Matrix -->
+<details>
+<summary><b>🔍 Common Pain Points & Solutions at a Glance (Click to expand)</b></summary>
+<br>
+<table>
+<tr><th>Your Pain Point / Search Intent</th><th>Vanilla MCP Behavior</th><th>mcptoon's Solution</th></tr>
+<tr><td><b>Context Window Bloat</b><br>Adding 10+ tools quickly hits context limits</td><td>Sends full JSON Schema of every tool every turn (70k+ tokens)</td><td><b>Compact Name Index</b>: ~2.2 tokens/tool on idle, schemas fetched on demand (99.2% token saving)</td></tr>
+<tr><td><b>Multi-Agent Sync Hell</b><br>Rewriting mcpServers JSON for Cursor, Claude Code, Windsurf</td><td>Manual copy-pasting into each client's config file</td><td><b>One-Command Takeover</b>: <code>mcptoon sync --takeover</code> automatically discovers and configures 103+ clients</td></tr>
+<tr><td><b>Headless CLI Execution</b><br>Need to call/test MCP tools directly in terminal/scripts</td><td>Requires spinning up full desktop agents or writing client code</td><td><b>Native Standard Library CLI</b>: <code>mcptoon call &lt;server&gt; &lt;tool&gt;</code> with zero dependencies</td></tr>
+<tr><td><b>Model Confusion & Hallucination</b><br>Too many candidate tools dilute model attention</td><td>Floods model with dozens of complex schemas simultaneously</td><td><b>Two-Stage Selection</b>: <code>mcptoon select "&lt;task&gt;"</code> pre-filters to the top 3 tools offline</td></tr>
+<tr><td><b>Agent Skills Fragmentation</b><br>Prompt instructions & skills can't be shared across agents</td><td>Manually duplicated across folders, drifting out of sync</td><td><b>Symlink-based Single-Source Hub</b>: <code>mcptoon skills sync</code>, 39-token pointer, zero duplication</td></tr>
+</table>
+</details>
 
 </div>
 
@@ -146,7 +161,7 @@ mcptoon docs resolve "how does release gating work"
 
 | 🔍 Find & call (why ③) | 🔌 Drive any API, not just MCP |
 | :--- | :--- |
-| • ✅ **17,000+ registry**: plain-language `search` across servers<br>• ✅ **Discover what's already installed**: `discover` scans existing client configs — **nothing to reinstall**<br>• ✅ **Call anything**: `call` headless, or `call --auto` to auto-find the server<br>• ✅ **On-demand schema**: `inspect` only when a tool is actually used<br>• ✅ **Pick for a task**: `select "<task>"` returns just the top few<br>• ✅ **Export anywhere**: `manifest --format openai\|openapi\|mcp` | • ✅ **OpenAPI / Swagger**: any REST API as commands (`openapi list\|call`)<br>• ✅ **GraphQL**: any endpoint as commands (`graphql list\|call`)<br>• ✅ **OAuth built in**: PKCE login, client-credentials, Dynamic Client Registration<br>• ✅ **MCP resources & prompts**: `resources`, `prompts`, `complete`<br>• ✅ **Saved connections**: `bake` — secrets by reference only (`env:` / `file:`)<br>• ✅ **Code sandbox**: `exec` — only stdout enters context |
+| • ✅ **Cross-registry search**: plain-language `search` across 17,000+ MCP servers<br>• ✅ **Discover what's already installed**: `discover` scans existing client configs — **nothing to reinstall**<br>• ✅ **Call anything**: `call` headless, or `call --auto` to auto-find the server<br>• ✅ **On-demand schema**: `inspect` only when a tool is actually used<br>• ✅ **Pick for a task**: `select "<task>"` returns just the top few<br>• ✅ **Export anywhere**: `manifest --format openai\|openapi\|mcp` | • ✅ **OpenAPI / Swagger**: any REST API as commands (`openapi list\|call`)<br>• ✅ **GraphQL**: any endpoint as commands (`graphql list\|call`)<br>• ✅ **OAuth built in**: PKCE login, client-credentials, Dynamic Client Registration<br>• ✅ **MCP resources & prompts**: `resources`, `prompts`, `complete`<br>• ✅ **Saved connections**: `bake` — secrets by reference only (`env:` / `file:`)<br>• ✅ **Code sandbox**: `exec` — only stdout enters context |
 
 | 🛡️ Safe, small, private | 📚 Docs & doctor |
 | :--- | :--- |
@@ -156,11 +171,13 @@ mcptoon docs resolve "how does release gating work"
 
 ---
 
-## Why mcptoon
+## Why mcptoon: Solving Context Window Bloat & Multi-Agent Config Fragmentation
 
-Every MCP agent (Claude Code, Cursor, Codex, …) loads **the full description of every tool and every skill into its context window before it does any work** — and re-sends it every turn. On 255 tools that is **71,929 tokens**: more than half of a 128K window spent on descriptions, before the first question.
+**mcptoon is a zero-dependency local tool gateway and skill manager for LLM agents.** In vanilla MCP architecture, every agent (Claude Code, Cursor, Windsurf, Codex, etc.) must inject the full JSON Schema definitions of all installed tools into its context window, resending them on every single turn.
 
-## How the token saving works
+According to our real-machine benchmark data: mounting just 255 common MCP tools consumes **71,929 tokens** in descriptions alone, eating over half of a standard 128K context window before the first user prompt is processed. This not only inflates token costs unnecessarily, but also dilutes the model's attention, causing severe tool confusion and parameter hallucinations. mcptoon compresses these 71,929 tokens down to **581 tokens (−99.2%)** using a compact name index, fetching schemas on demand only when a tool is actually called.
+
+## How Token Optimization Works: On-Demand Tool Retrieval & Dynamic Schemas
 
 mcptoon keeps those descriptions **on disk, not in context**, and hands the agent a compact view instead:
 
@@ -405,7 +422,7 @@ reinstall. A missing or empty variable fails loudly, naming it, never as an empt
 
 ---
 
-## Where the tools come from — search 17,000+, install with one command
+## Where tools come from — search across 17,000+ MCP servers with one command
 
 On a new machine the first question isn't "how do I save tokens", it's "which tools do I
 even want". The old answer is to hunt GitHub for `mcpServers` snippets and hand-copy them
@@ -576,7 +593,7 @@ The plugin and the skill are both surfaced through
 
 ---
 
-## Works with every AI agent
+## Cross-Agent Support: Works with Cursor, Claude Code, Windsurf & 103+ Clients
 
 mcptoon reaches an agent one of two ways, and every client below falls into one of them.
 You don't pick — `quickstart` registers both, and each host takes whichever it can:

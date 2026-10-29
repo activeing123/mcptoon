@@ -6,11 +6,12 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-<h3 align="center">MCP Token 优化 · 工具发现 · 上下文压缩 — MCP 工具与 Agent 技能的零配置 CLI</h3>
+<h3 align="center">所有 Agent 的 MCP 工具与技能，一处搞定。</h3>
 
 <p align="center">
-  <b>在本地安装 1,000 个技能和 1,000 个 MCP 工具 — 彻底告别上下文爆仓。</b><br>
-  零依赖 <b>MCP CLI</b> 与 <b>MCP 客户端</b>，专做 <b>MCP Token 优化</b>：用紧凑名字索引实现<b>工具发现</b>，再用<b>上下文压缩</b>，把工具上下文缩减 ~90%（255 工具样本降幅达 99.2%），工具 Schema 不进上下文窗口，<b>覆盖 103+ 款主流桌面与终端 Agent</b> 全自动零配置。
+  <b>你在任意一个 Agent 里配好的工具和技能，Cursor、Claude Code、Codex 等覆盖 103+ 款主流桌面与终端 Agent 都能直接用。</b><br>
+  首创开箱即用的按需拉取机制，不再把 Schema 堆满会话，<b>立省 99% Token 上下文</b>。<br>
+  零依赖，纯本地，不上云。
 </p>
 
 <!-- 核心权威徽章 -->
@@ -65,15 +66,15 @@ https://github.com/user-attachments/assets/a40bff9a-7f47-4bd2-84ec-04508e5b2a81
 <sub>不改 JSON、不重启</sub>
 </td>
 <td align="center" width="33%" valign="top">
-<br><b>③ 🔍 知道有 17,000+ 个，却不知道哪个好用？</b><br><br>
-先<b>自动捡起你已装的</b>（无需重装），再白话搜剩下的，当场装、当场调。<br>
-<sub><code>mcptoon discover</code> → <code>search</code> → <code>call</code></sub>
+<br><b>③ 🔍 面对全网成千上万个 MCP 工具，不知道哪个真好用？</b><br><br>
+不用去网上到处翻安装教程。先<b>一键扫描接管你电脑里已有的工具</b>，剩下的直接用大白话搜索，一键安装、当场调用。<br>
+<sub><code>mcptoon discover</code>（扫已装）→ <code>search</code>（搜全网）→ <code>call</code>（直接调）</sub>
 </td>
 </tr>
 </table>
 
 <p align="center">
-  <sub>还内置：OpenAPI / GraphQL 直通 · OAuth · MCP 资源与提示词 · 连接存名 · 代码沙箱 — <a href="#all-commands">详见 All commands</a>。</sub>
+  <sub>还内置：全网 API 即插即用 · 一键登录授权 (OAuth) · 现成模板直读 · 快捷别名直连 · 代码沙箱防搞坏电脑 — <a href="#all-commands">详见全部命令</a>。</sub>
 </p>
 
 <p align="center">
@@ -83,6 +84,20 @@ https://github.com/user-attachments/assets/a40bff9a-7f47-4bd2-84ec-04508e5b2a81
 <p align="center">
   <sub>装完会自动提示有新版，一条命令 <code>mcptoon upgrade</code> 即更新。</sub>
 </p>
+
+<!-- 核心痛点与长尾场景速查 (SEO & Fast Navigation) -->
+<details>
+<summary><b>🔍 常见痛点场景与解决方案速查（按需展开）</b></summary>
+<br>
+<table>
+<tr><th>你的痛点场景 / 搜索意图</th><th>传统 MCP 的痛点</th><th>mcptoon 的优雅解法</th></tr>
+<tr><td><b>上下文被挤爆 (Context Window Bloat)</b><br>装了 10+ 工具，问两句就提示 Context Limit 超限</td><td>每个工具的完整 JSON Schema 每轮重发（动辄 7 万+ Tokens）</td><td><b>紧凑名字索引</b>：常驻仅 ~2.2 Tokens/工具，调用时毫秒级按需拉取单个参数定义（立省 99.2%）</td></tr>
+<tr><td><b>多客户端重复配置 (Multi-Agent Sync)</b><br>在 Cursor、Claude Code、Windsurf 间重复手写配置</td><td>每个客户端的 <code>mcpServers</code> 配置文件手动复制粘贴，容易漏配</td><td><b>一键接管全部</b>：<code>mcptoon sync --takeover</code> 自动扫描、一键同步全部 103+ 款客户端</td></tr>
+<tr><td><b>命令行终端直调 (Headless MCP CLI)</b><br>只想在终端或自动化脚本里调某个工具，不想开重型 UI</td><td>必须启动完整的桌面 Agent 或编写专门的 Python 测试代码</td><td><b>纯标准库原生 CLI</b>：<code>mcptoon call &lt;server&gt; &lt;tool&gt;</code> 零依赖即开即调</td></tr>
+<tr><td><b>候选工具过多导致模型变蠢 (Model Confusion)</b><br>候选工具超过 40 个，模型注意力分散、选错工具或产生幻觉</td><td>所有 Schema 一股脑塞给大模型，严重干扰业务思考</td><td><b>两阶段离线挑选</b>：<code>mcptoon select "&lt;任务&gt;"</code> 秒级锁定最匹配的 Top 3 工具给模型</td></tr>
+<tr><td><b>跨 Agent 技能共享 (Agent Skills Hub)</b><br>好用的提示词规则与私有技能无法在各个 Agent 之间流通</td><td>各个项目目录手动拷贝多份，维护困难、版本互相漂移</td><td><b>单源软链分发 + 版本门禁</b>：<code>mcptoon skills sync</code>，常驻指针仅 39 Tokens，零拷贝零漂移</td></tr>
+</table>
+</details>
 
 </div>
 
@@ -143,7 +158,7 @@ mcptoon docs resolve "版本发布门禁怎么运作"
 
 | 🔍 发现与调用（为什么 ③） | 🔌 不只是 MCP：直通任意 API |
 | :--- | :--- |
-| • ✅ **17,000+ 注册表**：大白话 `search` 跨服务器搜<br>• ✅ **先捡已装的**：`discover` 扫现有客户端配置 —— **无需重装**<br>• ✅ **调什么都行**：`call` 直调，或 `call --auto` 自动找服务器<br>• ✅ **参数按需拉**：`inspect` 只在真要调时拉 schema<br>• ✅ **按任务挑**：`select "<任务>"` 只回最相关的几个<br>• ✅ **随处导出**：`manifest --format openai\|openapi\|mcp` | • ✅ **OpenAPI / Swagger**：任意 REST API 变命令（`openapi list\|call`）<br>• ✅ **GraphQL**：任意端点变命令（`graphql list\|call`）<br>• ✅ **内置 OAuth**：PKCE 登录、客户端凭证、动态客户端注册<br>• ✅ **MCP 资源与提示词**：`resources`、`prompts`、`complete`<br>• ✅ **连接存名**：`bake` —— 密钥只按引用存（`env:` / `file:`）<br>• ✅ **代码沙箱**：`exec` —— 只有 stdout 进上下文 |
+| • ✅ **跨生态全网检索**：大白话 `search` 搜索 17,000+ 个 MCP 服务器注册表，找工具不迷路<br>• ✅ **先捡已装的**：`discover` 扫现有客户端配置 —— **无需重装**<br>• ✅ **调什么都行**：`call` 直调，或 `call --auto` 自动找服务器<br>• ✅ **参数按需拉**：`inspect` 只在真要调时拉 schema<br>• ✅ **按任务挑**：`select "<任务>"` 只回最相关的几个<br>• ✅ **随处导出**：`manifest --format openai\|openapi\|mcp` | • ✅ **OpenAPI / Swagger**：任意 REST API 变命令（`openapi list\|call`）<br>• ✅ **GraphQL**：任意端点变命令（`graphql list\|call`）<br>• ✅ **内置 OAuth**：PKCE 登录、客户端凭证、动态客户端注册<br>• ✅ **MCP 资源与提示词**：`resources`、`prompts`、`complete`<br>• ✅ **连接存名**：`bake` —— 密钥只按引用存（`env:` / `file:`）<br>• ✅ **代码沙箱**：`exec` —— 只有 stdout 进上下文 |
 
 | 🛡️ 安全、轻量、隐私 | 📚 文档与体检 |
 | :--- | :--- |
@@ -153,11 +168,13 @@ mcptoon docs resolve "版本发布门禁怎么运作"
 
 ---
 
-## 为什么要用 mcptoon
+## 为什么要用 mcptoon：解决上下文吃满（Context Window Bloat）与配置撕裂
 
-每个 MCP Agent（Claude Code、Cursor、Codex……）在干活之前，都会把**每个工具、每个技能的完整描述加载进上下文窗口**——而且每轮重发一次。255 个工具就是 **71,929 tokens**：128K 的窗口，一半还多，还没问第一个问题就花在了"描述"上。
+**mcptoon 是一个专为大语言模型 Agent 打造的零依赖本地工具网关与技能管理器**。在原生 MCP 协议架构下，每一个 Agent（包括 Claude Code、Cursor、Windsurf、Codex 等）在每次向大模型发起对话时，都必须把已安装工具的完整 JSON Schema 参数定义完整加载进系统提示词，并在每一轮长会话中持续重复发送。
 
-## 省 token 的原理
+根据我们的真实机器实测数据：仅仅挂载 255 个常见 MCP 工具，其参数描述就高达 **71,929 Tokens**，还没开始执行任务就已经吃光了 128K 注意力窗口的一半以上。这不仅造成严重的 Token 账单浪费，还会淹没模型的注意力导致工具选错与参数幻觉。mcptoon 通过紧凑的名字索引将 71,929 Tokens 极致压缩至 **581 Tokens（降幅达 99.2%）**，让大模型只在真正调用时毫秒级按需拉取单个 Schema。
+
+## 怎么做到节省 99% Token？按需动态加载（On-Demand Tool Retrieval）机制
 
 mcptoon 把这些描述**留在磁盘上、不放进上下文**，只交给 Agent 一份紧凑视图：
 
@@ -365,7 +382,7 @@ mcptoon install remote-api --url https://example.com/mcp \
 
 ---
 
-## 工具从哪来——搜 17,000+，一条命令装上
+## 工具从哪来——跨 17,000+ MCP 服务器搜索，一条命令装上
 
 开一台新机器，第一个问题不是「怎么省 token」，是「我到底该装哪些工具」。传统做法是去 GitHub 到处翻 `mcpServers` 片段，再手抄进 JSON。
 
@@ -512,7 +529,7 @@ nix run github:numtide/llm-agents.nix#mcptoon -- --help
 
 ---
 
-## 所有 AI Agent 都能用
+## 跨 Agent 共享：在 Cursor、Claude Code、Windsurf 等 103+ 客户端统一管理 MCP
 
 mcptoon 只用两条路够到 Agent，下面每个客户端都落在其中一条上。不用你选——`quickstart` 两条都登记，哪台能收哪条就收哪条：
 
