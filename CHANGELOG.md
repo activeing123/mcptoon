@@ -5,6 +5,51 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.33] - 2026-10-29
+
+### Fixed
+
+- **The installed-server registry now follows `--dir`, `MCPTOON_HOME` and XDG
+  (issue #25, re-raised by @examosa).** `mcptoon install` recorded the servers it
+  had installed in `~/.mcp-cli/pro_installed.json`, a path resolved from a
+  module-level constant — so it ignored all three. Everything else in the state
+  dir moved where the user asked and this one file did not, which meant a
+  `--dir X` run wrote half its state inside X and half into `$HOME`. It is now
+  resolved the way the rest of `config.py` resolves paths: `MCPTOON_INSTALLED_FILE`
+  wins when set; an existing legacy `~/.mcp-cli/pro_installed.json` is kept,
+  never orphaned, so nobody's installed servers look uninstalled after upgrading;
+  the default is `STATE_DIR/pro_installed.json`, beside `handlers/` and
+  `toggles.json`. `installer` no longer caches the path at import time — a
+  constant cannot follow `--dir`, which is parsed after import — and `uninstall`
+  reports the same path it cleans. 6 new tests run each case in a fresh
+  interpreter under a fabricated `$HOME`, the only honest way to observe
+  import-time path resolution.
+- **Every skill count now names what it counted (issue #40).** Four surfaces
+  answered "how many skills?" with four different numbers and none said which
+  set it had measured, so each one looked wrong while every surface was
+  internally consistent: 453 (top-level `skills/<name>/` dirs), 467 (index
+  entries minus alias cards), 483 (every `SKILL.md` under the source,
+  recursively — 30 of them nested), 486 (distinct `SKILL.md` across the four
+  agent view roots, the footer's number). The fix labels the caliber instead of
+  collapsing the numbers: `skills doctor` prints a `calibers:` line reconciling
+  all four, and its header says `skill dirs` rather than a bare `skills`;
+  `status` says `index entries (recursive, deduped, N aliases)`; `skills index`
+  says `indexed N entries (M alias cards, K skills)`; quickstart says
+  `indexed N entries routable`. `count_calibers()` reads the footer's own
+  sidecar for the view count rather than walking the roots again — a hand-rolled
+  walk reported 958 against the footer's 486 here, because two of the four roots
+  are whole-directory links to the source. A count it cannot take is omitted,
+  never reported as `0`. Reported by @activeing123.
+
+### Docs
+
+- **The wheel-size claim was six releases stale.** Every surface that stated it
+  said `534KB`, which was accurate for 0.8.26 (547,084 B on PyPI) and had not
+  been re-measured since; 0.8.32 ships 574,555 B, so the honest figure was
+  ~561KB. Corrected on all nine surfaces plus the repository description, and
+  `534KB` moved into `RETIRED_KB` so the old value stays pinned as a known-past
+  number rather than a wrong current one.
+
 ## [0.8.32] - 2026-10-28
 
 ### Fixed
