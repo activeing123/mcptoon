@@ -181,9 +181,12 @@ def state_paths() -> dict:
         claiming to clean up would be the worst kind of surprise.
       - ``cache``       — regenerable (manifest + usage). Always safe to delete.
 
-    The installed-server registry (`~/.mcp-cli/pro_installed.json`) is in
-    ``bookkeeping`` as of 2026-10-02: it was absent, so `mcptoon uninstall` left
-    it behind even though it is state mcptoon created.
+    The installed-server registry (`pro_installed.json`) is in ``bookkeeping`` as
+    of 2026-10-02: it was absent, so `mcptoon uninstall` left it behind even
+    though it is state mcptoon created. Its location is not spelled out here —
+    ``_installed_registry_file()`` is the one place that decides it, because the
+    path moved (2026-10-29) off a hardcoded `~/.mcp-cli/` and a second copy of
+    that decision is how `uninstall` and `install` drift apart.
     """
     return {
         "bookkeeping": [_settings_file(), _welcome_file(), _footer_state_file(),
@@ -208,15 +211,39 @@ def _handlers_state_dir() -> Path:
         "MCPTOON_HANDLERS_DIR", str(STATE_DIR / "handlers")))
 
 
-def _installed_registry_file() -> Path:
-    """`~/.mcp-cli/pro_installed.json` — mcptoon's registry of installed servers.
+# Where the registry lived before it honoured the root. A real `Path`, not a
+# string, because the migration guard below asks it `.exists()`.
+LEGACY_INSTALLED_FILE = HOME_DIR / ".mcp-cli" / "pro_installed.json"
 
-    Resolved at call time from the same env var `installer` reads, so a test or a
-    redirected home names one path, not two.
+
+def _installed_registry_file() -> Path:
+    """`pro_installed.json` — mcptoon's registry of installed servers.
+
+    Three tiers, the same shape as `_resolve_root`:
+
+      1. `MCPTOON_INSTALLED_FILE` — explicit; always wins (tests, `uninstall`).
+      2. an existing legacy `~/.mcp-cli/pro_installed.json` — kept, never
+         orphaned, for the same reason an existing `~/.mcptoon` is kept: moving
+         a default must not make a user's installed servers look uninstalled.
+      3. `STATE_DIR/pro_installed.json` — the root every other state file uses
+         (`handlers/`, `toggles.json`), which is what makes `--dir`,
+         `MCPTOON_HOME` and the XDG variables reach it at all.
+
+    Before 2026-10-29 this was hardcoded to `~/.mcp-cli/` — a directory named
+    after a *different* tool — so `--dir X` wrote handlers under X and the
+    registry under `$HOME` (issue #25, re-raised by the original reporter).
+
+    Resolved at CALL time and only here, because `installer._installed_path()`
+    delegates to this function: a second copy of the precedence order is exactly
+    how the writer and `uninstall` end up disagreeing about which file is the
+    registry.
     """
-    return Path(os.environ.get(
-        "MCPTOON_INSTALLED_FILE",
-        os.path.expanduser("~/.mcp-cli/pro_installed.json")))
+    explicit = os.environ.get("MCPTOON_INSTALLED_FILE", "").strip()
+    if explicit:
+        return Path(explicit)
+    if LEGACY_INSTALLED_FILE.exists():
+        return LEGACY_INSTALLED_FILE
+    return STATE_DIR / "pro_installed.json"
 
 # Gateway preferences that are not per-server (footer on/off, ...). Kept apart
 # from config.json so a settings write can never corrupt a server definition.

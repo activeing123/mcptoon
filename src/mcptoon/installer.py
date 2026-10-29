@@ -57,12 +57,29 @@ class _Log:
 log = _Log()
 
 # ─── Installed MCP servers config file ───
-# Overridable so tests (and `mcptoon uninstall`, which must be able to name this
-# path) can redirect it without touching a real home. `config.state_paths()`
-# resolves the same variable, which is what lets `uninstall` clean it up — the
-# registry used to be invisible to uninstall and survived a full cleanup.
-_INSTALLED_FILE = os.environ.get(
-    "MCPTOON_INSTALLED_FILE", os.path.expanduser("~/.mcp-cli/pro_installed.json"))
+# `None` means "ask `config` where the registry lives, on every call". It is
+# deliberately not a path constant: `config._installed_registry_file()` owns the
+# precedence (explicit env > an existing legacy file > the state dir, which
+# follows `MCPTOON_HOME` / `--dir` / XDG — issue #25). A value assigned here
+# still wins, which is what lets tests and `mcptoon uninstall` name one path.
+#
+# Capturing a path at import time was the bug: `--dir X` runs after this module
+# is imported, so handlers landed under X while the registry kept being written
+# to `$HOME/.mcp-cli/`.
+_INSTALLED_FILE = None
+
+
+def _installed_path() -> str:
+    """Where the installed-server registry lives, resolved on every call.
+
+    `config._installed_registry_file()` is the single source of truth: the same
+    function `config.state_paths()` reports to `uninstall`, so the two cannot
+    disagree about which file is being written and which is being cleaned up.
+    """
+    if _INSTALLED_FILE is not None:
+        return str(_INSTALLED_FILE)
+    from . import config
+    return str(config._installed_registry_file())
 
 
 def _write_text_atomic(path, text: str) -> None:
@@ -92,7 +109,7 @@ def _write_text_atomic(path, text: str) -> None:
 def _load_installed():
     """Load installed MCP servers list."""
     try:
-        with open(_INSTALLED_FILE, encoding="utf-8") as f:
+        with open(_installed_path(), encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -108,13 +125,14 @@ def _save_installed(data):
     """
     import tempfile
 
-    os.makedirs(os.path.dirname(_INSTALLED_FILE), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(_INSTALLED_FILE) or ".",
-                               prefix=".installed-", suffix=".json")
+    target = _installed_path()
+    d = os.path.dirname(target) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".installed-", suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, _INSTALLED_FILE)
+        os.replace(tmp, target)
     except OSError:
         try:
             os.unlink(tmp)

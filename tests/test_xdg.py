@@ -50,19 +50,27 @@ PROBE = textwrap.dedent(
         "logs": str(cfg.LOG_DIR),
         "usage": str(_u._USAGE_FILE),
         "policy": str(cfg.POLICY_FILE),
+        "installed": str(cfg._installed_registry_file()),
     }))
     """
 )
 
 
 def _run_probe(env_overrides: dict, legacy_exists: bool = False,
-               xdg_exists: bool = False, argv_dir: str = "") -> dict:
+               xdg_exists: bool = False, argv_dir: str = "",
+               legacy_registry: bool = False) -> dict:
     """Resolve the roots in a clean interpreter under a fabricated HOME."""
     import json
 
     home = Path(tempfile.mkdtemp(prefix="mcptoon-xdg-home-"))
     if legacy_exists:
         (home / ".mcptoon").mkdir(parents=True)
+    if legacy_registry:
+        # The pre-2026-10-29 registry location, in a directory named after a
+        # different tool. 60 bytes of valid JSON is enough for `.exists()`.
+        (home / ".mcp-cli").mkdir(parents=True)
+        (home / ".mcp-cli" / "pro_installed.json").write_text(
+            '{"demo": {"transport": "stdio"}}', encoding="utf-8")
     env = {
         "PATH": os.environ.get("PATH", ""),
         "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
@@ -178,6 +186,70 @@ class TestUsageAndPolicyFollowTheRoot(unittest.TestCase):
         home = Path(tempfile.mkdtemp(prefix="mcptoon-policy-root-"))
         out, _ = _run_probe({"MCPTOON_HOME": str(home)})
         self.assertEqual(out["policy"], str(home / "compression.json"))
+
+
+class TestInstalledRegistryFollowsTheRoot(unittest.TestCase):
+    """The installed-server registry (`pro_installed.json`) must obey the root.
+
+    Re-raised on issue #25 by the original reporter (2026-10-28): the registry
+    was hardcoded to `~/.mcp-cli/pro_installed.json`, so it ignored `--dir`,
+    `MCPTOON_HOME` and the XDG variables while *handlers* honoured all three —
+    one command wrote half its state where the user asked and half into `$HOME`.
+    """
+
+    def test_registry_follows_mcptoon_home(self):
+        home = Path(tempfile.mkdtemp(prefix="mcptoon-reg-home-"))
+        out, _ = _run_probe({"MCPTOON_HOME": str(home)}, xdg_exists=True)
+        self.assertEqual(out["installed"], str(home / "pro_installed.json"))
+
+    def test_registry_follows_the_dir_flag(self):
+        home = Path(tempfile.mkdtemp(prefix="mcptoon-reg-dir-"))
+        chosen = home / "chosen"
+        out, _ = _run_probe({}, xdg_exists=True, argv_dir=str(chosen))
+        self.assertEqual(out["installed"], str(chosen / "pro_installed.json"))
+        self.assertFalse(
+            (home / ".mcp-cli" / "pro_installed.json").exists(),
+            "--dir was given; the legacy registry directory must stay untouched")
+
+    def test_registry_lands_in_state_dir_under_xdg(self):
+        """With XDG set, the registry is state, so it follows XDG_STATE_HOME."""
+        home = Path(tempfile.mkdtemp(prefix="mcptoon-reg-xdg-"))
+        state = home / "state"
+        state.mkdir(parents=True)
+        cfg_home = home / ".config"
+        (cfg_home / "mcptoon").mkdir(parents=True)
+        out, _ = _run_probe(
+            {"XDG_CONFIG_HOME": str(cfg_home), "XDG_STATE_HOME": str(state)},
+            xdg_exists=True)
+        self.assertEqual(
+            out["installed"], str(state / "mcptoon" / "pro_installed.json"))
+
+    def test_unset_xdg_falls_back_to_state_dir_in_legacy_root(self):
+        """No XDG, no override: the registry sits beside `handlers/`, not in $HOME."""
+        out, home = _run_probe({})
+        self.assertEqual(out["installed"],
+                         str(home / ".mcptoon" / "pro_installed.json"))
+        self.assertEqual(Path(out["installed"]).parent, Path(out["logs"]).parent)
+
+    def test_existing_legacy_registry_is_never_orphaned(self):
+        """The migration guard: a registry already on disk keeps being used.
+
+        Without this an upgrade would move the default, and every installed
+        server would look uninstalled while its record sat untouched on disk —
+        the same failure `_resolve_root` guards against for `~/.mcptoon`.
+        """
+        out, home = _run_probe({}, legacy_registry=True)
+        self.assertEqual(out["installed"],
+                         str(home / ".mcp-cli" / "pro_installed.json"))
+        self.assertFalse((home / ".mcptoon" / "pro_installed.json").exists())
+
+    def test_explicit_env_var_still_beats_the_legacy_file(self):
+        """`MCPTOON_INSTALLED_FILE` is the documented escape hatch; keep it."""
+        home = Path(tempfile.mkdtemp(prefix="mcptoon-reg-env-"))
+        target = home / "elsewhere" / "registry.json"
+        out, _ = _run_probe({"MCPTOON_INSTALLED_FILE": str(target)},
+                            legacy_registry=True)
+        self.assertEqual(out["installed"], str(target))
 
 
 class TestDirFlagIsConsumedByTheParser(unittest.TestCase):
