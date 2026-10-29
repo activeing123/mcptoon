@@ -119,3 +119,5 @@ SKILL.md.bak-*
 # ignore 的文件」，不 ignore 的话每次提交前都被它拦（正是要拦的那类）。
 docs/.gate.json
 docs/.state/
+
+preview-*.html
