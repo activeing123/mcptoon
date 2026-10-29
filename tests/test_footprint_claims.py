@@ -58,7 +58,7 @@ RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
               "337KB", "339KB", "341KB", "342KB", "346KB", "350KB", "362KB", "363KB",
-              "534KB")
+              "534KB", "561KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -210,7 +210,16 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # real (a local Windows build of the 0.8.26 tree measured 550,286 B against
 # PyPI's 547,084), which is why the published artifact is the only number worth
 # pinning. Re-measure at every release, from the tag, not from the working tree.
-WHEEL_KB = "561KB"
+# 2026-10-29 (0.8.33): re-measured, and this time **before** tagging rather than
+# six releases after. The local build of the v0.8.32 tree reproduces the known
+# noise exactly — 577,891 B locally against the 574,555 B PyPI serves, +3,336 B
+# (+0.58%), the same +0.58% seen on 0.8.26 (550,286 vs 547,084, +3,202 B) — so
+# the 0.8.33 tree (581,805 B locally) predicts a CI artifact of ~578,400 B =
+# 564.9 KB, and the claim moves 561KB -> 565KB. The prediction is calibrated
+# against two independent releases and is not a substitute for the real number:
+# the post-release step re-reads PyPI's `.whl` byte count and corrects this pin
+# if the two disagree. 561KB joins RETIRED_KB.
+WHEEL_KB = "565KB"
 
 
 def modules() -> list[Path]:

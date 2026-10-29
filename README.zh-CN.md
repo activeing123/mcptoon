@@ -78,7 +78,7 @@ https://github.com/user-attachments/assets/a40bff9a-7f47-4bd2-84ec-04508e5b2a81
 </p>
 
 <p align="center">
-  <b><code>pip install mcptoon &amp;&amp; mcptoon quickstart</code></b> — 561KB，零依赖，零配置。
+  <b><code>pip install mcptoon &amp;&amp; mcptoon quickstart</code></b> — 565KB，零依赖，零配置。
 </p>
 
 <p align="center">
@@ -129,7 +129,7 @@ mcptoon 安装后**会自动将官方技能（`/mcptoon`）注入到所有检测
 <h4>⚡ 终端极客方式：30 秒搞定</h4>
 
 ```bash
-# 1. 一键安装（零依赖，561KB）
+# 1. 一键安装（零依赖，565KB）
 pip install mcptoon
 
 # 2. 一键检测并自动配置已安装的 Agent
@@ -162,7 +162,7 @@ mcptoon docs resolve "版本发布门禁怎么运作"
 
 | 🛡️ 安全、轻量、隐私 | 📚 文档与体检 |
 | :--- | :--- |
-| • ✅ **零第三方依赖**：纯标准库，`pyproject.toml` 干净<br>• ✅ **561KB，2 秒装完**<br>• ✅ **100% 本地**：不上云、无遥测、可断网<br>• ✅ **三道闸**：每次调用查危险操作 + 提示注入 + 凭据泄露<br>• ✅ **XDG 规范**：沙箱友好，`--dir` 隔离 | • ✅ **文档路由**：`docs` 给 Markdown 树建索引，投喂 1 章而非 19 章（4 万 → 1.7 万 token）<br>• ✅ **文档内检索**：`kb` 只回段落不回整篇（95KB → 3 段）<br>• ✅ **自愈体检**：`doctor` 修 stdio 管道与环境，`health` 探每个服务器<br>• ✅ **当场证明**：`bench` / `demo` 在本机跑真实数字<br>• ✅ **透明播报**：`footer-facts` 每轮打印实时节省 |
+| • ✅ **零第三方依赖**：纯标准库，`pyproject.toml` 干净<br>• ✅ **565KB，2 秒装完**<br>• ✅ **100% 本地**：不上云、无遥测、可断网<br>• ✅ **三道闸**：每次调用查危险操作 + 提示注入 + 凭据泄露<br>• ✅ **XDG 规范**：沙箱友好，`--dir` 隔离 | • ✅ **文档路由**：`docs` 给 Markdown 树建索引，投喂 1 章而非 19 章（4 万 → 1.7 万 token）<br>• ✅ **文档内检索**：`kb` 只回段落不回整篇（95KB → 3 段）<br>• ✅ **自愈体检**：`doctor` 修 stdio 管道与环境，`health` 探每个服务器<br>• ✅ **当场证明**：`bench` / `demo` 在本机跑真实数字<br>• ✅ **透明播报**：`footer-facts` 每轮打印实时节省 |
 
 <sub>全部命令与参数见 [All commands](#all-commands)。</sub>
 
@@ -186,7 +186,7 @@ mcptoon 把这些描述**留在磁盘上、不放进上下文**，只交给 Agen
 
 什么都不丢：完整 schema 和完整技能全文，永远只差一条命令。省下的只有上下文窗口。
 
-mcptoon 是一个 **561KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
+mcptoon 是一个 **565KB、零依赖的原生 CLI**，管理你电脑上的每个 MCP 工具和 Agent 技能——并让它们在你所有 Agent 之间共享，而你一行配置都不用写。
 
 ## 不只我们一家这么说
 
@@ -313,7 +313,7 @@ mcptoon serve                       # 把所有已配置的服务器收在同一
 ## 30 秒上手
 
 ```bash
-pip install mcptoon                          # 纯标准库，561KB，零依赖
+pip install mcptoon                          # 纯标准库，565KB，零依赖
 
 # 一条命令：扫出你的 MCP 服务器、写好配置、把网关登记进你所有 Agent，并告诉它发现了什么：
 mcptoon quickstart
@@ -726,7 +726,7 @@ mcptoon uninstall               # 完整清理——先打印计划（--dry 预�
 
 ## 信任与安全
 
-**它只是一个 561KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
+**它只是一个 565KB 的原生 CLI——不喜欢，随时删掉；留着它，你永远不必再为任何 Agent 的工具和技能配置操心。** mcptoon 确实会碰你的 Agent 配置，所以它从设计上就做到透明——也让你随时能干净地离开。
 
 每个工具结果在进入你 Agent 之前，都要过三道防护：
 

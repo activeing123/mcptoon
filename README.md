@@ -79,7 +79,7 @@ No more hunting for install docs. It first <b>scans and takes over the tools you
 </p>
 
 <p align="center">
-  <b><code>pip install mcptoon &amp;&amp; mcptoon quickstart</code></b> — 561KB, zero dependencies, zero config.
+  <b><code>pip install mcptoon &amp;&amp; mcptoon quickstart</code></b> — 565KB, zero dependencies, zero config.
 </p>
 
 <p align="center">
@@ -130,7 +130,7 @@ When installed, mcptoon **automatically injects its own official skill (`/mcptoo
 <h4>⚡ Terminal Way: 30-Second Setup</h4>
 
 ```bash
-# 1. Install (zero dependencies, 561KB)
+# 1. Install (zero dependencies, 565KB)
 pip install mcptoon
 
 # 2. One command: detect MCP servers & auto-configure agents
@@ -165,7 +165,7 @@ mcptoon docs resolve "how does release gating work"
 
 | 🛡️ Safe, small, private | 📚 Docs & doctor |
 | :--- | :--- |
-| • ✅ **Zero dependencies**: pure standard library, `pyproject.toml` clean<br>• ✅ **561KB, installs in 2s**<br>• ✅ **100% local & private**: no cloud, no telemetry, air-gap ready<br>• ✅ **Guards**: destructive-op + prompt-injection + credential-leak checks on every call<br>• ✅ **XDG compliant**: sandbox-friendly `--dir` isolation | • ✅ **Docs router**: `docs` indexes a Markdown tree, feeds 1 chapter instead of 19 (40k → 17k tokens)<br>• ✅ **Search inside docs**: `kb` returns passages, not whole files (95KB → 3 snippets)<br>• ✅ **Self-heal**: `doctor` repairs stdio pipes & environments; `health` probes every server<br>• ✅ **Live proof**: `bench` / `demo` show the real numbers on your machine<br>• ✅ **Transparent footer**: `footer-facts` prints live savings after each turn |
+| • ✅ **Zero dependencies**: pure standard library, `pyproject.toml` clean<br>• ✅ **565KB, installs in 2s**<br>• ✅ **100% local & private**: no cloud, no telemetry, air-gap ready<br>• ✅ **Guards**: destructive-op + prompt-injection + credential-leak checks on every call<br>• ✅ **XDG compliant**: sandbox-friendly `--dir` isolation | • ✅ **Docs router**: `docs` indexes a Markdown tree, feeds 1 chapter instead of 19 (40k → 17k tokens)<br>• ✅ **Search inside docs**: `kb` returns passages, not whole files (95KB → 3 snippets)<br>• ✅ **Self-heal**: `doctor` repairs stdio pipes & environments; `health` probes every server<br>• ✅ **Live proof**: `bench` / `demo` show the real numbers on your machine<br>• ✅ **Transparent footer**: `footer-facts` prints live savings after each turn |
 
 <sub>Every command, with flags, is in [All commands](#all-commands).</sub>
 
@@ -190,7 +190,7 @@ mcptoon keeps those descriptions **on disk, not in context**, and hands the agen
 
 Nothing is lost: the full schema and the full skill text stay one command away. Only the context window is spared.
 
-mcptoon is a **561KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
+mcptoon is a **565KB, zero-dependency native CLI** that manages every MCP tool and agent skill on your computer — and shares them across all your agents with no config written by you.
 
 ## This isn't just us talking
 
@@ -324,7 +324,7 @@ Full reference: [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/mai
 ## 30 seconds up and running
 
 ```bash
-pip install mcptoon                          # pure stdlib, 561KB, zero dependencies
+pip install mcptoon                          # pure stdlib, 565KB, zero dependencies
 
 # One command: find your MCP servers, write your config, register the gateway
 # in every agent you have, and show you what it found:
@@ -827,7 +827,7 @@ to injecting every schema, at a fraction of the cost.
 
 ## Trust and safety
 
-**It's just a 561KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
+**It's just a 565KB native CLI — delete it anytime; keep it, and you never have to configure tools or skills for any agent again.** mcptoon touches your agent configs, so it is built to be transparent — and easy to walk away from.
 
 Three guards run on every tool result before your agent sees it:
 
