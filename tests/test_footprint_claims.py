@@ -57,7 +57,8 @@ COVERED = ("README.md", "README.zh-CN.md", "DEVELOPERS.md", "docs/comparison.md"
 RETIRED_KB = ("50KB", "250KB", "206KB", "232KB", "233KB", "189KB", "128KB",
               "146KB", "180KB", "156KB", "179KB", "190KB", "227KB", "297KB", "301KB",
               "304KB", "306KB", "307KB", "308KB", "322KB", "327KB", "332KB", "334KB",
-              "337KB", "339KB", "341KB", "342KB", "346KB", "350KB", "362KB", "363KB")
+              "337KB", "339KB", "341KB", "342KB", "346KB", "350KB", "362KB", "363KB",
+              "534KB")
 
 # Surfaces that state the suite total but were outside the badge guard.
 # 2026-09-17: the landing pages, DEVELOPERS.md and ROADMAP.md still advertised
@@ -195,7 +196,21 @@ SUITE_PROSE = re.compile(r"(\d[\d,]{2,6})\s*(?:tests?\b|个测试)")
 # value shipped in the CHANGELOG and on every surface. The authoritative method is
 # to measure `git archive <tag>` — the tree that actually publishes — never the
 # working tree. 362KB joins RETIRED_KB.
-WHEEL_KB = "534KB"
+# 2026-10-29: the pin was **six releases stale**. 534KB was measured correctly
+# against the 0.8.26 artifact (PyPI: 547,084 B = 534.26 KB) and then nobody
+# re-measured through 0.8.27 … 0.8.32, so eight surfaces went on advertising a
+# wheel that had grown 27KB. Re-measured from PyPI — the bytes `pip install`
+# actually pulls, and the same tree `git archive <tag>` produces:
+#
+#     https://pypi.org/pypi/mcptoon/0.8.32/json -> 574,555 B = 561.09 KB
+#
+# 534KB joins RETIRED_KB. Note what the drift says about this guard: it checks
+# that the surfaces *say* WHEEL_KB, never that WHEEL_KB is still true, so a pin
+# nothing re-measures is a memory with extra steps. Build-environment noise is
+# real (a local Windows build of the 0.8.26 tree measured 550,286 B against
+# PyPI's 547,084), which is why the published artifact is the only number worth
+# pinning. Re-measure at every release, from the tag, not from the working tree.
+WHEEL_KB = "561KB"
 
 
 def modules() -> list[Path]:

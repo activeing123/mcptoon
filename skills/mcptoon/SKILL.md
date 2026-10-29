@@ -30,7 +30,7 @@ mcptoon CLI is not; I installed it"* — and continue. Never silently pretend th
 commands worked, and never tell the user the feature is unavailable when a
 one-line install is the whole gap.
 
-mcptoon is a zero-dependency CLI (534KB, installs in seconds, nothing else pulled
+mcptoon is a zero-dependency CLI (561KB, installs in seconds, nothing else pulled
 in). It gives you a compressed view of the user's MCP tools and calls them back.
 
 ## When to use what
@@ -367,7 +367,7 @@ machine.
 ## Setup
 
 - Install/upgrade: `pip install --upgrade mcptoon` (zero-dependency wheel,
-  534KB, installs in seconds). Confirm the upgrade before running it — pinning a
+  561KB, installs in seconds). Confirm the upgrade before running it — pinning a
   version here would only go stale, but a bare `--upgrade` should be your call,
   not an automatic one.
 - Source: this package is published to PyPI by GitHub Actions from
