@@ -769,7 +769,7 @@ python -m pytest tests/ -v   # 3035 passed, 2 skipped
 
 三条硬规则：零依赖（CI 强制）、新功能必须带测试、Windows 是一等目标。新手可以先看 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) 和 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md)。
 
-代码规模：**56 个模块、41,179 行 Python**，零第三方依赖。
+代码规模：**56 个模块、41,185 行 Python**，零第三方依赖。
 
 ---
 

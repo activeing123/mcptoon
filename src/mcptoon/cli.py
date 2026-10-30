@@ -440,7 +440,13 @@ def _first_run_self_heal() -> None:
         if skills_mod.ensure_index():
             n = len(skills_mod.load_index().get("skills") or [])
             if n:
-                print(f"  ✓ Skill catalog indexed: {n} skill(s) routable "
+                # "entries", not "skills": the index carries alias cards, so this
+                # count is higher than the skill count `skills doctor` prints. The
+                # quickstart path below carries the same message; fixing only that
+                # one left this, the path that runs on every command, still saying
+                # "skill(s)" (issue #40 — four surfaces, four calibers, none named).
+                print(f"  ✓ Skill catalog indexed: {n} "
+                      f"entr{'y' if n == 1 else 'ies'} routable "
                       f"via `mcptoon skills resolve`")
         cfg.mark_selfheal_done(fingerprint)
     except Exception:

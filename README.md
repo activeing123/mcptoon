@@ -881,7 +881,7 @@ is a first-class target. New here? Start with
 [CONTRIBUTING.md](https://github.com/activeing123/mcptoon/blob/main/CONTRIBUTING.md) and
 [DEVELOPERS.md](https://github.com/activeing123/mcptoon/blob/main/DEVELOPERS.md).
 
-The codebase: **41,179 lines of Python across 56 modules**, zero third-party dependencies.
+The codebase: **41,185 lines of Python across 56 modules**, zero third-party dependencies.
 
 ---
 

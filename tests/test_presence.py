@@ -323,6 +323,13 @@ class TestFirstRunSelfHeal(_IsolatedHome):
         self.assertTrue(installed.is_file(), "the agent-visible skill was not written")
         self.assertIn("mcptoon skill installed", out)
         self.assertIn("Skill catalog indexed", out)
+        # The caliber, not just the prefix (issue #40). This path runs on every
+        # command, and quickstart carries a second copy of the same message — the
+        # one that is *not* covered here stayed on "skill(s)" for a whole release
+        # because the two sites were only ever asserted by their shared prefix.
+        self.assertIn("1 entry routable", out,
+                      "an index entry is not a skill; name what was counted")
+        self.assertNotIn("skill(s) routable", out)
         self.assertTrue(cfg.selfheal_done())
 
     def test_no_view_yet_says_so_instead_of_claiming_six_agents(self):
