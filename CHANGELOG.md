@@ -5,7 +5,7 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.34] - 2026-10-30
 
 ### Fixed
 
@@ -22,6 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still alive, so it still reports `RESPONSE_TIMEOUT`. The regression test forces
   the ordering (the child keeps stdout open, so no EOF ever arrives) and fails
   with the original `RESPONSE_TIMEOUT != PROCESS_DIED` on the previous code.
+- **The self-heal path also printed an unlabelled skill count (issue #40).** The
+  0.8.33 fix corrected the quickstart copy and missed the second call site in the
+  same file — the one that runs on every command. Two places print "Skill catalog
+  indexed"; the tests covering them asserted only the shared prefix, so nothing
+  could tell them apart and `mcptoon list` still said `N skill(s) routable`. Both
+  now say `N entry/entries routable`, and the presence test pins the caliber
+  rather than the prefix so the two sites cannot drift again.
+
+### Docs
+
+- **The channel ledger tracked a winget obligation against a PR that had been
+  closed for eight days.** `AGENTS.md` named `#443014` (0.8.3) as the open
+  submission; verified against the live API, `#443014` and `#450462` (0.8.17) were
+  closed unmerged on 2026-10-21 and `#457898` (0.8.25) on 2026-10-24, leaving
+  `#460772` (0.8.27) as the only one open. `release_sync.py` reads the live number
+  and was always right, which is exactly why nothing caught the prose drifting.
 
 ## [0.8.33] - 2026-10-29
 
