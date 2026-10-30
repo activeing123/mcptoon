@@ -5,6 +5,24 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A server that has already exited is reported as `PROCESS_DIED`, not as
+  `RESPONSE_TIMEOUT`.** Found by the 0.8.33 numtide packaging PR failing on that
+  project's aarch64 builder while every x86_64 run passed: `_stdio_request` waits
+  on a queue that is resolved either by the pump thread delivering its EOF
+  sentinel (→ `PROCESS_DIED`) or by the deadline (→ `RESPONSE_TIMEOUT`), and on a
+  loaded machine the deadline wins that race. The timeout branch never asked
+  whether the process was still alive, so a server that had exited was reported
+  as merely silent — the reader then goes looking for a slow server instead of a
+  dead one. It now checks `poll()` before deciding, which is the direct signal and
+  does not depend on the pump being scheduled; a server that is genuinely slow is
+  still alive, so it still reports `RESPONSE_TIMEOUT`. The regression test forces
+  the ordering (the child keeps stdout open, so no EOF ever arrives) and fails
+  with the original `RESPONSE_TIMEOUT != PROCESS_DIED` on the previous code.
+
 ## [0.8.33] - 2026-10-29
 
 ### Fixed

@@ -136,6 +136,24 @@ for line in sys.stdin:
 sys.exit(0)
 '''
 
+DEAD_BUT_PIPE_STAYS_OPEN = r'''
+"""Exits after the first request, but a child keeps stdout open.
+
+Why this shape: the pump can only notice death through EOF, and the sentinel it
+delivers is what makes a dead process report PROCESS_DIED. As long as some process
+still holds the write end of stdout, no EOF ever arrives, so the deadline is the
+only thing that can resolve the wait. That is the ordering a loaded builder
+produces, and it used to report RESPONSE_TIMEOUT for a process that was already
+gone. The child outlives the test on purpose (30s) so the ordering is forced
+rather than hoped for; it is a bare sleep with no side effects.
+"""
+import subprocess, sys
+for line in sys.stdin:
+    break
+subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+sys.exit(0)
+'''
+
 
 def _write_server(tmpdir, code, name):
     path = os.path.join(tmpdir, name)
@@ -166,6 +184,8 @@ class TestStdioResponsePump(unittest.TestCase):
         cls.silent = _write_server(cls.tmpdir, SILENT_SERVER, "silent_server.py")
         cls.slow = _write_server(cls.tmpdir, SLOW_PROBE_SERVER, "slow_probe.py")
         cls.dier = _write_server(cls.tmpdir, DIE_ON_FIRST_REQUEST, "dier.py")
+        cls.open_pipe = _write_server(cls.tmpdir, DEAD_BUT_PIPE_STAYS_OPEN,
+                                      "dead_open_pipe.py")
 
     def test_silent_probe_falls_back_and_works(self):
         """The production hang: silent probe → deadline → legacy fallback →
@@ -217,6 +237,26 @@ class TestStdioResponsePump(unittest.TestCase):
         self.assertEqual(cm.exception.code, "PROCESS_DIED")
         self.assertLess(elapsed, 15, f"took {elapsed:.1f}s; EOF wake-up failed")
         client.close()
+
+    def test_dead_process_reports_died_even_when_the_deadline_wins(self):
+        """A dead process is dead, not silent — whichever side of the race wins.
+
+        The existing test above covers the ordering where EOF arrives first. This
+        one forces the other ordering: the server exits but a child holds stdout
+        open, so no EOF sentinel is ever delivered and only the deadline resolves
+        the wait. Before the fix this raised RESPONSE_TIMEOUT for a process that
+        had already exited, which is how the 0.8.33 numtide packaging PR failed on
+        aarch64 (2026-10-29) while every x86_64 run passed.
+        """
+        client = MCPClient(stdio=[PY, self.open_pipe], timeout=2)
+        try:
+            with self.assertRaises(MCPError) as cm:
+                client.initialize()
+            self.assertEqual(
+                cm.exception.code, "PROCESS_DIED",
+                "a process that has exited must not be reported as a silent one")
+        finally:
+            client.close()
 
     def test_slow_probe_within_deadline_still_modern(self):
         """A slow-but-alive modern server (3s < 10s cap) still negotiates

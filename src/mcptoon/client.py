@@ -775,6 +775,22 @@ class MCPClient:
         except queue.Empty:
             with self._response_queues_lock:
                 self._response_queues.pop(rid, None)
+            # A timeout and a death are indistinguishable from the queue's point of
+            # view: the pump delivers a None sentinel on EOF, so if we are here the
+            # pump had not seen EOF *yet*. On a loaded machine the deadline wins
+            # that race, and reporting a process that is already gone as "server
+            # went silent" sends the reader after the wrong problem. Measured on
+            # numtide's aarch64 builder (2026-10-29): the client asserted
+            # PROCESS_DIED, this branch raised RESPONSE_TIMEOUT instead, and the
+            # 0.8.33 packaging PR could not merge. poll() is the direct signal and
+            # does not depend on the pump thread being scheduled; a server that is
+            # merely slow is still alive, so it still reports RESPONSE_TIMEOUT.
+            if self._proc is not None and self._proc.poll() is not None:
+                stderr = _salient_stderr(self._stderr_tail())
+                raise MCPError(
+                    "PROCESS_DIED",
+                    f"MCP server process exited (rc={self._proc.returncode}) "
+                    f"without answering request id {rid}. stderr: {stderr}") from None
             raise MCPError(
                 "RESPONSE_TIMEOUT",
                 f"no JSON-RPC response for request id {rid} "
