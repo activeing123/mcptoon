@@ -9,9 +9,14 @@
 <h3 align="center">所有 Agent 的 MCP 工具与技能，一处搞定。</h3>
 
 <p align="center">
-  <b>你在任意一个 Agent 里配好的工具和技能，Cursor、Claude Code、Codex 等覆盖 103+ 款主流桌面与终端 Agent 都能直接用。</b><br>
+  <b>在本地安装 1,000 个技能和 1,000 个 MCP 工具 — 彻底告别上下文爆仓。</b><br>
+  你在任意一个 Agent 里配好的工具和技能，Cursor、Claude Code、Codex 等覆盖 103+ 款主流桌面与终端 Agent 都能直接用。<br>
   首创开箱即用的按需拉取机制，不再把 Schema 堆满会话，<b>立省 99% Token 上下文</b>。<br>
   零依赖，纯本地，不上云。
+</p>
+
+<p align="center">
+  <sub>如果它帮你省下了 Token，欢迎 <a href="https://github.com/activeing123/mcptoon/stargazers">点个 Star</a> — 让更多开发者发现它。</sub>
 </p>
 
 <!-- 核心权威徽章 -->

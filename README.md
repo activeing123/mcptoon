@@ -9,9 +9,14 @@
 <h3 align="center">One Place for All Your Agents' MCP Tools and Skills.</h3>
 
 <p align="center">
-  <b>Tools and skills configured in any single agent just work across Cursor, Claude Code, Codex, and 103+ desktop & terminal agents.</b><br>
+  <b>Install 1,000 skills and 1,000 MCP tools locally — and never worry about context flooding.</b><br>
+  Tools and skills configured in any single agent just work across Cursor, Claude Code, Codex, and 103+ desktop & terminal agents.<br>
   Pioneering on-demand schema retrieval out of the box — no more stuffing context windows, <b>saving 99% context tokens</b>.<br>
   Zero dependencies, pure local, offline-first.
+</p>
+
+<p align="center">
+  <sub>If this saves you tokens, please <a href="https://github.com/activeing123/mcptoon/stargazers">star the repo</a> — it helps other builders discover it.</sub>
 </p>
 
 <!-- Primary Status Badges -->
