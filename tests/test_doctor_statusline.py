@@ -41,7 +41,6 @@ def _run_doctor(tmp_path, statusline_result, *, as_json=False):
     servers = {"good": {"transport": "stdio"}}
     buf = io.StringIO()
     code = 0
-    fmt = "json" if as_json else "auto"
     argv = ["--json"] if as_json else []
     with patch.object(cfg, "CONFIG_FILE", config_file), \
          patch.object(cfg, "CACHE_DIR", tmp_path / "cache"), \
@@ -53,7 +52,7 @@ def _run_doctor(tmp_path, statusline_result, *, as_json=False):
          patch.dict(os.environ, {"MCPTOON_NO_STAR_HINT": "1", "CI": ""}), \
          redirect_stdout(buf):
         try:
-            cli._cmd_doctor(argv, fmt=fmt)
+            cli._cmd_doctor(argv, json_mode=as_json)
         except SystemExit as e:
             code = e.code if isinstance(e.code, int) else 1
     return buf.getvalue(), code

@@ -162,7 +162,7 @@ def _run_doctor(tmp_path, mode_name):
             patch.dict(os.environ, {"MCPTOON_NO_STAR_HINT": "1", "CI": ""}), \
             redirect_stdout(buf):
         try:
-            cli._cmd_doctor([], fmt="auto")
+            cli._cmd_doctor([], json_mode=False)
         except SystemExit as e:
             code = e.code if isinstance(e.code, int) else 1
     return buf.getvalue(), code
@@ -476,7 +476,7 @@ def test_doctor_json_has_top_level_mode_and_recommendation(tmp_path):
             patch.dict(os.environ, {"MCPTOON_NO_STAR_HINT": "1", "CI": ""}), \
             redirect_stdout(buf):
         try:
-            cli._cmd_doctor([], fmt="json")
+            cli._cmd_doctor([], json_mode=True)
         except SystemExit:
             pass
     data = json.loads(buf.getvalue())

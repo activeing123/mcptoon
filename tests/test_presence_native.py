@@ -246,7 +246,7 @@ def _run_doctor_healthy(monkeypatch):
     monkeypatch.setattr(cli, "_doctor_smart_tips", lambda servers: None)
     out = io.StringIO()
     with redirect_stdout(out):
-        cli._cmd_doctor([], "auto")
+        cli._cmd_doctor([], json_mode=False)
     return out.getvalue()
 
 
@@ -266,7 +266,7 @@ def test_doctor_verification_line_is_gated_on_gateway_wiring(monkeypatch):
     monkeypatch.setattr(cli, "_doctor_smart_tips", lambda servers: None)
     out = io.StringIO()
     with redirect_stdout(out):
-        cli._cmd_doctor([], "auto")
+        cli._cmd_doctor([], json_mode=False)
     text = out.getvalue()
     assert "All good" in text
     assert "See it working" not in text, "no gateway wired → no 'let an agent use it' advice"
