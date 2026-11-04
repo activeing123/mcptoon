@@ -5,6 +5,24 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Per-command `ArgParserFactory`.** A new
+  `src/mcptoon/arg_parser_factory.py` module wraps `argparse.ArgumentParser`
+  with `allow_abbrev=False` and `add_help=False`, exposing a shared baseline of
+  output flags (`--json`, `--toon`, `--slim`, `--compact`, `--mcptoon`,
+  `--yaml`, `--format`, `--head`, `--max-chars`, `--full`, `--transport`,
+  `--stdin`, `--fallback-json`). `parse_cmd_args` uses `parse_known_args` so
+  positionals and opaque tails pass through to the command handler without
+  aborting; strict unknown-flag enforcement stays with the global pre-pass in
+  `cli.py`.
+- `doctor` subcommand migrated to the new parser. `_cmd_doctor` now takes
+  `json_mode=False` instead of the old `fmt`/`--json in rest` heuristic, and the
+  dispatch consumes `--json` via the factory. The global pre-pass still validates
+  every other flag and value, so strict-mode behavior is unchanged.
+
 ## [0.8.34] - 2026-10-30
 
 ### Fixed

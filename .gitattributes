@@ -1,2 +1,8 @@
 # Treat all files under docs/ as documentation so GitHub Linguist does not count HTML/JS toward the repo language stats
 docs/** linguist-documentation
+# These files are 100% CRLF in the repo. Mark them binary-ish (`-text`) so git
+# stores them verbatim and core.autocrlf cannot normalize them to LF on add
+# (which would show the whole file as changed in the diff).
+CHANGELOG.md -text
+assets/how-it-works-en.svg -text
+src/mcptoon/serve.py -text
