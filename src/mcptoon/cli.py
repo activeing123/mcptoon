@@ -66,6 +66,10 @@ KNOWN_FLAGS = frozenset(
         "--self", "--pack", "--packs",
         "--slim", "--smart",
         "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--top",
+        # `--yaml` is the YAML output format (see arg_parser_factory.ArgParserFactory).
+        # Registered so the central parser does not reject it as an unknown
+        # flag before the per-command parser handles it.
+        "--yaml",
         "--sort", "--verbose", "--base-url", "--cache-key", "--cache-ttl", "--register", "--client-name", "--bin", "--openapi", "--graphql", "--mcp", "--transport", "--complete",
         "--url", "--usage",
         "--version", "--version-gate", "--view", "--watch",
@@ -500,6 +504,13 @@ def _run(state: dict) -> None:
     i = 0
     while i < len(args):
         a = args[i]
+        if a == "--json" and "doctor" in cmd_args:
+            # `doctor` parses its own args (see the dispatch below); keep
+            # --json in rest so the per-command parser consumes it. The global
+            # pre-pass still validates every other flag and value here.
+            cmd_args.append(a)
+            i += 1
+            continue
         if a in _FORMAT_FLAGS:
             note = format_flag_override_note(fmt_flag, a)
             if note:
@@ -717,7 +728,10 @@ def _run(state: dict) -> None:
     elif command == "import":
         _cmd_import(rest, fmt, head_n, max_chars, full)
     elif command == "doctor":
-        _cmd_doctor(rest, fmt)
+        from .arg_parser_factory import ArgParserFactory
+        factory = ArgParserFactory()
+        ns, doctor_rest = factory.parse_cmd_args("doctor", rest)
+        _cmd_doctor(doctor_rest, json_mode=ns.json)
     elif command == "install":
         _cmd_install(rest, fmt, full, head_n, max_chars)
     elif command == "update":
@@ -5667,14 +5681,13 @@ def _explain_server_error(raw: str) -> tuple[str, str]:
     return manifest_mod.explain_error(raw)
 
 
-def _cmd_doctor(rest, fmt="auto"):
+def _cmd_doctor(rest, json_mode=False):
     """Self-diagnose configuration and connectivity.
 
     Usage:
         mcptoon doctor            # human-readable diagnostics
         mcptoon doctor --json     # structured {checks, issues, ok, broken}
     """
-    json_mode = fmt == "json" or "--json" in rest
     rows = []          # structured check results for --json
     broken = []        # (server, reason) for the human summary + JSON
 
