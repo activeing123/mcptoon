@@ -60,7 +60,7 @@ def _doctor_json(tmp_path, tools_by_server):
          patch.dict(os.environ, {"MCPTOON_NO_STAR_HINT": "1", "CI": ""}), \
          redirect_stdout(buf):
         try:
-            cli._cmd_doctor(["--json"], fmt="json")
+            cli._cmd_doctor(["--json"], json_mode=True)
         except SystemExit as e:
             code = e.code if isinstance(e.code, int) else 1
     return json.loads(buf.getvalue()), code
