@@ -126,15 +126,44 @@ def _tool_annotations(server: str, tool: str) -> dict | None:
     return None
 
 
+def _scan_arguments(args: dict | None) -> str | None:
+    """Inspect the call arguments: explicit force/confirm, then content.
+
+    Steps 4a/4b of `_check_dangerous`'s resolution order, pulled out so the
+    ``readOnlyHint`` branch can reuse them. A read-only *hint* is server-supplied
+    metadata; it may clear a name false positive, but it must never switch off
+    the inspection of what is actually being passed.
+    """
+    if not args or not isinstance(args, dict):
+        return None
+    # 4a. Explicit force/confirm flags
+    for key in ("force", "confirm"):
+        if key in args and args[key] is True:
+            return f"argument contains dangerous flag: {key}=true"
+    # 4b. Destructive statement hidden in a sql/shell-style argument
+    for key in _DANGEROUS_ARG_KEYS:
+        val = args.get(key)
+        if not isinstance(val, str):
+            continue
+        low = val.lower()
+        for pat in _DANGEROUS_ARG_PATTERNS:
+            if re.search(pat, low):
+                return f"argument '{key}' contains a destructive statement"
+    return None
+
+
 def _check_dangerous(server: str, tool: str, args: dict | None = None,
                      annotations: dict | None = None) -> str | None:
     """Check if operation is dangerous. Returns reason string or None.
 
     Resolution order, so an explicit MCP annotation beats a guessed name:
 
-      1. ``readOnlyHint: true``  → safe, skip the name check entirely. That is
-         the field's whole purpose: it clears a *false positive* such as a
-         cache-flush tool whose name happens to contain ``clear``.
+      1. ``readOnlyHint: true``  → skip the *name* check. That is the field's
+         whole purpose: it clears a *false positive* such as a cache-flush tool
+         whose name happens to contain ``clear``. It does **not** skip step 4 —
+         annotations are server-controlled, so a tool declaring read-only while
+         taking ``{"cmd": "rm -rf /"}`` would otherwise opt itself out of the
+         guard entirely (external report 2026-11-06, defect introduced in 0.8.27).
       2. ``destructiveHint: true`` → dangerous even when the name looks harmless
          (a `truncate_table` carrying the spec annotation). The old name-only
          screen waved this straight through.
@@ -157,14 +186,9 @@ def _check_dangerous(server: str, tool: str, args: dict | None = None,
     # 1. readOnlyHint clears the name check (fixes the clear_cache false positive)
     if isinstance(annotations, dict):
         if _coerce_bool(annotations.get("readOnlyHint")) is True:
-            # Still honour an explicit force/confirm argument — a read-only tool
-            # has no business taking one, and if it does the caller is asserting
-            # an intent we should not silently drop.
-            if args and isinstance(args, dict):
-                for key in ("force", "confirm"):
-                    if key in args and args[key] is True:
-                        return f"argument contains dangerous flag: {key}=true"
-            return None
+            # Skip the *name* screen only — the argument scan still runs, so a
+            # server cannot silence the guard by annotating its shell/SQL tool.
+            return _scan_arguments(args)
         # 2. destructiveHint flags a dangerous op the name does not advertise
         if _coerce_bool(annotations.get("destructiveHint")) is True:
             return "tool annotations declare destructiveHint: true"
@@ -174,21 +198,8 @@ def _check_dangerous(server: str, tool: str, args: dict | None = None,
         if pattern in tool_lower:
             return f"tool name matches dangerous pattern: '{pattern}'"
 
-    # 4a. Explicit force/confirm flags
-    if args and isinstance(args, dict):
-        for key in ("force", "confirm"):
-            if key in args and args[key] is True:
-                return f"argument contains dangerous flag: {key}=true"
-        # 4b. Destructive statement hidden in a sql/shell-style argument
-        for key in _DANGEROUS_ARG_KEYS:
-            val = args.get(key)
-            if not isinstance(val, str):
-                continue
-            low = val.lower()
-            for pat in _DANGEROUS_ARG_PATTERNS:
-                if re.search(pat, low):
-                    return f"argument '{key}' contains a destructive statement"
-    return None
+    # 4. Argument inspection
+    return _scan_arguments(args)
 
 
 # ─── Tool poisoning detection ───

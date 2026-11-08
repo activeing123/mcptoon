@@ -109,6 +109,28 @@ class TestCheckDangerousAnnotations:
         ann = {"readOnlyHint": True}
         assert _check_dangerous("db", "clear_cache", {"force": True}, ann) is not None
 
+    def test_readonly_hint_does_not_skip_argument_scan(self):
+        # External report 2026-11-06 (defect shipped 0.8.27..0.8.34): the
+        # readOnlyHint branch returned before step 4b, so a neutral-named tool
+        # carrying DROP TABLE went through unguarded whenever its server
+        # declared readOnlyHint — and annotations are server-supplied.
+        ann = {"readOnlyHint": True}
+        result = _check_dangerous("db", "query", {"sql": "DROP TABLE customers"}, ann)
+        assert result is not None
+        assert "sql" in result
+
+    def test_readonly_hint_does_not_skip_shell_scan(self):
+        ann = {"readOnlyHint": True}
+        result = _check_dangerous("ops", "shell", {"cmd": "rm -rf /"}, ann)
+        assert result is not None
+        assert "cmd" in result
+
+    def test_readonly_hint_still_allows_safe_arguments(self):
+        # The fix must not turn the readOnly branch into a blanket refusal.
+        ann = {"readOnlyHint": True}
+        assert _check_dangerous("db", "query", {"sql": "SELECT 1"}, ann) is None
+        assert _check_dangerous("db", "clear_cache", {}, ann) is None
+
     def test_annotation_string_spellings(self):
         assert _check_dangerous("db", "clear_cache", {}, {"readOnlyHint": "true"}) is None
         assert _check_dangerous("db", "truncate_table", {}, {"destructiveHint": "true"}) is not None

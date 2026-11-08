@@ -5,6 +5,24 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A `readOnlyHint: true` annotation no longer switches off the argument
+  screen.** Reported by a third party (2026-11-06) against 0.8.34 and
+  reproducible with no server attached: `_check_dangerous` resolved
+  `readOnlyHint` first and returned before step 4b, so a tool whose name dodges
+  the pattern list ran with nothing inspecting what it was passed —
+  `{"sql": "DROP TABLE customers"}` and `{"cmd": "rm -rf /"}` both returned
+  `None` while the identical arguments without the annotation were refused. The
+  annotation exists to clear a *name* false positive (`clear_cache`), and
+  annotations are server-supplied metadata, so treating it as "skip everything"
+  let a sloppy or hostile server opt its own shell/SQL tool out of the guard
+  silently. The argument scan now runs in the read-only branch too; only the name
+  check is skipped there. The defect shipped in 0.8.27 together with the
+  annotations fix and is present through 0.8.34.
+
 ## [0.8.34] - 2026-10-30
 
 ### Fixed
