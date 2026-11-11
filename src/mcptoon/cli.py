@@ -504,13 +504,6 @@ def _run(state: dict) -> None:
     i = 0
     while i < len(args):
         a = args[i]
-        if a == "--json" and "doctor" in cmd_args:
-            # `doctor` parses its own args (see the dispatch below); keep
-            # --json in rest so the per-command parser consumes it. The global
-            # pre-pass still validates every other flag and value here.
-            cmd_args.append(a)
-            i += 1
-            continue
         if a in _FORMAT_FLAGS:
             note = format_flag_override_note(fmt_flag, a)
             if note:
@@ -728,10 +721,18 @@ def _run(state: dict) -> None:
     elif command == "import":
         _cmd_import(rest, fmt, head_n, max_chars, full)
     elif command == "doctor":
+        # Keyed on the *resolved* command, never on a token that merely appears
+        # in the argument list: `mcptoon run doctor`, a server named `doctor`, or
+        # an `--name doctor` value must not switch parsing modes.
         from .arg_parser_factory import ArgParserFactory
         factory = ArgParserFactory()
         ns, doctor_rest = factory.parse_cmd_args("doctor", rest)
-        _cmd_doctor(doctor_rest, json_mode=ns.json)
+        # `--json` is a global format flag: the pre-pass above consumes it on
+        # either side of the command (`mcptoon doctor --json`,
+        # `mcptoon --json doctor`) and drops it from `rest`, so `fmt` is what
+        # reports it here. `ns.json` covers a caller that hands the factory its
+        # own argument list (tests, embedders).
+        _cmd_doctor(doctor_rest, json_mode=ns.json or fmt == "json")
     elif command == "install":
         _cmd_install(rest, fmt, full, head_n, max_chars)
     elif command == "update":
