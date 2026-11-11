@@ -5,6 +5,73 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.36] - 2026-11-11
+
+### Added
+
+- **DSH is a supported host.** `mcptoon sync --self` now writes the skill pointer
+  into `$DSH_HOME/AGENTS.md`. The contract was already there — the shell-capability
+  table reads `DSH_SHELL` (verified set to `1` inside a real DSH session), and the
+  pointer block was written with it in mind ("Codex (and DSH) mount no MCP, so the
+  handshake `instructions` channel never reaches them") — but there was no row in
+  `sync._AGENT_SPECS`, so a DSH user got no pointer, no `sync --self` and no
+  takeover, and had to hand-write the catalog line into their own instruction file.
+  The path follows `DSH_HOME` rather than a vendor constant, because DSH is
+  relocatable and one machine can run several instances with different homes
+  (measured: port 18085 → `E:\dsh-next\home`, port 18090 → its own); `~/.dsh` is the
+  fallback. `mcptoon sync --dry` now scans 13 hosts and names DSH.
+- **CLI discovery is counted.** `manifest`, `inspect`, `search` and `select` now
+  record a usage line under the reserved `mcptoon` server, the way the gateway's
+  own tools already did. Nothing counted them before, so on a CLI machine — the leg
+  whose design leans entirely on the model *asking* for the catalog instead of
+  receiving it — `mcptoon usage --json` reported `native_calls: 0` on a machine with
+  522 routed calls, and there was no way to tell "nobody asked" from "nobody
+  counted the asking". `mcptoon activity` now shows `mcptoon:manifest` beside the
+  routed calls.
+
+### Changed
+
+- **The per-turn footer describes the reader, not the machine.** On a machine whose
+  gateway is wired into *other* hosts while their direct entries remain
+  (`serve-alongside`), a reader that can run a shell was told `未接管·未省` on every
+  turn — a statement about four other applications, printed at an agent that was
+  already on the cheapest route there is (no MCP mounted, zero resident). Measured
+  on the machine this was found on: 16 days installed, 527 routed CLI calls,
+  `resident_avoided` still 0, and the headline never named the reader's own cost. A
+  reader whose environment identifies it as shell-capable (`DSH_SHELL`,
+  `CLAUDECODE`, `CODEX_HOME`, `CURSOR_TRACE_ID`) now gets its own figures —
+  `CLI 路线 · 0 常驻 · 省 655,518/轮 · 539 次` — while an unidentified or GUI reader
+  keeps the machine-global verdict, which is the true one for it. Unknown is
+  deliberately not treated as "shell-capable": guessing would print a CLI credit to
+  a host whose real cost is a serve figure. The `/轮` suffix was added after the
+  bare `省 655,518` read as a running total; the cumulative figure is a different
+  caliber (`mcptoon report` measures it as a lower bound on the *serve* caliber and
+  says so).
+- **The not-saving nudge names the subject.** It used to read `现在还没省:跑
+  mcptoon sync --takeover`, which is read as a claim about whoever is reading it —
+  how a CLI-leg session got told it was saving nothing. It now says `另有宿主仍直连
+  32 条,每次照旧直接加载`, so the entries are attributed to the hosts that hold
+  them.
+
+### Fixed
+
+- **Nothing said what to do when nothing is being saved.** The tools line reported
+  `未省`, which is a status; a status does not tell a reader what to type. When the
+  mode is `direct` or `serve-alongside`, the footer now carries one pasteable
+  command (`mcptoon sync --takeover` or `mcptoon quickstart`), throttled to at most
+  once per 24 hours and five times in total so it reads as a nudge rather than
+  nagging. `--json` stays read-only and does not spend the allowance, so a script
+  polling the figures cannot burn a human's.
+- **The test suite no longer writes into a developer's real DSH home.** Adding the
+  DSH row made `sync` write pointers through `$DSH_HOME`, and `tests/conftest.py`
+  isolated `HOME`, `%APPDATA%` and `XDG_CONFIG_HOME` but not that variable — so a
+  suite run appended the skill-pointer block to the live
+  `$DSH_HOME/AGENTS.md` (measured 1628 → 2368 bytes), i.e. the agent instructions of
+  whoever ran pytest. `conftest.py` now points `DSH_HOME` at a temp path and clears
+  the agent marker variables (`DSH_SHELL`, `CLAUDECODE`, `CODEX_HOME`, ...) for the
+  session, so which agent launched pytest can no longer change what the suite
+  asserts. Verified: the file's SHA-1 is unchanged across a full run.
+
 ## [0.8.35] - 2026-11-08
 
 ### Fixed
