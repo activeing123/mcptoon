@@ -1295,6 +1295,27 @@ class TestAgentTable:
                 assert spec.pointer_fn is not None, \
                     f"{spec.id} is CLI-only but has no pointer_fn: unreachable host"
 
+    def test_dsh_pointer_follows_dsh_home(self, tmp_path, monkeypatch):
+        """DSH is relocatable, so the pointer must follow the home it was started with.
+
+        One machine can run several DSH instances with different homes (measured
+        2026-11-11: 18085 → `E:\\dsh-next\\home`, 18090 → its own). A pointer written
+        into the wrong home is a silent no-op — the sessions that read it never see it.
+        """
+        from mcptoon.sync import pointer_path
+
+        monkeypatch.setenv("DSH_HOME", str(tmp_path / "dsh-home"))
+        assert pointer_path("dsh") == tmp_path / "dsh-home" / "AGENTS.md"
+
+    def test_dsh_falls_back_to_the_default_home(self, monkeypatch):
+        """No `DSH_HOME` exported: use the default DSH itself uses."""
+        from mcptoon.sync import pointer_path
+
+        monkeypatch.delenv("DSH_HOME", raising=False)
+        pointer = pointer_path("dsh")
+        assert pointer.name == "AGENTS.md"
+        assert pointer.parent.name == ".dsh"
+
     def test_pointer_path_agrees_with_the_table(self):
         """`pointer_path` is driven by `pointer_fn` — one rule, no second list."""
         from mcptoon.sync import _AGENT_SPECS, pointer_path

@@ -1244,6 +1244,38 @@ def remember_footer_line(line: str) -> None:
         pass
 
 
+# ─── Remembering the next-action nudge ───
+#
+# A separate file, not a key inside the footer state above: `remember_footer_line`
+# writes the whole document (`{"line": ...}`), so sharing one file would mean every
+# footer render silently erasing the nudge's own counters. Sits beside the footer
+# state on purpose — a test that redirects `MCPTOON_FOOTER_STATE_FILE` isolates
+# both, and a machine that clears its config clears both.
+
+def next_action_state() -> dict:
+    """The nudge's counters (`shown`, `ts`), or an empty dict.
+
+    Best-effort, same posture as `last_footer_line`: an unreadable file reads as
+    "never shown", which can only mean the nudge appears once more — never a crash.
+    """
+    try:
+        path = _footer_state_file().with_name("footer-hint.json")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def remember_next_action_state(state: dict) -> None:
+    """Persist the nudge's counters. Best-effort (a read-only home must not crash)."""
+    try:
+        path = _footer_state_file().with_name("footer-hint.json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state), encoding="utf-8")
+    except OSError:
+        pass
+
+
 # ─── Language of the human-facing strings ───
 
 def _lang_from_tag(tag: str | None) -> str | None:

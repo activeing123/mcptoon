@@ -137,6 +137,16 @@ _AGENT_SPECS: tuple[_AgentSpec, ...] = (
     _AgentSpec("opencode", "opencode", "_opencode_path",
                shape="pointer", detected_by="parent", only_when_present=True,
                pointer_fn="_opencode_path"),
+    # DSH is the host this leg was missing until 2026-11-11. It was already known to
+    # the shell-capability table (`mode._SHELL_HOST_ENV` reads `DSH_SHELL`, verified
+    # set to `1` inside a real DSH session), and `_skill_pointer_block` was already
+    # written with it in mind ("Codex (and DSH) mount no MCP, so the handshake
+    # `instructions` channel never reaches them") — but there was no row here, so a
+    # DSH user got no pointer, no `sync --self` and no takeover, and had to hand-write
+    # the catalog line into their own instructions file.
+    _AgentSpec("dsh", "DSH", "_dsh_agents_path",
+               shape="pointer", detected_by="parent", only_when_present=True,
+               pointer_fn="_dsh_agents_path"),
 )
 
 _AGENT_SPEC_BY_ID: dict[str, _AgentSpec] = {spec.id: spec for spec in _AGENT_SPECS}
@@ -265,6 +275,25 @@ def _opencode_path() -> Path:
     the two legs reinforce rather than fight.
     """
     return _config_dir() / "opencode" / "AGENTS.md"
+
+
+def _dsh_agents_path() -> Path:
+    """DSH's machine-wide instruction file.
+
+    `$DSH_HOME/AGENTS.md`. Unlike the other CLI-leg hosts this path is not a vendor
+    constant, because DSH is explicitly *relocatable*: the launcher sets `DSH_HOME`
+    to the home it was started with, and one machine can run several instances side
+    by side with different homes (measured here 2026-11-11: port 18085 →
+    `E:\\dsh-next\\home`, port 18090 → its own). Reading the variable means `sync`
+    writes the pointer into the home of the instance it was invoked from, which is
+    the only home whose sessions will read it.
+
+    `~/.dsh` is the fallback for a plain install that did not export the variable —
+    the same default DSH itself uses. The directory existing is the install proof
+    (`detected_by="parent"`); the file is what we may have to create.
+    """
+    home = os.environ.get("DSH_HOME")
+    return (Path(home) if home else _home() / ".dsh") / "AGENTS.md"
 
 
 # Hosts whose agent reads a machine-wide instruction file every session: the hosts

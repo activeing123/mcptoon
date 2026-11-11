@@ -40,3 +40,27 @@ os.environ["XDG_CONFIG_HOME"] = str(_home / ".config")
 # tests were written against; tests that want XDG behaviour set their own
 # environment (see tests/test_xdg.py).
 os.environ["MCPTOON_HOME"] = str(_home / ".mcptoon")
+
+# `DSH_HOME` is the second root that does not follow `HOME`.
+#
+# DSH is relocatable through this variable, and `sync._dsh_agents_path` reads it to
+# decide where DSH's pointer belongs — so a pointer write follows the *real* DSH home
+# even with `HOME` moved. Measured 2026-11-11: adding the DSH row to `_AGENT_SPECS`
+# and running the suite appended the skill-pointer block to the live
+# `$DSH_HOME/AGENTS.md` (1628 → 2368 bytes, i.e. the developer's own agent
+# instructions). Pointing it at a temp path — one that deliberately does not exist,
+# so DSH reads as "not installed" — makes a test that writes "for every host" write
+# nothing outside the temp tree. A test that wants a present DSH sets its own value.
+os.environ["DSH_HOME"] = str(_home / ".dsh")
+
+# Which agent launched pytest must not decide what the suite asserts.
+#
+# `footer.caller_can_shell` and `mode.detect_host` read the *calling* agent's env
+# markers, so a developer running pytest from inside DSH (or Claude Code, or a
+# Cursor terminal) would hand the suite a different reader than CI does — the same
+# class of leak as `DSH_HOME` above, one layer up. Cleared here, "unknown caller" is
+# the deterministic default; a test that wants a shell reader patches
+# `footer.caller_can_shell` or sets the marker itself.
+for _marker in ("DSH_SHELL", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_HOME",
+                "CURSOR_TRACE_ID", "TERM_PROGRAM"):
+    os.environ.pop(_marker, None)

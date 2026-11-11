@@ -954,10 +954,42 @@ def _emit_footer(command: str) -> None:
         if not footer_mod.enabled():
             return
         text = footer_mod.block()
-        if not footer_mod.changed(text):
-            return
-        print(text, file=sys.stderr)
-        footer_mod.remember(text)
+        if footer_mod.changed(text):
+            print(text, file=sys.stderr)
+            footer_mod.remember(text)
+        # The nudge rides this channel but not this gate. The change gate exists to
+        # silence a figure that repeats; a "you are saving nothing" line is the one
+        # case where the repeat is the point, and the silence is how a machine stays
+        # at 0 for weeks. Its own throttle (interval + cap, in `next_action_hint`)
+        # is what keeps it from nagging.
+        action = footer_mod.next_action_hint()
+        if action:
+            print(action, file=sys.stderr)
+            footer_mod.note_next_action_shown()
+    except Exception:
+        return
+
+
+def _track_discovery(name: str, payload=None) -> None:
+    """Record a CLI *discovery* call (`manifest` / `inspect` / `search` / `select`).
+
+    The gateway half of this has always been counted — `serve` calls
+    `usage.track_call("mcptoon", ...)` for its own tools — but the CLI half was not.
+    So on a CLI machine, which is the leg whose whole design depends on the model
+    *asking* for the catalog instead of receiving it, "does anyone ever ask?" had no
+    answer: measured 2026-11-11, `mcptoon usage --json` reported `native_calls: 0`
+    on a machine with 522 routed calls, and nothing could distinguish "nobody asked"
+    from "nobody counted".
+
+    Counted the same way the gateway counts it: `server="mcptoon"` marks a
+    first-party call, and `payload` is what the caller is about to see, so the token
+    figure means the same thing on both legs. Never raises — a discovery command
+    must not fail because its bookkeeping could.
+    """
+    try:
+        from . import usage as usage_mod
+
+        usage_mod.track_call("mcptoon", name, ok=True, payload=payload)
     except Exception:
         return
 
@@ -1191,6 +1223,8 @@ def _cmd_manifest(rest, fmt, head_n, max_chars, full, export_format=""):
         print("No tools found. Run: mcptoon quickstart")
         return
 
+    _track_discovery("manifest", manifest)
+
     # Order and cap before any renderer sees it, so every format agrees.
     manifest = manifest_mod.sort_manifest(manifest, sort_order)
     manifest = manifest_mod.cap_tools_per_server(manifest, top_n)
@@ -1300,6 +1334,7 @@ def _cmd_inspect(rest, fmt, max_chars, full, head_n=0):
             sys.exit(1)
         print(output.render(tools, fmt=fmt if fmt != "auto" else "json", head_n=head_n,
                             max_chars=max_chars, full=full))
+        _track_discovery("inspect", tools)
         # The list is the whole per-server schema set — the thing a CLI call does
         # NOT load (it fetches one). Say how big the set is, so "one at a time" has
         # a denominator. Human mode only, to stderr, so the data channel is pure.
@@ -1355,6 +1390,7 @@ def _cmd_inspect(rest, fmt, max_chars, full, head_n=0):
 
     print(output.render(info, fmt=fmt if fmt != "auto" else "json", head_n=head_n,
                         max_chars=max_chars, full=full))
+    _track_discovery("inspect", info)
     # `inspect` printed the schema and stopped, leaving the reader to turn
     # `required`/`properties` into an argument object. Show the ready-to-edit call.
     # To stderr and only in human mode, so `inspect ... > schema.json` and every
@@ -2125,6 +2161,7 @@ def _cmd_search(rest, fmt, head_n, max_chars, full):
     from . import manifest as manifest_mod
 
     results = manifest_mod.search_tools(query, limit=20)
+    _track_discovery("search", results)
 
     if not results:
         # A machine consumer (`mcptoon search q --json | jq`) must always get
@@ -2280,6 +2317,7 @@ def _cmd_select(rest, fmt="auto", head_n=0, max_chars=0, full=False):
 
     ranked, engine = manifest_mod.rank_tools(query, flat)
     ranked = ranked[:top]
+    _track_discovery("select", ranked)
     # `--head N` caps how many of the top picks are shown in the human output.
     # It used to be ignored here (only the json branch forwarded it to the
     # renderer), so `select ... --head 1` still printed all `--top` results
@@ -4022,6 +4060,10 @@ def _cmd_footer_facts(_rest, fmt, max_chars=0):
         payload = dict(f)
         payload["delivery_mode"] = footer_mod.current_mode()
         payload["cli_credit"] = footer_mod.cli_credit(f)
+        # Read-only here on purpose: a machine consumer asking for the figures must
+        # not advance the nudge's counters, or a script that polls `--json` would
+        # burn the human's whole allowance without ever showing them the line.
+        payload["next_action"] = footer_mod.next_action_hint()
         print(output.render(output.stamp_schema(payload), fmt="json", max_chars=max_chars))
         return
 
@@ -4035,6 +4077,14 @@ def _cmd_footer_facts(_rest, fmt, max_chars=0):
     n = footer_mod.note(f)
     if n:
         print(f"note: {n}")
+    # The machine's own next action, when it is saving nothing (2026-11-11). The
+    # tools line says `未省`, which is a status; this says what to type. Throttled in
+    # `footer.next_action_hint` — this line is *printed* by the surface, so the
+    # counter advances here and only here (the `--json` path above stays read-only).
+    action = footer_mod.next_action_hint()
+    if action:
+        print(action)
+        footer_mod.note_next_action_shown()
     # On a CLI machine the three lines above are all serve/gateway figures, which
     # read as "not about me" to a CLI user — the exact complaint this addresses.
     # Append the CLI-caliber line so the pasteable block names what *this* mode

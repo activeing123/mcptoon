@@ -110,7 +110,8 @@ import math
 
 __all__ = ["facts", "line", "skills_line", "compression_line", "note", "block",
            "enabled", "lang", "changed", "remember", "MARK",
-           "current_mode", "cli_credit", "cli_credit_line", "tool_schema_tokens"]
+           "current_mode", "cli_credit", "cli_credit_line", "tool_schema_tokens",
+           "next_action_hint", "note_next_action_shown", "caller_can_shell"]
 
 # The savings line is meant to be *noticed* — the entire point of this feature is
 # that an install stops being invisible. A single emoji is the cheapest way to
@@ -630,6 +631,98 @@ def current_mode() -> str:
         return ""
 
 
+def caller_can_shell() -> bool:
+    """Whether the reader asking for this footer is an agent that can run a shell.
+
+    `current_mode()` classifies the *machine*; this classifies the *reader*, and on
+    a `serve-alongside` machine the two disagree. Measured 2026-11-11: a DSH session
+    was shown `未接管·未省` on every turn — a fact about four other applications
+    (Claude Desktop, Cline, VS Code Copilot, Claude Code still holding direct MCP
+    entries) — while DSH itself was already on the cheapest route that exists (no
+    MCP mounted at all, 0 resident, the whole catalog fetched one schema at a time).
+    A saving claim about someone else's config, printed at a reader who is already
+    optimal, reads as "you are wasting tokens" and is simply false.
+
+    `mode.detect_host()` reads the markers an agent's own process environment
+    carries (`DSH_SHELL`, `CLAUDECODE`, `CODEX_HOME`, ...). Unknown returns False,
+    and that is deliberate: guessing "yes" would print the CLI credit to a GUI user
+    whose real cost is a different (serve) number.
+    """
+    try:
+        from . import mode as mode_mod
+
+        return mode_mod.detect_host().get("shell") is True
+    except Exception:
+        return False
+
+
+def _cli_route_line(d: dict, lng: str) -> str:
+    """The headline for a reader already on the CLI leg.
+
+    Says the one true thing about *its* cost: nothing is resident. The absolute
+    figure is the honest one here (`_human_tokens(full)`), not a rate — a rate
+    depends on how many tools the reader *would* have loaded, which is the serve
+    story, not this one (same rule as `cli_credit_line`).
+    """
+    calls = int(d.get("calls_recorded") or 0)
+    full = d.get("tokens_full") or 0
+    kept = _human_tokens(full) if full else ""
+    cal = d.get("token_caliber") or ""
+    # The 80-column budget binds before anything else (`test_footer_broadcast` grows
+    # the catalog until it does), and the `[caliber]` handle eats 24 of those columns,
+    # so the line keeps the two figures that carry the claim — what never loaded, and
+    # how many calls that covered — and abbreviates `calls` to `c` in English for the
+    # same reason the machine headline does.
+    # Wording, third pass (owner asked twice, 2026-11-11):
+    #   1. `全量 655,518 未加载` — `未加载` reads as "not loaded *yet*" (pending, or a
+    #      failure) and never names the destination.
+    #   2. `655,518 没进上下文` — true and unambiguous, but states only the fact and
+    #      never the benefit: a savings line has to say what was saved.
+    #   3. This: `0 常驻 · 省 655,518`. The order is load-bearing. `省 655,518` on its
+    #      own invites the cumulative reading ("I have saved 655,518 so far"), and the
+    #      cumulative figure is a different caliber — `mcptoon report` measures it at
+    #      ~340M for this machine and labels it a lower bound. Leading with the
+    #      resident fact ("0 常驻") anchors the number to the axis it belongs to, so
+    #      the line claims exactly what it can prove and still names the saving.
+    if lng == "zh":
+        parts = [f"{MARK} mcptoon: CLI 路线"]
+        if kept:
+            parts.append("0 常驻")
+            # `/轮` (owner's call, 2026-11-11): the bare `省 655,518` still read as a
+            # running total, because that is what a savings figure usually is. The
+            # suffix says it is the per-turn figure, which is the one this line can
+            # prove — `mcptoon report` keeps the cumulative (a lower-bound estimate on
+            # the serve caliber, explicitly not a CLI measurement).
+            parts.append(f"省 {kept}/轮")
+        if calls:
+            parts.append(f"{calls:,} 次")
+        return " · ".join(parts) + f" [{cal}]"
+    # English uses the phrase `cli_credit_line` already established for this axis
+    # (`tokens kept out of context`): it is the same claim in fewer columns, and the
+    # English budget has no room for both the resident and the saved figure. `/turn`
+    # carries the same job as the Chinese `0 常驻` anchor.
+    parts = [f"{MARK} mcptoon: CLI route"]
+    if kept:
+        parts.append(f"saves {kept}/turn")
+    if calls:
+        parts.append(f"{calls:,}c")
+    return " · ".join(parts) + f" [{cal}]"
+
+
+def _direct_entry_count() -> int:
+    """How many MCP entries still bypass the gateway, or 0 when unknown.
+
+    Read-only and cache-only (`mode.detect` already walks this for the mode itself),
+    so naming the count costs no server contact.
+    """
+    try:
+        from . import mode as mode_mod
+
+        return int(mode_mod.detect().get("direct_entries") or 0)
+    except Exception:
+        return 0
+
+
 def cli_credit(f: dict | None = None) -> dict | None:
     """The CLI-mode credit figures, or None when this is not a CLI machine.
 
@@ -770,6 +863,14 @@ def line(f: dict | None = None, lng: str | None = None) -> str:
     # saves nothing. Broadcasting the gateway rate here would credit mcptoon for a
     # saving it is not delivering — the exact "credit points the wrong way" defect.
     _cmode = current_mode()
+    # A reader that can run a shell is on the cheapest route there is, whatever the
+    # *machine's* mode says: it pulls one schema per call and keeps the catalog out
+    # of its context entirely. So for that reader the honest headline is its own cost
+    # (`_cli_route_line`), and the machine-global "not saving" verdict below — which
+    # is about the OTHER hosts that still hold direct entries — must not be printed
+    # at it. See `caller_can_shell` for the measurement behind this branch.
+    if _cmode in ("cli", "serve-alongside") and caller_can_shell():
+        return _cli_route_line(d, lng)
     if _cmode in ("direct", "serve-alongside"):
         _along = _cmode == "serve-alongside"
         _dfull = d.get("tokens_full") or 0
@@ -1138,3 +1239,94 @@ def remember(text: str) -> None:
     from . import config as cfg
 
     cfg.remember_footer_line(text)
+
+
+# ─── The one action that turns "installed" into "saving" ───
+#
+# Measured problem this exists for: a machine can carry mcptoon for weeks and still
+# save nothing, because the hosts that matter keep listing their MCP servers
+# directly (`serve-alongside`) or the gateway was never wired at all (`direct`). The
+# figures are honest about it — the tools line already says `未接管·未省` — but that
+# is a *status*, and a status does not tell a reader what to type. Field evidence,
+# 2026-11-11 on a 285-tool / 12-server machine: 16 days installed, 522 calls routed,
+# `resident_avoided` still 0, and nothing on the per-turn channel said so.
+#
+# Shown only while nothing is being saved, at most once per interval and at most
+# `MAX_SHOWS` times in total. That is the whole design: a nudge has to be seen to
+# work, and has to stop to stay read. The cap is what keeps a user who has decided
+# against the gateway from being nagged for the life of the install.
+
+NEXT_ACTION_INTERVAL_SECONDS = 24 * 3600
+NEXT_ACTION_MAX_SHOWS = 5
+
+
+def next_action_hint(lng: str | None = None, now: float | None = None) -> str | None:
+    """One pasteable command that would make this machine save, or None.
+
+    Reads state only (`config.next_action_state`); nothing is recorded here, so this
+    stays safe to call from any surface — including a renderer that may be asked for
+    the same block twice in one turn. `note_next_action_shown` does the bookkeeping.
+    """
+    import time
+
+    lng = lng or lang()
+    mode = current_mode()
+    if mode not in ("direct", "serve-alongside"):
+        return None  # the machine is saving; there is no next action to name
+    state = _next_action_state()
+    shown = int(state.get("shown") or 0)
+    if shown >= NEXT_ACTION_MAX_SHOWS:
+        return None
+    last = state.get("ts")
+    try:
+        last_ts = float(last) if last is not None else None
+    except (TypeError, ValueError):
+        last_ts = None
+    clock = time.time() if now is None else now
+    if last_ts is not None and clock - last_ts < NEXT_ACTION_INTERVAL_SECONDS:
+        return None
+    action = "mcptoon sync --takeover" if mode == "serve-alongside" else "mcptoon quickstart"
+    if mode == "serve-alongside":
+        # Name the subject. The unattributed version ("现在还没省") was read, correctly,
+        # as a claim about the reader — which is how a DSH session already on the CLI
+        # leg got told it was saving nothing. The entries belong to *other* hosts.
+        n = _direct_entry_count()
+        if lng == "zh":
+            what = f"{n} 条" if n else "若干条"
+            # Avoid the second sense of `全量` on this screen: the headline's `全量`
+            # is the size of the whole catalog, and reusing the word here for "loads
+            # everything each turn" made one word mean two things one line apart.
+            return f"→ 另有宿主仍直连 {what},每次照旧直接加载:{action}"
+        what_en = f"{n} direct entries" if n else "direct entries"
+        return f"-> other hosts: {what_en} still load: {action}"
+    if lng == "zh":
+        return f"→ 现在还没省:跑 {action}(接上网关)"
+    return f"-> not saving yet: run {action} (wire the gateway)"
+
+
+def note_next_action_shown(now: float | None = None) -> None:
+    """Record one showing of the nudge, so the interval and the cap advance.
+
+    Called by the surfaces that actually printed it. Best-effort throughout: a
+    read-only home must never turn a footer into a crash.
+    """
+    import time
+
+    state = _next_action_state()
+    try:
+        shown = int(state.get("shown") or 0)
+    except (TypeError, ValueError):
+        shown = 0
+    from . import config as cfg
+
+    cfg.remember_next_action_state({
+        "shown": shown + 1,
+        "ts": float(time.time() if now is None else now),
+    })
+
+
+def _next_action_state() -> dict:
+    """Thin wrapper so tests can patch one name instead of the config module."""
+    from . import config as cfg
+
+    return cfg.next_action_state()

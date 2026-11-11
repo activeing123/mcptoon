@@ -614,6 +614,121 @@ class TestBlockOrderAndGate(_IsolatedState):
         self.assertNotEqual(footer_mod._figures_of(a), footer_mod._figures_of(b))
 
 
+class TestNextActionHint(_IsolatedState):
+    """The nudge that names the one command turning "installed" into "saving".
+
+    Written against a measured machine (2026-11-11): 16 days installed, 522 calls
+    routed, `resident_avoided` still 0 — and the per-turn channel said only `未省`,
+    which is a status. A status does not tell a reader what to type.
+    """
+
+    def _seed(self, **state):
+        from mcptoon import config as cfg
+
+        cfg.remember_next_action_state(state)
+
+    def test_a_saving_machine_gets_no_nudge(self):
+        with patch.object(footer_mod, "current_mode", return_value="serve"):
+            self.assertIsNone(footer_mod.next_action_hint("zh"))
+
+    def test_an_untaken_over_gateway_names_the_takeover(self):
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"):
+            line = footer_mod.next_action_hint("zh")
+        self.assertIsNotNone(line)
+        self.assertIn("mcptoon sync --takeover", line)
+
+    def test_a_direct_machine_names_the_wiring_command(self):
+        with patch.object(footer_mod, "current_mode", return_value="direct"):
+            line = footer_mod.next_action_hint("en")
+        self.assertIsNotNone(line)
+        self.assertIn("mcptoon quickstart", line)
+
+    def test_the_nudge_is_throttled_to_one_per_interval(self):
+        t0 = 1_000_000.0
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"):
+            self.assertIsNotNone(footer_mod.next_action_hint("zh", now=t0))
+            footer_mod.note_next_action_shown(now=t0)
+            self.assertIsNone(footer_mod.next_action_hint("zh", now=t0 + 60),
+                              "a second turn inside the interval must stay silent")
+            after = t0 + footer_mod.NEXT_ACTION_INTERVAL_SECONDS + 1
+            self.assertIsNotNone(footer_mod.next_action_hint("zh", now=after))
+
+    def test_the_nudge_stops_after_the_cap(self):
+        """A user who decided against the gateway is not nagged for the life of the
+        install — the cap is what makes that true."""
+        self._seed(shown=footer_mod.NEXT_ACTION_MAX_SHOWS, ts=0)
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"):
+            self.assertIsNone(footer_mod.next_action_hint("zh", now=9_999_999_999.0))
+
+    def test_reading_the_hint_does_not_spend_a_showing(self):
+        """`--json` asks for the figures; a machine consumer polling it must not
+        burn the whole allowance without a human ever seeing the line."""
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"):
+            for _ in range(footer_mod.NEXT_ACTION_MAX_SHOWS + 2):
+                self.assertIsNotNone(footer_mod.next_action_hint("zh"))
+
+    def test_the_nudge_fits_the_width_budget(self):
+        for lng in ("zh", "en"):
+            with patch.object(footer_mod, "current_mode", return_value="serve-alongside"):
+                line = footer_mod.next_action_hint(lng)
+            self.assertLessEqual(TestLineWidthBudget._width(line), 80, line)
+
+
+class TestCallerAwareHeadline(_IsolatedState):
+    """One line of figures must describe the reader, not somebody else's config.
+
+    Measured 2026-11-11: a DSH session — no MCP mounted, 0 resident, 527 routed CLI
+    calls, i.e. already on the cheapest route that exists — was shown
+    `未接管·未省` on every turn. That verdict was a fact about four *other*
+    applications still holding direct MCP entries.
+    """
+
+    def test_a_shell_reader_on_an_alongside_machine_gets_its_own_cost(self):
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"), \
+             patch.object(footer_mod, "caller_can_shell", return_value=True):
+            zh = footer_mod.line(_FACTS, "zh")
+        self.assertIn("CLI 路线", zh)
+        self.assertNotIn("未省", zh)
+        # `未加载` read as "not loaded yet" (pending, or a failure); `没进上下文` named
+        # the destination but never the benefit. The owner asked about both, in that
+        # order, on 2026-11-11 — so the line now leads with the resident fact and
+        # then names what was saved.
+        self.assertNotIn("未加载", zh)
+        self.assertIn("0 常驻", zh)
+        # The bare `省 655,518` read as a running total; `/轮` marks it per-turn.
+        self.assertIn("省 ", zh)
+        self.assertIn("/轮", zh)
+
+    def test_a_gui_reader_still_gets_the_machine_verdict(self):
+        """A host that cannot shell out is not on the CLI leg; the verdict is real."""
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"), \
+             patch.object(footer_mod, "caller_can_shell", return_value=False):
+            zh = footer_mod.line(_FACTS, "zh")
+        self.assertIn("未接管·未省", zh)
+
+    def test_a_saving_machine_is_untouched(self):
+        with patch.object(footer_mod, "current_mode", return_value="serve"), \
+             patch.object(footer_mod, "caller_can_shell", return_value=True):
+            zh = footer_mod.line(_FACTS, "zh")
+        self.assertNotIn("CLI 路线", zh)
+
+    def test_the_cli_route_headline_fits_the_width_budget(self):
+        for lng in ("zh", "en"):
+            with patch.object(footer_mod, "current_mode", return_value="serve-alongside"), \
+                 patch.object(footer_mod, "caller_can_shell", return_value=True):
+                line = footer_mod.line(_FACTS, lng)
+            self.assertLessEqual(TestLineWidthBudget._width(line), 80, line)
+
+    def test_the_nudge_names_other_hosts_not_the_reader(self):
+        with patch.object(footer_mod, "current_mode", return_value="serve-alongside"), \
+             patch.object(footer_mod, "_direct_entry_count", return_value=32):
+            zh = footer_mod.next_action_hint("zh", now=1_000_000.0)
+        self.assertIn("另有宿主", zh)
+        self.assertIn("32 条", zh)
+        self.assertNotIn("现在还没省", zh)
+        self.assertIn("mcptoon sync --takeover", zh)
+
+
 class TestLineWidthBudget(unittest.TestCase):
     """Every line fits 80 display columns, so nothing wraps on a normal terminal.
 

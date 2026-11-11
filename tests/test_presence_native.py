@@ -110,6 +110,37 @@ def test_a_real_resolve_call_is_now_in_the_ledger(ledger):
     assert entries and entries[0]["tool"] == "mcptoon_resolve_skills"
 
 
+# ─── 1b. CLI discovery calls are counted too (2026-11-11) ────────────────────
+
+def test_cli_discovery_is_recorded_as_a_native_call(ledger):
+    """`manifest` / `inspect` / `search` / `select` used to leave no trace at all.
+
+    The gateway half was always counted (`serve._track_native`), the CLI half never
+    was — so on a CLI machine, where the whole design leans on the model *asking*
+    for the catalog, "does anyone ask?" had no answer. Measured 2026-11-11: 522
+    routed calls and `native_calls: 0`, with no way to tell "nobody asked" from
+    "nobody counted".
+    """
+    from mcptoon import cli
+
+    cli._track_discovery("manifest", {"fetch": [{"name": "fetch"}]})
+    entries = usage.read_activity(10)
+    assert entries, "a discovery call must leave a ledger line"
+    assert entries[0]["server"] == "mcptoon"
+    assert entries[0]["tool"] == "manifest"
+
+
+def test_cli_discovery_never_raises_on_a_bad_payload(ledger):
+    """Bookkeeping is a courtesy: a discovery command must still work without it."""
+    from mcptoon import cli
+
+    class Hostile:
+        def __repr__(self):
+            raise RuntimeError("boom")
+
+    cli._track_discovery("search", Hostile())  # must not propagate
+
+
 # ─── 2. the skill-delivery banner ────────────────────────────────────────────
 
 def test_skill_banner_attaches_on_first_resolve_with_skills(ledger, monkeypatch):
