@@ -300,6 +300,18 @@ COMMAND_FLAGS = {
     "statusline": frozenset({"--check", "--dry", "--guide", "--install",
                              "--uninstall"}),
     "docs": frozenset({"--k", "--query"}),
+    # Action-first: the flag follows a subcommand (`mcptoon plugin install <dir>
+    # --force`), so each set is the union over the actions, read from `_cmd_plugin_*`
+    # and the command's own module (`kb.py`, `session_log.py`, `mcp_extras.py`). A
+    # flag standing where the action belongs is still the command's own error, which
+    # says more than ours would ("Unknown plugin subcommand: --force. Available:
+    # scan | install | list | remove").
+    "plugin": frozenset({"--force", "--no-sync"}),
+    "kb": frozenset({"--force", "--k", "--query", "--source", "--ttl", "--yes"}),
+    "session": frozenset({"--purge"}),
+    "resources": frozenset({"--search"}),
+    "prompts": frozenset({"--search"}),
+    "complete": frozenset({"--search"}),
 }
 
 # Flags the pre-pass consumes for every command, wherever they stand, so no handler
