@@ -281,6 +281,19 @@ def _unowned_command_flags(command, args):
     ]
 
 
+def _flag_usage_error(msg):
+    """Report a flag misused on the command line.
+
+    Exits 2, or — with `MCPTOON_STRICT_FLAGS=0`, the same escape hatch the
+    unknown-flag path has — prints the same message as a warning and lets the
+    command run, so a caller piping a newer flag through an older CLI keeps working.
+    """
+    if os.environ.get("MCPTOON_STRICT_FLAGS", "1") != "0":
+        print(msg, file=sys.stderr)
+        sys.exit(2)
+    print(msg + " (ignored: MCPTOON_STRICT_FLAGS=0)", file=sys.stderr)
+
+
 def format_flag_override_note(previous, current):
     """Return the stderr note when a later format flag drops `--smart`, else "".
 
@@ -698,10 +711,33 @@ def _run(state: dict) -> None:
         if owners:
             msg += f"\n  '{bad}' is an option of: {', '.join(owners)}"
         msg += f"\nRun 'mcptoon {command} --help' for the options it accepts."
-        if os.environ.get("MCPTOON_STRICT_FLAGS", "1") != "0":
-            print(msg, file=sys.stderr)
-            sys.exit(2)
-        print(msg + " (ignored: MCPTOON_STRICT_FLAGS=0)", file=sys.stderr)
+        _flag_usage_error(msg)
+
+    # `--format` is manifest's export selector, yet the pre-pass consumes it for
+    # every command — it has to, because `mcptoon --format mcp manifest` puts the
+    # flag before the command. Measured 2026-11-12 on 0.8.38: `list --format json`,
+    # `list --format toon` and `list --format bogus` printed the *same* 940-character
+    # human list and exited 0. `fmt` is set by `--json`/`--toon`/`--slim`/... and
+    # never by `--format` (see `_FORMAT_FLAGS`), so every non-manifest use was a
+    # silent no-op (issue #50).
+    if export_format and command not in ("manifest", "tools"):
+        _flag_usage_error(
+            f"mcptoon: '--format' is not an option of '{command}'"
+            f"\n  '--format' is an option of: manifest (its export format)"
+            f"\n  for the output format here use one of: "
+            f"{', '.join(sorted(_FORMAT_FLAGS))}"
+            f"\nRun 'mcptoon --help' for the flags this version accepts."
+        )
+    elif export_format and export_format not in manifest_mod.EXPORT_FORMATS:
+        # Checked here, not in `_cmd_manifest`: an empty manifest returns before the
+        # export block ("No tools found"), so a handler-level check would be skipped
+        # exactly when a typo is easiest to make. `export_manifest` itself falls back
+        # to JSON for an unknown name — a deliberate contract for library callers
+        # (pinned by tests/test_v02_features.py), and precisely wrong for a typed
+        # command line, where `--format mpc` printed a full JSON dump and exited 0.
+        _err(f"Error: --format needs one of "
+             f"{'|'.join(sorted(manifest_mod.EXPORT_FORMATS))}, got {export_format!r}")
+        sys.exit(1)
 
     # First real command on this machine introduces mcptoon once (see _maybe_welcome).
     _maybe_welcome(command, fmt)

@@ -224,3 +224,45 @@ def test_strict_flags_zero_downgrades_the_ownership_error():
         out, err, code = _run(["list", "--verbose"])
     assert code == 0
     assert "ignored: MCPTOON_STRICT_FLAGS=0" in err
+
+
+# ── `--format` belongs to manifest (issue #50) ───────────────────────────────
+
+def test_format_on_a_command_without_an_export_is_a_usage_error():
+    """`list --format json` printed the human list and exited 0.
+
+    Measured 2026-11-12 on 0.8.38: `list --format json`, `--format toon` and
+    `--format bogus` produced the *same* 940-character human list, because `fmt` is
+    set by `--json`/`--toon`/... and never by `--format`. The flag is manifest's
+    export selector, so every other command must say so instead of dropping it.
+    """
+    out, err, code = _run(["list", "--format", "json"])
+    assert code == 2, f"a no-op flag must not exit 0, got {code}"
+    assert "'--format' is not an option of 'list'" in err
+    assert "manifest" in err
+    assert "--json" in err, "it should point at the flags that do set the format"
+    assert "Configured servers" not in out and "No tools found" not in out, \
+        "the command must not run"
+
+
+def test_format_is_still_accepted_by_manifest_and_its_alias():
+    """This home has no servers, so `manifest` returns "No tools found" before it can
+    export anything — the claim here is only that the flag is *accepted*, in both
+    spellings of the command and in both positions. That the export itself works was
+    measured on the published 0.8.38 with a real config (`manifest --format openai`
+    -> 1,067,298 bytes, exit 0)."""
+    for argv in (["manifest", "--format", "json"], ["tools", "--format", "json"],
+                 ["--format", "json", "manifest"]):
+        out, err, code = _run(argv)
+        assert code == 0, f"{argv}: exit {code} / {err}"
+        assert "is not an option of" not in err
+
+
+def test_an_unknown_export_format_is_rejected_even_with_nothing_to_export():
+    """`export_manifest` falls back to JSON for an unknown name (a library contract
+    pinned by test_v02_features), so the CLI has to reject the typo itself — and it
+    has to do so before the empty-manifest early return, not inside the handler."""
+    out, err, code = _run(["manifest", "--format", "bogus"])
+    assert code == 1, f"expected a bad-value error, got {code}"
+    assert "needs one of" in err and "bogus" in err
+    assert "No tools found" not in out, "a rejected value must not run the command"

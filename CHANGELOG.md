@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`--format` now says who owns it, and validates its value.** It is `manifest`'s
+  export selector (`openai|openapi|mcp|json|human`), but the global pre-pass consumes
+  it for every command — it has to, because `mcptoon --format mcp manifest` puts the
+  flag before the command. Measured on 0.8.38: `list --format json`,
+  `list --format toon` and `list --format bogus` all printed the *same*
+  940-character human list and exited 0 (`fmt` is set by `--json`/`--toon`/`--slim`,
+  never by `--format`). A command with no export now exits 2 and points at the flags
+  that do set the format, and `manifest --format mpc` (a typo) exits 1 with the
+  allowed list instead of silently dumping JSON — which is what `export_manifest`'s
+  documented fallback used to produce. `manifest`/`tools` keep working, in either
+  position.
 - **A flag a command does not own is now a usage error.** `mcptoon list --verbose`
   printed the human server list and exited **0**: `--verbose` is a real flag, just
   `manifest`'s, so the global pre-pass tolerated it and `list` silently dropped it —
