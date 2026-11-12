@@ -257,12 +257,53 @@ _FORMAT_FLAGS = {
 # flag is real, it is simply `manifest`'s — so nothing upstream complained and the
 # command dropped it silently. A correctly spelled wrong flag must not be quieter
 # than a typo.
+#
+# Sources for each set, so the next person can re-derive rather than guess: the
+# option literals in the handler itself (`src/mcptoon/cli.py`), in the command's own
+# module (`skills.py`, `serve.py`), and the invocations the shipped docs show. The
+# two scans are deliberately broad — an option that appears only in a message is
+# still accepted — because accepting one a command ignores is the old, quiet failure
+# while rejecting one it honors is a new, loud one.
+#
+# Deliberately NOT listed: the opaque-tail commands (`auth`, `bake`, `openapi`,
+# `graphql`). The pre-pass hands them the rest of the line verbatim, and their flags
+# belong to a sub-module that can accept anything (`bake create --openapi <spec>`),
+# so ownership cannot be enumerated here at all.
 COMMAND_FLAGS = {
+    # No flags of their own: everything they honor is consumed by the pre-pass.
     "list": frozenset(),
     "inspect": frozenset(),
     "search": frozenset(),
+    "retrieve": frozenset({"--list"}),
     "manifest": frozenset({"--sort", "--top", "--verbose"}),
+    "call": frozenset({"--auto", "--destructive", "--envelope",
+                       "--input-responses", "--request-state"}),
+    "install": frozenset({"--dry", "--header", "--list", "--npm", "--pack",
+                          "--packs", "--pip", "--remove", "--search", "--url"}),
+    "activity": frozenset({"--before", "--clear", "--export", "--failures",
+                           "--follow", "--host", "--search", "--since",
+                           "--summary", "--tool", "--top"}),
+    "sync": frozenset({"--agent", "--dry", "--dry-run", "--self", "--takeover",
+                       "--watch", "--yes"}),
+    "serve": frozenset({"--auth", "--background", "--daemon", "--http", "--install",
+                        "--install-autostart", "--listen", "--start", "--status",
+                        "--stop", "--uninstall-autostart"}),
+    "skills": frozenset({"--all", "--allow-tracked-deletes", "--archive", "--copy",
+                         "--derived", "--desc", "--dry", "--dry-run", "--endpoint",
+                         "--force", "--k", "--limit", "--model", "--tombstone",
+                         "--tools-k", "--usage", "--version-gate", "--view"}),
 }
+
+# Flags the pre-pass consumes for every command, wherever they stand, so no handler
+# ever sees them in `rest` and no command needs to declare them. Kept as data so
+# tests/test_documented_flags_are_owned.py can tell "the docs show a flag this
+# command accepts" from "the docs show a flag we would now reject"; that test feeds
+# each of these to `list` to prove the set matches the code, not the intent.
+PREPASS_FLAGS = frozenset({
+    "--compact", "--dir", "--fallback-json", "--format", "--full", "--head",
+    "--help", "--json", "--max-chars", "--mcptoon", "--raw", "--slim", "--smart",
+    "--stdin", "--toon", "--transport", "--version",
+})
 
 
 def _unowned_command_flags(command, args):
@@ -270,14 +311,16 @@ def _unowned_command_flags(command, args):
 
     Only `--long` forms are inspected: a single-dash token can be a negative value
     (`--head -5` is consumed by the pre-pass, but a bare `-1` positional is not a
-    flag). `-h`/`--help` are handled before this runs.
+    flag). `--help` always passes: for the ten commands with their own help page it
+    stays in `rest` (see `_COMMANDS_WITH_OWN_HELP`), and asking for help must never
+    be a usage error.
     """
     owned = COMMAND_FLAGS.get(command)
     if owned is None:
         return []
     return [
         name for name in (t.split("=", 1)[0] for t in args if t.startswith("--"))
-        if name not in owned and name != "--"
+        if name not in owned and name not in ("--", "--help")
     ]
 
 
@@ -704,10 +747,10 @@ def _run(state: dict) -> None:
     if unowned:
         bad = unowned[0]
         owners = sorted(c for c, owned in COMMAND_FLAGS.items() if bad in owned)
-        hint = _closest(bad, sorted(COMMAND_FLAGS.get(command, ())))
+        hints = _closest(bad, sorted(COMMAND_FLAGS.get(command, ())))
         msg = f"mcptoon: '{bad}' is not an option of '{command}'"
-        if hint and hint != bad:
-            msg += f" - did you mean '{hint}'?"
+        if hints:
+            msg += f" - did you mean: {', '.join(hints)}?"
         if owners:
             msg += f"\n  '{bad}' is an option of: {', '.join(owners)}"
         msg += f"\nRun 'mcptoon {command} --help' for the options it accepts."

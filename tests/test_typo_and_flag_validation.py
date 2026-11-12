@@ -266,3 +266,48 @@ def test_an_unknown_export_format_is_rejected_even_with_nothing_to_export():
     assert code == 1, f"expected a bad-value error, got {code}"
     assert "needs one of" in err and "bogus" in err
     assert "No tools found" not in out, "a rejected value must not run the command"
+
+
+# ── the second batch of owned flag sets (issue #41) ──────────────────────────
+
+def test_the_second_batch_owns_what_its_own_source_parses():
+    """`call`/`install`/`activity`/`sync` spell their flags out in cli.py; `skills`
+    and `serve` parse theirs in their own module (`skills.py`, `serve.py`) — those
+    sets were read from there, not guessed from the docs."""
+    assert cli._unowned_command_flags("call", ["--auto", "--destructive"]) == []
+    assert cli._unowned_command_flags("install", ["--pack", "--packs", "--url"]) == []
+    assert cli._unowned_command_flags("skills", ["--tombstone", "--version-gate"]) == []
+    assert cli._unowned_command_flags("serve", ["--background", "--listen"]) == []
+    assert cli._unowned_command_flags("retrieve", ["--list"]) == []
+
+
+def test_the_second_batch_rejects_a_flag_from_another_command():
+    """Every flag below is a real, known flag — just not this command's. Before the
+    registry existed each of these ran the command and exited 0."""
+    for command, flag in (("call", "--verbose"), ("install", "--destructive"),
+                          ("skills", "--sort"), ("sync", "--top"),
+                          ("activity", "--envelope"), ("retrieve", "--sort"),
+                          ("serve", "--sort")):
+        out, err, code = _run([command, flag])
+        assert code == 2, f"{command} {flag} must exit 2, got {code}: {err}"
+        assert f"is not an option of '{command}'" in err
+
+
+def test_help_still_works_for_a_command_with_its_own_page():
+    """`serve` is in `_COMMANDS_WITH_OWN_HELP`, so its `--help` is *not* consumed by
+    the pre-pass and does reach the ownership check — asking for help must never be a
+    usage error."""
+    out, err, code = _run(["serve", "--help"])
+    assert code == 0, err
+    assert "is not an option of" not in err
+
+
+def test_the_ownership_hint_is_a_name_not_a_python_list():
+    """`_closest` returns a list; interpolating it whole printed
+    `did you mean '['--envelope']'?` (found 2026-11-12 in the live check)."""
+    for command, flag in (("call", "--verbose"), ("serve", "--sort"),
+                          ("skills", "--sort")):
+        out, err, code = _run([command, flag])
+        assert code == 2, f"{command} {flag}: exit {code}"
+        assert "['" not in err, f"{command}: the hint leaked a list repr: {err}"
+        assert "did you mean: --" in err, f"{command}: expected a joined hint in {err}"
