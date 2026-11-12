@@ -613,6 +613,22 @@ def _run(state: dict) -> None:
     rest = cmd_args[1:]
     state["command"] = command
 
+    # A flag can never be the command. Command-scoped flags (`--verbose`,
+    # `--sort`, `--top`, `--langs`, ...) are in KNOWN_FLAGS so the pre-pass above
+    # tolerates them, but it does not own them — it appends them to `cmd_args`,
+    # and before this check the first one became `command`. The unknown-command
+    # path then handed the whole line to the natural-language router, whose
+    # keyword list contains bare command names, so `mcptoon --verbose list`
+    # silently ran `manifest` and exited 0 (found 2026-11-12 auditing #41).
+    # An option in the command position is a usage error, never another command.
+    # `-h`/`--help` stay exempt: they are the documented front door and the
+    # dispatch below answers them (see the `help` branch).
+    if command.startswith("-") and command not in ("-h", "--help"):
+        print(f"mcptoon: '{command}' is an option, not a command", file=sys.stderr)
+        print(f"  put it after the command: mcptoon <command> {command}", file=sys.stderr)
+        print("Run 'mcptoon help' for the command list, or 'mcptoon --help'.", file=sys.stderr)
+        sys.exit(2)
+
     # Asking for help must never run the command you asked about: `mcptoon
     # quickstart --help` used to discover servers and write them into config, and
     # `mcptoon serve --help` used to open a stdio bridge and hang until timeout.
@@ -6841,14 +6857,19 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
     """
     text = " ".join([command] + rest).lower()
 
-    # A lone word that is *close to a real command* is a mistyped command, not a
+    # A word that is *close to a real command* is a mistyped command, not a
     # phrase. `mcptoon listt` matched "list" inside the word and ran `manifest`,
     # and `mcptoon healthh` matched "health" and ran the health check — both
     # exiting 0, so a typo'd command in a CI step reported success (reported
     # 2026-10-18). Refuse to keyword-match a near-command so the typo surfaces as
-    # an error. A genuine single-token phrase (e.g. `mcptoon 有什么工具`) is not
-    # close to any command, so it still reaches the keyword routing below.
-    if not rest and _closest(command, _COMPLETION_COMMANDS):
+    # an error. A genuine phrase (e.g. `mcptoon 有什么工具`) is not close to any
+    # command, so it still reaches the keyword routing below.
+    # The `rest` exemption this guard used to carry ("a lone word" only) let the
+    # same hijack back in one token later: `mcptoon lst list` was taken for a
+    # phrase, keyword-matched "list" and ran `manifest` with exit 0 (found
+    # 2026-11-12 auditing #41). A near-command first word is a typo however many
+    # words follow it.
+    if _closest(command, _COMPLETION_COMMANDS):
         print(f"mcptoon: unknown command '{command}'", file=sys.stderr)
         print(f"  did you mean: {', '.join(_closest(command, _COMPLETION_COMMANDS))}?",
               file=sys.stderr)

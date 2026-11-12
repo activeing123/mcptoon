@@ -81,6 +81,45 @@ def test_genuine_single_token_phrase_still_routes():
     assert "unknown command" not in err
 
 
+# ── a flag in the command position ───────────────────────────────────────────
+
+def test_flag_in_command_position_is_a_usage_error_not_another_command():
+    # `--verbose`/`--sort`/`--top` are known to the global pre-pass but owned by
+    # the command that defines them, so the pre-pass appends them and the first
+    # one used to become `command`. The unknown-command path then keyword-matched
+    # the whole line against a list containing bare command names, so
+    # `mcptoon --verbose list` ran `manifest` and exited 0 (found 2026-11-12).
+    out, err, code = _run(["--verbose", "list"])
+    assert code == 2, f"expected a usage error, got exit {code}"
+    assert "'--verbose' is an option, not a command" in err
+    assert "No tools found" not in out, "it must not have run manifest"
+    assert "No servers configured" not in out, "it must not have run list either"
+
+
+def test_flag_with_a_value_in_command_position_errors_too():
+    out, err, code = _run(["--sort", "alpha", "list"])
+    assert code == 2
+    assert "'--sort' is an option, not a command" in err
+    assert "No tools found" not in out
+
+
+def test_help_in_command_position_still_prints_help():
+    # The exemption matters: `mcptoon --help` is the documented front door.
+    out, err, code = _run(["--help"])
+    assert code == 0
+    assert "is an option, not a command" not in err
+    assert out.strip(), "--help must still print the help page"
+
+
+def test_typo_before_a_keyword_word_is_still_unknown():
+    # Two tokens used to be enough to look like a phrase, so `mcptoon lst list`
+    # keyword-matched "list" and ran `manifest` — exit 0 on a typo.
+    out, err, code = _run(["lst", "list"])
+    assert code == 1, f"a typo must not exit 0, got {code}"
+    assert "unknown command 'lst'" in err
+    assert "No tools found" not in out, "it must not have run manifest"
+
+
 # ── non-integer flags ────────────────────────────────────────────────────────
 
 def test_head_non_integer_errors():
