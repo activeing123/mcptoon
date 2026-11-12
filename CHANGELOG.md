@@ -5,6 +5,25 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A flag in the command position is a usage error, not another command.**
+  Command-scoped flags (`--verbose`, `--sort`, `--top`, `--langs`, ...) are known
+  to the global pre-pass but owned by the command that defines them, so the
+  pre-pass appended them to `cmd_args` and the first one became the command name.
+  The unknown-command path then handed the whole line to the natural-language
+  router, whose keyword list contains bare command names, so
+  `mcptoon --verbose list` silently ran `manifest` and exited **0** (found
+  2026-11-12 while auditing #41). It now exits 2 with
+  `'--verbose' is an option, not a command`; `-h`/`--help` stay exempt.
+- **A mistyped first word is no longer keyword-routed when arguments follow.**
+  The near-command guard in the natural-language router applied only to a lone
+  word, so `mcptoon lst list` was taken for a phrase, keyword-matched "list" and
+  ran `manifest` with exit 0. A near-command first word is now an unknown command
+  however many words follow it.
+
 ## [0.8.37] - 2026-11-12
 
 ### Added
