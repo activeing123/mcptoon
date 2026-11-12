@@ -249,8 +249,9 @@ _FORMAT_FLAGS = {
 # A command belongs here only once its owned flags have been enumerated explicitly.
 # Never infer them by scraping a handler's docstring: that rejects flags the code
 # supports but the prose omits, turning a working invocation into a usage error.
-# Commands not listed keep the old behaviour (an unknown flag is ignored), so this
-# list can grow one command at a time.
+# A command absent from this table keeps the old leniency (an unknown flag is ignored)
+# — which is now the deliberate exception for the four listed below the table, not a
+# rollout state.
 #
 # Why: measured 2026-11-12 (issue #41), `mcptoon list --verbose` printed the human
 # server list and exited **0** while the typo `mcptoon list --verbos` exited 2. The
@@ -265,10 +266,13 @@ _FORMAT_FLAGS = {
 # still accepted — because accepting one a command ignores is the old, quiet failure
 # while rejecting one it honors is a new, loud one.
 #
-# Deliberately NOT listed: the opaque-tail commands (`auth`, `bake`, `openapi`,
-# `graphql`). The pre-pass hands them the rest of the line verbatim, and their flags
-# belong to a sub-module that can accept anything (`bake create --openapi <spec>`),
-# so ownership cannot be enumerated here at all.
+# Deliberately NOT listed, and the reason is always a working invocation that a set
+# here would reject — not "not done yet": `add` (everything after `--stdio`/`--http`
+# belongs to the child command), `exec` (the code positional may be a flag, and it
+# already rejects unknown options itself), `config` (`config set <key> <value>`, where
+# a value may start with `--`), and the opaque-tail commands (`auth`, `bake`,
+# `openapi`, `graphql`), whose pre-pass hands the rest of the line to a sub-module that
+# can accept anything (`bake create --openapi <spec>`).
 COMMAND_FLAGS = {
     # No flags of their own: everything they honor is consumed by the pre-pass.
     "list": frozenset(),
@@ -312,6 +316,65 @@ COMMAND_FLAGS = {
     "resources": frozenset({"--search"}),
     "prompts": frozenset({"--search"}),
     "complete": frozenset({"--search"}),
+    # ─── Fifth batch: everything whose flags could be enumerated (issue #41) ───
+    #
+    # Found by probing, not by reading: each command below was run with `--roots`, a
+    # real flag that only `bench` owns, so the pre-pass tolerates it everywhere and
+    # whatever the command does with it is its own answer. Measured 2026-11-13 on
+    # 0.8.39 — `usage`, `stats`, `status`, `credit`, `savings`, `report`, `mode`,
+    # `init`, `quickstart`, `off`, `restore`, `uninstall`, `update`, `upgrade`,
+    # `import`, `select`, `bench`, `footer-facts`, `demo` and `demo-server` all printed
+    # their normal output and exited **0**. `doctor` and `health` were worse than
+    # silent: they exited 1 for an unrelated reason (a failing check, a dead server),
+    # so the caller saw a failure and never learned the flag was the problem.
+    #
+    # Deliberately still absent, and why — the pre-pass hands these the rest of the
+    # line verbatim or their positionals can legitimately look like flags, so a set
+    # here would reject working invocations:
+    #   `add`     — everything after `--stdio`/`--http` belongs to the child command
+    #               (`add foo --stdio node server.js --port 3000` is legal today)
+    #   `exec`    — the code positional may be a flag (`exec bash --version`); it
+    #               already rejects unknown options itself, exit 1
+    #   `config`  — `config set <key> <value>`, and a value may start with `--`
+    #   `auth`/`bake`/`openapi`/`graphql` — delegated sub-modules own their tails
+    "usage": frozenset(),
+    "stats": frozenset(),
+    "status": frozenset(),
+    "credit": frozenset(),
+    "savings": frozenset(),
+    "footer-facts": frozenset(),
+    "mode": frozenset(),
+    "doctor": frozenset(),
+    "remove": frozenset(),
+    "demo-server": frozenset(),
+    "report": frozenset({"--query"}),
+    "bench": frozenset({"--query", "--roots"}),
+    "select": frozenset({"--engine", "--top"}),
+    "health": frozenset({"--timeout"}),
+    "policy": frozenset({"--list"}),
+    "toggle": frozenset({"--list"}),
+    "demo": frozenset({"--keep", "--quick"}),
+    "completion": frozenset({"--dry", "--install", "--uninstall"}),
+    "off": frozenset({"--dry", "--dry-run"}),
+    "init": frozenset({"--auto", "--dry", "--dry-run", "--force", "--http"}),
+    "quickstart": frozenset({"--dry", "--http", "--no-self", "--takeover", "--yes"}),
+    "import": frozenset({"--file", "--force", "--from", "--write"}),
+    "restore": frozenset({"--agent", "--dry", "--dry-run", "--yes"}),
+    "uninstall": frozenset({"--dry", "--dry-run", "--keep-history",
+                            "--no-keep-config", "--yes"}),
+    "update": frozenset({"--check", "--dry", "--dry-run"}),
+    "upgrade": frozenset({"--check", "--dry", "--dry-run", "--quiet", "--yes"}),
+}
+
+# The short forms the dispatch chain also accepts (`if command in ("list", "servers")`).
+# One table, so option ownership, `--help` lookup and completion can agree instead of
+# each spelling the pairs out. `help`/`-h`/`--help` are not here: they have no flags to
+# own and no page of their own to look up.
+COMMAND_ALIASES = {
+    "servers": "list",
+    "tools": "manifest",
+    "qs": "quickstart",
+    "brief": "status",
 }
 
 # Flags the pre-pass consumes for every command, wherever they stand, so no handler
@@ -334,8 +397,14 @@ def _unowned_command_flags(command, args):
     flag). `--help` always passes: for the ten commands with their own help page it
     stays in `rest` (see `_COMMANDS_WITH_OWN_HELP`), and asking for help must never
     be a usage error.
+
+    The alias is resolved first: `COMMAND_FLAGS` is keyed by canonical name, but the
+    dispatcher accepts four short forms, so looking the raw token up made an alias a
+    hole in the guard — measured 2026-11-13, `mcptoon list --verbose` exited 2 while
+    `mcptoon servers --verbose` (the same command) ran and exited 0, dropping the
+    flag. An alias is not a different command, so it must not be a different answer.
     """
-    owned = COMMAND_FLAGS.get(command)
+    owned = COMMAND_FLAGS.get(COMMAND_ALIASES.get(command, command))
     if owned is None:
         return []
     return [
@@ -766,8 +835,9 @@ def _run(state: dict) -> None:
     unowned = _unowned_command_flags(command, rest)
     if unowned:
         bad = unowned[0]
+        canonical = COMMAND_ALIASES.get(command, command)
         owners = sorted(c for c, owned in COMMAND_FLAGS.items() if bad in owned)
-        hints = _closest(bad, sorted(COMMAND_FLAGS.get(command, ())))
+        hints = _closest(bad, sorted(COMMAND_FLAGS.get(canonical, ())))
         msg = f"mcptoon: '{bad}' is not an option of '{command}'"
         if hints:
             msg += f" - did you mean: {', '.join(hints)}?"

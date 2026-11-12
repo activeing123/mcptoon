@@ -212,11 +212,51 @@ def test_shared_output_flags_are_unaffected_by_the_ownership_check():
     assert json.loads(out) == []
 
 
-def test_commands_without_an_explicit_enumeration_keep_the_old_leniency():
-    """Ownership rolls out one command at a time — `usage` is not migrated yet."""
-    out, err, code = _run(["usage", "--timeout", "5"])
-    assert code == 0, err
-    assert "is not an option of" not in err
+def test_commands_outside_the_registry_answer_for_themselves():
+    """The opaque-tail commands stay out of `COMMAND_FLAGS` on purpose, so the
+    ownership check must not claim them: `config`'s own action error answers first.
+
+    Until the fifth batch (2026-11-13) this test used `usage`, which was simply not
+    migrated yet. Every command that *can* be enumerated now is, so the leniency it
+    asserted no longer exists anywhere — what remains is the deliberate exception, and
+    that is what this pins. `config` takes `config set <key> <value>`, and a value may
+    start with `--`, so enumerating its flags would reject working invocations.
+    """
+    out, err, code = _run(["config", "--roots"])
+    assert "is not an option of" not in err, "config must not be in COMMAND_FLAGS"
+    assert "Unknown config action" in err
+    assert code == 1, "the command's own error, not our exit 2"
+
+
+def test_an_alias_is_not_a_hole_in_the_ownership_check():
+    """`servers` is `list`, so it must give `list`'s answer.
+
+    Measured 2026-11-13 on 0.8.39: `mcptoon list --verbose` exited 2 while
+    `mcptoon servers --verbose` — the same command — printed the server list and
+    exited **0**, dropping the flag. `COMMAND_FLAGS` is keyed by canonical name and
+    the check looked up the raw token, so every alias was unmigrated by accident.
+    """
+    out, err, code = _run(["list", "--verbose"])
+    assert code == 2
+    out, err, code = _run(["servers", "--verbose"])
+    assert code == 2, f"the alias must reject too, got {code}: {err}"
+    assert "'--verbose' is not an option of 'servers'" in err
+    # ...and the did-you-mean hint is derived from the canonical set, not an empty one:
+    # `tools` is `manifest`, so a near-miss of manifest's `--top` is suggested.
+    out, err, code = _run(["tools", "--tool"])
+    assert code == 2
+    assert "did you mean: --top" in err, err
+
+
+def test_every_alias_resolves_to_a_registered_command():
+    """Guard the alias table: a typo in it would silently reopen the hole."""
+    for alias, canonical in cli.COMMAND_ALIASES.items():
+        assert canonical in cli.COMMAND_FLAGS, (
+            f"alias {alias!r} points at {canonical!r}, which is not in COMMAND_FLAGS"
+        )
+        assert alias not in cli.COMMAND_FLAGS, (
+            f"{alias!r} is registered on its own — the alias would shadow it"
+        )
 
 
 def test_strict_flags_zero_downgrades_the_ownership_error():

@@ -5,6 +5,40 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **An alias is no longer a hole in the flag-ownership check.** `mcptoon list
+  --verbose` exited 2, while `mcptoon servers --verbose` — the same command under its
+  short form — printed the server list and exited **0**, dropping the flag in silence.
+  `COMMAND_FLAGS` is keyed by canonical name and the check looked the raw token up, so
+  all four aliases (`servers`, `tools`, `qs`, `brief`) were unmigrated by accident; the
+  "did you mean" hint was empty for them too. The alias now resolves to its canonical
+  command first, and `tests/test_typo_and_flag_validation.py` pins both the rejection
+  and the hint, plus a guard that every alias points at a registered command.
+
+### Changed
+
+- **Flag ownership now covers the remaining commands whose flags can be enumerated**
+  (issue #41, fifth batch). Measured 2026-11-13 on 0.8.39 by running every unregistered
+  command with `--roots` — a real flag that only `bench` owns, so the pre-pass tolerates
+  it everywhere and whatever the command does with it is its own answer: `usage`,
+  `stats`, `status`, `credit`, `savings`, `report`, `mode`, `init`, `quickstart`, `off`,
+  `restore`, `uninstall`, `update`, `upgrade`, `import`, `select`, `bench`,
+  `footer-facts`, `demo` and `demo-server` all printed their normal output and exited
+  **0**. `doctor` and `health` were worse than silent — they exited 1 for an unrelated
+  reason (a failing check, a dead server), so a caller saw a failure and never learned
+  the flag was the problem. The registry now covers **46 commands**.
+
+  Four commands stay out on purpose, and the reason is a working invocation that a set
+  here would reject: `add` (everything after `--stdio`/`--http` belongs to the child
+  command — `add foo --stdio node server.js --port 3000`), `exec` (the code positional
+  may itself be a flag — `exec bash --version` — and it already rejects unknown options
+  itself, exit 1), `config` (`config set <key> <value>`, where a value may start with
+  `--`), and the delegated families `auth`/`bake`/`openapi`/`graphql`, whose sub-modules
+  own their tails.
+
 ## [0.8.39] - 2026-11-12
 
 ### Changed
