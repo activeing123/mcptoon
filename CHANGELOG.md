@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flag ownership now also covers the action-first commands** — `plugin`, `kb`,
+  `session`, `resources`, `prompts`, `complete` (issue #41, final batch). Their flags
+  follow a subcommand (`mcptoon plugin install <dir> --force`), so each set is the
+  union over the actions, read from `_cmd_plugin_*` and the command's own module
+  (`kb.py`, `session_log.py`, `mcp_extras.py`). A flag standing where the action
+  belongs is still the command's own error, which says more than ours would
+  (`Unknown plugin subcommand: --force. Available: scan | install | list | remove`).
+  The registry now covers **20 commands**; `auth`, `bake`, `openapi` and `graphql`
+  stay out because the pre-pass hands them the rest of the line verbatim and their
+  flags belong to a sub-module.
 - **Flag ownership now covers `call`, `install`, `activity`, `sync`, `serve`,
   `skills` and `retrieve`** (issue #41, second batch). Each set was read from the
   source that parses it — the handler in `cli.py`, or the command's own module

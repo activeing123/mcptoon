@@ -282,6 +282,14 @@ def test_the_second_batch_owns_what_its_own_source_parses():
     assert cli._unowned_command_flags("discover", ["--health", "--write"]) == []
     assert cli._unowned_command_flags("statusline", ["--install", "--guide"]) == []
     assert cli._unowned_command_flags("docs", ["--k", "--query"]) == []
+    # Action-first commands: the flag follows the subcommand.
+    assert cli._unowned_command_flags("plugin", ["--force", "--no-sync"]) == []
+    assert cli._unowned_command_flags("kb", ["--ttl", "--source"]) == []
+    # `--purge` goes through the helper on purpose: `_run(["session", "--purge"])`
+    # deletes the caller's session logs, which is not a thing a test may do.
+    assert cli._unowned_command_flags("session", ["--purge"]) == []
+    for pillar in ("resources", "prompts", "complete"):
+        assert cli._unowned_command_flags(pillar, ["--search"]) == []
 
 
 def test_the_second_batch_rejects_a_flag_from_another_command():
@@ -291,7 +299,10 @@ def test_the_second_batch_rejects_a_flag_from_another_command():
                           ("skills", "--sort"), ("sync", "--top"),
                           ("activity", "--envelope"), ("retrieve", "--sort"),
                           ("serve", "--sort"), ("discover", "--sort"),
-                          ("statusline", "--sort"), ("docs", "--sort")):
+                          ("statusline", "--sort"), ("docs", "--sort"),
+                          ("plugin", "--destructive"), ("kb", "--envelope"),
+                          ("session", "--sort"), ("resources", "--sort"),
+                          ("prompts", "--sort"), ("complete", "--sort")):
         out, err, code = _run([command, flag])
         assert code == 2, f"{command} {flag} must exit 2, got {code}: {err}"
         assert f"is not an option of '{command}'" in err
