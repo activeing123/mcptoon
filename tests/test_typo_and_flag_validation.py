@@ -152,3 +152,23 @@ def test_select_top_non_integer_errors():
     out, err, code = _run(["select", "file", "--top", "abc"])
     assert code == 1
     assert "--top needs an integer" in err
+
+
+# ── a declared-but-unimplemented output flag ─────────────────────────────────
+
+def test_the_unimplemented_yaml_flag_is_rejected_instead_of_ignored():
+    """`--yaml` was registered for a YAML renderer that never existed (#49/#50).
+
+    It was a known flag, so the pre-pass handed it to the command, which ignored
+    it: `mcptoon list --yaml` printed human text and exited 0 while `list --json`
+    printed data. Unregistered, it now fails loudly in either position.
+    """
+    for argv in (["list", "--yaml"], ["--yaml", "list"]):
+        out, err, code = _run(argv)
+        assert code == 2, f"{argv} must be a usage error, got {code}"
+        assert "--yaml" in err, f"{argv} must name the offending flag"
+        assert "No servers configured" not in out, f"{argv} must not have run the command"
+
+
+def test_yaml_is_not_in_the_known_flag_registry():
+    assert "--yaml" not in cli.KNOWN_FLAGS

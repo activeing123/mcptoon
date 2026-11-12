@@ -66,10 +66,13 @@ KNOWN_FLAGS = frozenset(
         "--self", "--pack", "--packs",
         "--slim", "--smart",
         "--stdin", "--stdio", "--takeover", "--timeout", "--tombstone", "--toon", "--tools-k", "--top",
-        # `--yaml` is the YAML output format (see arg_parser_factory.ArgParserFactory).
-        # Registered so the central parser does not reject it as an unknown
-        # flag before the per-command parser handles it.
-        "--yaml",
+        # `--yaml` used to sit here as a pass-through — "let the per-command parser
+        # handle it". No command ever did: ArgParserFactory declared the flag, nothing
+        # read the namespace attribute, and `output.render` has no yaml branch, so
+        # `mcptoon list --yaml` printed human text and exited 0 while `--json` gave
+        # data (found 2026-11-12, issues #49/#50). Removed: an option nobody owns now
+        # fails loudly instead of pretending. Implement it with a renderer + tests,
+        # per command, when the output-format topic is taken up.
         "--sort", "--verbose", "--base-url", "--cache-key", "--cache-ttl", "--register", "--client-name", "--bin", "--openapi", "--graphql", "--mcp", "--transport", "--complete",
         "--url", "--usage",
         "--version", "--version-gate", "--view", "--watch",
