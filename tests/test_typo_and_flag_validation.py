@@ -279,6 +279,9 @@ def test_the_second_batch_owns_what_its_own_source_parses():
     assert cli._unowned_command_flags("skills", ["--tombstone", "--version-gate"]) == []
     assert cli._unowned_command_flags("serve", ["--background", "--listen"]) == []
     assert cli._unowned_command_flags("retrieve", ["--list"]) == []
+    assert cli._unowned_command_flags("discover", ["--health", "--write"]) == []
+    assert cli._unowned_command_flags("statusline", ["--install", "--guide"]) == []
+    assert cli._unowned_command_flags("docs", ["--k", "--query"]) == []
 
 
 def test_the_second_batch_rejects_a_flag_from_another_command():
@@ -287,7 +290,8 @@ def test_the_second_batch_rejects_a_flag_from_another_command():
     for command, flag in (("call", "--verbose"), ("install", "--destructive"),
                           ("skills", "--sort"), ("sync", "--top"),
                           ("activity", "--envelope"), ("retrieve", "--sort"),
-                          ("serve", "--sort")):
+                          ("serve", "--sort"), ("discover", "--sort"),
+                          ("statusline", "--sort"), ("docs", "--sort")):
         out, err, code = _run([command, flag])
         assert code == 2, f"{command} {flag} must exit 2, got {code}: {err}"
         assert f"is not an option of '{command}'" in err

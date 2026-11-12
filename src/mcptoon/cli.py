@@ -292,6 +292,14 @@ COMMAND_FLAGS = {
                          "--derived", "--desc", "--dry", "--dry-run", "--endpoint",
                          "--force", "--k", "--limit", "--model", "--tombstone",
                          "--tools-k", "--usage", "--version-gate", "--view"}),
+    # `discover` reads `--health` in the dispatch chain itself and the rest in
+    # `_cmd_auto_discover`; `statusline` and `docs` parse theirs in `mode.py` and
+    # `docs.py`, which is why a scan of the `_cmd_*` handlers found nothing for them.
+    "discover": frozenset({"--health", "--http", "--no-configs", "--no-env",
+                           "--no-local", "--no-network", "--write"}),
+    "statusline": frozenset({"--check", "--dry", "--guide", "--install",
+                             "--uninstall"}),
+    "docs": frozenset({"--k", "--query"}),
 }
 
 # Flags the pre-pass consumes for every command, wherever they stand, so no handler
