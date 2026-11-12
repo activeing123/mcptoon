@@ -33,8 +33,11 @@ SRC_PKG = Path(__file__).resolve().parents[1] / "src" / "mcptoon"
 # Names that appear in cli.py only to be cited as examples of what does NOT exist.
 # `--yaml` joined them 2026-11-12: it was registered as a pass-through for a YAML
 # renderer that never existed (issues #49/#50), so it is now an unknown flag and
-# survives only in the comment that explains why it is gone.
-DOCUMENTED_AS_ABSENT = {"--tokens", "--jsn", "--tooon", "--nonsense", "--yaml"}
+# survives only in the comment that explains why it is gone. `--verbos` is the typo
+# cited next to the ownership check and `--long` is prose ("only `--long` forms"),
+# not a flag name.
+DOCUMENTED_AS_ABSENT = {"--tokens", "--jsn", "--tooon", "--nonsense", "--yaml",
+                        "--verbos", "--long"}
 
 
 def package_flag_literals():

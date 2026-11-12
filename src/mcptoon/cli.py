@@ -242,6 +242,45 @@ _FORMAT_FLAGS = {
 }
 
 
+# Flags each command owns **in addition to** the shared output flags the pre-pass
+# consumes (`--json`, `--toon`, `--slim`, `--compact`, `--mcptoon`, `--format`,
+# `--head`, `--max-chars`, `--full`, ...), which never reach `rest`.
+#
+# A command belongs here only once its owned flags have been enumerated explicitly.
+# Never infer them by scraping a handler's docstring: that rejects flags the code
+# supports but the prose omits, turning a working invocation into a usage error.
+# Commands not listed keep the old behaviour (an unknown flag is ignored), so this
+# list can grow one command at a time.
+#
+# Why: measured 2026-11-12 (issue #41), `mcptoon list --verbose` printed the human
+# server list and exited **0** while the typo `mcptoon list --verbos` exited 2. The
+# flag is real, it is simply `manifest`'s — so nothing upstream complained and the
+# command dropped it silently. A correctly spelled wrong flag must not be quieter
+# than a typo.
+COMMAND_FLAGS = {
+    "list": frozenset(),
+    "inspect": frozenset(),
+    "search": frozenset(),
+    "manifest": frozenset({"--sort", "--top", "--verbose"}),
+}
+
+
+def _unowned_command_flags(command, args):
+    """Option names in `args` that `command` does not own. `[]` for unlisted commands.
+
+    Only `--long` forms are inspected: a single-dash token can be a negative value
+    (`--head -5` is consumed by the pre-pass, but a bare `-1` positional is not a
+    flag). `-h`/`--help` are handled before this runs.
+    """
+    owned = COMMAND_FLAGS.get(command)
+    if owned is None:
+        return []
+    return [
+        name for name in (t.split("=", 1)[0] for t in args if t.startswith("--"))
+        if name not in owned and name != "--"
+    ]
+
+
 def format_flag_override_note(previous, current):
     """Return the stderr note when a later format flag drops `--smart`, else "".
 
@@ -643,6 +682,26 @@ def _run(state: dict) -> None:
     if command not in _COMMANDS_WITH_OWN_HELP and any(a in ("-h", "--help") for a in rest):
         _print_command_help(command)
         return
+
+    # A flag this command does not own is a usage error, not a silent no-op — see
+    # COMMAND_FLAGS. Runs after the help shortcircuit (`mcptoon list --verbose --help`
+    # should still print help) and before the welcome card, so a rejected line does
+    # not also fire the first-run introduction.
+    unowned = _unowned_command_flags(command, rest)
+    if unowned:
+        bad = unowned[0]
+        owners = sorted(c for c, owned in COMMAND_FLAGS.items() if bad in owned)
+        hint = _closest(bad, sorted(COMMAND_FLAGS.get(command, ())))
+        msg = f"mcptoon: '{bad}' is not an option of '{command}'"
+        if hint and hint != bad:
+            msg += f" - did you mean '{hint}'?"
+        if owners:
+            msg += f"\n  '{bad}' is an option of: {', '.join(owners)}"
+        msg += f"\nRun 'mcptoon {command} --help' for the options it accepts."
+        if os.environ.get("MCPTOON_STRICT_FLAGS", "1") != "0":
+            print(msg, file=sys.stderr)
+            sys.exit(2)
+        print(msg + " (ignored: MCPTOON_STRICT_FLAGS=0)", file=sys.stderr)
 
     # First real command on this machine introduces mcptoon once (see _maybe_welcome).
     _maybe_welcome(command, fmt)
