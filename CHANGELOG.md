@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flag ownership now covers `call`, `install`, `activity`, `sync`, `serve`,
+  `skills` and `retrieve`** (issue #41, second batch). Each set was read from the
+  source that parses it — the handler in `cli.py`, or the command's own module
+  (`skills.py`, `serve.py`) — and cross-checked against the invocations the shipped
+  docs show. `auth`/`bake`/`openapi`/`graphql` stay out on purpose: the pre-pass
+  hands them the rest of the line verbatim, so their flags belong to a sub-module and
+  cannot be enumerated here. Two consequences of the wider set: `--help` now always
+  passes (ten commands carry their own help page, where it is not consumed by the
+  pre-pass and stays in the argument list), and a new test sweeps the docs and fails
+  if a registered command would reject a flag those docs promise — so the table can
+  keep growing one command at a time without documenting a rejected invocation. The
+  error's "did you mean" hint prints names now, not a Python list repr.
 - **`--format` now says who owns it, and validates its value.** It is `manifest`'s
   export selector (`openai|openapi|mcp|json|human`), but the global pre-pass consumes
   it for every command — it has to, because `mcptoon --format mcp manifest` puts the
