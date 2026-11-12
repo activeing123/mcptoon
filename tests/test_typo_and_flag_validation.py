@@ -22,6 +22,7 @@ Reported 2026-10-18:
 """
 import io
 import json
+import os
 from contextlib import redirect_stdout, redirect_stderr
 from unittest.mock import patch
 
@@ -172,3 +173,54 @@ def test_the_unimplemented_yaml_flag_is_rejected_instead_of_ignored():
 
 def test_yaml_is_not_in_the_known_flag_registry():
     assert "--yaml" not in cli.KNOWN_FLAGS
+
+
+# ── per-command flag ownership (issue #41) ───────────────────────────────────
+
+def test_a_flag_the_command_does_not_own_is_a_usage_error():
+    """`mcptoon list --verbose` printed the human server list and exited 0.
+
+    The flag is real — it is `manifest`'s — so the pre-pass tolerated it and `list`
+    dropped it, which made a correctly spelled wrong flag *quieter* than the typo
+    `list --verbos` (exit 2). Commands with an explicit enumeration now reject what
+    they do not own (found 2026-11-12 auditing #41).
+    """
+    out, err, code = _run(["list", "--verbose"])
+    assert code == 2, f"a wrong flag must not exit 0, got {code}"
+    assert "'--verbose' is not an option of 'list'" in err
+    assert "'--verbose' is an option of: manifest" in err, "it should name the owner"
+    assert out == "", "nothing may reach stdout"
+
+
+def test_every_migrated_command_rejects_a_flag_it_does_not_own():
+    for command, flag in (("inspect", "--verbose"), ("search", "--langs"),
+                          ("manifest", "--langs")):
+        out, err, code = _run([command, flag])
+        assert code == 2, f"{command} {flag} must exit 2, got {code}"
+        assert f"is not an option of '{command}'" in err
+
+
+def test_the_owned_flags_still_work():
+    out, err, code = _run(["manifest", "--sort", "alpha"])
+    assert code == 0, err
+    assert "is not an option of" not in err
+
+
+def test_shared_output_flags_are_unaffected_by_the_ownership_check():
+    out, err, code = _run(["list", "--json"])
+    assert code == 0, err
+    assert json.loads(out) == []
+
+
+def test_commands_without_an_explicit_enumeration_keep_the_old_leniency():
+    """Ownership rolls out one command at a time — `usage` is not migrated yet."""
+    out, err, code = _run(["usage", "--timeout", "5"])
+    assert code == 0, err
+    assert "is not an option of" not in err
+
+
+def test_strict_flags_zero_downgrades_the_ownership_error():
+    with patch.dict(os.environ, {"MCPTOON_STRICT_FLAGS": "0"}):
+        out, err, code = _run(["list", "--verbose"])
+    assert code == 0
+    assert "ignored: MCPTOON_STRICT_FLAGS=0" in err

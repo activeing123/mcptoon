@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A flag a command does not own is now a usage error.** `mcptoon list --verbose`
+  printed the human server list and exited **0**: `--verbose` is a real flag, just
+  `manifest`'s, so the global pre-pass tolerated it and `list` silently dropped it —
+  a correctly spelled wrong flag was *quieter* than the typo `list --verbos`
+  (exit 2). `list`, `inspect`, `search` and `manifest` now declare the flags they own
+  explicitly and reject anything else with exit 2, naming the command that does own
+  the flag (`'--verbose' is an option of: manifest`). A command joins that registry
+  only once its flags are enumerated by hand — never inferred from a handler's
+  docstring, which would reject flags the code supports but the prose omits. Every
+  other command keeps the previous behaviour until its turn (issue #41).
+  `MCPTOON_STRICT_FLAGS=0` still downgrades this and the unknown-option error to a
+  warning.
+
 ### Fixed
 
 - **`--yaml` is no longer accepted.** It was registered as a pass-through for a
