@@ -468,6 +468,16 @@ def format_manifest(manifest: dict, full: bool = False) -> str:
     return "\n".join(lines)
 
 
+# Every name `export_manifest` implements. The CLI validates `--format` against
+# this set *before* calling: the function itself falls back to JSON for an unknown
+# name, which is a deliberate contract for library callers (pinned by
+# tests/test_v02_features.py::test_export_unknown_format) but is exactly wrong for a
+# typed command line — `mcptoon manifest --format mpc` (typo) printed a full JSON
+# dump and exited 0, and `list --format json` was accepted by a command that has no
+# export at all (issue #50, measured 2026-11-12).
+EXPORT_FORMATS = frozenset({"json", "mcp", "openai", "openapi", "human"})
+
+
 def export_manifest(manifest: dict, fmt: str) -> str:
     """Export manifest in various agent-specific formats.
 
