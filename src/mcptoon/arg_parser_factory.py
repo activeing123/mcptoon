@@ -23,7 +23,11 @@ class ArgParserFactory:
             ("slim", "store_true"),
             ("compact", "store_true"),
             ("mcptoon", "store_true"),
-            ("yaml", "store_true"),
+            # ("yaml", "store_true") was declared here for parity with the other
+            # output formats, but no renderer ever existed and nothing read the
+            # parsed attribute - a command that accepted `--yaml` printed human
+            # text and exited 0 (issues #49/#50, found 2026-11-12). Dropped from
+            # the baseline and from KNOWN_FLAGS until YAML output is implemented.
             ("format", "store"),
             ("head", "store"),
             ("max-chars", "store"),

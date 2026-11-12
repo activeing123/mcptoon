@@ -95,10 +95,17 @@ in no workflow and no bot watches it, so the release ritual had nothing to catch
 It is now self-healing — `activeing123/homebrew-mcptoon` runs `.github/workflows/auto-bump.yml`
 daily — but step 6 is what tells *you*, immediately, if that automation ever breaks.
 
+Windows note: the tap's `auto-bump.yml` is a **twice-daily cron** (measured runs
+06:49Z and 19:44Z, gaps up to ~13h), so the Homebrew grace window is **14h**, not 2h
+(raised 2026-11-12). At 2h the gate reported Homebrew as blocking for hours after
+every release while the formula was already correct — v0.8.37's tap commit landed
+3.3h after the release — and a false red trains people to ignore the job. A tap that
+is genuinely broken is still caught within 14h.
+
 Deliberate design limits, so the gate does not turn into noise:
 - **Blocking** = only channels that are supposed to move automatically
   (MCP Registry / numtide / Homebrew / gemini manifest / GitHub Release), each with a
-  grace window sized to its bot (2h tap, 24h registry, 72h numtide).
+  grace window sized to its bot (14h tap, 24h registry, 72h numtide).
 - **Advisory** = channels needing a human-built artifact. A gate that cries wolf daily
   gets ignored, and then the real signal dies with it.
 - **ClawHub's version is a different numbering system** (skill `1.0.8` vs CLI `0.8.5`).

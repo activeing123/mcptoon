@@ -5,6 +5,20 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`--yaml` is no longer accepted.** It was registered as a pass-through for a
+  per-command YAML renderer that was never written: `ArgParserFactory` declared the
+  flag, no code read the parsed attribute, and `output.render` has no yaml branch —
+  so `mcptoon list --yaml` printed human text and exited **0** while `list --json`
+  printed data, and `mcptoon --help` never mentioned the flag at all (found
+  2026-11-12 while auditing the option-ownership surface, #49). It is now an unknown
+  option — exit 2 — in either position, and the factory baseline no longer offers it.
+  YAML output will come back per command, with a renderer and tests, when that topic
+  is taken up.
+
 ## [0.8.38] - 2026-11-12
 
 ### Fixed

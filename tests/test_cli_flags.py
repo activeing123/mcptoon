@@ -31,7 +31,10 @@ CLI_SOURCE = Path(__file__).resolve().parents[1] / "src" / "mcptoon" / "cli.py"
 SRC_PKG = Path(__file__).resolve().parents[1] / "src" / "mcptoon"
 
 # Names that appear in cli.py only to be cited as examples of what does NOT exist.
-DOCUMENTED_AS_ABSENT = {"--tokens", "--jsn", "--tooon", "--nonsense"}
+# `--yaml` joined them 2026-11-12: it was registered as a pass-through for a YAML
+# renderer that never existed (issues #49/#50), so it is now an unknown flag and
+# survives only in the comment that explains why it is gone.
+DOCUMENTED_AS_ABSENT = {"--tokens", "--jsn", "--tooon", "--nonsense", "--yaml"}
 
 
 def package_flag_literals():
