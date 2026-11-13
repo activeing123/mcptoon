@@ -7085,8 +7085,19 @@ def _try_natural(command, rest, fmt, head_n, max_chars, full):
     so a typo'd command in a CI step reported success (reported 2026-10-18). A
     single bare word (no extra arguments) must be a real command; anything else
     falls through to the "unknown command" path with a did-you-mean hint.
+
+    Keywords are matched against the *first* token, not the whole line. Matching
+    the joined line meant any garbage first word followed by a keyword routed and
+    exited 0: `mcptoon whatever health` ran the health check, `mcptoon garbage
+    tools` ran manifest, `mcptoon asdf search` ran search (found 2026-11-13
+    closing #41). The first token is the whole input for the phrase this feature
+    exists for — `mcptoon 有什么工具` — because CJK does not space its words. A
+    non-ASCII first token still matches the whole line, so a CJK user who does
+    space them (`mcptoon 列出 服务器`) keeps working.
     """
-    text = " ".join([command] + rest).lower()
+    text = command.lower()
+    if any(ord(ch) > 127 for ch in command):
+        text = " ".join([command] + rest).lower()
 
     # A word that is *close to a real command* is a mistyped command, not a
     # phrase. `mcptoon listt` matched "list" inside the word and ran `manifest`,
