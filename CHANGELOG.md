@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command first, and `tests/test_typo_and_flag_validation.py` pins both the rejection
   and the hint, plus a guard that every alias points at a registered command.
 
+- **A keyword after a garbage word no longer routes.** The natural-language router
+  matched its keyword list against the whole line, so any unknown first token followed
+  by a keyword ran a command and exited **0**: `mcptoon whatever health` ran the health
+  check, `mcptoon garbage tools` ran manifest, `mcptoon asdf search` ran search. This is
+  the same defect class as `mcptoon lst list` (fixed in 0.8.38) one token further out —
+  the guard rejected a *near-command* first word, but said nothing about an arbitrary
+  one. Keywords are now matched against the **first token only**, which is the whole
+  input for the phrase this feature exists for (`mcptoon 有什么工具`) because CJK does not
+  space its words. A non-ASCII first token still matches the whole line, so a CJK user
+  who does space them (`mcptoon 列出 服务器`) keeps working. Found 2026-11-13 while
+  closing #41; all five garbage-prefix shapes now exit 1 with a did-you-mean hint, and
+  the eight CJK phrases that motivated the router still route.
+
 ### Changed
 
 - **Flag ownership now covers the remaining commands whose flags can be enumerated**

@@ -121,6 +121,42 @@ def test_typo_before_a_keyword_word_is_still_unknown():
     assert "No tools found" not in out, "it must not have run manifest"
 
 
+def test_a_keyword_after_a_garbage_word_does_not_route():
+    # The keyword match used to run over the whole line, so any unknown first word
+    # followed by a keyword routed and exited 0. `mcptoon whatever health` ran the
+    # health check and reported success — the same defect class as `lst list`, one
+    # token further out (found 2026-11-13 closing #41). Only the first token decides.
+    for argv, forbidden in (
+        (["whatever", "health"], "Health check"),
+        (["foo", "bar", "health"], "Health check"),
+        (["xyz", "check"], "Health check"),
+        (["garbage", "tools"], "No tools found"),
+        (["asdf", "search"], "routed"),
+    ):
+        out, err, code = _run(argv)
+        assert code == 1, f"{argv} must exit 1, got {code}"
+        assert f"unknown command '{argv[0]}'" in err
+        assert forbidden not in out, f"{argv} must not have routed ({forbidden!r})"
+
+
+def test_the_cjk_phrase_that_motivated_routing_still_works():
+    # The reason the router exists: a Chinese-speaking user typing the question in
+    # their own words. CJK does not space its words, so the first token carries the
+    # whole phrase and the first-token rule keeps it.
+    out, err, code = _run(["有什么工具"])
+    assert code == 0, f"a genuine phrase must still route, got exit {code}: {err}"
+    assert "unknown command" not in err
+
+
+def test_a_spaced_cjk_phrase_still_routes():
+    # A CJK user who *does* space their words gets the whole-line match, because
+    # the first token is non-ASCII. Without that exemption `列出 服务器` would be
+    # an error even though every word is part of the question.
+    out, err, code = _run(["列出", "服务器"])
+    assert code == 0, f"a spaced CJK phrase must still route, got exit {code}: {err}"
+    assert "unknown command" not in err
+
+
 # ── non-integer flags ────────────────────────────────────────────────────────
 
 def test_head_non_integer_errors():
