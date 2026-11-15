@@ -38,6 +38,10 @@
 </p>
 
 <p align="center">
+  <sub>第三方独立评分 <b>4.2 / 5.0</b> — <a href="https://glama.ai/mcp/servers/activeing123/mcptoon">Glama</a> TDQS（2026-11-15 实测）。</sub>
+</p>
+
+<p align="center">
   <b><a href="https://mcptoon.github.io/">🌐 官方网站</a></b> · 
   <b><a href="https://mcptoon.github.io/tools/token-tax/zh/">🧮 30秒 Token 浪费计算器</a></b> · 
   <b><a href="https://github.com/activeing123/mcptoon/blob/main/README.md">🇺🇸 English README</a></b> · 

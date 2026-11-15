@@ -38,6 +38,10 @@
 </p>
 
 <p align="center">
+  <sub>Independently scored <b>4.2 / 5.0</b> by <a href="https://glama.ai/mcp/servers/activeing123/mcptoon">Glama</a> (TDQS, measured 2026-11-15).</sub>
+</p>
+
+<p align="center">
   <b><a href="https://mcptoon.github.io/">🌐 Official Website</a></b> · 
   <b><a href="https://mcptoon.github.io/tools/token-tax/">🧮 30s Token Tax Calculator</a></b> · 
   <b><a href="https://github.com/activeing123/mcptoon/blob/main/README.zh-CN.md">🇨🇳 中文文档</a></b> · 
