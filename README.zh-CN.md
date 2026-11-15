@@ -536,6 +536,23 @@ nix run github:numtide/llm-agents.nix#mcptoon -- --help
 `pkgs.agent-plugins.github.activeing123.mcptoon.<plugin-name>` 与
 `pkgs.agent-skills.github.activeing123.mcptoon.<skill-name>`。
 
+### Windows 包管理器
+
+```powershell
+# Scoop —— 我们自己的 bucket，清单自动跟 GitHub release
+scoop bucket add mcptoon https://github.com/activeing123/scoop-mcptoon
+scoop install mcptoon
+
+# Chocolatey —— 社区仓库，需要审核
+choco install mcptoon
+```
+
+> Chocolatey 每个版本都要人工审核，所以那边显示的版本可能比最新 release 晚几天。
+> 审核通过后 `choco upgrade mcptoon` 就能升上去。包内自带 CPython，不需要系统装 Python。
+>
+> winget：已向 `microsoft/winget-pkgs` 提交 PR，**尚未合并**——今天 `winget install mcptoon`
+> 装不上，合并之前这份 README 不会写它可用。
+
 ---
 
 ## 跨 Agent 共享：在 Cursor、Claude Code、Windsurf 等 103+ 客户端统一管理 MCP

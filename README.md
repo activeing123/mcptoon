@@ -600,6 +600,25 @@ The plugin and the skill are both surfaced through
 `pkgs.agent-plugins.github.activeing123.mcptoon.<plugin-name>` and
 `pkgs.agent-skills.github.activeing123.mcptoon.<skill-name>`.
 
+### Windows package managers
+
+```powershell
+# Scoop - our own bucket; the manifest follows GitHub releases automatically
+scoop bucket add mcptoon https://github.com/activeing123/scoop-mcptoon
+scoop install mcptoon
+
+# Chocolatey - community repository, moderated
+choco install mcptoon
+```
+
+> Chocolatey reviews every version before it goes live, so the version there can trail
+> the latest release by a few days. `choco upgrade mcptoon` picks up a new version once
+> it has been approved. The package embeds its own CPython, so no Python is required.
+>
+> winget: submitted as a pull request to `microsoft/winget-pkgs`, not merged yet —
+> `winget install mcptoon` does not work today, and this README will not claim otherwise
+> until it does.
+
 ---
 
 ## Cross-Agent Support: Works with Cursor, Claude Code, Windsurf & 103+ Clients
