@@ -721,10 +721,15 @@ class MCPServerBridge:
             body = info.get("body", "")
         # v0.7.3: prompts were previously returned unscanned — a poisoned
         # SKILL.md could inject instructions straight into the agent context.
-        # Run the same heuristic the tool-result path uses.
-        poison = router_mod._check_poisoning(body)
-        if poison:
-            raise MCPError(-32003, f"prompt blocked: {poison}")
+        # Run the same heuristic the tool-result path uses, under the same
+        # switch: a host that turned the screen off (`config set guard off` /
+        # MCPTOON_NO_GUARD=1) does not expect the *other* path to keep blocking
+        # (issue #60 asked for exactly one switch that covers both).
+        if router_mod.guard_active():
+            poison = router_mod._check_poisoning(body)
+            if poison:
+                raise MCPError(-32003, f"prompt blocked: {poison}"
+                                       f"{router_mod._GUARD_HINT}")
         return {
             "description": info.get("description", ""),
             "messages": [
@@ -2410,6 +2415,10 @@ Environment:
   MCPTOON_ALLOWED_HOSTS   Extra hostnames accepted in Origin/Host checks
   MCPTOON_LIST_TTL_MS     CacheableResult ttlMs on list/read results (default: 300000)
   MCPTOON_LIST_CACHE_SCOPE  cacheScope on list/read results: public|private (default: public)
+  MCPTOON_NO_GUARD        1/true/yes turns the injection + credential screen off
+                          (same as `mcptoon config set guard off`; default: on)
+  MCPTOON_GUARD           on|off — explicit form of the same switch; wins over
+                          MCPTOON_NO_GUARD and over the stored setting
 
 Protocol (2026-07-28):
   - Stateless-first: no initialize handshake required; every request is

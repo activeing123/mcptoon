@@ -1378,8 +1378,13 @@ _FIX_SUGGESTIONS = {
     "CONNECTION_FAILED": "Try: mcptoon doctor    | check if npx/node is installed and in PATH",
     "TIMEOUT": "Try: mcptoon doctor    | the server may be slow to start (first npx download)",
     "DANGEROUS_OP": "Add --destructive flag to confirm: mcptoon call <server> <tool> '{...}' --destructive",
-    "CREDENTIAL_LEAK": "Result blocked for safety. If this is a false positive, use --raw to bypass",
-    "TOOL_POISONING": "Result blocked for safety. If this is a false positive, use --raw to bypass",
+    # Two exits, because one of them used to be unreachable: `--raw` only exists
+    # on this command, so a gateway/serve user had no way to turn the screen off
+    # at all (issue #60). The setting covers every path, this call included.
+    "CREDENTIAL_LEAK": "Result blocked for safety. False positive? use --raw for this call,"
+                       " or `mcptoon config set guard off` (MCPTOON_NO_GUARD=1) everywhere",
+    "TOOL_POISONING": "Result blocked for safety. False positive? use --raw for this call,"
+                      " or `mcptoon config set guard off` (MCPTOON_NO_GUARD=1) everywhere",
     "PARSE_ERROR": "Try: mcptoon inspect <server> <tool>    | check required parameters and types",
 }
 
@@ -5548,6 +5553,12 @@ def _cmd_config(rest, fmt, head_n=0, max_chars=0, full=False):
               " auto follows the OS language.")
         print("  compress smart|off|toon controls result compression;"
               " smart (default) shrinks redundant results.")
+        print("  guard on|off controls the injection/credential screen on tool"
+              " results and skill prompts;")
+        print("    on (default) blocks results containing prompt-injection or"
+              " credential patterns. off = never block,")
+        print("    for people whose technical prose trips the heuristic"
+              " (env: MCPTOON_NO_GUARD=1).")
         print("  select.engine lexical|command picks how `mcptoon select` ranks"
               " tools for a task;")
         print("    lexical (default) is built in and offline, command runs"
@@ -5603,6 +5614,10 @@ def _cmd_config(rest, fmt, head_n=0, max_chars=0, full=False):
         print(f"{key}: {value}   (saved)")
         if key == "footer" and value == "off":
             print("The gateway will stop adding the savings line on the next connection.")
+        if key == "guard" and value == "off":
+            print("The injection/credential screen is now off on every path — CLI, MCP"
+                  " serve, and skill prompts.")
+            print("Results come back verbatim. Set it back with: mcptoon config set guard on")
         if key == "lang":
             # Print what the setting resolves to *now*, not what was typed: with
             # `auto` those differ, and "auto" alone leaves the user guessing which

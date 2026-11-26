@@ -296,7 +296,7 @@ CLI_AHA_FILE = Path(os.environ.get(
 # order"; see `resolve_lang` for the order and for why an order — not a guess —
 # is what makes the answer stable.
 SETTING_DEFAULTS = {"footer": "on", "welcome": "on", "lang": "auto",
-                    "exposure": "compact", "compress": "smart",
+                    "exposure": "compact", "compress": "smart", "guard": "on",
                     "runners": "prefer-installed", "select.engine": "lexical",
                     "select.command": "", "presence": "on", "receipt": "on",
                     "activity_keep": "2000"}
@@ -384,6 +384,18 @@ EXPOSURE_MODES = ("compact", "full")
 #           1.8%-48.6% on call results, 11.8% on schemas — never quote a flat number).
 COMPRESS_MODES = ("smart", "off", "toon")
 
+# The injection/credential screen that runs on tool results and on skill prompts
+# (router._check_poisoning / _check_credential_leak).
+#
+# It is a heuristic, not a security boundary, and it has real false positives:
+# ordinary technical prose ("you are a ..."), release notes quoting a `curl`
+# repro, and any issue/report text that happens to contain an indicator all get
+# turned into `Error [TOOL_POISONING]` — the reader gets *nothing* rather than a
+# rewritten summary. Until 2026-11-26 the only escape hatch was `mcptoon call
+# --raw`, which the MCP/serve path could not reach at all, so a gateway user had
+# no way to turn it off (issue #60). This setting is that missing switch.
+GUARD_MODES = ("on", "off")
+
 # Settings that are a plain on/off switch.
 BOOL_MODES = ("on", "off")
 
@@ -423,6 +435,7 @@ PRESENCE_MODES = ("on", "brief", "off")
 # not in ("off", "0", "false", "no") as *on*. A typo therefore left the welcome
 # banner showing while the user believed they had turned it off.
 SETTING_CHOICES = {"exposure": EXPOSURE_MODES, "compress": COMPRESS_MODES,
+                   "guard": GUARD_MODES,
                    "footer": BOOL_MODES, "welcome": BOOL_MODES,
                    "runners": RUNNER_MODES, "select.engine": SELECT_ENGINES,
                    "presence": PRESENCE_MODES, "receipt": BOOL_MODES}
@@ -1097,6 +1110,33 @@ def auto_smart_enabled() -> bool:
     `mcptoon config set compress off` turns it off entirely.
     """
     return compression_mode() == "smart"
+
+
+def guard_enabled() -> bool:
+    """Whether the injection/credential screen may run at all. Default: on.
+
+    Resolution order, most explicit first:
+
+    1. ``MCPTOON_GUARD=on|off`` — one process, one answer, no file edit.
+    2. ``MCPTOON_NO_GUARD=1`` (also true/yes/on) — the shorthand an operator
+       reaches for; any other value means "no opinion", not "on".
+    3. the ``guard`` setting (``mcptoon config set guard off``) — machine-wide.
+    4. on.
+
+    Environment first because the people who hit false positives are usually
+    launching the gateway from a host config file: turning the screen off for one
+    embed must not require rewriting the settings of every other client on the
+    box. An unrecognized stored value falls back to *on* — for a screen whose
+    job is blocking injected instructions, a typo must not open the door.
+    """
+    env = (os.environ.get("MCPTOON_GUARD") or "").strip().lower()
+    if env in GUARD_MODES:
+        return env == "on"
+    if (os.environ.get("MCPTOON_NO_GUARD") or "").strip().lower() in (
+            "1", "true", "yes", "on"):
+        return False
+    value = get_setting("guard").strip().lower()
+    return value != "off"
 
 
 def welcome_enabled() -> bool:

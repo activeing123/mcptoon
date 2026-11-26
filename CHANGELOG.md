@@ -5,6 +5,26 @@ All notable changes to mcptoon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The injection/credential screen finally has an off switch, and it reaches the
+  MCP path.** `mcptoon config set guard off` — or `MCPTOON_NO_GUARD=1` /
+  `MCPTOON_GUARD=off` for a single process — turns `_check_poisoning` and
+  `_check_credential_leak` off everywhere: `mcptoon call`, the serve/gateway tool
+  result path, and the skill-prompt scan in `prompts/get`. Until now the only
+  escape hatch was `mcptoon call --raw`, a flag the MCP/serve path cannot pass at
+  all, so a gateway user had no way to disable a heuristic that does produce false
+  positives (ordinary technical prose like "you are a ...", release notes quoting a
+  `curl` repro, any issue text that happens to contain an indicator) — and a block
+  replaces the whole result, so the data is simply gone. Reported as #60. The
+  switch fails closed: a missing or unrecognized value keeps the screen **on**, and
+  both `TOOL_POISONING` and `CREDENTIAL_LEAK` now name the way out instead of a flag
+  the current path never sees. `tests/test_guard_switch.py` pins the setting, both
+  env vars and their precedence, the rejected typo, the serve prompt path, and that
+  the default is still on.
+
 ## [0.8.40] - 2026-11-13
 
 ### Fixed

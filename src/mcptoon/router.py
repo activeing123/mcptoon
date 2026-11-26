@@ -465,6 +465,26 @@ def _get_pool() -> MCPClientPool:
 
 # ─── Main router ───
 
+# Appended to every screen verdict so the reader of a blocked result knows the
+# way out. The earlier hint named `--raw`, which the MCP/serve path cannot pass
+# at all (issue #60: "the escape hatch names a flag this path never sees").
+_GUARD_HINT = (" — false positive? turn the screen off with "
+               "`mcptoon config set guard off` (or MCPTOON_NO_GUARD=1)")
+
+
+def guard_active() -> bool:
+    """Whether the injection/credential screen runs for this process.
+
+    Reads config.guard_enabled() (setting + env). Fails *closed*: if the setting
+    cannot be read, the screen stays on, because the failure mode that matters
+    here is a screen that silently stopped watching.
+    """
+    try:
+        from .config import guard_enabled
+        return bool(guard_enabled())
+    except Exception:
+        return True
+
 def call_tool(
     server: str,
     tool: str,
@@ -524,19 +544,21 @@ def call_tool(
             result = handler(tool, args)
             if result is not None:
                 # Check for poisoning and credential leaks
-                if not skip_poisoning_check:
+                if not skip_poisoning_check and guard_active():
                     poison = _check_poisoning(result)
                     if poison:
                         return make_error(
                             "TOOL_POISONING",
-                            f"Tool result may contain prompt injection: {poison}",
+                            f"Tool result may contain prompt injection: {poison}"
+                            f"{_GUARD_HINT}",
                             "router", retry=False, server=server, tool=tool,
                         )
                     leak = _check_credential_leak(result)
                     if leak:
                         return make_error(
                             "CREDENTIAL_LEAK",
-                            f"Tool result may contain exposed credentials: {leak}",
+                            f"Tool result may contain exposed credentials: {leak}"
+                            f"{_GUARD_HINT}",
                             "router", retry=False, server=server, tool=tool,
                         )
                 usage.track_call(server, tool, ok=not is_error(result), payload=result,
@@ -585,19 +607,21 @@ def call_tool(
                                request_state=request_state)
 
         # Check for poisoning and credential leaks in result
-        if not skip_poisoning_check:
+        if not skip_poisoning_check and guard_active():
             poison = _check_poisoning(result)
             if poison:
                 return make_error(
                     "TOOL_POISONING",
-                    f"Tool result may contain prompt injection: {poison}",
+                    f"Tool result may contain prompt injection: {poison}"
+                    f"{_GUARD_HINT}",
                     "router", retry=False, server=server, tool=tool,
                 )
             leak = _check_credential_leak(result)
             if leak:
                 return make_error(
                     "CREDENTIAL_LEAK",
-                    f"Tool result may contain exposed credentials: {leak}",
+                    f"Tool result may contain exposed credentials: {leak}"
+                    f"{_GUARD_HINT}",
                     "router", retry=False, server=server, tool=tool,
                 )
 
