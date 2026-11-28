@@ -6,7 +6,7 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-<h3 align="center">所有 Agent 的 MCP 工具与技能，一处搞定。</h3>
+<h3 align="center">所有 Agent 共用一套 skills 和 MCP!并且自带压缩:MCP 工具 schema 46,808→3,303 token、技能目录 1,835,987→39 token。</h3>
 
 <p align="center">
   <b>在本地安装 1,000 个技能和 1,000 个 MCP 工具 — 彻底告别上下文爆仓。</b><br>

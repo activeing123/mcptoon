@@ -6,7 +6,7 @@
   <img src="https://raw.githubusercontent.com/activeing123/mcptoon/main/docs/assets/lockup-h-split-light.svg" alt="mcptoon" height="88">
 </picture>
 
-<h3 align="center">One Place for All Your Agents' MCP Tools and Skills.</h3>
+<h3 align="center">All agents share one set of skills and MCP! And built-in compression: MCP tool schemas 46,808→3,303 tokens, skill catalog 1,835,987→39 tokens.</h3>
 
 <p align="center">
   <b>Install 1,000 skills and 1,000 MCP tools locally — and never worry about context flooding.</b><br>
