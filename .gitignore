@@ -101,12 +101,25 @@ docs/product-hunt-launch.md
 docs/devto-zero-deps.md
 docs/global-community-strategy.md
 docs/reddit-strategy.md
+# 2026-11-28: promo drafts, competitive intel and local evidence dumps stay local
+docs/.publish-only.md
+docs/.publish-only.review/
+docs/competitors-2026-10.md
+docs/evidence.jsonl
+docs/hn-old-thread-update.html
+docs/reddit-ready.html
+docs/show-hn-20261019.md
+docs/show-hn-ready.html
 
 # Exception: ROADMAP.md is tracked (product roadmap)
 !ROADMAP.md
 
 # Private layer (local handlers, not for public release)
 local/
+
+# 2026-11-28: local tool state / runtime caches — never commit these
+.serena/
+list/
 
 # Preview artifacts
 readme_preview.html
